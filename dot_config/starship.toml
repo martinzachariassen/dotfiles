@@ -1,0 +1,79 @@
+# =====================================================================
+#
+# Starship prompt (fast, minimal, high-signal)
+# - Performance first: short scan timeout, no heavy modules enabled.
+# - Single-line prompt for compactness.
+# =====================================================================
+
+add_newline = false
+
+# How long starship will search your filesystem for context (e.g., git repo).
+# Keep low for performance in huge directories / network mounts.
+scan_timeout = 30
+
+# Max time starship allows any command/module to run.
+command_timeout = 200
+
+# Prompt order. Keep "expensive" modules out unless needed.
+format = "$directory$git_branch$git_commit$git_status$nodejs$java$cmd_duration$status$character"
+
+# -------------------------
+# Directory
+# -------------------------
+[directory]
+# Show at most N path segments.
+truncation_length = 3
+
+# If in a repo, show path relative to repo root (better signal).
+truncate_to_repo = true
+
+# -------------------------
+# Git
+# -------------------------
+[git_branch]
+format = " [$branch]($style)"
+style = "bold"
+
+[git_commit]
+# Show short hash (useful when detached or checking builds).
+format = " [@$hash]($style)"
+style = "dimmed"
+commit_hash_length = 7
+
+[git_status]
+# Show staged/unstaged/untracked + ahead/behind.
+# $ahead_behind is cheap and high value.
+format = " [$all_status$ahead_behind]($style)"
+style = "bold"
+
+# -------------------------
+# Tool versions (shown only when relevant)
+# -------------------------
+[nodejs]
+format = " [node $version]($style)"
+style = "dimmed"
+
+[java]
+format = " [java $version]($style)"
+style = "dimmed"
+
+# -------------------------
+# Execution feedback
+# -------------------------
+[cmd_duration]
+# Only show if command took at least this long (ms).
+min_time = 800
+format = " [$duration]($style)"
+style = "dimmed"
+
+[status]
+# Show non-zero exit codes.
+disabled = false
+format = " [$status]($style)"
+map_symbol = true
+
+[character]
+# Keep minimal, but distinguish success vs error.
+success_symbol = "❯ "
+error_symbol = "✗ ❯ "
+

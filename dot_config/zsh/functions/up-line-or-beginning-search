@@ -1,0 +1,6 @@
+# If there is text, search history for lines beginning with it; otherwise normal up
+if [[ -n $BUFFER ]]; then
+  zle history-beginning-search-backward
+else
+  zle up-line-or-history
+fi

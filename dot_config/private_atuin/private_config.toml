@@ -1,0 +1,21 @@
+# Local-only, low-noise, fast.
+
+# Keep everything local (no background sync).
+auto_sync = false
+
+# No update pings / network checks.
+update_check = false
+
+# UI: compact is fastest to scan.
+style = "compact"
+
+# Search: prefer commands used in the current directory/repo.
+# If you prefer "just this terminal session", use "session" instead.
+filter_mode = "directory"
+
+# Fuzzy search is the best default for Ctrl-R.
+search_mode = "fuzzy"
+
+# Enter runs the selected command immediately.
+enter_accept = true
+

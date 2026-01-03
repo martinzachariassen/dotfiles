@@ -1,0 +1,75 @@
+# -------------------------
+# OS / filesystem noise
+# -------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# -------------------------
+# Editors / IDEs
+# -------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.Session.vim
+.nvim/
+.nvimrc
+.lvimrc
+
+# -------------------------
+# Logs / temp
+# -------------------------
+*.log
+*.tmp
+*.bak
+
+# -------------------------
+# Chezmoi runtime / caches (shouldn't be in repo)
+# -------------------------
+.chezmoi*
+*.age
+*.gpg
+
+# -------------------------
+# Security: never commit secrets/credentials
+# -------------------------
+**/*token*
+**/*secret*
+**/*apikey*
+**/*api_key*
+**/*password*
+**/*credentials*
+**/*key.pem
+**/*id_rsa*
+**/*id_ed25519*
+**/*config.json
+
+# Specific known sensitive configs (if they ever get added by mistake)
+dot_config/1Password/
+dot_config/github-copilot/
+dot_config/docker/config.json
+dot_config/atuin/history.db
+dot_config/atuin/*.db
+dot_config/npm/_cacache/
+dot_config/npm/_logs/
+
+# -------------------------
+# Shell history / sessions (state)
+# -------------------------
+dot_config/zsh/.zsh_history
+dot_config/zsh/.zsh_sessions/
+dot_config/zsh/.zcompdump*
+dot_config/zsh/*.zwc
+dot_config/zsh/**/*.zwc
+
+# -------------------------
+# Git internal files (shouldn't be tracked)
+# -------------------------
+.git/
+

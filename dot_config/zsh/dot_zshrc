@@ -1,0 +1,17 @@
+[[ -o interactive ]] || return 0
+
+# XDG locations
+export ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+export ZSH_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/zsh"
+mkdir -p "$ZSH_CACHE_DIR" "$ZSH_STATE_DIR" 2>/dev/null
+
+# Completion dump location (avoid ~/.zcompdump*)
+export ZSH_COMPDUMP="$ZSH_CACHE_DIR/zcompdump"
+
+# Load functions
+fpath=("$ZDOTDIR/functions" $fpath)
+
+# Load config modules in order
+for f in "$ZDOTDIR"/conf.d/*.zsh; do
+  [[ -r "$f" ]] && source "$f"
+done

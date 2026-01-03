@@ -1,0 +1,84 @@
+# =====================================================================
+# Ghostty config (macOS + Zsh)
+# Comments must be on their own lines (no inline comments).
+# =====================================================================
+
+# Optional machine-local overrides (missing file is ignored due to '?').
+config-file = ?config.local
+
+# Theme
+theme = TokyoNight Moon
+
+# Transparency + blur
+background-opacity = 0.92
+background-blur = true
+
+# Window padding
+window-padding-x = 10
+window-padding-y = 10
+window-padding-balance = true
+
+# macOS window chrome
+macos-titlebar-style = hidden
+
+# Scrollback (bytes). 50_000_000 ~= 50MB per terminal surface.
+scrollback-limit = 50000000
+
+# Safety
+clipboard-paste-protection = true
+
+# Alt/Option behavior
+macos-option-as-alt = left
+
+# Inherit cwd for new tabs/splits (requires shell integration)
+window-inherit-working-directory = true
+
+# Shell integration
+shell-integration = detect
+shell-integration-features = cursor,sudo,title
+
+# Quick terminal
+quick-terminal-position = bottom
+# Requires Ghostty >= 1.2.0
+quick-terminal-size = 35%
+
+# Font
+font-family = "JetBrains Mono NL"
+font-size = 12
+font-thicken = true
+# 0-255 on macOS
+font-thicken-strength = 40
+
+# =====================================================================
+# Keybindings
+# Leader: cmd+s then a key
+# =====================================================================
+
+keybind = cmd+s>r=reload_config
+keybind = cmd+s>c=open_config
+
+# Splits + navigation
+keybind = cmd+s>v=new_split:right
+keybind = cmd+s>b=new_split:down
+keybind = cmd+s>h=goto_split:left
+keybind = cmd+s>j=goto_split:down
+keybind = cmd+s>k=goto_split:up
+keybind = cmd+s>l=goto_split:right
+keybind = cmd+s>z=toggle_split_zoom
+
+# Tabs
+keybind = cmd+s>t=new_tab
+keybind = cmd+s>n=next_tab
+keybind = cmd+s>m=previous_tab
+
+# Quick terminal toggle (if "space" key name gives issues, change to cmd+s>q)
+keybind = cmd+s>space=toggle_quick_terminal
+
+# Prompt jump (needs shell integration working)
+keybind = cmd+s>u=jump_to_prompt:-1
+keybind = cmd+s>d=jump_to_prompt:1
+
+# Copy on Ctrl+C only when selection exists (requires newer Ghostty).
+# If this errors on your version, delete this line.
+keybind = performable:ctrl+c=copy_to_clipboard
+

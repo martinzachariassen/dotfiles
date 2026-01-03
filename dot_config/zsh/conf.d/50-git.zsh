@@ -1,0 +1,13 @@
+# Faster/more readable git output
+export GIT_PAGER='delta'
+export LESS='-FRX'
+alias g='git'
+alias gs='git status'
+alias ga='git add'
+alias gc='git commit'
+alias gca='git commit --amend'
+alias gp='git push'
+alias gl='git log --oneline --decorate --graph --all'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias lg='lazygit'

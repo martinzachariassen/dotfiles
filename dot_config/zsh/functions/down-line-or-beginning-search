@@ -1,0 +1,5 @@
+if [[ -n $BUFFER ]]; then
+  zle history-beginning-search-forward
+else
+  zle down-line-or-history
+fi
