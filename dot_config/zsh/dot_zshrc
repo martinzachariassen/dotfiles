@@ -15,3 +15,4 @@ fpath=("$ZDOTDIR/functions" $fpath)
 for f in "$ZDOTDIR"/conf.d/*.zsh; do
   [[ -r "$f" ]] && source "$f"
 done
+

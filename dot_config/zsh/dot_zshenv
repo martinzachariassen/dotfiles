@@ -1,11 +1,26 @@
+[[ -o interactive ]] || return 0
+
+# XDG base dirs
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 
+# Ensure commonly used state/cache dirs exist
+mkdir -p "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" 2>/dev/null
+mkdir -p "$XDG_STATE_HOME/zsh" "$XDG_STATE_HOME/zsh/sessions" 2>/dev/null
+
+# Homebrew (Apple Silicon)
+case ":$PATH:" in
+  *":/opt/homebrew/bin:"*) ;;
+  *) export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH" ;;
+esac
+
+# Zsh history + session state
 export HISTFILE="$XDG_STATE_HOME/zsh/history"
 export ZSH_SESSION_DIR="$XDG_STATE_HOME/zsh/sessions"
 
+# Tool configs
 export DOCKER_CONFIG="$XDG_CONFIG_HOME/docker"
 export NPM_CONFIG_USERCONFIG="$XDG_CONFIG_HOME/npm/npmrc"
 export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"
