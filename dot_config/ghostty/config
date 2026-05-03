@@ -1,0 +1,58 @@
+# Ghostty config — managed by chezmoi
+# Edit via: chezmoi edit ~/.config/ghostty/config
+# Reference: https://ghostty.org/docs/config/reference
+#
+# IMPORTANT: Ghostty does NOT support inline comments. Every comment must be
+# on its own line — putting `# foo` after a value will be parsed as part of
+# the value and produce a "Configuration Error" on launch.
+
+# ─── Theme ────────────────────────────────────────────────────────────────────
+# Custom theme file at ~/.config/ghostty/themes/catppuccin-frappe (also managed
+# by chezmoi). Using a local theme rather than relying on a built-in name gives
+# us deterministic colors regardless of Ghostty version.
+theme = catppuccin-frappe
+
+# ─── Font ─────────────────────────────────────────────────────────────────────
+font-family = JetBrainsMono Nerd Font
+font-size = 13
+# JetBrainsMono ligatures
+font-feature = calt
+font-feature = liga
+
+# ─── Window ───────────────────────────────────────────────────────────────────
+window-padding-x = 12
+window-padding-y = 12
+window-padding-balance = true
+window-save-state = always
+background-blur-radius = 20
+background-opacity = 0.97
+
+# ─── macOS-specific ───────────────────────────────────────────────────────────
+macos-titlebar-style = transparent
+# Treat the Option key as Alt so Alt-key shortcuts (word-jumping in zsh, etc)
+# behave like in a normal terminal.
+macos-option-as-alt = true
+macos-non-native-fullscreen = true
+
+# ─── Cursor ───────────────────────────────────────────────────────────────────
+cursor-style = bar
+cursor-style-blink = true
+
+# ─── Shell integration ────────────────────────────────────────────────────────
+# Ghostty injects its zsh integration automatically; nothing extra in .zshrc
+# beyond what we already have. Enables proper title-setting, jump-between-prompts, etc.
+shell-integration = zsh
+shell-integration-features = cursor,sudo,title
+
+# ─── Scrollback ───────────────────────────────────────────────────────────────
+scrollback-limit = 100000
+
+# ─── Keybindings ──────────────────────────────────────────────────────────────
+# Cmd+K clears screen + scrollback (matches iTerm muscle memory)
+keybind = cmd+k=clear_screen
+# Cmd+Enter toggles fullscreen
+keybind = cmd+enter=toggle_fullscreen
+# Cmd+Shift+. toggles the inspector (useful for debugging colors/keys)
+keybind = cmd+shift+period=inspector:toggle
+
+# Cmd+T / Cmd+W / Cmd+1..9 / Cmd+Shift+[ / Cmd+Shift+] for tabs are all defaults.

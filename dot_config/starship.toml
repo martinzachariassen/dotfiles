@@ -1,0 +1,147 @@
+# Starship prompt — managed by chezmoi
+# Reference: https://starship.rs/config/
+# Edit via: chezmoi edit ~/.config/starship.toml
+
+palette = "catppuccin_frappe"
+
+# Two-line prompt: context info on line 1, prompt char on line 2.
+# Only show modules relevant to backend dev (Java/Node/Python/Go) and cloud
+# context (kubernetes/aws). Modules disable themselves when irrelevant.
+format = """
+$directory\
+$git_branch$git_status\
+$java$nodejs$python$golang\
+$kubernetes$aws\
+$cmd_duration\
+$line_break\
+$character"""
+
+add_newline = true
+command_timeout = 1000
+
+# ── Prompt character ──────────────────────────────────────────────────────────
+[character]
+success_symbol = "[❯](bold mauve)"
+error_symbol   = "[❯](bold red)"
+vimcmd_symbol  = "[❮](bold green)"
+
+# ── Directory ─────────────────────────────────────────────────────────────────
+[directory]
+style              = "bold blue"
+truncation_length  = 3
+truncation_symbol  = "…/"
+read_only          = " 󰌾"
+read_only_style    = "red"
+home_symbol        = "~"
+format             = "[$path]($style)[$read_only]($read_only_style) "
+
+# ── Git ───────────────────────────────────────────────────────────────────────
+[git_branch]
+symbol            = " "
+style             = "lavender"
+truncation_length = 32
+format            = "on [$symbol$branch]($style) "
+
+[git_status]
+style       = "peach"
+ahead       = "⇡${count} "
+behind      = "⇣${count} "
+diverged    = "⇕⇡${ahead_count}⇣${behind_count} "
+modified    = " ${count} "
+untracked   = "?${count} "
+stashed     = "≡ "
+staged      = "+${count} "
+conflicted  = "✗ "
+format      = "[$all_status$ahead_behind]($style)"
+
+# ── Languages ─────────────────────────────────────────────────────────────────
+[java]
+symbol = " "
+style  = "red"
+format = "via [$symbol($version )]($style)"
+
+[nodejs]
+symbol = " "
+style  = "green"
+format = "via [$symbol($version )]($style)"
+
+[python]
+symbol  = " "
+style   = "yellow"
+format  = 'via [${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
+
+[golang]
+symbol = " "
+style  = "sky"
+format = "via [$symbol($version )]($style)"
+
+# ── Cloud / cluster context ───────────────────────────────────────────────────
+[kubernetes]
+symbol     = "⎈ "
+style      = "teal"
+disabled   = false
+format     = '[$symbol$context( ($namespace))]($style) '
+# Don't blast the prompt with the cluster name in every dir — only show when
+# you're actually working in a project that touches k8s.
+detect_files     = ["k8s.yaml", "k8s.yml", "kustomization.yaml", "Chart.yaml", "skaffold.yaml"]
+detect_folders   = ["k8s", "kubernetes", "manifests", "charts"]
+
+[aws]
+symbol = " "
+style  = "yellow"
+format = '[$symbol($profile )(\($region\) )(\[$duration\])]($style)'
+# Same logic — only when in a project with AWS-related files.
+[aws.region_aliases]
+eu-north-1     = "eu-n"
+eu-west-1      = "eu-w"
+us-east-1      = "us-e"
+us-west-2      = "us-w2"
+
+# ── Command duration ──────────────────────────────────────────────────────────
+[cmd_duration]
+min_time         = 2_000
+format           = "took [$duration](peach) "
+show_milliseconds = false
+
+# ── Modules turned off ────────────────────────────────────────────────────────
+# Cleaner prompt — re-enable any of these by deleting the `disabled = true` line.
+[battery]
+disabled = true
+
+[time]
+disabled = true
+
+[hostname]
+disabled = true
+
+[username]
+disabled = true
+
+# ── Catppuccin Frappé palette ─────────────────────────────────────────────────
+[palettes.catppuccin_frappe]
+rosewater = "#f2d5cf"
+flamingo  = "#eebebe"
+pink      = "#f4b8e4"
+mauve     = "#ca9ee6"
+red       = "#e78284"
+maroon    = "#ea999c"
+peach     = "#ef9f76"
+yellow    = "#e5c890"
+green     = "#a6d189"
+teal      = "#81c8be"
+sky       = "#99d1db"
+sapphire  = "#85c1dc"
+blue      = "#8caaee"
+lavender  = "#babbf1"
+text      = "#c6d0f5"
+subtext1  = "#b5bfe2"
+subtext0  = "#a5adce"
+overlay2  = "#949cbb"
+overlay1  = "#838ba7"
+overlay0  = "#737994"
+surface2  = "#626880"
+surface1  = "#51576d"
+surface0  = "#414559"
+base      = "#303446"
+mantle    = "#292c3c"
+crust     = "#232634"

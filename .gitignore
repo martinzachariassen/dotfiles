@@ -1,0 +1,59 @@
+# ─── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+
+# ─── Editors / IDEs ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.netrwhist
+.nvimlog
+Session.vim
+
+# ─── Build / temp ─────────────────────────────────────────────────────────────
+*.bak
+*.orig
+*.tmp
+*.log
+.cache/
+
+# ─── chezmoi internal state (should never appear here, but belt-and-suspenders) ─
+.chezmoistate*
+chezmoistate.boltdb
+
+# ─── Secrets — fail-safe even though we don't intentionally put them here ────
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+
+# Anything literally named "secret" or "private"
+*-private*
+*-secret*
+secrets.*
+.env
+.env.*
+!.env.example
+!.env.sample
+.envrc.local
+
+# Cloud auth state
+.aws/credentials
+gcloud-credentials.json
+*-service-account*.json

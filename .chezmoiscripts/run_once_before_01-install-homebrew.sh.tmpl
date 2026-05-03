@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Installs Homebrew if missing. Runs ONCE (before the first apply).
+#
+# Guarded to macOS only — chezmoi runs scripts on every platform unless we tell
+# it not to. Linuxbrew works but lives at a different path and isn't in scope here.
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[brew] not on macOS, skipping"
+exit 0
+{{ end -}}
+
+if command -v brew >/dev/null 2>&1; then
+    echo "[brew] already installed"
+    exit 0
+fi
+
+echo "[brew] installing Homebrew…"
+NONINTERACTIVE=1 /bin/bash -c \
+    "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Apple Silicon path
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi

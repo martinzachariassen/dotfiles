@@ -1,0 +1,15 @@
+# mise — runtime version manager
+# Per-project versions go in repo-local .mise.toml or .tool-versions
+
+[tools]
+java   = "temurin-21"
+maven  = "latest"
+gradle = "latest"
+node   = "latest"           # bundles npm; install pnpm/yarn separately if you need them
+pnpm   = "latest"
+python = "latest"
+
+[settings]
+experimental = true
+# Idiomatic: warn on missing tools rather than failing the shell
+not_found_auto_install = false

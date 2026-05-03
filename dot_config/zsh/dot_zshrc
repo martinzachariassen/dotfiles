@@ -1,0 +1,144 @@
+# ~/.config/zsh/.zshrc — interactive shell configuration
+# Found via ZDOTDIR (set in ~/.zshenv). Edit via `chezmoi edit ~/.config/zsh/.zshrc`.
+
+# ─── Shell options ────────────────────────────────────────────────────────────
+setopt INTERACTIVE_COMMENTS    # allow # comments in interactive shells (bash-style)
+setopt AUTO_CD                  # `dirname` alone = `cd dirname`
+setopt AUTO_PUSHD               # `cd` pushes onto the dir stack
+setopt PUSHD_IGNORE_DUPS        # no duplicates in dir stack
+setopt CORRECT                  # offer command corrections on typos
+
+# ─── Tooling ──────────────────────────────────────────────────────────────────
+# mise: manages Java, Maven, Gradle, Node, Python (config in ~/.config/mise/)
+eval "$(mise activate zsh)"
+
+# direnv: per-directory env vars. Drop a `.envrc` into any project and it loads
+# automatically when you `cd` in (after one-time `direnv allow`).
+command -v direnv >/dev/null && eval "$(direnv hook zsh)"
+
+# ─── History ──────────────────────────────────────────────────────────────────
+# IMPORTANT: macOS's /etc/zshrc runs AFTER ~/.zshenv but BEFORE this file and
+# does:  HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
+# That clobbers what we set in ~/.zshenv. So we re-set it here (interactively),
+# which wins because this is the last shell rc to run.
+export HISTFILE="$XDG_STATE_HOME/zsh/history"
+[ -d "${HISTFILE%/*}" ] || mkdir -p "${HISTFILE%/*}"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt EXTENDED_HISTORY        # save timestamp + duration
+setopt HIST_EXPIRE_DUPS_FIRST  # drop dupes first when trimming
+setopt HIST_IGNORE_DUPS        # don't store consecutive dupes
+setopt HIST_IGNORE_SPACE       # don't store lines starting with space (private)
+setopt HIST_VERIFY             # show !! expansions before running
+setopt SHARE_HISTORY           # share across sessions
+
+# ─── Completion ───────────────────────────────────────────────────────────────
+# Move zcompdump out of $HOME too
+ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump"
+[ -d "${ZSH_COMPDUMP%/*}" ] || mkdir -p "${ZSH_COMPDUMP%/*}"
+
+# zsh-completions (brew) — must be on fpath BEFORE compinit
+if [ -d /opt/homebrew/share/zsh-completions ]; then
+    fpath=(/opt/homebrew/share/zsh-completions $fpath)
+fi
+
+autoload -Uz compinit
+# Always skip the per-shell security check (`-C`). It's the right tradeoff:
+#   - Permissions on /opt/homebrew/share are tightened at install time and after
+#     every `brew bundle` (.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl
+#     runs `chmod -R go-w /opt/homebrew/share`), so the check has nothing to find.
+#   - Without `-C`, zsh prompts on every new shell whenever it does find anything,
+#     which is hostile UX for a known-good system.
+# If you ever want to audit, run `compaudit` manually.
+compinit -C -d "$ZSH_COMPDUMP"
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'  # case-insensitive
+
+# ─── fzf — fuzzy finder shell integration (Ctrl-R, Ctrl-T, **<Tab>) ───────────
+# fzf 0.48+ ships its own zsh integration; older versions used `$(brew --prefix)/opt/fzf/install`.
+command -v fzf >/dev/null && eval "$(fzf --zsh)" 2>/dev/null
+
+# ─── Starship prompt ──────────────────────────────────────────────────────────
+# Replaces zsh's default prompt. Config at ~/.config/starship.toml.
+command -v starship >/dev/null && eval "$(starship init zsh)"
+
+# ─── Claude Code: work vs personal profile ────────────────────────────────────
+# Routes to the right CLAUDE_CONFIG_DIR based on PWD:
+#   - under ~/Dev/Work/  → work profile  (uses ~/.claude, storecode-managed, hardcoded)
+#   - everywhere else    → personal profile (uses ~/.config/claude/personal, XDG)
+# Override:  CLAUDE_PROFILE=work claude ...   or use the cw / cme aliases.
+CLAUDE_PERSONAL_DIR="$XDG_CONFIG_HOME/claude/personal"
+CLAUDE_WORK_DIR="$HOME/.claude"
+claude() {
+    local config_dir
+    case "${CLAUDE_PROFILE:-auto}" in
+        work)     config_dir="$CLAUDE_WORK_DIR" ;;
+        personal) config_dir="$CLAUDE_PERSONAL_DIR" ;;
+        auto|*)
+            case "$PWD/" in
+                "$HOME/Dev/Work/"*) config_dir="$CLAUDE_WORK_DIR" ;;
+                *)                  config_dir="$CLAUDE_PERSONAL_DIR" ;;
+            esac
+            ;;
+    esac
+    CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+}
+alias cw='CLAUDE_PROFILE=work claude'
+alias cme='CLAUDE_PROFILE=personal claude'
+
+# ─── Modern CLI replacements (installed via Brewfile) ─────────────────────────
+# Only alias if the tool is present, so the shell still works on a fresh box.
+command -v eza >/dev/null && {
+    alias ls='eza --group-directories-first'
+    alias ll='eza -lah --group-directories-first --git --time-style=long-iso'
+    alias tree='eza --tree --level=3 --group-directories-first'
+}
+# Intentional: aliasing `cat` to bat. Use `command cat` (or `\cat`) if you need
+# the bare GNU/BSD cat behavior — e.g. when piping into something that doesn't
+# expect ANSI color codes or when behavior parity with scripts matters.
+command -v bat >/dev/null && alias cat='bat --paging=never --style=plain'
+command -v fd  >/dev/null && alias find='fd'
+
+# ─── Quality-of-life ──────────────────────────────────────────────────────────
+alias g='git'
+alias gs='git status -sb'
+alias gd='git diff'
+alias gl='git log --oneline --graph --decorate -20'
+alias ..='cd ..'
+alias ...='cd ../..'
+# Note: `mkdir` is NOT aliased to `mkdir -p`. The error from `mkdir foo` when
+# foo exists is occasionally useful as a guard in scripts you paste interactively.
+# Type `mkdir -p` explicitly when you want it.
+
+# ─── Dotfiles meta-commands ───────────────────────────────────────────────────
+# Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
+# Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
+# fresh Mac or after wiping a system pref pane back to defaults.
+alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/macos-defaults.sh"'
+
+# Quick `cd` into the dotfiles repo
+alias dotfiles='cd "$HOME/Dev/Personal/dotfiles"'
+
+# ─── Zellij (terminal multiplexer) ────────────────────────────────────────────
+# Manual launch. Use `zj` for a default session you can detach/reattach to.
+# Run `zellij` directly to spawn a one-off session.
+alias zj='zellij attach -c default'
+
+# Auto-attach to a default zellij session on every interactive Ghostty shell.
+# Commented out by default — uncomment if you want every new terminal tab to
+# drop straight into zellij. The guards prevent double-nesting (zellij inside
+# zellij) and from launching inside VS Code's integrated terminal.
+#
+# if [[ -z "$ZELLIJ" && -z "$VSCODE_INJECTION" && -t 1 ]] \
+#         && command -v zellij >/dev/null; then
+#     zellij attach -c default
+# fi
+
+# ─── Local overrides (not versioned) ──────────────────────────────────────────
+[ -f "$ZDOTDIR/.zshrc.local" ] && source "$ZDOTDIR/.zshrc.local"
+
+# ─── zsh-syntax-highlighting (brew) — must be sourced LAST ────────────────────
+# Required to be the final addition per upstream docs.
+if [ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]; then
+    source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi

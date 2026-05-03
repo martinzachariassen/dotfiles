@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Lint plain shell scripts
+        # .chezmoiscripts/*.tmpl contain Go template syntax that shellcheck can't
+        # parse — those get validated by the chezmoi job instead.
+        run: shellcheck install.sh macos-defaults.sh
+
+  chezmoi:
+    name: chezmoi templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install chezmoi
+        run: |
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: chezmoi init (renders .chezmoi.toml.tmpl, fills prompts non-interactively)
+        run: |
+          chezmoi init --source="$PWD" \
+            --promptString name=CI \
+            --promptString email=ci@example.com \
+            --promptString signingKey="ssh-ed25519 AAAAci-placeholder"
+      - name: chezmoi apply --dry-run (renders every other template)
+        # On Linux, the macOS-only run_onchange_after_* scripts hit their guards
+        # and exit 0 cleanly. Any template parse error or missing variable fails here.
+        run: chezmoi apply --dry-run --verbose

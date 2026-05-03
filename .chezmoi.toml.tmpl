@@ -1,0 +1,22 @@
+{{/* chezmoi init prompts — run on `chezmoi init`.
+     Defaults are intentionally empty for forks; override by answering at the prompt
+     or by setting values in ~/.config/chezmoi/chezmoi.toml's [data] block before init. */ -}}
+{{- $name       := promptStringOnce . "name"       "Full name"                                  "" -}}
+{{- $email      := promptStringOnce . "email"      "Git email (noreply works fine)"             "" -}}
+{{- $signingKey := promptStringOnce . "signingKey" "SSH signing key (1Password public key)"     "" -}}
+
+# Tell chezmoi the source repo lives under ~/Dev/Personal/dotfiles
+# (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
+sourceDir = "{{ .chezmoi.homeDir }}/Dev/Personal/dotfiles"
+
+[data]
+    name       = {{ $name | quote }}
+    email      = {{ $email | quote }}
+    signingKey = {{ $signingKey | quote }}
+
+{{- if lookPath "delta" }}
+# delta is installed → use it as the diff pager.
+# (If you just installed it via brew bundle, run `chezmoi init` again to pick this up.)
+[diff]
+    pager = "delta"
+{{- end }}

@@ -1,0 +1,32 @@
+# Global gitignore — applies to every repo
+# Reference: git config --global core.excludesFile (chezmoi/git already auto-detects this XDG path)
+
+# Claude Code per-project local settings (machine-specific permissions)
+**/.claude/settings.local.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editors
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Direnv
+.envrc.local
+
+# Common secret files
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key

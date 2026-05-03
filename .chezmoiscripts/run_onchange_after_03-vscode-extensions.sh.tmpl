@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Installs VS Code extensions listed in .chezmoidata/packages.toml
+# Runs whenever the extension list changes.
+#
+# Extensions hash: {{ .vscode.extensions | toJson | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[vscode] not on macOS, skipping"
+exit 0
+{{ end -}}
+
+if ! command -v code >/dev/null 2>&1; then
+    echo "[vscode] 'code' CLI not found; skipping. Install via Brewfile + 'Shell Command: Install code command in PATH'."
+    exit 0
+fi
+
+echo "[vscode] installing extensions…"
+{{ range .vscode.extensions -}}
+code --install-extension {{ . }} --force
+{{ end -}}

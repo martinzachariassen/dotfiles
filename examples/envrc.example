@@ -1,0 +1,36 @@
+# .envrc — direnv config for a project. Loaded automatically when you `cd` in
+# (after a one-time `direnv allow` per project). Reverted when you `cd` out.
+#
+# Activate by:  cp envrc.example /path/to/project/.envrc && cd && direnv allow
+# Edit by:      direnv edit            # opens in $EDITOR, re-allows on save
+
+# ─── Tool versions via mise ──────────────────────────────────────────────────
+# Reads .mise.toml or .tool-versions in this dir. Pins Java/Node/Python/etc.
+# per-project so a Java 21 service and a Java 17 service can coexist on PATH.
+use mise
+
+# ─── Project-local environment variables ─────────────────────────────────────
+# These are scoped: they exist while you're in this directory, gone when you leave.
+export DATABASE_URL="postgres://localhost:5432/myapp_dev"
+export RUST_LOG="debug"
+export PYTHONDONTWRITEBYTECODE=1
+
+# ─── Project bin/ on PATH ────────────────────────────────────────────────────
+# `PATH_add` is a direnv stdlib helper — prepends to PATH only inside this dir.
+# Useful for project-local scripts (./bin/run-tests, ./bin/migrate, etc.)
+PATH_add ./bin
+
+# ─── Secrets pulled from 1Password (uncomment to use) ────────────────────────
+# Requires the 1Password CLI (`op`, installed via Brewfile cask "1password-cli").
+# Sign in once with `op signin`; thereafter direnv can fetch values on demand.
+# Each call hits 1Password, so cache the results in a local var if you call them
+# repeatedly inside the same .envrc.
+#
+# export STRIPE_API_KEY="$(op read 'op://Personal/Stripe Test/api-key')"
+# export GITHUB_TOKEN="$(op read 'op://Work/GitHub PAT/token')"
+
+# ─── Local-only overrides (not committed) ────────────────────────────────────
+# If a .envrc.local exists alongside this file, source it. Pattern: keep the
+# committed .envrc clean; put machine-specific paths/credentials in .envrc.local
+# (which is in our global .gitignore — see ~/.config/git/ignore).
+[ -f .envrc.local ] && source_env .envrc.local

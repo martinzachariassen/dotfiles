@@ -1,0 +1,79 @@
+[user]
+    name = {{ .name }}
+    email = {{ .email }}
+    signingkey = {{ .signingKey }}
+
+[init]
+    defaultBranch = main
+
+[commit]
+    gpgsign = true
+
+[gpg]
+    format = ssh
+
+[gpg "ssh"]
+    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+
+[core]
+    editor = nvim
+    pager = delta
+    # Global ignore lives at ~/.config/git/ignore (XDG)
+
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    line-numbers = true
+    side-by-side = false
+
+[diff]
+    colorMoved = default
+    algorithm = histogram
+
+[merge]
+    conflictstyle = zdiff3
+
+[push]
+    default = simple
+    autoSetupRemote = true
+    followTags = true
+
+[pull]
+    rebase = true
+    ff = only
+
+[rebase]
+    autoStash = true
+    autoSquash = true
+
+[rerere]
+    enabled = true
+
+[fetch]
+    prune = true
+    pruneTags = true
+
+[branch]
+    sort = -committerdate
+
+[help]
+    autocorrect = prompt
+
+[alias]
+    s   = status -sb
+    co  = checkout
+    sw  = switch
+    br  = branch --sort=-committerdate
+    lg  = log --oneline --graph --decorate -20
+    last = log -1 HEAD --stat
+    unstage = reset HEAD --
+    amend = commit --amend --no-edit
+    fixup = commit --fixup
+    wip  = !git add -A && git commit -m 'wip' --no-verify
+    undo = reset --soft HEAD~1
+
+# URL rewrites — push always goes via SSH, even if cloned via HTTPS
+[url "git@github.com:"]
+    pushInsteadOf = https://github.com/

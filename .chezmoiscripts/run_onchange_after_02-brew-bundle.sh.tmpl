@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Runs `brew bundle` whenever the Brewfile changes.
+#
+# chezmoi triggers this script when the hash of the embedded Brewfile changes,
+# so adding a `brew "foo"` line and running `chezmoi apply` is all you need.
+#
+# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[brew-bundle] not on macOS, skipping"
+exit 0
+{{ end -}}
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+BREWFILE="{{ .chezmoi.sourceDir }}/Brewfile"
+
+echo "[brew] running brew bundle from $BREWFILE"
+# --no-lock was removed in modern Homebrew; lock files are off by default now.
+brew bundle install --file="$BREWFILE"
+
+# brew installs sometimes leave group/other-write bits on share dirs that end
+# up on zsh's $fpath, which makes `compinit` prompt at every shell startup:
+#   "zsh compinit: insecure directories, run compaudit for list."
+# Strip those bits proactively so completions just work.
+echo "[brew] tightening permissions on /opt/homebrew/share (compinit safety)"
+chmod -R go-w /opt/homebrew/share 2>/dev/null || true

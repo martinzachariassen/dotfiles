@@ -1,0 +1,5 @@
+# ~/.config/zsh/.zprofile — login shell setup
+# Found via ZDOTDIR. Runs once at login, before .zshrc.
+
+# Homebrew (Apple Silicon path)
+eval "$(/opt/homebrew/bin/brew shellenv zsh)"

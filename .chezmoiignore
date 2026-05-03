@@ -1,0 +1,13 @@
+README.md
+WORK-SETUP.md
+MAPPING.md
+LICENSE
+install.sh
+Brewfile
+macos-defaults.sh
+.editorconfig
+.gitattributes
+.github/
+.gitignore
+.DS_Store
+examples/

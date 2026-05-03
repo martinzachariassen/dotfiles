@@ -1,0 +1,30 @@
+# ~/.zshenv — read by every zsh invocation (interactive, login, scripts) BEFORE any
+# other rc file. Only file that MUST stay in $HOME, because zsh reads it before
+# environment variables are set.
+#
+# Keep this minimal. Only env vars universally needed go here.
+# Interactive shell config (aliases, completions, history opts) lives in
+# $ZDOTDIR/.zshrc — see ~/.config/zsh/.zshrc.
+
+# ─── Tell zsh where to find the rest of its config ────────────────────────────
+export ZDOTDIR="$HOME/.config/zsh"
+
+# ─── XDG Base Directory paths ─────────────────────────────────────────────────
+# These are the spec defaults; setting explicitly so XDG-aware tools agree.
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_CACHE_HOME="$HOME/.cache"
+
+# ─── Redirect tool dirs out of $HOME into XDG paths ───────────────────────────
+export GRADLE_USER_HOME="$XDG_CONFIG_HOME/gradle"   # was ~/.gradle
+export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"       # was ~/.npm
+export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
+# git auto-detects ~/.config/git/{config,ignore} — no env var needed.
+# claude-personal lives under ~/.config/claude/personal — see wrapper in .zshrc.
+
+# ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
+export SHELL_SESSIONS_DISABLE=1
+
+# ─── PATH ─────────────────────────────────────────────────────────────────────
+export PATH="$HOME/.local/bin:$PATH"
