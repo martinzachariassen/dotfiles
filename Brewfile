@@ -13,11 +13,14 @@
 # (then move profile-specific lines back into Brewfile.personal / Brewfile.work)
 #
 # Notes on package choices:
-#   - terraform was removed from homebrew-core after the BSL license change.
-#     We use opentofu (drop-in compatible). To switch back to official Terraform:
-#         tap "hashicorp/tap"
-#         brew "hashicorp/tap/terraform"
+#   - Terraform isn't in homebrew-core (HashiCorp pulled it after the BSL
+#     license change in 2023). We install it from HashiCorp's official tap.
+#     If license terms ever bother you, OpenTofu (`brew "opentofu"`) is a
+#     Linux Foundation fork with identical HCL syntax — switch by swapping
+#     the two `terraform` lines for it.
 #   - google-cloud-sdk and docker-desktop are casks, not formulae.
+
+tap "hashicorp/tap"
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "git"
@@ -49,15 +52,30 @@ brew "httpie"                   # curl, but human
 brew "grpcurl"                  # like curl, but for gRPC services
 brew "mkcert"                   # locally-trusted dev certificates for HTTPS work
 
-# ─── Backend / cloud / IaC ────────────────────────────────────────────────────
+# ─── Kubernetes ───────────────────────────────────────────────────────────────
 # Java/Maven/Gradle/Node/Python are managed by mise — see ~/.config/mise/config.toml
-brew "kubernetes-cli"           # kubectl
-brew "kubectx"                  # also installs `kubens` — switch contexts/namespaces fast
-brew "k9s"                      # kubernetes TUI
-brew "stern"                    # multi-pod log tailing
+brew "kubernetes-cli"                  # kubectl
+brew "kubectx"                         # also installs `kubens` — switch contexts/namespaces fast
+brew "k9s"                             # kubernetes TUI
+brew "stern"                           # multi-pod log tailing
 brew "helm"
-brew "opentofu"                 # terraform-compatible (see header note)
-brew "tflint"                   # works with both terraform and opentofu
+
+# ─── Azure ────────────────────────────────────────────────────────────────────
+brew "azure-cli"                       # `az` CLI — sign in via `az login`
+brew "Azure/kubelogin/kubelogin"       # required for kubectl against AKS clusters using Azure AD
+
+# ─── Google Cloud ─────────────────────────────────────────────────────────────
+# The full Cloud SDK (`gcloud`, `gsutil`, `bq`) comes from the gcloud-cli cask
+# below. There's NO Homebrew formula for `gke-gcloud-auth-plugin` — Google
+# distributes it as a gcloud SDK component. After `gcloud auth login`, run:
+#     gcloud components install gke-gcloud-auth-plugin
+# Required for kubectl ≥ 1.26 to authenticate against GKE clusters (the
+# legacy in-tree GCP auth provider was dropped).
+
+# ─── Infrastructure-as-Code ───────────────────────────────────────────────────
+brew "hashicorp/tap/terraform"         # official Terraform from HashiCorp's tap
+brew "tflint"                          # static analysis for Terraform / OpenTofu
+brew "terraform-docs"                  # generate Markdown docs from Terraform modules
 
 # ─── Databases (CLI clients only — actual servers run via docker/cloud) ───────
 brew "pgcli"                    # PostgreSQL CLI with auto-complete + syntax highlighting

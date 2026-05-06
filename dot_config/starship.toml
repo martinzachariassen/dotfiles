@@ -10,8 +10,8 @@ palette = "catppuccin_frappe"
 format = """
 $directory\
 $git_branch$git_status\
-$java$nodejs$python$golang\
-$kubernetes$aws\
+$java$kotlin$nodejs$python\
+$kubernetes$azure$gcloud\
 $cmd_duration\
 $line_break\
 $character"""
@@ -60,6 +60,11 @@ symbol = " "
 style  = "red"
 format = "via [$symbol($version )]($style)"
 
+[kotlin]
+symbol = " "
+style  = "mauve"
+format = "via [$symbol($version )]($style)"
+
 [nodejs]
 symbol = " "
 style  = "green"
@@ -69,11 +74,6 @@ format = "via [$symbol($version )]($style)"
 symbol  = " "
 style   = "yellow"
 format  = 'via [${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
-
-[golang]
-symbol = " "
-style  = "sky"
-format = "via [$symbol($version )]($style)"
 
 # ── Cloud / cluster context ───────────────────────────────────────────────────
 [kubernetes]
@@ -86,16 +86,21 @@ format     = '[$symbol$context( ($namespace))]($style) '
 detect_files     = ["k8s.yaml", "k8s.yml", "kustomization.yaml", "Chart.yaml", "skaffold.yaml"]
 detect_folders   = ["k8s", "kubernetes", "manifests", "charts"]
 
+[azure]
+symbol   = "󰠅 "
+style    = "blue"
+format   = '[$symbol($subscription)]($style) '
+disabled = false
+
+[gcloud]
+symbol   = " "
+style    = "lavender"
+format   = '[$symbol$account(@$domain)(\($project\))]($style) '
+disabled = false
+
+# AWS module disabled — not part of my cloud stack.
 [aws]
-symbol = " "
-style  = "yellow"
-format = '[$symbol($profile )(\($region\) )(\[$duration\])]($style)'
-# Same logic — only when in a project with AWS-related files.
-[aws.region_aliases]
-eu-north-1     = "eu-n"
-eu-west-1      = "eu-w"
-us-east-1      = "us-e"
-us-west-2      = "us-w2"
+disabled = true
 
 # ── Command duration ──────────────────────────────────────────────────────────
 [cmd_duration]

@@ -12,7 +12,8 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key. Git auto-detects this XDG path. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
 | `dot_config/mise/config.toml` | `~/.config/mise/config.toml` | mise toolchain definitions. |
-| `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile (CLAUDE_CONFIG_DIR points here). |
+| `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile settings (CLAUDE_CONFIG_DIR points here). |
+| `dot_config/claude/personal/CLAUDE.md` | `~/.config/claude/personal/CLAUDE.md` | Global instructions auto-loaded into every personal Claude Code session — communication style, environment, code-style preferences, anti-patterns to avoid. Project-specific overrides go in `<project>/CLAUDE.md`. |
 | `dot_docker/config.json` | `~/.docker/config.json` | Docker CLI config. Stays at `~/.docker/` because Docker Desktop hardcodes the path. |
 | `dot_docker/daemon.json` | `~/.docker/daemon.json` | Docker daemon config. |
 | `dot_config/ghostty/config` | `~/.config/ghostty/config` | Ghostty terminal config. Catppuccin Frappé theme is built into Ghostty, no theme file needed. |

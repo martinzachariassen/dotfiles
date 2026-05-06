@@ -56,12 +56,17 @@ open -a 1Password
 
 # 2. Authenticate cloud CLIs
 gh auth login            # GitHub
-gcloud auth login        # GCP — optional
+az login                 # Azure
+gcloud auth login        # GCP
 
-# 3. Reload shell with the new config
+# 3. Install the GKE auth plugin (gcloud component, not a Homebrew formula —
+#    only run this AFTER gcloud auth login above).
+gcloud components install gke-gcloud-auth-plugin
+
+# 4. Reload shell with the new config
 exec zsh
 
-# 4. Restart the Mac so all macOS defaults take full effect
+# 5. Restart the Mac so all macOS defaults take full effect
 sudo shutdown -r now
 ```
 
@@ -91,7 +96,7 @@ To switch profiles later, edit `~/.config/chezmoi/chezmoi.toml` and change `prof
 | **Shell** | zsh with full XDG layout, mise activation, direnv hook, fzf integration (`Ctrl-R` history search, `**<Tab>` completion), `zsh-completions` + `zsh-syntax-highlighting`, claude work/personal wrapper, modern CLI aliases (`ls→eza`, `cat→bat`, `find→fd`). |
 | **Git** | Identity + 1Password commit signing via `op-ssh-sign`, delta diffs, useful aliases (`s`, `lg`, `wip`, `undo`, `amend`, `fixup`), pull rebase, rerere. |
 | **Runtimes** | mise: Java 21 (Temurin), Maven, Gradle, Node (bundles npm), pnpm, Python — all "latest", overridable per-project via `.mise.toml`. |
-| **Brew** | ~55 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), cloud + IaC (`awscli`, `gcloud-cli`, `opentofu`, `tflint`), DB clients (`pgcli`, `mysql-client`, `redis-cli`), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
+| **Brew** | ~55 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), Azure (`az`, `kubelogin`), GCP (`gcloud`, `gke-gcloud-auth-plugin`), IaC (`terraform` from HashiCorp tap, `tflint`, `terraform-docs`), DB clients (`pgcli`, `mysql-client`, `redis-cli`), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
 | **Editor (GUI)** | VS Code with Catppuccin Frappé, Material Icon Theme, JetBrainsMono ligatures, Python + Pylance + black-formatter + Containers extensions, format on save. |
 | **Editor (terminal)** | [Neovim](https://neovim.io) with [LazyVim](https://www.lazyvim.org) and the Catppuccin Frappé flavor. First launch auto-installs `lazy.nvim`, then LazyVim pulls in LSP (via mason), treesitter, telescope, nvim-tree, which-key, gitsigns, and the standard distribution. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/Terraform/Markdown) ship commented-out in `lua/config/lazy.lua` — uncomment whichever you want. |
 | **macOS** | Fast key repeat, no autocorrect, full keyboard nav, Finder shows everything, Dock auto-hide, screenshots → `~/Pictures/Screenshots`, Safari dev menu, screensaver password immediately. Idempotent — `def_write` helper only writes when the value differs from current. |
@@ -221,6 +226,10 @@ A wrapper function in `.zshrc` routes `claude` based on PWD:
 Override with `cw` (work) or `cme` (personal) aliases, or `CLAUDE_PROFILE=work claude …` for one-off.
 
 The CLI binary comes from the `cask "claude-code@latest"` line in `Brewfile.personal` (rolling channel — auto-updates as Anthropic ships). Switch to `cask "claude-code"` if you'd rather pin to the stable named release.
+
+### Global CLAUDE.md
+
+[`dot_config/claude/personal/CLAUDE.md`](dot_config/claude/personal/CLAUDE.md) is auto-loaded into every personal Claude Code session — covers communication style, the tool environment Claude can assume is available, language-specific code-style preferences, and explicit anti-patterns ("don't suggest tmux, I use Zellij"). Edit via `chezmoi edit ~/.config/claude/personal/CLAUDE.md` to keep it in sync with your source. Project-specific instructions go in `<project>/CLAUDE.md` and merge on top of this global one.
 
 ---
 
