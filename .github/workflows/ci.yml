@@ -5,35 +5,82 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel an in-flight run if a new push lands on the same branch.
+# Saves CI minutes; the latest commit is always what matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  shellcheck:
-    name: shellcheck
+  # ─── Job 1: shell scripts ───────────────────────────────────────────────────
+  # Catches shell typos in:
+  #   - plain scripts:        install.sh, macos-defaults.sh
+  #   - templated scripts:    .chezmoiscripts/*.sh.tmpl (after stripping Go templates)
+  shell:
+    name: shell scripts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Lint plain shell scripts
-        # .chezmoiscripts/*.tmpl contain Go template syntax that shellcheck can't
-        # parse — those get validated by the chezmoi job instead.
-        run: shellcheck install.sh macos-defaults.sh
 
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Lint plain shell scripts
+        run: shellcheck --shell=bash install.sh macos-defaults.sh
+
+      - name: Lint chezmoi script templates
+        # The .chezmoiscripts/*.sh.tmpl files contain Go template directives
+        # that shellcheck can't parse. We strip them out (replace `{{ ... }}`
+        # with empty string) and then lint the resulting bash. This catches
+        # structural shell bugs (quoting, set -e, undefined vars, typos) but
+        # won't catch logic errors that depend on what the template renders.
+        run: |
+          set -e
+          for f in .chezmoiscripts/*.sh.tmpl; do
+            echo "─── linting: $f ───"
+            tmp=$(mktemp --suffix=.sh)
+            sed -E 's/\{\{[^}]*\}\}//g' "$f" > "$tmp"
+            shellcheck --shell=bash "$tmp"
+            rm "$tmp"
+          done
+
+  # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
+  # Renders every template in the repo and surfaces:
+  #   - Go template syntax errors (mismatched braces, bad function calls)
+  #   - Undefined data variables ({{ .typo }})
+  #   - Stale .chezmoiignore entries that confuse the source state
+  #   - Missing required prompts in .chezmoi.toml.tmpl
   chezmoi:
     name: chezmoi templates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install chezmoi
         run: |
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: chezmoi init (renders .chezmoi.toml.tmpl, fills prompts non-interactively)
+
+      - name: chezmoi init (renders .chezmoi.toml.tmpl)
+        # All four prompts get stub values so init runs non-interactively.
+        # `profile=both` exercises BOTH profile-conditional template branches
+        # (work and personal) in the dry-run apply below — a value of `personal`
+        # would only render half of the conditionals.
         run: |
           chezmoi init --source="$PWD" \
             --promptString name=CI \
             --promptString email=ci@example.com \
-            --promptString signingKey="ssh-ed25519 AAAAci-placeholder"
-      - name: chezmoi apply --dry-run (renders every other template)
-        # On Linux, the macOS-only run_onchange_after_* scripts hit their guards
-        # and exit 0 cleanly. Any template parse error or missing variable fails here.
+            --promptString signingKey="ssh-ed25519 AAAAci-placeholder" \
+            --promptChoice profile=both
+
+      - name: chezmoi apply --dry-run (renders every template)
+        # Dry-run never writes to disk; it just resolves the source state and
+        # reports what would change. Any template parse error, undefined
+        # variable, or template-helper misuse fails this step.
+        #
+        # The macOS-only chezmoi scripts (run_*before_01-install-homebrew,
+        # run_*after_02-brew-bundle, run_*after_03-vscode-extensions,
+        # run_*after_04-macos-defaults) all have a guard that exits 0 on
+        # non-darwin, so we don't need Homebrew or any macOS-specific tooling
+        # in this runner.
         run: chezmoi apply --dry-run --verbose
