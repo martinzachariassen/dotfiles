@@ -153,25 +153,26 @@ step "8" "Verify bootstrap" \
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
 
 verify() {
-    local name="$1" cmd="$2"
-    if eval "$cmd" >/dev/null 2>&1; then
+    local name="$1"
+    shift
+    if "$@" >/dev/null 2>&1; then
         ok "$name"
     else
-        fail "$name   ${DIM}(\`$cmd\` failed)${RESET}"
+        fail "$name"
     fi
 }
-verify "git"             "git --version"
-verify "chezmoi"         "chezmoi --version"
-verify "mise"            "mise --version"
-verify "starship"        "starship --version"
-verify "zellij"          "zellij --version"
-verify "kubectl"         "kubectl version --client=true"
-verify "lazygit"         "lazygit --version"
-verify "direnv"          "direnv version"
-verify "claude (CLI)"    "command -v claude"
-verify "Ghostty.app"     "test -d /Applications/Ghostty.app"
-verify "VS Code.app"     "test -d '/Applications/Visual Studio Code.app'"
-verify "1Password.app"   "test -d /Applications/1Password.app"
+verify "git"           git --version
+verify "chezmoi"       chezmoi --version
+verify "mise"          mise --version
+verify "starship"      starship --version
+verify "zellij"        zellij --version
+verify "kubectl"       kubectl version --client=true
+verify "lazygit"       lazygit --version
+verify "direnv"        direnv version
+verify "claude (CLI)"  command -v claude
+verify "Ghostty.app"   test -d /Applications/Ghostty.app
+verify "VS Code.app"   test -d "/Applications/Visual Studio Code.app"
+verify "1Password.app" test -d /Applications/1Password.app
 
 # ─── Done ────────────────────────────────────────────────────────────────────
 cat <<EOF
