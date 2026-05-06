@@ -46,8 +46,10 @@ These are repo metadata, install scripts, or holding-pen files for things we rem
 
 | File | Role |
 |---|---|
-| `.chezmoi.toml.tmpl` | Init prompts. Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. |
+| `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
 | `.chezmoidata/packages.toml` | Data file (vscode extension list) available to all templates. |
+| `Brewfile`, `Brewfile.personal`, `Brewfile.work` | Three-tier brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers `Brewfile.personal` and/or `Brewfile.work` based on the profile data var. |
+| `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
 | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` | Runs once before any apply. macOS-only via template guard. |
 | `.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl` | Runs after apply when Brewfile content hash changes. macOS-only. |

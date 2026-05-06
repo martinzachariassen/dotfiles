@@ -1,5 +1,9 @@
 # ~/.config/zsh/.zshrc — interactive shell configuration
 # Found via ZDOTDIR (set in ~/.zshenv). Edit via `chezmoi edit ~/.config/zsh/.zshrc`.
+#
+# This file is rendered by chezmoi from `dot_zshrc.tmpl`. Profile-conditional
+# blocks (search for `chezmoi.profile`) only render based on the profile you
+# chose at `chezmoi init` time. Current profile: {{ .profile }}
 
 # ─── Shell options ────────────────────────────────────────────────────────────
 setopt INTERACTIVE_COMMENTS    # allow # comments in interactive shells (bash-style)
@@ -133,6 +137,25 @@ alias zj='zellij attach -c default'
 #         && command -v zellij >/dev/null; then
 #     zellij attach -c default
 # fi
+
+{{ if or (eq .profile "work") (eq .profile "both") -}}
+# ─── Work-only shell config (rendered because profile = {{ .profile }}) ───────
+# Edit by changing the `{{`{{`}} if or (eq .profile "work") ... block in
+# dot_config/zsh/dot_zshrc.tmpl, then `chezmoi apply -v`.
+
+# Make storecode binaries available if the work tooling is installed.
+[ -d "$HOME/.storecode/bin" ] && export PATH="$HOME/.storecode/bin:$PATH"
+
+# Add work-only env vars, aliases, or hooks below as needed:
+# export CORP_VPN_PROFILE="default"
+# alias k="kubectl --context=work-prod"
+{{ end -}}
+
+{{ if or (eq .profile "personal") (eq .profile "both") -}}
+# ─── Personal-only shell config (rendered because profile = {{ .profile }}) ───
+# Add personal-only env vars, aliases, or hooks below as needed:
+# alias music='open -a "Spotify"'
+{{ end -}}
 
 # ─── Local overrides (not versioned) ──────────────────────────────────────────
 [ -f "$ZDOTDIR/.zshrc.local" ] && source "$ZDOTDIR/.zshrc.local"

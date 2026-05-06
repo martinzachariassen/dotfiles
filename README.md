@@ -14,15 +14,32 @@ On a fresh Mac, open Terminal and run:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-That's the whole thing. The script is idempotent — re-running is safe. It takes ~15–20 minutes (mostly Homebrew downloading).
+The script is a guided 8-step tour with explanations at each step. It's idempotent — re-running is safe. Total time: ~15–20 minutes (mostly Homebrew downloading).
 
-You'll be prompted three times during the run:
+The 8 steps:
 
-1. **Xcode Command Line Tools** — a GUI dialog appears. Click *Install*, wait for it to finish, then re-run the script (it exits with a hint).
-2. **chezmoi init** — name, git email, and SSH signing key (the public key from your 1Password entry). Asked once, stored under `[data]` in `~/.config/chezmoi/chezmoi.toml`.
-3. **macOS defaults** — sudo password for system settings (keyboard repeat, Finder, Dock, screenshots, etc.).
+1. **Xcode Command Line Tools** — a GUI dialog appears. Click *Install*, wait, re-run the script (it exits with a hint).
+2. **Homebrew** — installed non-interactively at the Apple Silicon path.
+3. **chezmoi** — installed via `brew install chezmoi`.
+4. **Clone repo** to `~/Dev/Personal/dotfiles`.
+5. **Configure chezmoi** — prompts for **profile** (personal / work / both) and **identity** (name, git email, SSH signing key). Answers stored in `~/.config/chezmoi/chezmoi.toml` and persist across re-runs.
+6. **Apply dotfiles + install packages** — writes every dotfile, then runs `brew bundle` against the appropriate Brewfiles for your profile, installs VS Code extensions, applies macOS defaults (sudo prompt).
+7. **Re-render config** — re-runs `chezmoi init` so the `[diff] pager = "delta"` block picks up the now-installed `delta`.
+8. **Self-test** — verifies key tools and apps actually landed.
 
 When it's done, sign in to 1Password (so the SSH agent works), `gh auth login`, optionally `gcloud auth login`, then `exec zsh` to reload, and restart so all the macOS defaults take effect.
+
+### Profiles
+
+The `profile` answer at step 5 controls which packages and shell config get installed:
+
+| Profile | What you get |
+|---|---|
+| `personal` | Common Brewfile + `Brewfile.personal` (Claude desktop + Claude Code CLI cask, plus any other personal-only apps you add). Personal-only `.zshrc` block renders. |
+| `work` | Common Brewfile + `Brewfile.work` (work-only apps you add — Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders, including `~/.storecode/bin` on PATH if installed. Personal Claude casks are *not* installed (work uses storecode-managed `~/.claude` per [`WORK-SETUP.md`](WORK-SETUP.md)). |
+| `both` | Common Brewfile + both extras + both `.zshrc` blocks. Useful for a single-machine-many-jobs setup. |
+
+To switch profiles later, edit `~/.config/chezmoi/chezmoi.toml` and change the `profile = "..."` value, then `chezmoi apply -v`. The brew-bundle script will install whichever extras the new profile requires (it doesn't auto-uninstall the old profile's packages — `brew uninstall <name>` manually if you want to clean up).
 
 ---
 

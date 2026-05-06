@@ -1,0 +1,27 @@
+# Brewfile.work — extras for the `work` profile.
+#
+# Installed by the brew-bundle chezmoi script ON TOP of the common `Brewfile`
+# when your profile is "work" or "both". Skipped when your profile is
+# "personal".
+#
+# Note: the corporate Claude Code distribution (storecode, ~/.claude, ~/.rampart, etc.)
+# is installed by your employer's tooling, NOT via brew. See WORK-SETUP.md for that.
+# This file is only for *additional* work-relevant brew packages.
+#
+# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/Brewfile.work
+
+# ─── Add your work-only apps below ────────────────────────────────────────────
+# Common candidates for backend dev at most companies — uncomment as relevant:
+#
+# cask "slack"
+# cask "microsoft-teams"
+# cask "zoom"
+# cask "loom"
+# cask "notion"
+# cask "linear-linear"
+# cask "tableplus"             # GUI database client
+# cask "postman"               # API client (alternatives: insomnia, bruno)
+# cask "datagrip"              # JetBrains DB IDE
+# cask "intellij-idea"         # if Java work
+# brew "awscli-local"          # if you use LocalStack
+# brew "lima"                  # alternative container runtime to Docker Desktop

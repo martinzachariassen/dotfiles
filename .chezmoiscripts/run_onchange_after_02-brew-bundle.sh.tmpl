@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Runs `brew bundle` whenever the Brewfile changes.
+# Runs `brew bundle` whenever any of the Brewfiles, the profile, or this script
+# itself changes. The hash comments below pull all of those into the trigger.
 #
-# chezmoi triggers this script when the hash of the embedded Brewfile changes,
-# so adding a `brew "foo"` line and running `chezmoi apply` is all you need.
-#
-# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+# Brewfile (common)   hash: {{ include "Brewfile" | sha256sum }}
+# Brewfile.personal   hash: {{ include "Brewfile.personal" | sha256sum }}
+# Brewfile.work       hash: {{ include "Brewfile.work" | sha256sum }}
+# Profile in effect:        {{ .profile }}
 
 set -euo pipefail
 
@@ -15,15 +16,33 @@ exit 0
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-BREWFILE="{{ .chezmoi.sourceDir }}/Brewfile"
+SOURCE="{{ .chezmoi.sourceDir }}"
+PROFILE="{{ .profile }}"
 
-echo "[brew] running brew bundle from $BREWFILE"
-# --no-lock was removed in modern Homebrew; lock files are off by default now.
-brew bundle install --file="$BREWFILE"
+# Always install the common tier
+echo "[brew] installing common Brewfile (always)"
+brew bundle install --file="$SOURCE/Brewfile"
+
+# Layer profile-specific extras on top
+case "$PROFILE" in
+    personal|both)
+        echo "[brew] installing personal extras (profile = $PROFILE)"
+        brew bundle install --file="$SOURCE/Brewfile.personal"
+        ;;
+esac
+case "$PROFILE" in
+    work|both)
+        echo "[brew] installing work extras (profile = $PROFILE)"
+        brew bundle install --file="$SOURCE/Brewfile.work"
+        ;;
+esac
 
 # brew installs sometimes leave group/other-write bits on share dirs that end
 # up on zsh's $fpath, which makes `compinit` prompt at every shell startup:
 #   "zsh compinit: insecure directories, run compaudit for list."
-# Strip those bits proactively so completions just work.
-echo "[brew] tightening permissions on /opt/homebrew/share (compinit safety)"
-chmod -R go-w /opt/homebrew/share 2>/dev/null || true
+# Strip those bits proactively. Narrowed to just the zsh-related dirs (the only
+# ones compinit walks); recursing all of /opt/homebrew/share would chmod
+# 100k+ files for no benefit.
+echo "[brew] tightening permissions on /opt/homebrew/share/zsh* (compinit safety)"
+chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
+echo "[brew] permissions tightened."

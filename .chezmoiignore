@@ -4,6 +4,8 @@ MAPPING.md
 LICENSE
 install.sh
 Brewfile
+Brewfile.personal
+Brewfile.work
 macos-defaults.sh
 .editorconfig
 .gitattributes

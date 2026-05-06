@@ -1,14 +1,23 @@
-# Brewfile — installed via `brew bundle --file=~/Dev/Personal/dotfiles/Brewfile`
-# Regenerate from a known-good machine: `brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile`
+# Brewfile — the COMMON tier. Always installed regardless of profile.
+#
+# This file is paired with `Brewfile.personal` and `Brewfile.work` — the
+# brew-bundle chezmoi script picks which extras to layer on top based on the
+# `profile` value you chose at `chezmoi init` time (personal / work / both).
+#
+# Edit a profile-specific extra by editing the matching Brewfile.<profile>.
+# Move a package between tiers by cutting the line and pasting into the
+# appropriate file.
+#
+# Regenerate the common file from a known-good machine:
+#   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile
+# (then move profile-specific lines back into Brewfile.personal / Brewfile.work)
 #
 # Notes on package choices:
 #   - terraform was removed from homebrew-core after the BSL license change.
-#     We use opentofu (drop-in compatible). To switch back to official Terraform,
-#     replace the opentofu line with:
+#     We use opentofu (drop-in compatible). To switch back to official Terraform:
 #         tap "hashicorp/tap"
 #         brew "hashicorp/tap/terraform"
-#   - google-cloud-sdk and docker-desktop are casks (binary distributions),
-#     not formulae.
+#   - google-cloud-sdk and docker-desktop are casks, not formulae.
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "git"
@@ -47,7 +56,6 @@ brew "kubectx"                  # also installs `kubens` — switch contexts/nam
 brew "k9s"                      # kubernetes TUI
 brew "stern"                    # multi-pod log tailing
 brew "helm"
-brew "awscli"
 brew "opentofu"                 # terraform-compatible (see header note)
 brew "tflint"                   # works with both terraform and opentofu
 
@@ -73,10 +81,6 @@ cask "docker-desktop"           # was "docker", renamed Aug 2024
 cask "gcloud-cli"               # gcloud (was named google-cloud-sdk before 2025)
 cask "1password"
 cask "1password-cli"            # `op` CLI — used by chezmoi if you ever template secrets via `op read`
-cask "claude"                   # Claude desktop GUI app
-cask "claude-code@latest"       # Claude Code CLI (rolling channel — what the `claude` wrapper in .zshrc invokes).
-                                # Switch to plain `cask "claude-code"` if you'd rather pin to the stable named release;
-                                # you'd then `brew uninstall --cask claude-code@latest` first to free up /opt/homebrew/bin/claude.
 cask "google-chrome"
 cask "rectangle"                # window snapping
 cask "raycast"                  # Spotlight replacement

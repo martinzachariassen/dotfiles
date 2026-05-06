@@ -1,0 +1,22 @@
+# Brewfile.personal — extras for the `personal` profile.
+#
+# Installed by the brew-bundle chezmoi script ON TOP of the common `Brewfile`
+# when your profile is "personal" or "both". Skipped when your profile is
+# "work".
+#
+# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/Brewfile.personal
+
+# ─── Claude Code (personal profile uses these) ───────────────────────────────
+# Work machines get Claude Code via storecode (managed by employer's tooling),
+# so we don't install the personal CLI cask there — that would create a binary
+# collision at /opt/homebrew/bin/claude.
+cask "claude"                   # Claude desktop GUI app
+cask "claude-code@latest"       # Claude Code CLI (rolling channel; binary at /opt/homebrew/bin/claude)
+
+# ─── Add your other personal-only apps below ──────────────────────────────────
+# cask "spotify"
+# cask "discord"
+# cask "steam"
+# cask "vlc"
+# cask "obs"
+# cask "transmission"
