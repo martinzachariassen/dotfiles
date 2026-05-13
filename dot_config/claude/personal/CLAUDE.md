@@ -86,7 +86,9 @@ something else.
 
 **Databases**
 
-- `pgcli` (Postgres), `mysql-client`, `redis-cli`.
+- `pgcli` (Postgres) and `redis-cli` available globally via Brewfile. For
+  servers (Postgres 16, Redis, …) prefer per-project pinning via
+  `devbox add postgresql_16 redis` rather than a global brew install.
 
 **HTTP / RPC**
 

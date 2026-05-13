@@ -78,9 +78,14 @@ jobs:
         run: chezmoi apply --dry-run --verbose
 
   # ─── Job 3: brew bundle sanity (macOS) ──────────────────────────────────────
-  # Runs `brew bundle check` against all three Brewfiles on a real macOS
+  # Runs `brew bundle check` against every Brewfile module on a real macOS
   # runner. Catches deprecated/renamed casks, removed taps, and other things
   # that only fail when Homebrew evaluates the Brewfile.
+  #
+  # We iterate `Brewfile Brewfile.*` so feature modules (Brewfile.cloud,
+  # Brewfile.iac, Brewfile.databases, Brewfile.mac-apps) AND profile extras
+  # (Brewfile.personal, Brewfile.work) all get checked. Lockfile is skipped
+  # explicitly.
   #
   # `continue-on-error: true` because GitHub-hosted macOS runners are slow,
   # rate-limited, and flaky for brew operations — we want signal, not red CI
@@ -98,14 +103,15 @@ jobs:
       # `brew bundle check` reports what's missing; with `--verbose` it lists
       # each tap/brew/cask. A bad cask name (e.g. an old "google-cloud-sdk")
       # produces a non-zero exit and a clear error.
-      - name: Check common Brewfile
-        run: brew bundle check --verbose --file=Brewfile || true
-
-      - name: Check Brewfile.personal
-        run: brew bundle check --verbose --file=Brewfile.personal || true
-
-      - name: Check Brewfile.work
-        run: brew bundle check --verbose --file=Brewfile.work || true
+      - name: Check every Brewfile module
+        run: |
+          set +e
+          for f in Brewfile Brewfile.*; do
+            case "$f" in *.lock.json) continue ;; esac
+            [ -f "$f" ] || continue
+            echo "── $f ──"
+            brew bundle check --verbose --file="$f" || true
+          done
 
       # Stronger signal than `check`: actually try to resolve every formula and
       # cask. If a name is dead, brew exits with a parse error here.
@@ -114,7 +120,11 @@ jobs:
           set -e
           # Strip comments and blank lines, then verify each `brew "X"` /
           # `cask "X"` actually exists in homebrew-core or a tap we use.
-          for f in Brewfile Brewfile.personal Brewfile.work; do
+          # Iterates every Brewfile module so a typo in Brewfile.cloud is
+          # caught the same as one in the core Brewfile.
+          for f in Brewfile Brewfile.*; do
+            case "$f" in *.lock.json) continue ;; esac
+            [ -f "$f" ] || continue
             echo "── $f ──"
             grep -E '^(brew|cask) "' "$f" | while read -r line; do
               name=$(echo "$line" | sed -E 's/^(brew|cask) "([^"]+)".*/\2/')

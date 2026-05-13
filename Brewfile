@@ -9,7 +9,7 @@
 # top of this one based on your answers to the install wizard. See:
 #   Brewfile.cloud      — Kubernetes + Azure + Google Cloud + Helm + kubelogin
 #   Brewfile.iac        — Terraform + tflint + terraform-docs
-#   Brewfile.databases  — pgcli, mysql-client, redis-cli
+#   Brewfile.databases  — pgcli + redis-cli (Postgres-first; MySQL omitted)
 #   Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
 #   Brewfile.personal   — Claude desktop + Claude Code CLI (rolling)
 #   Brewfile.work       — work-only casks (you fill in)

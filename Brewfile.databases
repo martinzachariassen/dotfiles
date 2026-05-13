@@ -2,10 +2,15 @@
 #
 # Installed when `features.databases = true` in chezmoi data.
 #
-# Just the clients — actual servers are expected to run via docker / a managed
-# service / a colleague's laptop. Add `brew "postgresql@16"` etc. if you need
-# a local server too.
+# Postgres-first stack (matches dot_config/claude/personal/CLAUDE.md). Adding
+# back `brew "mysql-client"` is one line if a project ever needs it, but
+# nothing in the documented workflow does — the canonical pattern for a
+# per-project DB is to pin it in that project's devbox.json (e.g.
+# `devbox add postgresql_16 redis`) rather than installing globally.
+#
+# What's here is the "I want a DB shell from any directory" toolkit only.
+# Server processes belong per-project (docker, devbox.json, or a managed
+# instance).
 
 brew "pgcli"                    # PostgreSQL CLI with auto-complete + syntax highlighting
-brew "mysql-client"             # `mysql` CLI without the server
 brew "redis"                    # `redis-cli` plus a local `redis-server` you can run on demand

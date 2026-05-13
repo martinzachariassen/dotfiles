@@ -578,7 +578,7 @@ choices() {
     tui_select_many feat_bits "Optional features (space to toggle, ↵ to confirm)" \
         "Cloud — Kubernetes (kubectl/k9s/kubectx/stern/helm) + Azure CLI + gcloud" \
         "IaC   — Terraform + tflint + terraform-docs" \
-        "DBs   — pgcli + mysql-client + redis-cli" \
+        "DBs   — pgcli + redis (Postgres-first)" \
         "Apps  — Rectangle + Raycast + Stats + Chrome + dive"
     local i=0 key
     # shellcheck disable=SC2206

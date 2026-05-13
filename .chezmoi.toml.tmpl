@@ -28,7 +28,7 @@
 {{- $useOnePassword := promptBoolOnce . "useOnePassword" "Use 1Password for SSH + git signing"          true -}}
 {{- $featCloud      := promptBoolOnce . "features.cloud"     "Install Kubernetes + Azure + Google Cloud CLIs" true -}}
 {{- $featIaC        := promptBoolOnce . "features.iac"       "Install Terraform + tflint + terraform-docs"    true -}}
-{{- $featDatabases  := promptBoolOnce . "features.databases" "Install database clients (pgcli, mysql, redis)" true -}}
+{{- $featDatabases  := promptBoolOnce . "features.databases" "Install database CLIs (pgcli, redis-cli)" true -}}
 {{- $featMacApps    := promptBoolOnce . "features.macApps"   "Install Mac-only QoL apps (Rectangle, Raycast, …)" true -}}
 
 # Tell chezmoi the source repo lives under ~/Dev/Personal/dotfiles

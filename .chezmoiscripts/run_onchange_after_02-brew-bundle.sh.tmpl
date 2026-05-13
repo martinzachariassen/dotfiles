@@ -126,7 +126,7 @@ add_step "IaC (Terraform + lint)"         "Brewfile.iac"
 add_step "cloud (k8s + az + gcloud)"      "Brewfile.cloud"
 {{ end -}}
 {{ if dig "features" "databases" true . -}}
-add_step "databases (pgcli + mysql + redis)"  "Brewfile.databases"
+add_step "databases (pgcli + redis)"  "Brewfile.databases"
 {{ end -}}
 {{ if dig "features" "macApps" true . -}}
 add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "Brewfile.mac-apps"

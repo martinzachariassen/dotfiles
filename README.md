@@ -118,7 +118,7 @@ Phase B asks two orthogonal questions: which **profile** you're on (which casks/
 |---|---|---|
 | `cloud` | `Brewfile.cloud` | Kubernetes (kubectl, kubectx, k9s, stern, helm), Azure CLI + kubelogin, Google Cloud SDK cask. |
 | `iac` | `Brewfile.iac` | Terraform (HashiCorp tap), tflint, terraform-docs. Easy to swap for OpenTofu. |
-| `databases` | `Brewfile.databases` | pgcli, mysql-client, redis-cli. CLI clients only — bring your own servers. |
+| `databases` | `Brewfile.databases` | pgcli, redis (cli + on-demand server). Postgres-first — MySQL isn't in the default kit; uncomment `brew "mysql-client"` if you need it. CLI clients only — for servers, pin via per-project `devbox.json`. |
 | `macApps` | `Brewfile.mac-apps` | Rectangle, Raycast, Stats, Chrome, dive. Pure QoL — skip on a server-y machine. |
 
 The core `Brewfile` always installs (git, modern CLI, prompt, runtimes, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim). Anything fundamental to the documented "what you get" experience lives there; everything else is a feature toggle.
@@ -162,7 +162,7 @@ Run `chezdoctor` for a reminder. The script can't verify these for you, but it p
 | **Shell** | zsh with full XDG layout, direnv hook (auto-activates each project's devbox env on `cd`), fzf integration (`Ctrl-R` history search, `**<Tab>` completion), `zsh-completions` + `zsh-syntax-highlighting`, claude work/personal wrapper, modern CLI aliases (`ls→eza`, `cat→bat`, `find→fd`). |
 | **Git** | Identity + 1Password commit signing via `op-ssh-sign`, delta diffs, useful aliases (`s`, `lg`, `wip`, `undo`, `amend`, `fixup`), pull rebase, rerere. |
 | **Runtimes** | **Per-project** via [Devbox](https://www.jetify.com/devbox) (Nix-backed). Each project's repo carries its own `devbox.json` + `.envrc`; on `cd` direnv activates the project's pinned JDK/Kotlin/Postgres/Node/etc. without polluting the global PATH. Devbox itself isn't in homebrew — `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` handles both the Jetify curl-installer for the CLI and the Determinate Nix bootstrap for the `/nix` store, both non-interactively, so a fresh `chezmoi apply` ends with `devbox shell` ready to fire without prompts. No global runtime pin list in this repo; use `devbox global add jdk21 kotlin nodejs@lts` if you want fallback runtimes outside any project. |
-| **Brew** | ~55 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), Azure (`az`, `kubelogin`), GCP (`gcloud`, `gke-gcloud-auth-plugin`), IaC (`terraform` from HashiCorp tap, `tflint`, `terraform-docs`), DB clients (`pgcli`, `mysql-client`, `redis-cli`), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
+| **Brew** | ~50 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), Azure (`az`, `kubelogin`), GCP (`gcloud`, `gke-gcloud-auth-plugin`), IaC (`terraform` from HashiCorp tap, `tflint`, `terraform-docs`), DB clients (`pgcli`, `redis-cli` — Postgres-first; add `mysql-client` if needed), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
 | **Editor (GUI)** | VS Code with Catppuccin Frappé, Material Icon Theme, JetBrainsMono ligatures, Python + Pylance + black-formatter + Containers extensions, format on save. |
 | **Editor (terminal)** | [Neovim](https://neovim.io) with [LazyVim](https://www.lazyvim.org) and the Catppuccin Frappé flavor. First launch auto-installs `lazy.nvim`, then LazyVim pulls in LSP (via mason), treesitter, telescope, nvim-tree, which-key, gitsigns, and the standard distribution. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/Terraform/Markdown) ship commented-out in `lua/config/lazy.lua` — uncomment whichever you want. |
 | **macOS** | Fast key repeat, no autocorrect, full keyboard nav, Finder shows everything, Dock auto-hide, screenshots → `~/Pictures/Screenshots`, Safari dev menu, screensaver password immediately. Idempotent — `def_write` helper only writes when the value differs from current. |
@@ -590,7 +590,7 @@ Plus an upfront plan that tells you what's coming and roughly how long:
 [brew-bundle]   1. core (always)
 [brew-bundle]   2. IaC (Terraform + lint)
 [brew-bundle]   3. cloud (k8s + az + gcloud)
-[brew-bundle]   4. databases (pgcli + mysql + redis)
+[brew-bundle]   4. databases (pgcli + redis)
 [brew-bundle]   5. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
 [brew-bundle]   6. personal profile extras
 [brew-bundle] expected time on first install: ~5-15 min (downloads dominate)
