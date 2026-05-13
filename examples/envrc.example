@@ -1,19 +1,26 @@
-# .envrc — direnv config for a project. Loaded automatically when you `cd` in
-# (after a one-time `direnv allow` per project). Reverted when you `cd` out.
+# .envrc — direnv config for a project. Loaded automatically when you `cd` in.
+# Projects under whitelisted roots (see ~/.config/direnv/direnv.toml) are
+# trusted by default; everywhere else needs a one-time `direnv allow`.
 #
-# Activate by:  cp envrc.example /path/to/project/.envrc && cd && direnv allow
+# Pair this with a devbox.json sitting next to it (run `devbox init` to scaffold,
+# then `devbox add jdk21 kotlin postgresql_16 ...` to pin the toolchain).
+#
+# Activate by:  cp envrc.example /path/to/project/.envrc
+#               cd /path/to/project && devbox init     # if you haven't yet
+#               (direnv allow                          # only if outside whitelist)
 # Edit by:      direnv edit            # opens in $EDITOR, re-allows on save
 
-# ─── Tool versions via mise ──────────────────────────────────────────────────
-# Reads .mise.toml or .tool-versions in this dir. Pins Java/Node/Python/etc.
-# per-project so a Java 21 service and a Java 17 service can coexist on PATH.
-use mise
+# ─── Runtime toolchain via devbox ────────────────────────────────────────────
+# `use_devbox` is the direnv stdlib hook for devbox. It reads devbox.json in
+# this directory and exports the project's Nix-built JDK / Kotlin / Postgres /
+# Node / etc. into the shell — scoped to this dir only, reverted on `cd` out.
+# Two projects on different JDK majors coexist without PATH gymnastics.
+use_devbox
 
 # ─── Project-local environment variables ─────────────────────────────────────
-# These are scoped: they exist while you're in this directory, gone when you leave.
+# These exist while you're in this directory, gone when you leave.
 export DATABASE_URL="postgres://localhost:5432/myapp_dev"
-export RUST_LOG="debug"
-export PYTHONDONTWRITEBYTECODE=1
+export SPRING_PROFILES_ACTIVE="local"
 
 # ─── Project bin/ on PATH ────────────────────────────────────────────────────
 # `PATH_add` is a direnv stdlib helper — prepends to PATH only inside this dir.

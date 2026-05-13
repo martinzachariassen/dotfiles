@@ -19,7 +19,7 @@ if [ -e /dev/tty ] && [ -r /dev/tty ]; then
     exec </dev/tty
 fi
 
-echo "[vscode] step 3/4 — installing VS Code extensions"
+echo "[vscode] apply step 4/5 — installing VS Code extensions"
 
 if ! command -v code >/dev/null 2>&1; then
     echo "[vscode] 'code' CLI not found; skipping. Install via Brewfile + 'Shell Command: Install code command in PATH'."

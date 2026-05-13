@@ -159,9 +159,9 @@ Run `chezdoctor` for a reminder. The script can't verify these for you, but it p
 | **Terminal** | [Ghostty](https://ghostty.org) with Catppuccin Frappé, JetBrainsMono Nerd Font, transparent titlebar, blurred background. Theme YAML at `~/.config/ghostty/themes/catppuccin-frappe` (chezmoi-managed, so it's deterministic across Ghostty versions). |
 | **Multiplexer** | [Zellij](https://zellij.dev) with the Catppuccin Frappé theme, compact layout, mouse + clipboard integration, session persistence. Launch with the `zj` alias. Auto-attach on shell startup is opt-in (commented snippet in `.zshrc`). |
 | **Prompt** | [Starship](https://starship.rs) with Catppuccin Frappé palette. Two-line prompt that surfaces git branch/status, language versions (Java/Node/Python/Go), Kubernetes context, and AWS profile only when contextually relevant — keeps it clean otherwise. See [the prompt examples](#what-the-prompt-looks-like) below. |
-| **Shell** | zsh with full XDG layout, mise activation, direnv hook, fzf integration (`Ctrl-R` history search, `**<Tab>` completion), `zsh-completions` + `zsh-syntax-highlighting`, claude work/personal wrapper, modern CLI aliases (`ls→eza`, `cat→bat`, `find→fd`). |
+| **Shell** | zsh with full XDG layout, direnv hook (auto-activates each project's devbox env on `cd`), fzf integration (`Ctrl-R` history search, `**<Tab>` completion), `zsh-completions` + `zsh-syntax-highlighting`, claude work/personal wrapper, modern CLI aliases (`ls→eza`, `cat→bat`, `find→fd`). |
 | **Git** | Identity + 1Password commit signing via `op-ssh-sign`, delta diffs, useful aliases (`s`, `lg`, `wip`, `undo`, `amend`, `fixup`), pull rebase, rerere. |
-| **Runtimes** | mise: Java 21 (Temurin), Maven, Gradle, Node (bundles npm), pnpm, Python — all "latest", overridable per-project via `.mise.toml`. |
+| **Runtimes** | **Per-project** via [Devbox](https://www.jetify.com/devbox) (Nix-backed). Each project's repo carries its own `devbox.json` + `.envrc`; on `cd` direnv activates the project's pinned JDK/Kotlin/Postgres/Node/etc. without polluting the global PATH. Devbox itself isn't in homebrew — `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` handles both the Jetify curl-installer for the CLI and the Determinate Nix bootstrap for the `/nix` store, both non-interactively, so a fresh `chezmoi apply` ends with `devbox shell` ready to fire without prompts. No global runtime pin list in this repo; use `devbox global add jdk21 kotlin nodejs@lts` if you want fallback runtimes outside any project. |
 | **Brew** | ~55 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), Azure (`az`, `kubelogin`), GCP (`gcloud`, `gke-gcloud-auth-plugin`), IaC (`terraform` from HashiCorp tap, `tflint`, `terraform-docs`), DB clients (`pgcli`, `mysql-client`, `redis-cli`), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
 | **Editor (GUI)** | VS Code with Catppuccin Frappé, Material Icon Theme, JetBrainsMono ligatures, Python + Pylance + black-formatter + Containers extensions, format on save. |
 | **Editor (terminal)** | [Neovim](https://neovim.io) with [LazyVim](https://www.lazyvim.org) and the Catppuccin Frappé flavor. First launch auto-installs `lazy.nvim`, then LazyVim pulls in LSP (via mason), treesitter, telescope, nvim-tree, which-key, gitsigns, and the standard distribution. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/Terraform/Markdown) ship commented-out in `lua/config/lazy.lua` — uncomment whichever you want. |
@@ -298,7 +298,7 @@ chez                         # smart `chezmoi apply` — diff preview + auto-for
 chezup                       # `git pull --ff-only` in the source repo, then chez — most common upgrade workflow
 chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + chez. Use after a data-model change upstream
 chezdiff                     # chezmoi diff + brew bundle drift across every Brewfile module + which scripts would re-fire
-chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + mise upgrade + re-add mise config
+chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + devbox global update
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
 chezdoctor                   # full health check (XDG layout, claude routing, op signing, brew sync, auth state)
 
@@ -339,7 +339,7 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 - **Claude routing** — wrapper loads, routes correctly from `/tmp` (personal) and `~/Dev/Work/` (work), `~/.claude` present if work profile.
 - **Git signing** — `op-ssh-sign` exists, signing key configured, smoke test of `git -S commit` actually succeeds.
 - **Brew packages** — every Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
-- **mise** — installed, toolchains present.
+- **devbox + direnv + Nix** — devbox CLI installed, `/nix` store mounted, `nix-daemon` running, direnv hook wired into the shell, global direnv config present, no leftover `mise` on PATH.
 - **Cloud auth** — informational status of `gh`, `az`, `gcloud`, `op`, plus GKE plugin presence.
 - **Fonts** — JetBrainsMono Nerd Font installed.
 - **Privacy permissions** — printed checklist (these can't be checked programmatically).
@@ -418,7 +418,7 @@ Same recipe for any other module. `chezaudit` (alias) shows you packages current
 
 ```sh
 chezreinit         # pull + init + apply — handles data-model drift in one shot
-chezbump           # brew update/upgrade + mise upgrade + re-snapshot mise pins
+chezbump           # brew update/upgrade + devbox global update
 chezdoctor         # full health check — surfaces anything that broke while you were away
 ```
 
@@ -471,13 +471,19 @@ Three classes of files in this repo, plus chezmoi's own infrastructure.
 
 - `.chezmoi.toml.tmpl` — init prompts. Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`.
 - `.chezmoidata/packages.toml` — data file (vscode extension list) available in every template via `{{ .vscode.extensions }}`.
-- `.chezmoiscripts/` — auto-run hooks.
-  - `run_before_00-sudo-cache` — runs at the very start of every apply. Pre-authenticates sudo on a clean terminal and starts a background keeper that refreshes the credentials every 50s, so every later sudo call inside cask installs and macOS defaults is silent. Silent no-op when sudo is already cached or when there's no TTY.
-  - `run_once_before_01-install-homebrew` — once before the first apply.
-  - `run_onchange_after_02-brew-bundle` — re-runs when any Brewfile or the script itself changes. `exec </dev/tty` on entry so sudo-requiring casks (docker-desktop, 1password) can read the password.
-  - `run_onchange_after_03-vscode-extensions` — re-runs when the extension list changes.
-  - `run_once_after_04-macos-defaults` — once per machine; never again even if you edit (use the `macos-defaults` alias for re-runs). Also does `exec </dev/tty`.
-  - `run_onchange_after_99-completion` — runs *every* apply and prints a `✓ chezmoi apply complete` banner so it's unambiguous when chezmoi has finished. Forces re-fire by including a `{{ now.Unix }}` timestamp in its rendered content.
+- `.chezmoiscripts/` — auto-run hooks. Five user-visible steps per apply, in order:
+
+  | # | Script | Phase | Runs when | What it does |
+  |---|---|---|---|---|
+  | 1 | `run_before_00-sudo-cache` | before, every apply | always | Pre-authenticates sudo on a clean terminal + background keeper refreshing every 50s. Silent no-op when sudo is already cached or there's no TTY. |
+  | — | `run_once_before_01-install-homebrew` | before, once | first apply only | Installs Homebrew if missing. Silent on every subsequent apply. |
+  | 2 | `run_onchange_before_01b-install-devbox` | before, on script change | always (idempotent) | Two-part: curl-installs devbox CLI from Jetify if missing, then bootstraps the Nix store at `/nix` via the Determinate Systems installer (`--determinate --no-confirm`). Both halves short-circuit when already present. |
+  | 3 | `run_onchange_after_02-brew-bundle` | after, on Brewfile/profile/feature change | always | Layers core Brewfile + the enabled feature modules + your profile's extras. `exec </dev/tty` so sudo-requiring casks (docker-desktop, 1password) can read the password. Heartbeat every 45s during silent stretches. |
+  | 4 | `run_onchange_after_03-vscode-extensions` | after, on extension-list change | always | Installs/updates VS Code extensions from `.chezmoidata/packages.toml`. |
+  | 5 | `run_once_after_04-macos-defaults` | after, once | first apply only | Runs `macos-defaults.sh`. Never re-fires automatically — re-apply edits via the `macos-defaults` zsh alias. |
+  | — | `run_onchange_after_99-completion` | after, every apply | always | Prints the `✓ chezmoi apply complete` banner with the day-to-day reference card. Re-fires because the rendered content embeds `{{ now.Unix }}`. |
+
+  The "step N/5" prefixes you see in apply output (`[brew-bundle] apply step 3/5 …`) match this numbering, so a wall of brew-bundle output never leaves you wondering what's left.
 
 ---
 
@@ -579,7 +585,7 @@ Plus an upfront plan that tells you what's coming and roughly how long:
 
 ```text
 ═════════════════════════════════════════════════════════════════════
-[brew-bundle] step 2 of 4 — installing/updating brew packages
+[brew-bundle] apply step 3/5 — installing/updating brew packages
 [brew-bundle] modules to apply: 6
 [brew-bundle]   1. core (always)
 [brew-bundle]   2. IaC (Terraform + lint)

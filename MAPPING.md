@@ -11,7 +11,7 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/zsh/dot_zprofile` | `~/.config/zsh/.zprofile` | Login shell init (brew shellenv). |
 | `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key. Git auto-detects this XDG path. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
-| `dot_config/mise/config.toml` | `~/.config/mise/config.toml` | mise toolchain definitions. |
+| `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Dev` (no per-project `direnv allow` required). |
 | `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile settings (CLAUDE_CONFIG_DIR points here). |
 | `dot_config/claude/personal/CLAUDE.md` | `~/.config/claude/personal/CLAUDE.md` | Global instructions auto-loaded into every personal Claude Code session — communication style, environment, code-style preferences, anti-patterns to avoid. Project-specific overrides go in `<project>/CLAUDE.md`. |
 | `dot_docker/config.json` | `~/.docker/config.json` | Docker CLI config. Stays at `~/.docker/` because Docker Desktop hardcodes the path. |
@@ -32,6 +32,7 @@ Reference table showing exactly what each file in the repo does.
 | `remove_dot_gitconfig` | `~/.gitconfig` | Git checks `~/.gitconfig` before `~/.config/git/config`, so a legacy file there silently shadows the XDG-managed config. Active protection. |
 | `remove_dot_zshrc` | `~/.zshrc` | Real zshrc is at `~/.config/zsh/.zshrc` via `ZDOTDIR`. Legacy file would shadow it. |
 | `remove_dot_zprofile` | `~/.zprofile` | Real zprofile is at `~/.config/zsh/.zprofile`. Same reason. |
+| `dot_config/mise/remove_config.toml` | `~/.config/mise/config.toml` | **Transitional.** Empty file with the `remove_` prefix tells chezmoi to delete `~/.config/mise/config.toml` from $HOME on first apply (we migrated mise → devbox). Once every machine you own has applied at least once, you can delete the whole `dot_config/mise/` source dir: `rm -rf ~/Dev/Personal/dotfiles/dot_config/mise && git add -A && git commit -m "chore: drop mise removal marker"`. |
 
 **Note:** there is *no* `remove_dot_zsh_history` marker. We deliberately don't manage the legacy `~/.zsh_history` or `~/.config/zsh/.zsh_history` files because chezmoi tries to remove them, the live shell (with `SHARE_HISTORY` enabled) recreates them after every command, and the result is an endless "target has changed" prompt every time you run `chezmoi apply`. The new HISTFILE is at `~/.local/state/zsh/history` per `~/.zshenv` + `~/.config/zsh/.zshrc`; any old `.zsh_history` files on disk are inert and you can delete them by hand if you care: `rm -f ~/.zsh_history ~/.config/zsh/.zsh_history`.
 
@@ -64,6 +65,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
 | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` | Runs once before any apply. macOS-only via template guard. |
+| `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` | Runs before apply. Two-step: (1) curl-installs devbox from `get.jetify.com/devbox` if missing (devbox isn't in homebrew); (2) if `/nix` doesn't exist, eagerly bootstraps the Nix store via Determinate Systems' installer (`install --determinate --no-confirm`) — same code path devbox would invoke lazily, just run upfront so the first `devbox shell` doesn't pause for a "press enter to continue" prompt. macOS-only. Both halves idempotent. Doesn't fail the apply if Nix bootstrap errors — falls back to lazy install. |
 | `.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl` | Runs after apply when Brewfile content hash changes. macOS-only. |
 | `.chezmoiscripts/run_onchange_after_03-vscode-extensions.sh.tmpl` | Runs after apply when extension list changes. macOS-only. |
 | `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |

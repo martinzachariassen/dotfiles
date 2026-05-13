@@ -772,7 +772,13 @@ self_test() {
     say "${DIM}core${RESET}"
     _v "git"      git --version
     _v "chezmoi"  chezmoi --version
-    _v "mise"     mise --version
+    _v "devbox"   devbox version
+    # Nix isn't on PATH in this script's shell (Determinate adds it to /etc/zshrc
+    # which only takes effect in new shells), so check the store directory and
+    # the daemon LaunchDaemon instead — both are stable signals that Nix is
+    # actually functional, not just half-installed.
+    _vf "Nix store /nix"   "[ -d /nix ]"
+    _vf "nix-daemon running" "launchctl list 2>/dev/null | grep -q org.nixos.nix-daemon"
     _v "starship" starship --version
     _v "zellij"   zellij --version
     _v "lazygit"  lazygit --version

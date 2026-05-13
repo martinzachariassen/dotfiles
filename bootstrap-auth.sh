@@ -138,12 +138,20 @@ if [ "${SKIP_OP:-0}" != "1" ]; then
     if ! command -v op >/dev/null 2>&1; then
         warn "op not installed — skipping (in Brewfile)"
     else
-        if op account list >/dev/null 2>&1 && op vault list >/dev/null 2>&1; then
+        # `op account list` and `op vault list` are interactive when no
+        # accounts are configured — they print "No accounts configured…" and
+        # prompt "Do you want to add an account manually now? [Y/n]". We close
+        # stdin with </dev/null so this script never gets ambushed by that.
+        # If you DO want to set up op CLI, the warn-block below gives the
+        # exact commands to run manually.
+        if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             ok "op CLI already signed in"
         else
-            info "running op signin (paste the URL+secret-key from 1Password if first run)"
-            warn "If first time, run: op account add  → then  eval \$(op signin)"
-            warn "If already added, run:  eval \$(op signin)"
+            info "op CLI not signed in. For most flows you don't need this —"
+            info "  1Password's SSH agent + git signing go through the desktop"
+            info "  app, not via \`op\`. Only set up the CLI if you actually use"
+            info "  it (chezmoi templates that pull secrets, op-injected envs)."
+            warn "To set up:  op account add   →   eval \$(op signin)"
         fi
     fi
 fi

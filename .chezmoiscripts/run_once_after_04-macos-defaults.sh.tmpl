@@ -20,7 +20,7 @@ exit 0
 # stdin from the controlling terminal if one exists, so sudo can read the
 # password normally. In CI or other no-tty contexts, skip cleanly with a
 # helpful message rather than hang.
-echo "[macos-defaults] step 4/4 — applying system settings (one-time, sudo prompt)"
+echo "[macos-defaults] apply step 5/5 — applying system settings (one-time, sudo prompt)"
 
 if [ -e /dev/tty ] && [ -r /dev/tty ]; then
     exec </dev/tty

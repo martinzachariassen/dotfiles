@@ -2,8 +2,8 @@
 #
 # This is the smallest set that makes the dotfiles' shell experience work as
 # documented: a Catppuccin-themed Ghostty + Starship + Zellij + zsh stack with
-# the modern CLI replacements wired into aliases, mise for runtimes, chezmoi
-# for managing this repo, and 1Password for SSH + git signing.
+# the modern CLI replacements wired into aliases, devbox + direnv for per-project
+# runtimes, chezmoi for managing this repo, and 1Password for SSH + git signing.
 #
 # Optional add-ons live in sibling Brewfile.<feature> files and are layered on
 # top of this one based on your answers to the install wizard. See:
@@ -24,9 +24,13 @@ brew "git-delta"               # syntax-highlighted git diffs
 brew "gh"                      # GitHub CLI
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
-brew "mise"                    # runtime version manager (Java, Node, Python, Go, …)
+# devbox: NOT a brew formula. Installed via Jetify's official curl-installer
+# in .chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl, which runs
+# before this Brewfile is touched. Devbox itself manages per-project runtimes
+# (Java/Kotlin/Postgres/…) via Nix; on first `devbox shell` it bootstraps Nix
+# in multi-user mode if absent.
 brew "chezmoi"                 # this very repo's manager
-brew "direnv"                  # per-directory env vars; essential for multi-project work
+brew "direnv"                  # per-directory env vars + auto-activates devbox via .envrc
 brew "wget"
 brew "curl"
 brew "jq"                      # JSON

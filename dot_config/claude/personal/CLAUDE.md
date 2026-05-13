@@ -42,19 +42,27 @@ something else.
 
 **Runtimes & version management**
 
-- **`mise`** — single tool replacing `nvm`, `jenv`, `pyenv`, `rbenv`, `asdf`,
-  `volta`, etc. Global config at `~/.config/mise/config.toml` pins Java 21
-  (Temurin), Maven, Gradle, Node, pnpm, Python — all "latest".
-- Per-project pinning via a committed `.mise.toml`. For a new Spring Boot
-  service the file looks like:
-  ```toml
-  [tools]
-  java   = "temurin-21"
-  maven  = "3.9"
+- **`devbox`** (Jetify, Nix-backed) for per-project runtimes — Java/Kotlin/
+  Postgres/Node/etc. Each project's repo carries its own `devbox.json`
+  (committed) and `.envrc` (with `use_devbox`); on `cd` direnv activates the
+  pinned toolchain for that project only. Two services on different JDK
+  majors coexist without PATH gymnastics.
+- For a new Spring Boot service the scaffold is:
+  ```sh
+  devbox init
+  devbox add jdk21 kotlin gradle postgresql_16 flyway
+  # writes devbox.json + devbox.lock — both committed
   ```
-- **`direnv`** for project env vars + automatic mise activation. Drop a
-  `.envrc` into a project with `use mise` plus any project-local exports;
-  `direnv allow` once and it loads on `cd` in.
+  Common nixpkgs for my stack: `jdk21` / `temurin-bin-21`, `kotlin`, `gradle`,
+  `maven`, `postgresql_16`, `redis`, `flyway`. Search at
+  <https://search.nixos.org/packages>.
+- **`direnv`** for project env vars + auto-activating devbox. The hook lives
+  in `~/.config/zsh/.zshrc`; the whitelist in `~/.config/direnv/direnv.toml`
+  trusts `~/Dev` automatically, so no per-project `direnv allow` is needed
+  for projects under there.
+- **No global runtime manager** (no mise, asdf, nvm, jenv, pyenv, sdkman, …).
+  If I genuinely need a fallback JDK or Node outside any project, it's
+  `devbox global add jdk21 kotlin nodejs@lts` — but default to per-project.
 
 **Shell & terminal**
 
@@ -215,15 +223,17 @@ refactor(api)!: rename /users → /accounts (drops backward compat)
 
 ## Tooling conventions (positive defaults)
 
-- **Always assume `mise`** for installing/managing language runtimes and
-  build tools. Don't suggest `nvm`, `jenv`, `pyenv`, `rbenv`, `asdf`,
-  `volta`, or installing those via `brew` directly.
-- **For new projects, propose a committed `.mise.toml`** that pins the
-  project's tools — it makes onboarding deterministic and survives switching
-  between projects without `nvm use` ceremony.
-- **For Node, prefer `pnpm`** (managed by mise alongside Node).
-- **For installing dev CLIs globally**, prefer adding them to my Brewfile
-  rather than language-specific installers (`npm install -g`, `pip install --user`).
+- **Always assume `devbox` + `direnv`** for per-project runtimes (JDK, Kotlin,
+  Node, Postgres, Redis, etc.). Don't suggest `mise`, `nvm`, `jenv`, `pyenv`,
+  `rbenv`, `asdf`, `volta`, `sdkman`, or installing language runtimes via
+  `brew` directly.
+- **For new projects, propose a committed `devbox.json` + `.envrc`** with
+  `use_devbox`. The toolchain travels with the project repo, so onboarding is
+  `git clone && cd` and direnv handles the rest.
+- **For Node, prefer `pnpm`** (add it via `devbox add nodejs pnpm` per project).
+- **For installing dev CLIs globally** (things you want available outside any
+  project — `kubectl`, `terraform`, etc.), add them to my Brewfile rather than
+  language-specific installers (`npm install -g`, `pip install --user`).
 - **For zsh customization**, add things to my managed `.zshrc` rather than
   introducing a framework (oh-my-zsh, prezto, zinit). My setup is plain zsh +
   brew `zsh-completions` + `zsh-syntax-highlighting`.
@@ -232,7 +242,7 @@ refactor(api)!: rename /users → /accounts (drops backward compat)
 
 - **Don't apologize** when correcting yourself — just state the correction.
 - **Don't surface "this might not work in older versions" caveats** for
-  tools I have installed. Trust my mise/Brewfile versions; if compatibility
+  tools I have installed. Trust my devbox/Brewfile versions; if compatibility
   genuinely matters for a snippet, say so once and move on.
 - **Default cloud examples to Azure or GCP.** AWS is fine when I explicitly
   ask or when the topic is cloud-agnostic and AWS is the most-recognizable

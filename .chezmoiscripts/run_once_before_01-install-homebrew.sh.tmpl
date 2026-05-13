@@ -10,7 +10,9 @@ echo "[brew] not on macOS, skipping"
 exit 0
 {{ end -}}
 
-echo "[brew] step 1/4 — checking Homebrew installation"
+# Not numbered in the apply step 1..5 sequence because this only runs on the
+# very first apply (`run_once_before_*`). Subsequent applies skip it silently.
+echo "[brew] one-time: checking Homebrew installation"
 
 if command -v brew >/dev/null 2>&1; then
     echo "[brew] ✓ already installed"

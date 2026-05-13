@@ -249,17 +249,55 @@ else
     fail "brew not on PATH"
 fi
 
-# ─── 7. mise toolchains ───────────────────────────────────────────────────────
-section "mise"
-if command -v mise >/dev/null 2>&1; then
-    pass "mise installed"
-    if mise list 2>/dev/null | grep -qE 'java|node|python'; then
-        pass "mise toolchains present"
+# ─── 7. devbox + direnv (per-project runtimes) ────────────────────────────────
+section "devbox + direnv"
+if command -v devbox >/dev/null 2>&1; then
+    pass "devbox installed: $(devbox version 2>/dev/null | head -1)"
+else
+    fail "devbox missing — runtimes (Java, Kotlin, Postgres, …) won't activate per project"
+fi
+# Nix is bootstrapped eagerly by run_onchange_before_01b-install-devbox; verify
+# it actually landed. Without /nix, `devbox shell` will halt on a "press enter
+# to continue" prompt the first time it runs — that's the paper-cut the eager
+# install is meant to prevent.
+if [ -d /nix ]; then
+    pass "Nix store present at /nix"
+    # The LaunchDaemon label depends on which Nix flavour you have:
+    #   - Upstream Nix multi-user:  org.nixos.nix-daemon
+    #   - Determinate Nix Installer: systems.determinate.nix-daemon
+    # We use Determinate via the devbox-bootstrap script, but accept either so
+    # this check doesn't flap if/when labels change again or if someone reinstalls
+    # with the upstream installer. `sudo launchctl list` lists system daemons.
+    if sudo -n launchctl list 2>/dev/null | grep -qE '(org\.nixos|systems\.determinate)\.nix-daemon'; then
+        pass "nix-daemon LaunchDaemon running"
+    elif launchctl list 2>/dev/null | grep -qE '(org\.nixos|systems\.determinate)\.nix-daemon'; then
+        pass "nix-daemon LaunchDaemon running"
     else
-        warn "no mise toolchains installed — run: mise install"
+        warn "/nix exists but nix-daemon label not found — run \`sudo launchctl list | grep -i nix\` to see what's there. If empty, kickstart with \`sudo launchctl kickstart -k system/systems.determinate.nix-daemon\` (or org.nixos.nix-daemon for upstream Nix)."
     fi
 else
-    fail "mise missing"
+    fail "Nix store missing at /nix — devbox will prompt for install on first use. Re-run \`chez\` to bootstrap."
+fi
+if command -v direnv >/dev/null 2>&1; then
+    pass "direnv installed: $(direnv version 2>/dev/null)"
+    # Confirm the hook is actually wired into the shell config — without it
+    # devbox activation via .envrc is a no-op.
+    if grep -q 'direnv hook zsh' "$HOME/.config/zsh/.zshrc" 2>/dev/null; then
+        pass "direnv hook present in ~/.config/zsh/.zshrc"
+    else
+        fail "direnv hook missing from ~/.config/zsh/.zshrc — run: chezmoi apply"
+    fi
+    if [ -f "$HOME/.config/direnv/direnv.toml" ]; then
+        pass "~/.config/direnv/direnv.toml present"
+    else
+        warn "~/.config/direnv/direnv.toml missing — projects under whitelisted dirs will need per-project \`direnv allow\`"
+    fi
+else
+    fail "direnv missing — .envrc activation won't fire on cd"
+fi
+# Legacy guard: catch a stale mise install that the user hasn't uninstalled yet.
+if command -v mise >/dev/null 2>&1; then
+    warn "legacy \`mise\` still on PATH — run: brew uninstall mise && rm -rf ~/.local/share/mise ~/.config/mise"
 fi
 
 # ─── 8. Auth state (FYI) ──────────────────────────────────────────────────────
@@ -286,10 +324,26 @@ if command -v gcloud >/dev/null 2>&1; then
     fi
 fi
 if command -v op >/dev/null 2>&1; then
-    if op account list >/dev/null 2>&1 && op vault list >/dev/null 2>&1; then
-        pass "1Password CLI signed in"
+    # CRITICAL: `op account list` and `op vault list` are interactive when no
+    # accounts are configured — they print a prompt asking if you want to add
+    # one. doctor.sh is supposed to be read-only and non-interactive, so we
+    # explicitly close stdin with </dev/null. Without this, the next prompt
+    # in doctor's flow (or the user's next command) gets ambushed.
+    #
+    # We also check ~/.config/op/config.json first — if it doesn't exist, op
+    # has never been configured and there's nothing to "sign in to". That's
+    # the common state when 1Password desktop SSH integration is the only op
+    # surface in use (which is our setup).
+    if [ -f "$HOME/.config/op/config.json" ] || [ -f "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/Library/Application Support/1Password/Data/op/config.json" ]; then
+        if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
+            pass "1Password CLI signed in"
+        else
+            warn "1Password CLI not signed in — run: eval \$(op signin)"
+        fi
     else
-        warn "1Password CLI not signed in — run: eval \$(op signin)"
+        # No op CLI config at all — that's fine, the SSH agent + git signing
+        # path goes through the desktop app, not via `op` directly. No warn.
+        pass "1Password CLI not configured (desktop SSH integration is sufficient for this setup)"
     fi
 fi
 

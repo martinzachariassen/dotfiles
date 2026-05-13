@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# run_onchange_before_01b-install-devbox — install the devbox CLI + Nix store.
+#
+# This script handles two things, both of which need to happen before any
+# project-level `devbox` command works:
+#
+#   1. The devbox CLI binary itself (curl-installer from Jetify, since
+#      devbox isn't in homebrew — no formula, no official tap).
+#   2. The Nix store at /nix (via the Determinate Nix Installer, which is
+#      what devbox itself would shell out to on first use). Doing this
+#      eagerly here — non-interactively — means the first `devbox shell`
+#      / `devbox list` / `devbox add` in a project just works, instead of
+#      pausing on "Nix is not installed. Press enter to continue."
+#
+# Why `onchange_before` and not `once_before`:
+#   `once_*` records a single execution and never re-fires, even if you edit
+#   the script. `onchange_*` re-fires when the script content changes — so
+#   when we bump installer URLs or flags, the next `chezmoi apply` actually
+#   runs the updated logic. Both halves of the script are idempotent (devbox
+#   short-circuits on `command -v`, Nix short-circuits on `[ -d /nix ]`),
+#   so re-fires are cheap no-ops.
+#
+# Why `before_` not `after_`:
+#   Keeps the install ordering predictable. Homebrew is in place by
+#   `01-install-homebrew`, devbox+Nix here, brew-bundle (`02-brew-bundle`)
+#   runs after apply with both already available. Nothing in brew-bundle
+#   currently uses devbox, but co-locating package managers in the same
+#   phase keeps the mental model clean: "before-scripts install package
+#   managers, after-scripts install packages."
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[devbox] not on macOS, skipping"
+exit 0
+{{ end -}}
+
+# Apply-lifecycle step 2 of 5 (sudo-cache → devbox+Nix → brew-bundle →
+# vscode-extensions → macos-defaults). The "1/2" / "2/2" below are internal
+# to this script (devbox CLI install + Nix bootstrap), not the lifecycle.
+
+# ─── Part 1: devbox CLI ───────────────────────────────────────────────────────
+echo "[devbox] apply step 2/5 — devbox CLI + Nix bootstrap"
+echo "[devbox]   substep 1/2 — checking devbox CLI"
+
+if command -v devbox >/dev/null 2>&1; then
+    echo "[devbox] ✓ devbox CLI already installed: $(devbox version 2>&1 | head -1)"
+else
+    echo "[devbox] installing devbox via Jetify's official installer"
+    echo "[devbox]   (https://get.jetify.com/devbox — devbox isn't in homebrew)"
+
+    # Re-attach stdin to /dev/tty in case chezmoi disconnected it. The Jetify
+    # installer is non-interactive in the common case, but if /usr/local/bin
+    # doesn't exist yet it'll invoke sudo to create it — and sudo needs a TTY
+    # to read a password from. `run_before_00-sudo-cache` has already cached
+    # the credential, so in practice there's no prompt; the TTY re-attach is
+    # defence in depth for the cold-cache case.
+    exec </dev/tty 2>/dev/null || true
+
+    # Drops the binary in /usr/local/bin and prints progress. If you hit a
+    # TLS/network error here, just re-run `chezmoi apply` — this script is
+    # idempotent and `command -v devbox` will short-circuit it.
+    curl -fsSL https://get.jetify.com/devbox | bash
+
+    # Verify the install actually landed somewhere on PATH for the Nix step
+    # below. /usr/local/bin is on the default macOS PATH from /etc/paths,
+    # so this should always succeed; if it doesn't, the installer changed
+    # and we want to know loudly rather than silently fail.
+    if ! command -v devbox >/dev/null 2>&1; then
+        if [ -x /usr/local/bin/devbox ]; then
+            export PATH="/usr/local/bin:$PATH"
+        else
+            echo "[devbox] ✗ install ran but binary isn't on PATH."
+            echo "[devbox]   Expected at /usr/local/bin/devbox — investigate."
+            exit 1
+        fi
+    fi
+    echo "[devbox] ✓ devbox CLI installed: $(devbox version 2>&1 | head -1)"
+fi
+
+# ─── Part 2: Nix store ────────────────────────────────────────────────────────
+# devbox depends on Nix for every per-project package. We use the Determinate
+# Systems installer because:
+#   - It's what devbox itself shells out to when /nix is missing — same code
+#     path, just run eagerly here with --no-confirm so chezmoi doesn't stop
+#     for an interactive prompt later.
+#   - It creates a separate APFS volume mounted at /nix instead of touching
+#     the read-only macOS boot volume, and registers a clean uninstaller
+#     (`/nix/nix-installer uninstall`) for the rare day you want out.
+#   - Multi-user mode (with the nix-daemon LaunchDaemon + _nixbld* build
+#     sandbox users) is the only path that scales to multiple devbox users
+#     on the same Mac and is what Jetify recommends.
+
+echo "[devbox]   substep 2/2 — checking Nix store"
+
+if [ -d /nix ]; then
+    echo "[devbox] ✓ Nix store already present at /nix"
+    exit 0
+fi
+
+echo "[devbox] bootstrapping Nix via Determinate Systems' installer (~1-2 min)"
+echo "[devbox]   - creates APFS volume \"Nix Store\" mounted at /nix"
+echo "[devbox]   - registers org.nixos.nix-daemon LaunchDaemon"
+echo "[devbox]   - adds _nixbld1..32 build sandbox users"
+echo "[devbox]   - uninstall later with: /nix/nix-installer uninstall"
+
+exec </dev/tty 2>/dev/null || true
+
+# `--determinate` selects Determinate Nix (their hardened fork that ships with
+# the uninstaller and a few stability patches). `--no-confirm` skips the
+# interactive y/n. The installer itself escalates to sudo internally; the
+# sudo-cache from run_before_00 means no prompt fires in the common case.
+if curl -fsSL https://install.determinate.systems/nix | \
+        sh -s -- install --determinate --no-confirm; then
+    echo "[devbox] ✓ Nix store created at /nix"
+    echo "[devbox]   Note: \`nix\` won't be on PATH in THIS script's shell, but"
+    echo "[devbox]   /etc/zshrc has been updated, so new shells (and the next"
+    echo "[devbox]   chezmoi apply step) see it. devbox itself doesn't need"
+    echo "[devbox]   \`nix\` on PATH — it talks to /nix/ directly."
+else
+    # Don't fail the whole apply for a Nix bootstrap glitch. devbox CLI works;
+    # the user can retry via \`chezup\` or trigger devbox usage manually to
+    # fall back to the lazy install path. Most failures here are transient
+    # (network, sudo timeout) — easy to recover from.
+    echo "[devbox] ⚠ Nix bootstrap failed (rc=$?). devbox CLI is installed,"
+    echo "[devbox]   but the first \`devbox\` command in a project will retry"
+    echo "[devbox]   the Nix install interactively. Re-run \`chez\` to retry"
+    echo "[devbox]   from this script."
+    exit 0
+fi

@@ -59,11 +59,11 @@ exec </dev/tty
 
 cat <<'EOF'
 
-── Sudo pre-authentication ───────────────────────────────────────
-  A few scripts in this apply need sudo (cask installs, macOS
-  defaults). Entering your password here — once, on a clean
-  terminal — caches it for the rest of the apply so brew bundle's
-  output can't compete for your keystrokes later.
+── Sudo pre-authentication (apply step 1/5) ─────────────────────
+  A few scripts in this apply need sudo (Nix bootstrap, cask
+  installs, macOS defaults). Entering your password here — once,
+  on a clean terminal — caches it for the rest of the apply so
+  brew bundle's output can't compete for your keystrokes later.
 
   If Touch ID for sudo is already enabled, just tap your finger.
 ──────────────────────────────────────────────────────────────────

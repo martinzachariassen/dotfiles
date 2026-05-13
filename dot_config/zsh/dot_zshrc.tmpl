@@ -13,11 +13,12 @@ setopt PUSHD_IGNORE_DUPS        # no duplicates in dir stack
 setopt CORRECT                  # offer command corrections on typos
 
 # ─── Tooling ──────────────────────────────────────────────────────────────────
-# mise: manages Java, Maven, Gradle, Node, Python (config in ~/.config/mise/)
-eval "$(mise activate zsh)"
-
-# direnv: per-directory env vars. Drop a `.envrc` into any project and it loads
-# automatically when you `cd` in (after one-time `direnv allow`).
+# direnv: per-directory env vars + the activation hook for devbox. Drop a
+# `.envrc` into any project (typically containing `use_devbox`) and it loads
+# automatically when you `cd` in. Per-project runtimes (JDK, Kotlin, Postgres,
+# Node, …) come from each project's own `devbox.json`, not from this repo.
+# Whitelist of trusted dirs lives in ~/.config/direnv/direnv.toml so projects
+# under those roots don't need a per-project `direnv allow`.
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"
 
 # ─── History ──────────────────────────────────────────────────────────────────
@@ -262,8 +263,9 @@ chezreinit() {
     chezmoi init && chez "$@"
 }
 
-# Routine dependency bump: update brew & mise, then snapshot mise's pinned
-# versions back into source so the toolchain travels with the repo.
+# Routine dependency bump: update brew + devbox globals.
+# Per-project runtimes live in each project's own devbox.json and travel with
+# the project's repo — not bumped here.
 # Doesn't auto-commit — you review the diff and commit yourself.
 chezbump() {
     local src
@@ -277,12 +279,11 @@ chezbump() {
                         --file="$src/Brewfile.work" 2>/dev/null \
         || brew bundle cleanup --file="$src/Brewfile"
     echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
-    echo
-    echo "── mise upgrade ───────────────────────────────────────────────"
-    mise upgrade
-    echo
-    echo "── re-add mise config to source ───────────────────────────────"
-    chezmoi re-add ~/.config/mise/config.toml || true
+    if command -v devbox >/dev/null 2>&1; then
+        echo
+        echo "── devbox global update ──────────────────────────────────────"
+        devbox global update || true
+    fi
     echo
     echo "Now: cd $src && git diff   to review, then commit."
 }
