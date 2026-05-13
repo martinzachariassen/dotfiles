@@ -1,29 +1,76 @@
-{{/* chezmoi init prompts — run on `chezmoi init`.
-     Defaults are intentionally empty for identity fields so forks of this repo
-     don't inherit private values. Override by answering at the prompt or by
-     pre-populating ~/.config/chezmoi/chezmoi.toml's [data] block before init. */ -}}
+{{/* chezmoi init prompts — used as a fallback if the install wizard didn't
+     pre-populate ~/.config/chezmoi/chezmoi.toml.
+
+     The wizard in install.sh writes all of these values up front so this file
+     just rubber-stamps them on first init. On a re-run, promptOnce / promptOnceBool
+     short-circuit and reuse the existing answers, so this template is
+     idempotent.
+
+     Defaults are intentionally empty for identity fields so forks of this
+     repo don't inherit private values. */ -}}
+
 {{- $name       := promptStringOnce . "name"       "Full name"                                  "" -}}
 {{- $email      := promptStringOnce . "email"      "Git email (noreply works fine)"             "" -}}
 {{- $signingKey := promptStringOnce . "signingKey" "SSH signing key (1Password public key)"     "" -}}
 
 {{/* Profile picker — controls which casks get installed and which config blocks
      activate. `personal` and `work` install only their respective extras on top
-     of the common Brewfile; `both` installs everything. */ -}}
+     of the core Brewfile; `both` installs everything. */ -}}
 {{- $profile    := promptChoiceOnce . "profile" "Profile" (list "personal" "work" "both") "personal" -}}
+
+{{/* Feature toggles — each one decides whether a Brewfile.<feature> module is
+     layered in. The install wizard sets these via a multi-select; if you skip
+     the wizard, the defaults below describe the "kitchen sink" so you don't
+     lose anything you used to get.
+
+     Edit ~/.config/chezmoi/chezmoi.toml's [data.features] block to flip a
+     toggle later, then `chezmoi apply` to install/uninstall accordingly. */ -}}
+{{- $useOnePassword := promptBoolOnce . "useOnePassword" "Use 1Password for SSH + git signing"          true -}}
+{{- $featCloud      := promptBoolOnce . "features.cloud"     "Install Kubernetes + Azure + Google Cloud CLIs" true -}}
+{{- $featIaC        := promptBoolOnce . "features.iac"       "Install Terraform + tflint + terraform-docs"    true -}}
+{{- $featDatabases  := promptBoolOnce . "features.databases" "Install database clients (pgcli, mysql, redis)" true -}}
+{{- $featMacApps    := promptBoolOnce . "features.macApps"   "Install Mac-only QoL apps (Rectangle, Raycast, …)" true -}}
 
 # Tell chezmoi the source repo lives under ~/Dev/Personal/dotfiles
 # (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
 sourceDir = "{{ .chezmoi.homeDir }}/Dev/Personal/dotfiles"
 
-[data]
-    name       = {{ $name | quote }}
-    email      = {{ $email | quote }}
-    signingKey = {{ $signingKey | quote }}
-    profile    = {{ $profile | quote }}
+# Note: the minimum chezmoi version is enforced by the `.chezmoiversion` file
+# at the repo root (not a config-file field). chezmoi refuses to interpret
+# the source state if the current version is too old.
 
-{{- if lookPath "delta" }}
-# delta is installed → use it as the diff pager.
-# (If you just installed it via brew bundle, run `chezmoi init` again to pick this up.)
+[data]
+    name           = {{ $name | quote }}
+    email          = {{ $email | quote }}
+    signingKey     = {{ $signingKey | quote }}
+    profile        = {{ $profile | quote }}
+    useOnePassword = {{ $useOnePassword }}
+
+    [data.features]
+        cloud     = {{ $featCloud }}
+        iac       = {{ $featIaC }}
+        databases = {{ $featDatabases }}
+        macApps   = {{ $featMacApps }}
+
+# delta is unconditionally in the core Brewfile, so we can wire chezmoi's
+# diff pager to it without `lookPath` gating. The path resolves on first
+# `chezmoi diff` AFTER brew bundle has run; nothing in the install flow calls
+# `chezmoi diff` before that, so there's no chicken-and-egg issue.
 [diff]
     pager = "delta"
-{{- end }}
+
+# Make `chezmoi apply` (and every variant — `apply -v`, etc.) behave as if
+# `--force` were always passed. Reasoning: when a managed file in $HOME has
+# drifted from its source state, plain `chezmoi apply` stops and asks per-file
+#   diff/overwrite/skip/quit/merge?
+# The single-keypress prompt collides with later sudo prompts and feels
+# completely unexpected if you didn't realise you'd edited a managed file
+# locally.
+#
+# Force-by-default makes the apply non-interactive: it just overwrites local
+# drift. The safety net is `chez` (the zshrc wrapper) — it shows
+# `chezmoi status` upfront with a one-shot y/N so you can see and abort if
+# unwanted changes would be clobbered. To preserve a local edit before
+# applying, run `chezmoi re-add ~/.X` to capture it back into source first.
+[apply]
+    force = true

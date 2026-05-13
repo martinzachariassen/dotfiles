@@ -8,10 +8,41 @@
 
 set -euo pipefail
 echo "Applying macOS defaults — sudo will be requested for some changes."
-sudo -v
 
-# Keep sudo alive while this script runs
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+# When this script runs as part of `chezmoi apply`, the run_before_00-sudo-cache
+# script already prompted upfront and cached the credentials; sudo -v here is a
+# silent no-op. When it runs standalone (via the `macos-defaults` zsh alias) the
+# cache may be empty, in which case we prompt.
+#
+# Defensive against the "first keystroke eaten by TTY mode race" some
+# GPU-accelerated terminals (Ghostty, Alacritty, Kitty) exhibit:
+#   • Brief sleep so any pending terminal output is fully drained before
+#     sudo flips the line discipline to no-echo.
+#   • A distinct -p prompt so the user has an unambiguous visual signal
+#     this is the sudo password, not some other interactive question.
+if ! sudo -n true 2>/dev/null; then
+    sleep 0.2
+fi
+sudo -v -p "[macos-defaults] sudo password: "
+
+# Keep sudo alive while this script runs. Double-forked + tight poll so the
+# keeper exits within 2s of this script — same reasoning as the chezmoi
+# pre-auth script's keeper. Without this, you'd see a perceived shell "halt"
+# at the end of `macos-defaults` while waiting for the keeper to notice.
+PARENT_PID=$$
+(
+    (
+        refresh_in=0
+        while kill -0 "$PARENT_PID" 2>/dev/null; do
+            if [ "$refresh_in" -le 0 ]; then
+                sudo -n true 2>/dev/null || exit
+                refresh_in=240
+            fi
+            sleep 2
+            refresh_in=$((refresh_in - 2))
+        done
+    ) &
+) </dev/null >/dev/null 2>&1
 
 # def_write <domain> <key> <-type> <value>
 # Reads the current value first and only writes when it differs. Cuts re-apply
@@ -150,6 +181,38 @@ def_write NSGlobalDomain AppleFontSmoothing -int 1
 # Disable shake-mouse-to-find-cursor (annoying when you actually want a tiny cursor).
 # Comment out if you LIKE this feature.
 def_write NSGlobalDomain CGDisableCursorLocationMagnification -bool true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TOUCH ID FOR SUDO (Sonoma 14+)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Lets you authenticate `sudo` with Touch ID instead of typing the password.
+# Apple introduced /etc/pam.d/sudo_local in Sonoma specifically to make this
+# survive OS upgrades — earlier macOS versions required editing the protected
+# /etc/pam.d/sudo, which got reverted on every system update. We write the
+# upgrade-stable file.
+#
+# Skipped on pre-Sonoma. Skipped if the line is already present. Single
+# `sudo tee` so we don't read the file (which is owned by root).
+TOUCHID_LINE="auth       sufficient     pam_tid.so"
+SUDO_LOCAL=/etc/pam.d/sudo_local
+SUDO_LOCAL_TEMPLATE=/etc/pam.d/sudo_local.template
+macos_major=$(sw_vers -productVersion | cut -d. -f1)
+if [ "$macos_major" -ge 14 ]; then
+    if sudo grep -q "pam_tid.so" "$SUDO_LOCAL" 2>/dev/null; then
+        : # already configured
+    else
+        # Apple ships a sudo_local.template you're meant to copy + edit.
+        # Build it if missing so we don't depend on the template's existence.
+        if [ -r "$SUDO_LOCAL_TEMPLATE" ] && ! sudo test -f "$SUDO_LOCAL"; then
+            sudo cp "$SUDO_LOCAL_TEMPLATE" "$SUDO_LOCAL"
+        fi
+        printf '# Managed by dotfiles macos-defaults.sh\nauth       sufficient     pam_tid.so\n' \
+            | sudo tee -a "$SUDO_LOCAL" >/dev/null
+        echo "  ✓ Touch ID for sudo enabled (next sudo will prompt)"
+    fi
+else
+    echo "  ⚠️  Touch ID for sudo skipped — requires macOS Sonoma (14+)"
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Apply changes — restart affected apps only if their settings actually changed

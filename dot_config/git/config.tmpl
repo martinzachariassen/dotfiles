@@ -1,11 +1,21 @@
+{{/* Upgrade safety: dig defaults useOnePassword to true if the key is missing
+     (pre-upgrade configs). Signing is only actually emitted when there's a
+     signing key, so missing-key users don't get a broken config. */ -}}
+{{- $useOP := dig "useOnePassword" true . -}}
 [user]
     name = {{ .name }}
     email = {{ .email }}
+{{- if and $useOP .signingKey }}
     signingkey = {{ .signingKey }}
+{{- end }}
 
 [init]
     defaultBranch = main
 
+{{ if and $useOP .signingKey -}}
+# Commit signing is enabled because useOnePassword=true and signingKey is set.
+# To disable: edit ~/.config/chezmoi/chezmoi.toml — set useOnePassword=false or
+# blank out signingKey — then `chezmoi apply`.
 [commit]
     gpgsign = true
 
@@ -14,6 +24,7 @@
 
 [gpg "ssh"]
     program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+{{- end }}
 
 [core]
     editor = nvim
@@ -27,6 +38,15 @@
     navigate = true
     line-numbers = true
     side-by-side = false
+    # Pager wired with the same flags as $LESS in ~/.zshenv:
+    #   F = auto-exit when content fits in one screen
+    #   R = raw ANSI colors so delta's syntax highlighting renders
+    #   K = Ctrl-C quits less (instead of interrupting in-progress search)
+    #   -P… = custom status line showing how to escape, instead of the cryptic ":"
+    # NOT using -X — see the rationale in ~/.zshenv. Without -X, less uses the
+    # alt-screen buffer so content + status line vanish cleanly on exit
+    # instead of cluttering scrollback.
+    pager = "less -FRK -P'Press q or Ctrl-C to quit · / search · h for help'"
 
 [diff]
     colorMoved = default

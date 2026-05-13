@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# run_onchange_after_99-completion — closing summary at the end of every apply.
+#
+# Why this exists:
+#   The earlier scripts in the apply (brew-bundle, vscode-extensions, macos-defaults)
+#   produce a lot of output. Without a structured closing summary, you're left
+#   looking at the tail of brew bundle's verbose log with no clear "you're done,
+#   and here's what's available to you now" signal.
+#
+# Naming considerations:
+# - "99-" prefix sorts last numerically among the after-scripts (02, 03, 04, 99).
+# - `onchange_` (rather than plain `run_after_`) ensures we sort *after* both
+#   `once_after_*` and other `onchange_after_*` siblings.
+# - The timestamp comment below intentionally changes every render so chezmoi
+#   treats this script as "changed" and re-runs it on every apply.
+#
+# Last-render timestamp (forces re-run): {{ now.Unix }}
+
+set -euo pipefail
+
+# ─── Inputs from chezmoi data ────────────────────────────────────────────────
+PROFILE="{{ .profile }}"
+SOURCE="{{ .chezmoi.sourceDir }}"
+USE_OP="{{ dig "useOnePassword" true . }}"
+
+# Build feature list as a bullet-separated string for compact display.
+FEATURES=""
+{{ if dig "features" "cloud" true . }}FEATURES="${FEATURES}cloud · "{{ end }}
+{{ if dig "features" "iac" true . }}FEATURES="${FEATURES}iac · "{{ end }}
+{{ if dig "features" "databases" true . }}FEATURES="${FEATURES}databases · "{{ end }}
+{{ if dig "features" "macApps" true . }}FEATURES="${FEATURES}macApps · "{{ end }}
+FEATURES="${FEATURES% · }"
+[ -z "$FEATURES" ] && FEATURES="(none enabled)"
+
+# ─── Colors (only if stdout is a real TTY) ───────────────────────────────────
+if [ -t 1 ]; then
+    B=$'\033[1m'; D=$'\033[2m'
+    G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; M=$'\033[35m'
+    R=$'\033[0m'
+else
+    B="";D="";G="";C="";Y="";M="";R=""
+fi
+
+# ─── Output ──────────────────────────────────────────────────────────────────
+cat <<EOF
+
+${C}═════════════════════════════════════════════════════════════════════${R}
+  ${G}${B}✓ chezmoi apply complete${R}
+${C}═════════════════════════════════════════════════════════════════════${R}
+
+  ${B}Profile${R}        ${G}${PROFILE}${R}
+  ${B}Features${R}       ${FEATURES}
+  ${B}1Password${R}      $([ "$USE_OP" = "true" ] && printf "%senabled%s" "$G" "$R" || printf "%sdisabled%s" "$Y" "$R")
+  ${B}Source${R}         ${D}${SOURCE}${R}
+
+${D}─── What's available now ────────────────────────────────────────────${R}
+
+  ${B}Daily workflow${R}  ${D}(defined in your zshrc)${R}
+    ${C}chez${R}          smart apply — status preview + safe overwrite
+    ${C}chezup${R}        git pull + chez — the everyday upgrade
+    ${C}chezreinit${R}    pull + re-init + apply — after wizard data changes
+    ${C}chezdiff${R}      show everything pending (dotfiles + brew + scripts)
+    ${C}chezdoctor${R}    full health check
+    ${C}chezbump${R}      routine brew + mise version bump
+    ${C}chezaudit${R}     find brew packages not tracked in any Brewfile
+
+  ${B}Day-to-day shortcuts${R}
+    ${C}g  / gs / gd${R}      git / status -sb / diff
+    ${C}k  / kgp / klf${R}    kubectl / get pods / logs -f
+    ${C}lg${R}                lazygit (interactive git TUI)
+    ${C}zj${R}                zellij attach (terminal multiplexer)
+    ${C}cw / cme${R}          Claude Code work / personal profile
+    ${C}n${R}                 nvim
+    ${C}macos-defaults${R}    re-apply system settings (sudo prompt)
+
+${D}─── Suggested next steps ────────────────────────────────────────────${R}
+
+  ${M}1.${R}  ${C}exec zsh${R}                     ${D}reload shell if you changed shell config${R}
+  ${M}2.${R}  ${C}chezdoctor${R}                   ${D}verify everything is healthy${R}
+  ${M}3.${R}  ${C}bash ${SOURCE}/bootstrap-auth.sh${R}
+                                  ${D}gh / az / gcloud sign-in (skip if done)${R}
+
+${D}Re-run this apply anytime with ${C}chezup${D} — or ${C}bash ${SOURCE}/install.sh${D} to walk the wizard again.${R}
+
+${C}═════════════════════════════════════════════════════════════════════${R}
+EOF

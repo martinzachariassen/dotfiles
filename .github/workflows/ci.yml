@@ -28,7 +28,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
       - name: Lint plain shell scripts
-        run: shellcheck --shell=bash install.sh macos-defaults.sh
+        run: shellcheck --shell=bash install.sh macos-defaults.sh doctor.sh bootstrap-auth.sh
 
   # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
   # Renders every template in the repo. Catches Go template syntax errors,
@@ -76,3 +76,55 @@ jobs:
         # "darwin" }}exit 0{{ end }}` guard, so they don't need any
         # macOS-specific tooling on this Linux runner — they just exit 0.
         run: chezmoi apply --dry-run --verbose
+
+  # ─── Job 3: brew bundle sanity (macOS) ──────────────────────────────────────
+  # Runs `brew bundle check` against all three Brewfiles on a real macOS
+  # runner. Catches deprecated/renamed casks, removed taps, and other things
+  # that only fail when Homebrew evaluates the Brewfile.
+  #
+  # `continue-on-error: true` because GitHub-hosted macOS runners are slow,
+  # rate-limited, and flaky for brew operations — we want signal, not red CI
+  # every time Homebrew's CDN coughs.
+  brew:
+    name: brew bundle (macOS)
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show brew version
+        run: brew --version
+
+      # `brew bundle check` reports what's missing; with `--verbose` it lists
+      # each tap/brew/cask. A bad cask name (e.g. an old "google-cloud-sdk")
+      # produces a non-zero exit and a clear error.
+      - name: Check common Brewfile
+        run: brew bundle check --verbose --file=Brewfile || true
+
+      - name: Check Brewfile.personal
+        run: brew bundle check --verbose --file=Brewfile.personal || true
+
+      - name: Check Brewfile.work
+        run: brew bundle check --verbose --file=Brewfile.work || true
+
+      # Stronger signal than `check`: actually try to resolve every formula and
+      # cask. If a name is dead, brew exits with a parse error here.
+      - name: Resolve formulae and casks (no install)
+        run: |
+          set -e
+          # Strip comments and blank lines, then verify each `brew "X"` /
+          # `cask "X"` actually exists in homebrew-core or a tap we use.
+          for f in Brewfile Brewfile.personal Brewfile.work; do
+            echo "── $f ──"
+            grep -E '^(brew|cask) "' "$f" | while read -r line; do
+              name=$(echo "$line" | sed -E 's/^(brew|cask) "([^"]+)".*/\2/')
+              kind=$(echo "$line" | awk '{print $1}')
+              if [ "$kind" = "brew" ]; then
+                brew info --formula "$name" >/dev/null 2>&1 \
+                  || echo "  ✗ formula not found: $name"
+              else
+                brew info --cask "$name" >/dev/null 2>&1 \
+                  || echo "  ✗ cask not found: $name"
+              fi
+            done
+          done

@@ -3,9 +3,16 @@ WORK-SETUP.md
 MAPPING.md
 LICENSE
 install.sh
+doctor.sh
+bootstrap-auth.sh
 Brewfile
+Brewfile.cloud
+Brewfile.iac
+Brewfile.databases
+Brewfile.mac-apps
 Brewfile.personal
 Brewfile.work
+Brewfile.lock.json
 macos-defaults.sh
 .editorconfig
 .gitattributes

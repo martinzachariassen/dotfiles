@@ -1,0 +1,11 @@
+# Brewfile.databases — Database CLI clients.
+#
+# Installed when `features.databases = true` in chezmoi data.
+#
+# Just the clients — actual servers are expected to run via docker / a managed
+# service / a colleague's laptop. Add `brew "postgresql@16"` etc. if you need
+# a local server too.
+
+brew "pgcli"                    # PostgreSQL CLI with auto-complete + syntax highlighting
+brew "mysql-client"             # `mysql` CLI without the server
+brew "redis"                    # `redis-cli` plus a local `redis-server` you can run on demand

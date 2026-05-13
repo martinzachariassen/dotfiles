@@ -26,5 +26,28 @@ export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
 # ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
 export SHELL_SESSIONS_DISABLE=1
 
+# ─── Pager behaviour ──────────────────────────────────────────────────────────
+# Default `less` is "stay open until q", with no on-screen reminder that q is
+# the way out. That makes short diffs feel like you're stuck in vim — chezmoi
+# diff, git log, git diff, etc. all hit this.
+#
+#   F = quit-if-one-screen   short output auto-exits, no key needed
+#   R = raw ANSI colors      delta's syntax highlighting comes through
+#   K = quit on interrupt    Ctrl-C exits less (instead of just interrupting
+#                            an in-progress search)
+#   -P… = custom prompt      Replaces the cryptic default ":" / "(END)" status
+#                            line with a visible reminder of how to escape.
+#
+# NOT using -X (no-terminal-init): with -X, less prints content + status line
+# to your normal terminal stream, which means the "Press q…" prompt sticks
+# around in your scrollback as a stale artifact every time less auto-quits.
+# Without -X, less uses the alternate-screen buffer — content and prompt
+# vanish cleanly on exit, leaving your terminal as it was before. To re-view a
+# diff, just re-run the command.
+#
+# Three ways to escape any pager: q · Ctrl-C · (short content auto-exits).
+# The -P prompt is double-quoted so less treats spaces inside as one argument.
+export LESS='-FRK -P"Press q or Ctrl-C to quit · / search · h for help"'
+
 # ─── PATH ─────────────────────────────────────────────────────────────────────
 export PATH="$HOME/.local/bin:$PATH"

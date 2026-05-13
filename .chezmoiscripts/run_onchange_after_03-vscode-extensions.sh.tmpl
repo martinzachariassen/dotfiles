@@ -11,12 +11,24 @@ echo "[vscode] not on macOS, skipping"
 exit 0
 {{ end -}}
 
+# Same TTY-reattach trick as the other chezmoi scripts. `code --install-extension`
+# is non-interactive in practice, but if a future extension ever wants stdin
+# (some auth providers do), this avoids the "characters scattered to parent
+# shell" class of bugs without costing anything when nothing needs stdin.
+if [ -e /dev/tty ] && [ -r /dev/tty ]; then
+    exec </dev/tty
+fi
+
+echo "[vscode] step 3/4 — installing VS Code extensions"
+
 if ! command -v code >/dev/null 2>&1; then
     echo "[vscode] 'code' CLI not found; skipping. Install via Brewfile + 'Shell Command: Install code command in PATH'."
     exit 0
 fi
 
-echo "[vscode] installing extensions…"
+echo "[vscode] → installing/updating extensions from .chezmoidata/packages.toml"
 {{ range .vscode.extensions -}}
 code --install-extension {{ . }} --force
 {{ end -}}
+
+echo "[vscode] ✓ extensions up to date"

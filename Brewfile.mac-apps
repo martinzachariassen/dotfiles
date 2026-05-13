@@ -1,0 +1,14 @@
+# Brewfile.mac-apps — Mac-only quality-of-life GUI apps + container introspection.
+#
+# Installed when `features.macApps = true` in chezmoi data.
+#
+# Pure preference stack — none of these are required by the shell config or
+# scripts. Skip the toggle if you prefer to install your own picks. Each line
+# is also fine to comment out individually.
+
+cask "rectangle"                # window snapping (also: aerospace, raycast hotkeys)
+cask "raycast"                  # Spotlight replacement
+cask "stats"                    # menu bar resource monitor
+cask "google-chrome"            # the only browser most web tooling assumes
+
+brew "dive"                     # explore docker image layers; spot bloat fast

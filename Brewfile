@@ -1,113 +1,74 @@
-# Brewfile — the COMMON tier. Always installed regardless of profile.
+# Brewfile — the CORE tier. Always installed regardless of profile or features.
 #
-# This file is paired with `Brewfile.personal` and `Brewfile.work` — the
-# brew-bundle chezmoi script picks which extras to layer on top based on the
-# `profile` value you chose at `chezmoi init` time (personal / work / both).
+# This is the smallest set that makes the dotfiles' shell experience work as
+# documented: a Catppuccin-themed Ghostty + Starship + Zellij + zsh stack with
+# the modern CLI replacements wired into aliases, mise for runtimes, chezmoi
+# for managing this repo, and 1Password for SSH + git signing.
 #
-# Edit a profile-specific extra by editing the matching Brewfile.<profile>.
-# Move a package between tiers by cutting the line and pasting into the
-# appropriate file.
+# Optional add-ons live in sibling Brewfile.<feature> files and are layered on
+# top of this one based on your answers to the install wizard. See:
+#   Brewfile.cloud      — Kubernetes + Azure + Google Cloud + Helm + kubelogin
+#   Brewfile.iac        — Terraform + tflint + terraform-docs
+#   Brewfile.databases  — pgcli, mysql-client, redis-cli
+#   Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
+#   Brewfile.personal   — Claude desktop + Claude Code CLI (rolling)
+#   Brewfile.work       — work-only casks (you fill in)
 #
-# Regenerate the common file from a known-good machine:
+# Regenerate from a known-good machine:
 #   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile
-# (then move profile-specific lines back into Brewfile.personal / Brewfile.work)
-#
-# Notes on package choices:
-#   - Terraform isn't in homebrew-core (HashiCorp pulled it after the BSL
-#     license change in 2023). We install it from HashiCorp's official tap.
-#     If license terms ever bother you, OpenTofu (`brew "opentofu"`) is a
-#     Linux Foundation fork with identical HCL syntax — switch by swapping
-#     the two `terraform` lines for it.
-#   - google-cloud-sdk and docker-desktop are casks, not formulae.
-
-tap "hashicorp/tap"
+# (then move feature-specific lines back into the matching Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
-brew "gh"                       # GitHub CLI
-brew "lazygit"                  # git TUI — staging, blame, branch ops, all interactive
-brew "pre-commit"               # git hook framework (most modern Python/JS repos use it)
-brew "mise"                     # runtime version manager
-brew "chezmoi"                  # this very repo's manager
-brew "direnv"                   # per-directory env vars; essential for multi-project work
+brew "gh"                      # GitHub CLI
+brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
+brew "pre-commit"              # git hook framework
+brew "mise"                    # runtime version manager (Java, Node, Python, Go, …)
+brew "chezmoi"                 # this very repo's manager
+brew "direnv"                  # per-directory env vars; essential for multi-project work
 brew "wget"
 brew "curl"
-brew "jq"                       # JSON
-brew "yq"                       # YAML
+brew "jq"                      # JSON
+brew "yq"                      # YAML
 brew "tree"
-brew "tldr"                     # `tldr <cmd>` — concise example-driven help (replaces googling man pages)
-brew "coreutils"                # GNU date/tar/sort/etc., available with `g` prefix (gdate, gtar)
+brew "tldr"                    # `tldr <cmd>` — concise example-driven help
+brew "coreutils"               # GNU date/tar/sort/etc. as gdate, gtar, …
 
-# ─── Modern CLI replacements (used everywhere: terminal, IDE terminals, SSH) ──
-brew "eza"                      # ls
-brew "bat"                      # cat
-brew "ripgrep"                  # grep
-brew "fd"                       # find
-brew "fzf"                      # fuzzy finder; integrated into zsh in .zshrc (Ctrl-R)
-brew "dust"                     # disk usage
-brew "duf"                      # df
-brew "btop"                     # top
-brew "httpie"                   # curl, but human
-brew "grpcurl"                  # like curl, but for gRPC services
-brew "mkcert"                   # locally-trusted dev certificates for HTTPS work
+# ─── Modern CLI replacements (the shell config aliases these by default) ──────
+brew "eza"                     # ls
+brew "bat"                     # cat
+brew "ripgrep"                 # grep
+brew "fd"                      # find
+brew "fzf"                     # fuzzy finder; integrated into zsh (Ctrl-R)
+brew "dust"                    # disk usage
+brew "duf"                     # df
+brew "btop"                    # top
+brew "httpie"                  # curl, but human
+brew "mkcert"                  # locally-trusted dev certificates
+brew "grpcurl"                 # curl, but for gRPC
 
-# ─── Kubernetes ───────────────────────────────────────────────────────────────
-# Java/Maven/Gradle/Node/Python are managed by mise — see ~/.config/mise/config.toml
-brew "kubernetes-cli"                  # kubectl
-brew "kubectx"                         # also installs `kubens` — switch contexts/namespaces fast
-brew "k9s"                             # kubernetes TUI
-brew "stern"                           # multi-pod log tailing
-brew "helm"
+# ─── Editor (terminal) ────────────────────────────────────────────────────────
+brew "neovim"                  # init.lua in dot_config/nvim ships LazyVim presets
 
-# ─── Azure ────────────────────────────────────────────────────────────────────
-brew "azure-cli"                       # `az` CLI — sign in via `az login`
-brew "Azure/kubelogin/kubelogin"       # required for kubectl against AKS clusters using Azure AD
-
-# ─── Google Cloud ─────────────────────────────────────────────────────────────
-# The full Cloud SDK (`gcloud`, `gsutil`, `bq`) comes from the gcloud-cli cask
-# below. There's NO Homebrew formula for `gke-gcloud-auth-plugin` — Google
-# distributes it as a gcloud SDK component. After `gcloud auth login`, run:
-#     gcloud components install gke-gcloud-auth-plugin
-# Required for kubectl ≥ 1.26 to authenticate against GKE clusters (the
-# legacy in-tree GCP auth provider was dropped).
-
-# ─── Infrastructure-as-Code ───────────────────────────────────────────────────
-brew "hashicorp/tap/terraform"         # official Terraform from HashiCorp's tap
-brew "tflint"                          # static analysis for Terraform / OpenTofu
-brew "terraform-docs"                  # generate Markdown docs from Terraform modules
-
-# ─── Databases (CLI clients only — actual servers run via docker/cloud) ───────
-brew "pgcli"                    # PostgreSQL CLI with auto-complete + syntax highlighting
-brew "mysql-client"             # `mysql` CLI without the server
-brew "redis"                    # `redis-cli` plus a local server you can run via `redis-server`
-
-# ─── Container introspection ──────────────────────────────────────────────────
-brew "dive"                     # explore docker image layers; spot bloat fast
-
-# ─── Editors / shells ─────────────────────────────────────────────────────────
-brew "neovim"
+# ─── Shell ────────────────────────────────────────────────────────────────────
 brew "zsh-completions"
 brew "zsh-syntax-highlighting"
-brew "starship"                 # cross-shell prompt
-brew "zellij"                   # terminal multiplexer (modern tmux alternative)
+brew "zsh-autosuggestions"     # fish-style type-ahead suggestions (→ to accept)
+brew "starship"                # cross-shell prompt
+brew "zellij"                  # terminal multiplexer (modern tmux alternative)
 
-# ─── Casks (GUI apps + binary distributions) ──────────────────────────────────
-cask "ghostty"                  # terminal emulator
-cask "visual-studio-code"
-cask "docker-desktop"           # was "docker", renamed Aug 2024
-cask "gcloud-cli"               # gcloud (was named google-cloud-sdk before 2025)
-cask "1password"
-cask "1password-cli"            # `op` CLI — used by chezmoi if you ever template secrets via `op read`
-cask "google-chrome"
-cask "rectangle"                # window snapping
-cask "raycast"                  # Spotlight replacement
-cask "stats"                    # menu bar resource monitor
+# ─── GUI essentials (terminal + 1Password are foundational here) ──────────────
+cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
+cask "visual-studio-code"      # VS Code (extensions in .chezmoidata/packages.toml)
+cask "1password"               # GUI app — SSH agent + git signing live here
+cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
+cask "docker-desktop"          # if you'd rather use colima/podman, swap this line
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
-cask "font-jetbrains-mono-nerd-font"
-cask "font-fira-code-nerd-font"
+cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this
+cask "font-fira-code-nerd-font"        # secondary; nice ligatures
 
-# ─── Mac App Store apps (requires `mas`) ─────────────────────────────────────
+# ─── Mac App Store apps (requires `mas`) ──────────────────────────────────────
 # brew "mas"
 # mas "Xcode", id: 497799835

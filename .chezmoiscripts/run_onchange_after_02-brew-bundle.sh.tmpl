@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# Runs `brew bundle` whenever any of the Brewfiles, the profile, or this script
-# itself changes. The hash comments below pull all of those into the trigger.
+# Runs `brew bundle` whenever any of the Brewfiles, the profile, the feature
+# toggles, or this script itself change. Hash comments below pull all of those
+# into the trigger.
 #
-# Brewfile (common)   hash: {{ include "Brewfile" | sha256sum }}
-# Brewfile.personal   hash: {{ include "Brewfile.personal" | sha256sum }}
-# Brewfile.work       hash: {{ include "Brewfile.work" | sha256sum }}
-# Profile in effect:        {{ .profile }}
+# Upgrade safety: every feature toggle is read through `dig … true …` so that
+# users who installed BEFORE the features.* keys existed (and haven't re-run
+# `chezmoi init` yet) get the "all on" default instead of silently losing
+# Kubernetes/Terraform/etc. on their next chezmoi apply.
+#
+# Brewfile (core)        hash: {{ include "Brewfile" | sha256sum }}
+# Brewfile.cloud         hash: {{ include "Brewfile.cloud" | sha256sum }}
+# Brewfile.iac           hash: {{ include "Brewfile.iac" | sha256sum }}
+# Brewfile.databases     hash: {{ include "Brewfile.databases" | sha256sum }}
+# Brewfile.mac-apps      hash: {{ include "Brewfile.mac-apps" | sha256sum }}
+# Brewfile.personal      hash: {{ include "Brewfile.personal" | sha256sum }}
+# Brewfile.work          hash: {{ include "Brewfile.work" | sha256sum }}
+# Profile in effect:           {{ .profile }}
+# Feature: cloud               {{ dig "features" "cloud" true . }}
+# Feature: iac                 {{ dig "features" "iac" true . }}
+# Feature: databases           {{ dig "features" "databases" true . }}
+# Feature: macApps             {{ dig "features" "macApps" true . }}
 
 set -euo pipefail
 
@@ -14,35 +28,157 @@ echo "[brew-bundle] not on macOS, skipping"
 exit 0
 {{ end -}}
 
+# Re-attach stdin to the controlling terminal so casks that invoke sudo
+# (docker-desktop, 1password) can read the password. See run_before_00-sudo-cache
+# for the upfront pre-auth; this is the belt-and-braces complement.
+if [ -e /dev/tty ] && [ -r /dev/tty ]; then
+    exec </dev/tty
+else
+    echo "[brew-bundle] no TTY available (CI / non-interactive); casks needing sudo may be skipped"
+fi
+
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
 SOURCE="{{ .chezmoi.sourceDir }}"
-PROFILE="{{ .profile }}"
 
-# Always install the common tier
-echo "[brew] installing common Brewfile (always)"
-brew bundle install --file="$SOURCE/Brewfile"
+# ─── Pretty progress + heartbeat helpers ──────────────────────────────────────
+HEARTBEAT_PID=""
 
-# Layer profile-specific extras on top
-case "$PROFILE" in
-    personal|both)
-        echo "[brew] installing personal extras (profile = $PROFILE)"
-        brew bundle install --file="$SOURCE/Brewfile.personal"
-        ;;
+# Start a heartbeat that prints an "(elapsed)" message every 45s. Useful for
+# silent stretches like brew downloading a 1 GB cask over a slow link — the
+# user can see something's still happening. The heartbeat self-terminates
+# within 2 seconds of its parent dying, so it can't outlive the script if
+# something goes sideways.
+start_heartbeat() {
+    local label="$1"
+    local parent_pid=$$
+    local start_ts
+    start_ts="$(date +%s)"
+    (
+        # Wait 45s before the first message — quick installs shouldn't
+        # trigger heartbeat noise at all.
+        sleep 45
+        local since_msg=0
+        while kill -0 "$parent_pid" 2>/dev/null; do
+            sleep 2
+            since_msg=$((since_msg + 2))
+            if [ "$since_msg" -ge 45 ]; then
+                local now elapsed mins secs
+                now="$(date +%s)"
+                elapsed=$((now - start_ts))
+                mins=$((elapsed / 60))
+                secs=$((elapsed % 60))
+                printf "[brew-bundle]   … still working on %s — %dm%02ds elapsed\n" "$label" "$mins" "$secs"
+                since_msg=0
+            fi
+        done
+    ) &
+    HEARTBEAT_PID=$!
+}
+stop_heartbeat() {
+    [ -n "$HEARTBEAT_PID" ] && kill "$HEARTBEAT_PID" 2>/dev/null
+    wait "$HEARTBEAT_PID" 2>/dev/null || true
+    HEARTBEAT_PID=""
+}
+# Ensure heartbeat is always cleaned up if the script aborts mid-bundle.
+trap stop_heartbeat EXIT
+
+# Run one Brewfile with module-level header, heartbeat, and timing.
+# Args: label, file, step-N, total-N
+bundle_one() {
+    local label="$1" file="$2" step="$3" total="$4"
+    if [ ! -f "$file" ]; then
+        echo "[brew-bundle]   ! $label: $file not found, skipping"
+        return 0
+    fi
+    local start_ts
+    start_ts="$(date +%s)"
+    printf "[brew-bundle] ┌── %d/%d  %s  (%s)\n" "$step" "$total" "$label" "$(basename "$file")"
+    start_heartbeat "$label"
+    # `|| true` because we want to print the closing line even on failure,
+    # then bubble the failure up.
+    local rc=0
+    brew bundle install --file="$file" || rc=$?
+    stop_heartbeat
+    local end_ts elapsed mins secs
+    end_ts="$(date +%s)"
+    elapsed=$((end_ts - start_ts))
+    mins=$((elapsed / 60))
+    secs=$((elapsed % 60))
+    if [ "$rc" -eq 0 ]; then
+        printf "[brew-bundle] └── ✓ %d/%d  %s  done in %dm%02ds\n" "$step" "$total" "$label" "$mins" "$secs"
+    else
+        printf "[brew-bundle] └── ✗ %d/%d  %s  FAILED after %dm%02ds (rc=%d)\n" "$step" "$total" "$label" "$mins" "$secs" "$rc"
+        return "$rc"
+    fi
+}
+
+# ─── Build the run plan up front so the user sees the whole picture ──────────
+PLAN_LABELS=()
+PLAN_FILES=()
+add_step() { PLAN_LABELS+=("$1"); PLAN_FILES+=("$SOURCE/$2"); }
+
+add_step "core (always)"                  "Brewfile"
+{{ if dig "features" "iac" true . -}}
+add_step "IaC (Terraform + lint)"         "Brewfile.iac"
+{{ end -}}
+{{ if dig "features" "cloud" true . -}}
+add_step "cloud (k8s + az + gcloud)"      "Brewfile.cloud"
+{{ end -}}
+{{ if dig "features" "databases" true . -}}
+add_step "databases (pgcli + mysql + redis)"  "Brewfile.databases"
+{{ end -}}
+{{ if dig "features" "macApps" true . -}}
+add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "Brewfile.mac-apps"
+{{ end -}}
+case "{{ .profile }}" in
+    personal|both) add_step "personal profile extras"  "Brewfile.personal" ;;
 esac
-case "$PROFILE" in
-    work|both)
-        echo "[brew] installing work extras (profile = $PROFILE)"
-        brew bundle install --file="$SOURCE/Brewfile.work"
-        ;;
+case "{{ .profile }}" in
+    work|both)     add_step "work profile extras"      "Brewfile.work" ;;
 esac
+
+TOTAL=${#PLAN_LABELS[@]}
+
+echo "═════════════════════════════════════════════════════════════════════"
+echo "[brew-bundle] step 2 of 4 — installing/updating brew packages"
+echo "[brew-bundle] active profile: {{ .profile }}"
+echo "[brew-bundle] modules to apply: $TOTAL"
+for i in $(seq 0 $((TOTAL - 1))); do
+    printf "[brew-bundle]   %d. %s\n" $((i + 1)) "${PLAN_LABELS[$i]}"
+done
+echo "[brew-bundle] expected time on first install: ~5-15 min (downloads dominate)"
+echo "[brew-bundle] heartbeat every 45s during silent stretches"
+echo "═════════════════════════════════════════════════════════════════════"
+
+# Print disabled modules so users know nothing's being silently dropped.
+{{ if not (dig "features" "iac" true .) -}}
+echo "[brew-bundle]   · IaC module disabled (features.iac=false)"
+{{ end -}}
+{{ if not (dig "features" "cloud" true .) -}}
+echo "[brew-bundle]   · cloud module disabled (features.cloud=false)"
+{{ end -}}
+{{ if not (dig "features" "databases" true .) -}}
+echo "[brew-bundle]   · databases module disabled (features.databases=false)"
+{{ end -}}
+{{ if not (dig "features" "macApps" true .) -}}
+echo "[brew-bundle]   · mac-apps module disabled (features.macApps=false)"
+{{ end -}}
+
+# ─── Execute the plan ─────────────────────────────────────────────────────────
+OVERALL_START="$(date +%s)"
+for i in $(seq 0 $((TOTAL - 1))); do
+    bundle_one "${PLAN_LABELS[$i]}" "${PLAN_FILES[$i]}" $((i + 1)) "$TOTAL"
+done
+OVERALL_END="$(date +%s)"
+OVERALL_ELAPSED=$((OVERALL_END - OVERALL_START))
+OVERALL_MIN=$((OVERALL_ELAPSED / 60))
+OVERALL_SEC=$((OVERALL_ELAPSED % 60))
 
 # brew installs sometimes leave group/other-write bits on share dirs that end
 # up on zsh's $fpath, which makes `compinit` prompt at every shell startup:
 #   "zsh compinit: insecure directories, run compaudit for list."
-# Strip those bits proactively. Narrowed to just the zsh-related dirs (the only
-# ones compinit walks); recursing all of /opt/homebrew/share would chmod
-# 100k+ files for no benefit.
-echo "[brew] tightening permissions on /opt/homebrew/share/zsh* (compinit safety)"
+# Strip those bits proactively.
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
-echo "[brew] permissions tightened."
+
+printf "[brew-bundle] ✓ all %d module(s) up to date — total %dm%02ds\n" "$TOTAL" "$OVERALL_MIN" "$OVERALL_SEC"

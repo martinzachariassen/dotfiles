@@ -1,0 +1,14 @@
+# Brewfile.iac — Infrastructure-as-Code tooling.
+#
+# Installed when `features.iac = true` in chezmoi data.
+#
+# Terraform isn't in homebrew-core (HashiCorp pulled it after the BSL license
+# change in 2023). We install it from HashiCorp's official tap. If the license
+# terms ever bother you, OpenTofu (`brew "opentofu"`) is a Linux Foundation
+# fork with identical HCL syntax — swap the line below.
+
+tap "hashicorp/tap"
+
+brew "hashicorp/tap/terraform"         # official Terraform from HashiCorp's tap
+brew "tflint"                          # static analysis for Terraform / OpenTofu
+brew "terraform-docs"                  # generate Markdown docs from Terraform modules

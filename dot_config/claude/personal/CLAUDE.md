@@ -59,8 +59,12 @@ something else.
 **Shell & terminal**
 
 - zsh, XDG layout (`ZDOTDIR=~/.config/zsh`), `fzf` for fuzzy history search
-  (`Ctrl-R`).
+  (`Ctrl-R`) backed by `fd` instead of `find`.
+- `zsh-autosuggestions` for fish-like type-ahead from history;
+  `zsh-syntax-highlighting` for inline syntax coloring; `zsh-completions` for
+  extra completions.
 - Terminal: **Ghostty** | Multiplexer: **Zellij** | Prompt: **Starship**.
+- `k` is aliased to `kubectl`.
 
 **Editors**
 
@@ -249,5 +253,9 @@ The repo at `~/Dev/Personal/dotfiles` uses chezmoi conventions:
   layers based on the `profile` value.
 - Edit dotfiles via `chezmoi edit ~/.X` (opens the source). Editing the live
   `$HOME` file directly creates drift.
+- For applying changes, use the `chez` zsh function (a wrapper around
+  `chezmoi apply --force` with an upfront diff-preview prompt). Avoids
+  prompt collisions between chezmoi's per-file conflict prompts and sudo's
+  password prompt during macos-defaults.
 - `MAPPING.md` is the authoritative source-to-target table. Update it when
   adding/removing managed files.
