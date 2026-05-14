@@ -35,12 +35,12 @@ echo "[devbox] not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Apply-lifecycle step 2 of 5 (sudo-cache → devbox+Nix → brew-bundle →
-# vscode-extensions → macos-defaults). The "1/2" / "2/2" below are internal
+# Apply-lifecycle step 2 of 4 (sudo-cache → devbox+Nix → brew-bundle →
+# macos-defaults). The "1/2" / "2/2" below are internal
 # to this script (devbox CLI install + Nix bootstrap), not the lifecycle.
 
 # ─── Part 1: devbox CLI ───────────────────────────────────────────────────────
-echo "[devbox] apply step 2/5 — devbox CLI + Nix bootstrap"
+echo "[devbox] apply step 2/4 — devbox CLI + Nix bootstrap"
 echo "[devbox]   substep 1/2 — checking devbox CLI"
 
 if command -v devbox >/dev/null 2>&1; then

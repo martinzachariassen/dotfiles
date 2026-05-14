@@ -64,13 +64,13 @@ brew "zellij"                  # terminal multiplexer (modern tmux alternative)
 
 # ─── GUI essentials (terminal + 1Password are foundational here) ──────────────
 cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
-cask "visual-studio-code"      # VS Code (extensions in .chezmoidata/packages.toml)
+cask "visual-studio-code"      # VS Code app; settings/extensions sync via VS Code cloud
 cask "1password"               # GUI app — SSH agent + git signing live here
 cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
 cask "docker-desktop"          # if you'd rather use colima/podman, swap this line
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
-cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this
+cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty reference this
 cask "font-fira-code-nerd-font"        # secondary; nice ligatures
 
 # ─── Mac App Store apps (requires `mas`) ──────────────────────────────────────

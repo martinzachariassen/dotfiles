@@ -23,7 +23,6 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/nvim/lua/config/lazy.lua` | `~/.config/nvim/lua/config/lazy.lua` | LazyVim bootstrap. Auto-clones lazy.nvim on first launch. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/etc.) ship commented-out for opt-in. |
 | `dot_config/nvim/lua/plugins/colorscheme.lua` | `~/.config/nvim/lua/plugins/colorscheme.lua` | Catppuccin Frappé colorscheme override for LazyVim. |
 | `private_dot_ssh/config` | `~/.ssh/config` | Mode 0600 enforced via `private_` prefix. SSH hardcodes `~/.ssh/`. |
-| `Library/Application Support/Code/User/settings.json` | `~/Library/Application Support/Code/User/settings.json` | VS Code user settings (macOS-native location). |
 
 ## Files chezmoi REMOVES from `$HOME` (the `remove_` markers)
 
@@ -84,7 +83,6 @@ These are the dotfiles/dirs that will remain — and the reason each one can't g
 | `~/.config/`, `~/.local/`, `~/.cache/` | These ARE the XDG dirs. They're where everything moved TO. |
 | `~/.ssh/` | OpenSSH hardcodes `~/.ssh/` for keys, known_hosts, agent socket. Cannot move. |
 | `~/.docker/` | Docker Desktop GUI writes here regardless of `DOCKER_CONFIG`. Moving the CLI config would create drift. |
-| `~/.vscode/`, `~/.vscode-shared/` | VS Code on macOS hardcodes `~/.vscode/` for extensions and CLI binary. |
 | `~/.claude/` | Work Claude Code, installed by storecode. Hooks reference absolute `/Users/martin/.storecode/...` paths. Touching it breaks work. |
 | `~/.storecode/`, `~/.rampart/`, `~/.copilot/` | Work tooling installed by your employer. Hardcoded. |
 | `~/.m2/` | Maven 3.x doesn't have a clean XDG override. Maven 4 does (`MAVEN_USER_CONFIG_HOME`) — revisit when you move to mvn 4. |
