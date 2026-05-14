@@ -118,7 +118,7 @@ chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml fr
 chezdiff                     # chezmoi diff + brew bundle drift across every Brewfile module + which scripts would re-fire
 chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + devbox global update
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
-chezdoctor                   # full health check (XDG layout, claude routing, op signing, brew sync, auth state)
+chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)
 
 # Modern CLI replacements (only activate if the tool is installed)
 ls, ll, tree                 # eza variants
@@ -139,10 +139,6 @@ mkcd <dir>                   # mkdir -p <dir> && cd into it
 # Terminal multiplexer
 zj                           # zellij attach -c default — named session, detach/reattach friendly
 
-# Claude Code profile (also auto-routes by PWD)
-cw                           # work profile      (CLAUDE_CONFIG_DIR=~/.claude)
-cme                          # personal profile  (CLAUDE_CONFIG_DIR=~/.config/claude/personal)
-
 # Maintenance ceremonies (run on demand, NOT on every chezmoi apply)
 macos-defaults               # re-apply system settings (sudo prompt; idempotent)
 ```
@@ -154,7 +150,7 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 - **Source repo** — exists, on the right branch, in sync with origin, working tree clean.
 - **chezmoi** — installed, `chezmoi doctor` is clean, no source/$HOME drift.
 - **XDG layout** — no legacy `~/.zshrc`, `~/.gitconfig`, `~/.zprofile`; `~/.config/zsh/.zshrc` and `~/.zshenv` present.
-- **Claude routing** — wrapper loads, routes correctly from `/tmp` (personal) and `~/Dev/Work/` (work), `~/.claude` present if work profile.
+- **Claude personal config** — wrapper loads and `~/.config/claude/personal` is present.
 - **Git signing** — `op-ssh-sign` exists, signing key configured, smoke test of `git -S commit` actually succeeds.
 - **Brew packages** — every workstation/profile Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
 - **devbox + direnv + Nix** — devbox CLI installed, `/nix` store mounted, `nix-daemon` running, direnv hook wired into the shell, global direnv config present, no leftover `mise` on PATH.

@@ -9,7 +9,7 @@
 # top of this one based on your answers to the install wizard. See:
 #   brewfiles/Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
 #   brewfiles/Brewfile.personal   — personal-only casks (you fill in)
-#   brewfiles/Brewfile.work       — work-only casks, including Claude Code CLI
+#   brewfiles/Brewfile.work       — work-only casks (you fill in)
 #
 # Regenerate from a known-good machine:
 #   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile

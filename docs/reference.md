@@ -1,7 +1,6 @@
 # Reference
 
 - [Mapping](mapping.md) — every file in the repo and where it lands in `$HOME`, plus chezmoi internals.
-- [Work setup](work-setup.md) — corporate Claude Code (`storecode`) install, separate from this repo.
 - [`install.sh`](../install.sh) — the 6-phase wizard (fresh + existing Macs). `DRY_RUN=1` previews, `YES=1` accepts defaults.
 - [`scripts/bootstrap-auth.sh`](../scripts/bootstrap-auth.sh) — post-install gh / az / gcloud / AKS / GKE / signing walkthrough. Idempotent.
 - [`scripts/doctor.sh`](../scripts/doctor.sh) — read-only health check. Aliased as `chezdoctor`.

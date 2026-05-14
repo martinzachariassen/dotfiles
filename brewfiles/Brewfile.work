@@ -6,9 +6,6 @@
 #
 # Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.work
 
-# ─── Claude Code ─────────────────────────────────────────────────────────────
-cask "claude-code"              # Claude Code CLI, work profile only
-
 # ─── Add your work-only apps below ────────────────────────────────────────────
 # Common candidates for backend dev at most companies — uncomment as relevant:
 #

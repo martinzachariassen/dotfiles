@@ -96,8 +96,7 @@ See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 | [Upgrading](docs/upgrading.md) | `chezup`, `chezreinit`, invalidation rules, and long-absence maintenance. |
 | [Troubleshooting](docs/troubleshooting.md) | Known failure modes and recovery commands. |
 | [Architecture](docs/architecture.md) | Chezmoi file classes, remove markers, ignored files, and apply scripts. |
-| [AI tools](docs/ai-tools.md) | Claude Code work/personal routing and Codex global instructions. |
-| [Work setup](docs/work-setup.md) | Corporate Claude Code setup outside chezmoi. |
+| [AI tools](docs/ai-tools.md) | Claude Code personal config and Codex global instructions. |
 | [Forking](docs/forking.md) | What to change when basing your own setup on this repo. |
 | [Uninstall / reset](docs/uninstall-reset.md) | Homebrew mirror/reset and manual rollback notes. |
 | [Reference](docs/reference.md) | Links to the important repo files. |

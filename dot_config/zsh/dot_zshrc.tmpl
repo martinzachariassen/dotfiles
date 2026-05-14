@@ -76,43 +76,11 @@ command -v fzf >/dev/null && eval "$(fzf --zsh)" 2>/dev/null
 # Replaces zsh's default prompt. Config at ~/.config/starship.toml.
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
-# ─── Claude Code: work vs personal profile ────────────────────────────────────
-# Routes to the right CLAUDE_CONFIG_DIR based on PWD:
-#   - under ~/Dev/Work/  → work profile  (uses ~/.claude, storecode-managed, hardcoded)
-#   - everywhere else    → personal profile (uses ~/.config/claude/personal, XDG)
-# Override:  CLAUDE_PROFILE=work claude ...   or use the cw / cme aliases.
-#
-# Safety net: if the work dir doesn't exist (storecode not installed yet on a
-# fresh work machine), we fall back to personal with a one-time stderr warning
-# instead of failing opaquely. Setting CLAUDE_FORCE_WORK=1 disables the fallback.
+# ─── Claude Code personal profile ─────────────────────────────────────────────
 CLAUDE_PERSONAL_DIR="$XDG_CONFIG_HOME/claude/personal"
-CLAUDE_WORK_DIR="$HOME/.claude"
 claude() {
-    local config_dir requested_profile
-    case "${CLAUDE_PROFILE:-auto}" in
-        work)     requested_profile=work     ; config_dir="$CLAUDE_WORK_DIR"     ;;
-        personal) requested_profile=personal ; config_dir="$CLAUDE_PERSONAL_DIR" ;;
-        auto|*)
-            case "$PWD/" in
-                "$HOME/Dev/Work/"*) requested_profile=work     ; config_dir="$CLAUDE_WORK_DIR"     ;;
-                *)                  requested_profile=personal ; config_dir="$CLAUDE_PERSONAL_DIR" ;;
-            esac
-            ;;
-    esac
-    # Fall back to personal if work was requested but storecode isn't installed.
-    if [[ "$requested_profile" = "work" && ! -d "$CLAUDE_WORK_DIR" ]]; then
-        if [[ -n "${CLAUDE_FORCE_WORK:-}" ]]; then
-            print -u2 "claude: work profile requested but $CLAUDE_WORK_DIR is missing — refusing (CLAUDE_FORCE_WORK is set)."
-            return 1
-        fi
-        print -u2 "claude: ⚠ work profile requested but $CLAUDE_WORK_DIR not found — falling back to personal."
-        print -u2 "claude:   See docs/work-setup.md to install storecode if you need the work profile."
-        config_dir="$CLAUDE_PERSONAL_DIR"
-    fi
-    CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
+    CLAUDE_CONFIG_DIR="$CLAUDE_PERSONAL_DIR" command claude "$@"
 }
-alias cw='CLAUDE_PROFILE=work claude'
-alias cme='CLAUDE_PROFILE=personal claude'
 
 # ─── Modern CLI replacements (installed via Brewfile) ─────────────────────────
 # Only alias if the tool is present, so the shell still works on a fresh box.
@@ -352,9 +320,6 @@ alias zj='zellij attach -c default'
 # ─── Work-only shell config (rendered because profile = {{ .profile }}) ───────
 # Edit by changing the `{{`{{`}} if or (eq .profile "work") ... block in
 # dot_config/zsh/dot_zshrc.tmpl, then `chezmoi apply -v`.
-
-# Make storecode binaries available if the work tooling is installed.
-[ -d "$HOME/.storecode/bin" ] && export PATH="$HOME/.storecode/bin:$PATH"
 
 # Add work-only env vars, aliases, or hooks below as needed:
 # export CORP_VPN_PROFILE="default"

@@ -7,7 +7,7 @@ Reference table showing exactly what each file in the repo does.
 | Source (in repo) | Destination (in `$HOME`) | Notes |
 |---|---|---|
 | `dot_zshenv` | `~/.zshenv` | Tiny stub, sets ZDOTDIR + XDG vars + tool env vars. Only file that MUST stay in `$HOME`. |
-| `dot_config/zsh/dot_zshrc` | `~/.config/zsh/.zshrc` | Interactive shell config (aliases, completions, claude wrapper). Found via ZDOTDIR. |
+| `dot_config/zsh/dot_zshrc` | `~/.config/zsh/.zshrc` | Interactive shell config (aliases, completions, Claude personal wrapper). Found via ZDOTDIR. |
 | `dot_config/zsh/dot_zprofile` | `~/.config/zsh/.zprofile` | Login shell init (brew shellenv). |
 | `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key. Git auto-detects this XDG path. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
@@ -55,7 +55,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 |---|---|---|
 | `install.sh` | 7-step bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
 | `scripts/bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
-| `scripts/doctor.sh` | Reads-only health check. Verifies XDG layout, claude routing, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
+| `scripts/doctor.sh` | Reads-only health check. Verifies XDG layout, Claude personal config, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
 | `scripts/macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
 
 ## chezmoi infrastructure (not files in `$HOME`, but used by chezmoi itself)
@@ -85,8 +85,6 @@ These are the dotfiles/dirs that will remain — and the reason each one can't g
 | `~/.config/`, `~/.local/`, `~/.cache/` | These ARE the XDG dirs. They're where everything moved TO. |
 | `~/.ssh/` | OpenSSH hardcodes `~/.ssh/` for keys, known_hosts, agent socket. Cannot move. |
 | `~/.docker/` | Docker Desktop GUI writes here regardless of `DOCKER_CONFIG`. Moving the CLI config would create drift. |
-| `~/.claude/` | Work Claude Code, installed by storecode. Hooks reference absolute `/Users/martin/.storecode/...` paths. Touching it breaks work. |
-| `~/.storecode/`, `~/.rampart/`, `~/.copilot/` | Work tooling installed by your employer. Hardcoded. |
 | `~/.m2/` | Maven 3.x doesn't have a clean XDG override. Maven 4 does (`MAVEN_USER_CONFIG_HOME`) — revisit when you move to mvn 4. |
 | `~/.claude.json` | Claude Code session state, hardcoded path inside the binary. |
 | `~/.CFUserTextEncoding`, `~/.Trash/` | macOS system files. |

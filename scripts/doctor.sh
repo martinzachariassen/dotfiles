@@ -16,7 +16,7 @@
 #
 # Why a script and not just `chezmoi doctor`:
 #   chezmoi's built-in doctor checks chezmoi's own state. This script checks the
-#   *whole stack* this repo expects — XDG layout, claude wrapper routing, op
+#   *whole stack* this repo expects — XDG layout, claude personal config, op
 #   signing, brew bundle drift, auth state — anything that can quietly break and
 #   bite you a week later.
 
@@ -109,58 +109,10 @@ else
     fail "~/.zshenv missing — run: chezmoi apply"
 fi
 
-# ─── 4. Claude wrapper routing ────────────────────────────────────────────────
-section "Claude profile routing"
-# Source the wrapper into a subshell and exercise it from two PWDs.
+# ─── 4. Claude personal config ────────────────────────────────────────────────
+section "Claude personal config"
 if zsh -c 'source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1; type claude >/dev/null 2>&1'; then
     pass "claude wrapper loads"
-    # Personal route (PWD outside ~/Dev/Work/)
-    # NOTE: comments inside zsh -c "..." must avoid apostrophes — the outer
-    # quoting is single, so an apostrophe in a comment closes it prematurely.
-    personal_dir=$(zsh -c '
-        source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1
-        cd /tmp
-        # Re-exec the wrapper logic to print where it would route, using the
-        # same case statement the wrapper itself uses.
-        unset CLAUDE_PROFILE
-        CLAUDE_PERSONAL_DIR="$HOME/.config/claude/personal"
-        CLAUDE_WORK_DIR="$HOME/.claude"
-        case "$PWD/" in
-            "$HOME/Dev/Work/"*) echo "$CLAUDE_WORK_DIR" ;;
-            *)                  echo "$CLAUDE_PERSONAL_DIR" ;;
-        esac
-    ' 2>/dev/null)
-    expected_personal="$HOME/.config/claude/personal"
-    if [ "$personal_dir" = "$expected_personal" ]; then
-        pass "PWD=/tmp routes to personal ($expected_personal)"
-    else
-        fail "PWD=/tmp routed to '$personal_dir' (expected $expected_personal)"
-    fi
-    # Work route (PWD inside ~/Dev/Work/) — only sane to test if the dir exists
-    if [ -d "$HOME/Dev/Work" ]; then
-        work_dir=$(zsh -c '
-            source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1
-            cd "$HOME/Dev/Work"
-            unset CLAUDE_PROFILE
-            CLAUDE_PERSONAL_DIR="$HOME/.config/claude/personal"
-            CLAUDE_WORK_DIR="$HOME/.claude"
-            case "$PWD/" in
-                "$HOME/Dev/Work/"*) echo "$CLAUDE_WORK_DIR" ;;
-                *)                  echo "$CLAUDE_PERSONAL_DIR" ;;
-            esac
-        ' 2>/dev/null)
-        if [ "$work_dir" = "$HOME/.claude" ]; then
-            pass "PWD=~/Dev/Work routes to work (~/.claude)"
-        else
-            fail "PWD=~/Dev/Work routed to '$work_dir' (expected ~/.claude)"
-        fi
-        if [ -d "$HOME/.claude" ]; then
-            pass "~/.claude present (storecode installed)"
-        else
-            warn "~/.claude missing — work-profile claude calls would fall back to personal (see docs/work-setup.md)"
-        fi
-    fi
-    # Personal config dir
     if [ -d "$HOME/.config/claude/personal" ]; then
         pass "~/.config/claude/personal present"
     else

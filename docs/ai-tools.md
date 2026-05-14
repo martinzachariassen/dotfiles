@@ -1,15 +1,10 @@
 # AI tools
 
-## Claude Code: work vs personal
+## Claude Code
 
-A wrapper function in `.zshrc` routes `claude` based on PWD:
+A wrapper function in `.zshrc` sets the personal config directory before invoking `claude`:
 
-- Anywhere under `~/Dev/Work/` → uses `~/.claude` (work profile, managed by employer's tooling — see [Work setup](work-setup.md))
-- Everywhere else → uses `~/.config/claude/personal`
-
-Override with `cw` (work) or `cme` (personal) aliases, or `CLAUDE_PROFILE=work claude …` for one-off.
-
-The CLI binary comes from the `cask "claude-code"` line in `brewfiles/Brewfile.work`; it is intentionally installed only for the work profile.
+- `CLAUDE_CONFIG_DIR=~/.config/claude/personal`
 
 ### Global CLAUDE.md
 

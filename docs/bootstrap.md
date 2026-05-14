@@ -88,7 +88,7 @@ Phase B asks two orthogonal questions: which **profile** you're on (which casks/
 | Profile | Brewfiles applied (on top of core) | Notes |
 |---|---|---|
 | `personal` | `brewfiles/Brewfile.personal` | Personal-only apps you add. Personal-only `.zshrc` block renders. |
-| `work` | `brewfiles/Brewfile.work` | Work-only apps you add (Claude Code, Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders, including `~/.storecode/bin` on PATH if installed. |
+| `work` | `brewfiles/Brewfile.work` | Work-only apps you add (Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders. |
 | `both` | both | Single-machine-many-jobs. |
 
 **Features** are intentionally narrow. Project toolchains are Devbox-owned; Homebrew features are only for workstation-level preferences:
