@@ -43,35 +43,44 @@ On a fresh Mac (or an existing one), open Terminal and run:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-You'll meet a Vite/Clack-style guided wizard — arrow-key navigation, real checkboxes for the multi-select, the vertical-bar gutter, prompts that collapse to a one-line summary after you answer. Every prompt is batched in Phase B; once you say yes in Phase C the install runs unattended (the only interruption is one sudo prompt for the macOS-defaults block). Total time: ~15 min, almost all of it Homebrew downloading.
+You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. Every prompt is batched in Phase B; once you confirm in Phase C the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Homebrew downloading.
 
 ```text
-┌  dotfiles wizard
-│  Personal macOS setup managed by chezmoi — backend-dev preset.
-│
-│  Use ↑↓ to navigate, space to toggle, ↵ to confirm, ctrl-c to abort.
-│
-◆  Which profile?
-│  ● personal — adds Brewfile.personal (personal-only apps)
-│  ○ work     — adds Brewfile.work (work-only apps, Claude Code)
-│  ○ both     — adds both
-│  ↑↓ navigate · ↵ select
++  Dotfiles setup
+|  Reliable numbered wizard for a fresh or existing Mac.
+|
+>  Phase B - Choices
+|
+|  How to use this screen: enter numbers for menus, type text into fields,
+|  or press Enter to keep the shown default.
+|
+>  Profile
+|    1. personal - personal extras only
+|    2. work - work extras only
+|    3. both - personal and work extras (current)
+|  Choose 1-3, or leave blank for both:
 ```
 
-After you answer, the menu collapses to `◇ Which profile? personal` and the wizard advances. The whole conversation flows under the same gutter from `┌` to `└`.
-
-The wizard is idempotent. Re-run it any time — it detects existing state, offers to re-use prior answers, and skips steps that are already done.
+The wizard is idempotent. Re-run it any time — it detects existing state, shows current values as defaults, lets you change profile/identity/features, and skips steps that are already done.
 
 Useful environment variables:
 
 ```sh
 DRY_RUN=1         bash install.sh   # print state-changing commands without running them
 YES=1             bash install.sh   # accept recommended defaults at every prompt (good for CI / reinstalls)
-NO_TUI=1          bash install.sh   # force the plain-text fallback path (no raw mode, no arrow keys)
 SKIP_BACKUP=1     bash install.sh   # don't snapshot pre-existing legacy dotfiles
 DOTFILES_REPO=…   bash install.sh   # point at a fork
 DOTFILES_DIR=…    bash install.sh   # clone somewhere other than ~/Dev/Personal/dotfiles
 ```
+
+For a Homebrew cleanup, there are two guarded modes:
+
+```sh
+bash install.sh --mirror-brew  # remove packages not in the active Brewfiles
+bash install.sh --reset-brew   # uninstall everything first, then reinstall
+```
+
+Mirror mode keeps packages from the active set: `Brewfile`, enabled feature Brewfiles such as `Brewfile.mac-apps`, and the selected profile Brewfile(s). It removes local Homebrew packages outside that set. Reset mode uninstalls every current Homebrew formula and cask, then lets `chezmoi apply` reinstall the repo-managed set. In interactive runs you must type `MIRROR BREW` or `RESET BREW` before the cleanup proceeds.
 
 On an already-bootstrapped machine, use the short configuration path when you
 only want to change profile, identity, or feature toggles:
@@ -85,9 +94,9 @@ bash install.sh --configure-only
 | Phase | Name | What it does |
 |---|---|---|
 | **A** | Discovery | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **B** | Choices | Profile picker (arrow-key radio). Identity (text input, defaults pulled from existing `git config`). 1Password (arrow-key Yes/No; if yes, paste the public key). Workstation extras — currently macOS quality-of-life apps. Existing-system handling (back up + remove legacy files? uninstall oh-my-zsh?). |
+| **B** | Choices | Numbered profile picker. Identity text fields with existing values as defaults. 1Password yes/no; if yes, paste the public signing key. Workstation extras — currently macOS quality-of-life apps. Existing-system handling (Homebrew mirror/reset? back up + remove legacy files? uninstall oh-my-zsh?). |
 | **C** | Confirm | One-screen summary of every choice. Last chance to abort. |
-| **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
+| **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
 | **E** | Self-test | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
 | **F** | Next steps | Prints the exact follow-ups: sign in to 1Password, run `bootstrap-auth.sh`, `exec zsh`, restart. |
 
@@ -629,6 +638,15 @@ If you genuinely think brew is frozen (heartbeat stopped firing too), `ps aux | 
 ---
 
 ## Uninstall / reset
+
+For the supported "make Homebrew match the managed workstation set" flow, run:
+
+```sh
+bash ~/Dev/Personal/dotfiles/install.sh --mirror-brew
+bash ~/Dev/Personal/dotfiles/install.sh --reset-brew
+```
+
+`--mirror-brew` leaves the Homebrew installation in place and removes formulae/casks that are not listed in the active Brewfile set for your selected profile/features. `--reset-brew` removes all current formulae/casks first, then reinstalls whatever the selected profile/features require. Both are intentionally guarded by an explicit confirmation phrase in interactive mode.
 
 There's no `uninstall.sh` because there's not a clean inverse — the bootstrap installs ~55 brew packages, modifies macOS defaults, and changes your shell's interpretation of `$HOME`. If you want to walk it back, the steps are:
 

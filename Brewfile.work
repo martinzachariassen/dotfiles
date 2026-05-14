@@ -15,3 +15,4 @@ cask "claude-code"              # Claude Code CLI, work profile only
 cask "intellij-idea"            # if Java work
 cask "microsoft-teams"
 cask "slack"
+cask "microsoft-outlook"
