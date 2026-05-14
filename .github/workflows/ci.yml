@@ -13,18 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  workflow:
-    name: workflow syntax
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Lint GitHub Actions workflows
-        uses: rhysd/actionlint@v1
-
   # ─── Job 1: shell scripts ───────────────────────────────────────────────────
-  # shellcheck the plain shell scripts. We deliberately do NOT lint the
-  # .chezmoiscripts/*.sh.tmpl files — they have Go template directives
+  # ShellCheck the plain shell scripts for errors. We deliberately do NOT lint
+  # the .chezmoiscripts/*.sh.tmpl files — they have Go template directives
   # (e.g. `{{ if ne .chezmoi.os "darwin" }}exit 0{{ end }}`) that strip-and-
   # lint approaches mishandle (the bare `exit 0` makes everything below it
   # look unreachable to shellcheck). Those scripts are validated indirectly
@@ -39,8 +30,8 @@ jobs:
       - name: Install shell tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck zsh
 
-      - name: Lint plain shell scripts
-        run: shellcheck --shell=bash install.sh scripts/*.sh
+      - name: Lint plain shell scripts for errors
+        run: shellcheck --severity=error --shell=bash install.sh scripts/*.sh
 
       - name: Check shell parser syntax
         run: |

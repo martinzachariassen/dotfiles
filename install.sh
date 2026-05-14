@@ -235,13 +235,13 @@ json_bool() {
 toml_string() {
     local file="$1" key="$2"
     [ -f "$file" ] || return 0
-    sed -n "s/^[[:space:]]*$key[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$/\1/p" "$file" | tail -1
+    sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$/\1/p" "$file" | tail -1
 }
 
 toml_bool() {
     local file="$1" key="$2"
     [ -f "$file" ] || return 0
-    sed -n "s/^[[:space:]]*$key[[:space:]]*=[[:space:]]*\\(true\\|false\\)[[:space:]]*$/\1/p" "$file" | tail -1
+    sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\\(true\\|false\\)[[:space:]]*$/\1/p" "$file" | tail -1
 }
 
 load_existing_answers() {

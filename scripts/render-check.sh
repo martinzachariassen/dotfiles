@@ -42,17 +42,30 @@ sourceDir = "$SOURCE_DIR"
 EOF
 
 echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
-HOME="$tmpdir" chezmoi apply --dry-run --source="$SOURCE_DIR" --no-pager --color=false
+HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
+    --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
+    --destination="$tmpdir" \
+    --source="$SOURCE_DIR" \
+    --no-pager \
+    --color=false
 
 for template in "$SOURCE_DIR"/.chezmoiscripts/*.sh.tmpl; do
     [ -f "$template" ] || continue
     echo "Checking rendered bash syntax: ${template#"$SOURCE_DIR"/}"
-    HOME="$tmpdir" chezmoi execute-template --source="$SOURCE_DIR" --file "$template" | bash -n
+    HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi execute-template \
+        --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
+        --destination="$tmpdir" \
+        --source="$SOURCE_DIR" \
+        --file "$template" | bash -n
 done
 
 if command -v zsh >/dev/null 2>&1; then
     echo "Checking rendered zsh syntax: dot_config/zsh/dot_zshrc.tmpl"
-    HOME="$tmpdir" chezmoi execute-template --source="$SOURCE_DIR" --file "$SOURCE_DIR/dot_config/zsh/dot_zshrc.tmpl" | zsh -n
+    HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi execute-template \
+        --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
+        --destination="$tmpdir" \
+        --source="$SOURCE_DIR" \
+        --file "$SOURCE_DIR/dot_config/zsh/dot_zshrc.tmpl" | zsh -n
     zsh -n "$SOURCE_DIR/dot_zshenv" "$SOURCE_DIR/dot_config/zsh/dot_zprofile"
 else
     echo "Skipping rendered zsh syntax check: zsh not installed"
