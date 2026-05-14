@@ -2,7 +2,7 @@
 # doctor.sh — health check for the dotfiles install on this machine.
 #
 # Run anytime (idempotent, read-only):
-#   bash ~/Dev/Personal/dotfiles/doctor.sh
+#   bash ~/Dev/Personal/dotfiles/scripts/doctor.sh
 #   chezdoctor                                 # zsh alias
 #
 # Output convention:
@@ -157,7 +157,7 @@ if zsh -c 'source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1; type claude >/dev/
         if [ -d "$HOME/.claude" ]; then
             pass "~/.claude present (storecode installed)"
         else
-            warn "~/.claude missing — work-profile claude calls would fall back to personal (see WORK-SETUP.md)"
+            warn "~/.claude missing — work-profile claude calls would fall back to personal (see docs/work-setup.md)"
         fi
     fi
     # Personal config dir
@@ -216,26 +216,26 @@ if command -v brew >/dev/null 2>&1; then
     profile=$(chezmoi data --format=json 2>/dev/null | grep -o '"profile":"[^"]*"' | cut -d'"' -f4 || echo "")
     case "$profile" in
         personal|both)
-            if brew bundle check --file="$SOURCE_DIR/Brewfile.personal" >/dev/null 2>&1; then
+            if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.personal" >/dev/null 2>&1; then
                 pass "personal Brewfile satisfied"
             else
-                warn "Brewfile.personal out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile.personal"
+                warn "Brewfile.personal out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.personal"
             fi
             ;;
     esac
     case "$profile" in
         work|both)
-            if brew bundle check --file="$SOURCE_DIR/Brewfile.work" >/dev/null 2>&1; then
+            if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.work" >/dev/null 2>&1; then
                 pass "work Brewfile satisfied"
             else
-                warn "Brewfile.work out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile.work"
+                warn "Brewfile.work out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.work"
             fi
             ;;
     esac
     # Drift the OTHER way: ad-hoc installs not tracked anywhere.
     leaves_tmp=$(mktemp)
     brew leaves > "$leaves_tmp" 2>/dev/null || true
-    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/Brewfile* 2>/dev/null \
+    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.* 2>/dev/null \
         | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
         | awk -F/ '{print $NF}' \
         | sort -u)

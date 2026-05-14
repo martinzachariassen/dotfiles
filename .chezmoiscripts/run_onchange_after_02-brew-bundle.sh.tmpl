@@ -4,9 +4,9 @@
 # belong in per-project devbox.json files, not in global Homebrew modules.
 #
 # Brewfile (core)        hash: {{ include "Brewfile" | sha256sum }}
-# Brewfile.mac-apps      hash: {{ include "Brewfile.mac-apps" | sha256sum }}
-# Brewfile.personal      hash: {{ include "Brewfile.personal" | sha256sum }}
-# Brewfile.work          hash: {{ include "Brewfile.work" | sha256sum }}
+# brewfiles/Brewfile.mac-apps      hash: {{ include "brewfiles/Brewfile.mac-apps" | sha256sum }}
+# brewfiles/Brewfile.personal      hash: {{ include "brewfiles/Brewfile.personal" | sha256sum }}
+# brewfiles/Brewfile.work          hash: {{ include "brewfiles/Brewfile.work" | sha256sum }}
 # Profile in effect:           {{ .profile }}
 # Feature: macApps             {{ dig "features" "macApps" true . }}
 
@@ -109,13 +109,13 @@ add_step() { PLAN_LABELS+=("$1"); PLAN_FILES+=("$SOURCE/$2"); }
 
 add_step "core (always)"                  "Brewfile"
 {{ if dig "features" "macApps" true . -}}
-add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "Brewfile.mac-apps"
+add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "brewfiles/Brewfile.mac-apps"
 {{ end -}}
 case "{{ .profile }}" in
-    personal|both) add_step "personal profile extras"  "Brewfile.personal" ;;
+    personal|both) add_step "personal profile extras"  "brewfiles/Brewfile.personal" ;;
 esac
 case "{{ .profile }}" in
-    work|both)     add_step "work profile extras"      "Brewfile.work" ;;
+    work|both)     add_step "work profile extras"      "brewfiles/Brewfile.work" ;;
 esac
 
 TOTAL=${#PLAN_LABELS[@]}

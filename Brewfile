@@ -5,15 +5,15 @@
 # the modern CLI replacements wired into aliases, devbox + direnv for per-project
 # runtimes, chezmoi for managing this repo, and 1Password for SSH + git signing.
 #
-# Optional add-ons live in sibling Brewfile.<feature> files and are layered on
+# Optional add-ons live in brewfiles/Brewfile.<feature> files and are layered on
 # top of this one based on your answers to the install wizard. See:
-#   Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
-#   Brewfile.personal   — personal-only casks (you fill in)
-#   Brewfile.work       — work-only casks, including Claude Code CLI
+#   brewfiles/Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
+#   brewfiles/Brewfile.personal   — personal-only casks (you fill in)
+#   brewfiles/Brewfile.work       — work-only casks, including Claude Code CLI
 #
 # Regenerate from a known-good machine:
 #   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile
-# (then move feature-specific lines back into the matching Brewfile.<feature>)
+# (then move feature-specific lines back into the matching brewfiles/Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "git"

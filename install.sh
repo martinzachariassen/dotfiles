@@ -512,13 +512,13 @@ EOF_FORMULAE
 active_brewfiles() {
     printf '%s\n' "$SOURCE_DIR/Brewfile"
     if [ "${CHOICE_FEAT_macApps:-true}" = "true" ]; then
-        printf '%s\n' "$SOURCE_DIR/Brewfile.mac-apps"
+        printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
     fi
     case "${CHOICE_PROFILE:-personal}" in
-        personal|both) printf '%s\n' "$SOURCE_DIR/Brewfile.personal" ;;
+        personal|both) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.personal" ;;
     esac
     case "${CHOICE_PROFILE:-personal}" in
-        work|both) printf '%s\n' "$SOURCE_DIR/Brewfile.work" ;;
+        work|both) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.work" ;;
     esac
 }
 
@@ -751,13 +751,13 @@ next_steps() {
         say "$n. ${BOLD}Sign in to 1Password${RESET} and enable Settings -> Developer -> SSH agent"
         n=$((n + 1))
     fi
-    say "$n. ${BOLD}bash $SOURCE_DIR/bootstrap-auth.sh${RESET} - gh/az/gcloud sign-in and signing checks"
+    say "$n. ${BOLD}bash $SOURCE_DIR/scripts/bootstrap-auth.sh${RESET} - gh/az/gcloud sign-in and signing checks"
     n=$((n + 1))
     say "$n. ${BOLD}exec zsh${RESET} - reload shell configuration"
     n=$((n + 1))
     say "$n. ${BOLD}Restart your Mac${RESET} - some macOS defaults need a reboot"
     hr
-    say "${DIM}Diagnose anytime:${RESET} ${BOLD}bash $SOURCE_DIR/doctor.sh${RESET}"
+    say "${DIM}Diagnose anytime:${RESET} ${BOLD}bash $SOURCE_DIR/scripts/doctor.sh${RESET}"
     say "${DIM}Re-run configuration only:${RESET} ${BOLD}bash $SOURCE_DIR/install.sh --configure-only${RESET}"
     printf "%s\n" "${CYAN}|${RESET}"
     printf "%s  %sWizard complete.%s\n" "${GREEN}+${RESET}" "$BOLD" "$RESET"

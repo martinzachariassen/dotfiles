@@ -8,7 +8,7 @@
 # already signed in.
 #
 # Usage:
-#   bash ~/Dev/Personal/dotfiles/bootstrap-auth.sh
+#   bash ~/Dev/Personal/dotfiles/scripts/bootstrap-auth.sh
 #
 # Environment variables:
 #   SKIP_GH=1       — skip gh auth login

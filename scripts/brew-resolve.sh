@@ -6,7 +6,7 @@ set -euo pipefail
 SOURCE_DIR="${1:-$(pwd)}"
 missing=0
 
-for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/Brewfile.*; do
+for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
     [ -f "$f" ] || continue
     case "$f" in *.lock.json) continue ;; esac
     echo "── $(basename "$f") ──"

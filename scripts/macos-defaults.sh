@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # macos-defaults.sh — opinionated macOS system defaults
-# Run manually:  bash ~/Dev/Personal/dotfiles/macos-defaults.sh
-# Or applied automatically by chezmoi via .chezmoiscripts/run_onchange_after_*.sh
+# Run manually:  bash ~/Dev/Personal/dotfiles/scripts/macos-defaults.sh
+# Or applied automatically by chezmoi via .chezmoiscripts/run_once_after_*.sh
 #
 # Safe to re-run. Some changes need a logout/restart to take full effect.
 # Each `defaults write` is annotated; comment out anything you don't want.

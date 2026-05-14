@@ -106,7 +106,7 @@ claude() {
             return 1
         fi
         print -u2 "claude: ⚠ work profile requested but $CLAUDE_WORK_DIR not found — falling back to personal."
-        print -u2 "claude:   See WORK-SETUP.md to install storecode if you need the work profile."
+        print -u2 "claude:   See docs/work-setup.md to install storecode if you need the work profile."
         config_dir="$CLAUDE_PERSONAL_DIR"
     fi
     CLAUDE_CONFIG_DIR="$config_dir" command claude "$@"
@@ -167,7 +167,7 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
 # Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
 # fresh Mac or after wiping a system pref pane back to defaults.
-alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/macos-defaults.sh"'
+alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/scripts/macos-defaults.sh"'
 
 # Dotfiles control panel. With no args it cd's into the source repo; with args
 # it dispatches to scripts/dotfiles-config.sh, e.g.
@@ -253,7 +253,7 @@ chezdiff() {
     echo "── brew bundle (missing packages) ────────────────────────────"
     # Check every Brewfile module that exists in source. The wildcard catches
     # core + workstation extras + profile extras.
-    for f in "$src"/Brewfile "$src"/Brewfile.*; do
+    for f in "$src"/Brewfile "$src"/brewfiles/Brewfile.*; do
         [ -f "$f" ] || continue
         case "$f" in *.lock.json) continue ;; esac
         brew bundle check --verbose --file="$f" 2>&1 \
@@ -287,8 +287,8 @@ chezbump() {
     echo
     echo "── brew bundle cleanup (preview) ──────────────────────────────"
     echo "  Packages installed locally but not in any Brewfile:"
-    brew bundle cleanup --file="$src/Brewfile" --file="$src/Brewfile.personal" \
-                        --file="$src/Brewfile.work" 2>/dev/null \
+    brew bundle cleanup --file="$src/Brewfile" --file="$src/brewfiles/Brewfile.personal" \
+                        --file="$src/brewfiles/Brewfile.work" 2>/dev/null \
         || brew bundle cleanup --file="$src/Brewfile"
     echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
     if command -v devbox >/dev/null 2>&1; then
@@ -309,7 +309,7 @@ chezaudit() {
     local tracked untracked leaves_tmp
     leaves_tmp=$(mktemp)
     brew leaves > "$leaves_tmp"
-    tracked=$(grep -h '^\(brew\|cask\) ' "$src"/Brewfile* 2>/dev/null \
+    tracked=$(grep -h '^\(brew\|cask\) ' "$src"/Brewfile "$src"/brewfiles/Brewfile.* 2>/dev/null \
         | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
         | awk -F/ '{print $NF}' \
         | sort -u)
@@ -321,16 +321,16 @@ chezaudit() {
         echo "── Untracked (installed locally, not in any Brewfile) ────────"
         echo "$untracked"
         echo
-        echo "Add to the right Brewfile (Brewfile / Brewfile.personal / Brewfile.work),"
+        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.personal / brewfiles/Brewfile.work),"
         echo "or \`brew uninstall <name>\` if you don't actually use it."
     fi
 }
 
-# Full-stack health check (sources doctor.sh from the source dir).
+# Full-stack health check (sources scripts/doctor.sh from the source dir).
 chezdoctor() {
     local src
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
-    bash "$src/doctor.sh"
+    bash "$src/scripts/doctor.sh"
 }
 
 # ─── Zellij (terminal multiplexer) ────────────────────────────────────────────

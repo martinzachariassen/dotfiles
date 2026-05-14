@@ -43,35 +43,35 @@ Reference table showing exactly what each file in the repo does.
 
 Listed in `.chezmoiignore`:
 
-`README.md`, `WORK-SETUP.md`, `MAPPING.md`, `LICENSE`, `install.sh`, `doctor.sh`, `bootstrap-auth.sh`, `Brewfile`, `Brewfile.personal`, `Brewfile.work`, `Brewfile.lock.json`, `macos-defaults.sh`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`
+`README.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`
 
 These are repo metadata, install scripts, or holding-pen files for things we removed.
 
-## Repo-root utility scripts (run by hand or via aliases)
+## Utility scripts (run by hand or via aliases)
 
 Not synced to `$HOME` — these are tools you run from the repo itself.
 
 | Script | What it does | When to run |
 |---|---|---|
 | `install.sh` | 7-step bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
-| `bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
-| `doctor.sh` | Reads-only health check. Verifies XDG layout, claude routing, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
-| `macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
+| `scripts/bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
+| `scripts/doctor.sh` | Reads-only health check. Verifies XDG layout, claude routing, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
+| `scripts/macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
 
 ## chezmoi infrastructure (not files in `$HOME`, but used by chezmoi itself)
 
 | File | Role |
 |---|---|
 | `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile, workstation extras). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
-| `Brewfile`, `Brewfile.mac-apps`, `Brewfile.personal`, `Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional mac apps and profile extras based on chezmoi data. |
+| `Brewfile`, `brewfiles/Brewfile.mac-apps`, `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional mac apps and profile extras based on chezmoi data. |
 | `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
 | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` | Runs once before any apply. macOS-only via template guard. |
 | `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` | Runs before apply. Two-step: (1) curl-installs devbox from `get.jetify.com/devbox` if missing (devbox isn't in homebrew); (2) if `/nix` doesn't exist, eagerly bootstraps the Nix store via Determinate Systems' installer (`install --determinate --no-confirm`) — same code path devbox would invoke lazily, just run upfront so the first `devbox shell` doesn't pause for a "press enter to continue" prompt. macOS-only. Both halves idempotent. Doesn't fail the apply if Nix bootstrap errors — falls back to lazy install. |
 | `.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl` | Runs after apply when Brewfile content hash changes. macOS-only. |
-| `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
+| `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `scripts/macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
 | `.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl` | Prints a clear "✓ chezmoi apply complete" banner at the end of every apply. Always re-fires because the embedded `{{ now.Unix }}` timestamp makes the content hash differ on every render. The "99-" prefix sorts it after all other after-scripts. Pure UX — gives an unambiguous signal that chezmoi has finished its work. |
-| `macos-defaults.sh` (root) | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |
+| `scripts/macos-defaults.sh` | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |
 
 ---
 

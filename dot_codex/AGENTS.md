@@ -302,7 +302,7 @@ The repo at `~/Dev/Personal/dotfiles` uses chezmoi conventions:
 - Files ending in `.tmpl` are Go templates rendered with chezmoi data
   (`{{ .name }}`, `{{ .email }}`, `{{ .signingKey }}`, `{{ .profile }}`).
 - The Brewfile is split into three tiers: `Brewfile` (common, always),
-  `Brewfile.personal`, `Brewfile.work`. The brew-bundle chezmoi script picks
+  `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work`. The brew-bundle chezmoi script picks
   layers based on the `profile` value.
 - Edit dotfiles via `chezmoi edit ~/.X` (opens the source). Editing the live
   `$HOME` file directly creates drift.
@@ -310,5 +310,5 @@ The repo at `~/Dev/Personal/dotfiles` uses chezmoi conventions:
   `chezmoi apply --force` with an upfront diff-preview prompt). This avoids
   prompt collisions between chezmoi's per-file conflict prompts and sudo's
   password prompt during macos-defaults.
-- `MAPPING.md` is the authoritative source-to-target table. Update it when
+- `docs/mapping.md` is the authoritative source-to-target table. Update it when
   adding/removing managed files.

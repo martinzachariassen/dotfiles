@@ -4,7 +4,7 @@
 # when your profile is "work" or "both". Skipped when your profile is
 # "personal".
 #
-# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/Brewfile.work
+# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.work
 
 # ─── Claude Code ─────────────────────────────────────────────────────────────
 cask "claude-code"              # Claude Code CLI, work profile only
