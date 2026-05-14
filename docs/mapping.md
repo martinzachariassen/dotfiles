@@ -43,7 +43,7 @@ Reference table showing exactly what each file in the repo does.
 
 Listed in `.chezmoiignore`:
 
-`README.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`
+`README.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`, `raycast/`
 
 These are repo metadata, install scripts, or holding-pen files for things we removed.
 

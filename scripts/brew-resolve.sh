@@ -6,21 +6,31 @@ set -euo pipefail
 SOURCE_DIR="${1:-$(pwd)}"
 missing=0
 
+resolve() {
+    local kind="$1" name="$2" flag
+
+    if [ "$kind" = "brew" ]; then
+        flag="--formula"
+    else
+        flag="--cask"
+    fi
+
+    brew info "$flag" "$name" >/dev/null 2>&1 \
+        || brew search "$flag" "$name" 2>/dev/null | grep -Fxq "$name"
+}
+
 for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
     [ -f "$f" ] || continue
     case "$f" in *.lock.json) continue ;; esac
     echo "── $(basename "$f") ──"
-    while read -r line; do
-        name="$(echo "$line" | sed -E 's/^(brew|cask) "([^"]+)".*/\2/')"
-        kind="$(echo "$line" | awk '{print $1}')"
-        if [ "$kind" = "brew" ]; then
-            brew info --formula "$name" >/dev/null 2>&1 \
-                || { echo "  ✗ formula not found: $name"; missing=1; }
-        else
-            brew info --cask "$name" >/dev/null 2>&1 \
-                || { echo "  ✗ cask not found: $name"; missing=1; }
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*(brew|cask)[[:space:]]+\"([^\"]+)\" ]]; then
+            kind="${BASH_REMATCH[1]}"
+            name="${BASH_REMATCH[2]}"
+            resolve "$kind" "$name" \
+                || { echo "  ✗ $kind not found: $name"; missing=1; }
         fi
-    done < <(grep -E '^(brew|cask) "' "$f" || true)
+    done < "$f"
 done
 
 exit "$missing"

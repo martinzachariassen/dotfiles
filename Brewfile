@@ -75,4 +75,3 @@ cask "font-fira-code-nerd-font"        # secondary; nice ligatures
 # ─── Mac App Store apps (requires `mas`) ──────────────────────────────────────
 # brew "mas"
 # mas "Xcode", id: 497799835
-brew "clean"

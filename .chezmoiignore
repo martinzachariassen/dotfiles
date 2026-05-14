@@ -12,3 +12,4 @@ brewfiles/
 .gitignore
 .DS_Store
 examples/
+raycast/

@@ -370,7 +370,7 @@ choices() {
 
     local current_macapps
     current_macapps="${EXISTING_FEAT_macApps:-true}"
-    prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps? (Rectangle, Raycast, Stats, Chrome, dive)" "$([ "$current_macapps" = "true" ] && echo 1 || echo 0)"
+    prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps?" "$([ "$current_macapps" = "true" ] && echo 1 || echo 0)"
 
     CHOICE_RESET_BREW=false
     CHOICE_MIRROR_BREW=false

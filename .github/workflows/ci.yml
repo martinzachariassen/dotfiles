@@ -5,11 +5,23 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  workflow:
+    name: workflow syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint GitHub Actions workflows
+        uses: rhysd/actionlint@v1
+
   # ─── Job 1: shell scripts ───────────────────────────────────────────────────
   # shellcheck the plain shell scripts. We deliberately do NOT lint the
   # .chezmoiscripts/*.sh.tmpl files — they have Go template directives
@@ -17,18 +29,23 @@ jobs:
   # lint approaches mishandle (the bare `exit 0` makes everything below it
   # look unreachable to shellcheck). Those scripts are validated indirectly
   # by the chezmoi job below: rendering them via chezmoi catches Go template
-  # syntax bugs, and a bash syntax bug would also fail rendering.
+  # syntax bugs, then bash parses the rendered script bodies.
   shell:
     name: shell scripts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install shellcheck
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+      - name: Install shell tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck zsh
 
       - name: Lint plain shell scripts
-        run: shellcheck --shell=bash install.sh macos-defaults.sh doctor.sh bootstrap-auth.sh scripts/*.sh
+        run: shellcheck --shell=bash install.sh scripts/*.sh
+
+      - name: Check shell parser syntax
+        run: |
+          bash -n install.sh scripts/*.sh
+          zsh -n dot_zshenv dot_config/zsh/dot_zprofile
 
   # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
   # Renders every template in the repo. Catches Go template syntax errors,
@@ -40,8 +57,16 @@ jobs:
   chezmoi:
     name: chezmoi templates
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [personal, work, both]
+        mac_apps: [true, false]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
 
       - name: Install chezmoi
         run: |
@@ -57,6 +82,9 @@ jobs:
         # vscode-extensions, macos-defaults) all have a `{{ if ne .chezmoi.os
         # "darwin" }}exit 0{{ end }}` guard, so they don't need any
         # macOS-specific tooling on this Linux runner — they just exit 0.
+        env:
+          PROFILE: ${{ matrix.profile }}
+          MAC_APPS: ${{ matrix.mac_apps }}
         run: bash scripts/render-check.sh "$PWD"
 
   # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────
