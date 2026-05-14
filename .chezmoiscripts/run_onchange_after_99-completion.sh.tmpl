@@ -23,14 +23,11 @@ PROFILE="{{ .profile }}"
 SOURCE="{{ .chezmoi.sourceDir }}"
 USE_OP="{{ dig "useOnePassword" true . }}"
 
-# Build feature list as a bullet-separated string for compact display.
-FEATURES=""
-{{ if dig "features" "cloud" true . }}FEATURES="${FEATURES}cloud · "{{ end }}
-{{ if dig "features" "iac" true . }}FEATURES="${FEATURES}iac · "{{ end }}
-{{ if dig "features" "databases" true . }}FEATURES="${FEATURES}databases · "{{ end }}
-{{ if dig "features" "macApps" true . }}FEATURES="${FEATURES}macApps · "{{ end }}
-FEATURES="${FEATURES% · }"
-[ -z "$FEATURES" ] && FEATURES="(none enabled)"
+# Build current workstation extras as a bullet-separated string for compact display.
+EXTRAS=""
+{{ if dig "features" "macApps" true . }}EXTRAS="${EXTRAS}macApps · "{{ end }}
+EXTRAS="${EXTRAS% · }"
+[ -z "$EXTRAS" ] && EXTRAS="(none enabled)"
 
 # ─── Colors (only if stdout is a real TTY) ───────────────────────────────────
 if [ -t 1 ]; then
@@ -49,7 +46,7 @@ ${C}═════════════════════════�
 ${C}═════════════════════════════════════════════════════════════════════${R}
 
   ${B}Profile${R}        ${G}${PROFILE}${R}
-  ${B}Features${R}       ${FEATURES}
+  ${B}Extras${R}         ${EXTRAS}
   ${B}1Password${R}      $([ "$USE_OP" = "true" ] && printf "%senabled%s" "$G" "$R" || printf "%sdisabled%s" "$Y" "$R")
   ${B}Source${R}         ${D}${SOURCE}${R}
 
@@ -78,7 +75,7 @@ ${D}─── Suggested next steps ───────────────
   ${M}1.${R}  ${C}exec zsh${R}                     ${D}reload shell if you changed shell config${R}
   ${M}2.${R}  ${C}chezdoctor${R}                   ${D}verify everything is healthy${R}
   ${M}3.${R}  ${C}bash ${SOURCE}/bootstrap-auth.sh${R}
-                                  ${D}gh / az / gcloud sign-in (skip if done)${R}
+                                  ${D}gh / az / gcloud sign-in + AKS/GKE checks${R}
 
 ${D}Re-run this apply anytime with ${C}chezup${D} — or ${C}bash ${SOURCE}/install.sh${D} to walk the wizard again.${R}
 

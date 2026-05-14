@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Manage this repo's chezmoi profile and workstation feature toggles without
+# re-running the full bootstrap wizard.
+
+set -euo pipefail
+
+SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")}"
+CHEZMOI_CONFIG="${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}"
+FEATURE_KEYS=(macApps)
+APPLY=1
+
+usage() {
+    cat <<EOF
+Usage:
+  dotfiles profile show
+  dotfiles profile set personal|work|both [--no-apply]
+  dotfiles features list
+  dotfiles features enable macApps [--no-apply]
+  dotfiles features disable macApps [--no-apply]
+  dotfiles features set macApps true|false [--no-apply]
+
+Environment:
+  CHEZMOI_CONFIG   path to chezmoi.toml (default: ~/.config/chezmoi/chezmoi.toml)
+  DOTFILES_DIR     source repo fallback when chezmoi is not initialized
+EOF
+}
+
+die() {
+    echo "dotfiles: $*" >&2
+    exit 1
+}
+
+valid_profile() {
+    case "$1" in
+        personal|work|both) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+valid_feature() {
+    local key
+    for key in "${FEATURE_KEYS[@]}"; do
+        [ "$1" = "$key" ] && return 0
+    done
+    return 1
+}
+
+parse_common_flags() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --no-apply) APPLY=0 ;;
+            -h|--help) usage; exit 0 ;;
+            *) die "unknown option: $1" ;;
+        esac
+        shift
+    done
+}
+
+ensure_config() {
+    if [ ! -f "$CHEZMOI_CONFIG" ]; then
+        die "chezmoi config missing at $CHEZMOI_CONFIG; run install.sh or chezmoi init first"
+    fi
+}
+
+show_profile() {
+    ensure_config
+    chezmoi data --format=json 2>/dev/null \
+        | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | sed '/^$/d' \
+        | tail -1
+}
+
+show_features() {
+    ensure_config
+    local data key val
+    data="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
+    for key in "${FEATURE_KEYS[@]}"; do
+        val="$(printf '%s\n' "$data" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\(true\\|false\\).*/\\1/p" | head -1)"
+        printf '%-10s %s\n' "$key" "${val:-true}"
+    done
+}
+
+set_toml_value() {
+    local section="$1" key="$2" value="$3" tmp
+    tmp="$(mktemp)"
+    awk -v section="$section" -v key="$key" -v value="$value" '
+        BEGIN {
+            in_section = 0
+            saw_section = 0
+            replaced = 0
+            section_header = "[" section "]"
+        }
+        function emit_key() {
+            if (section == "data.features") {
+                print "        " key " = " value
+            } else {
+                print "    " key " = " value
+            }
+        }
+        /^\[[^]]+\]/ {
+            if (in_section && !replaced) {
+                emit_key()
+                replaced = 1
+            }
+            in_section = ($0 == section_header)
+            if (in_section) {
+                saw_section = 1
+            }
+        }
+        {
+            if (in_section && $1 == key && $2 == "=") {
+                emit_key()
+                replaced = 1
+                next
+            }
+            print
+        }
+        END {
+            if (!saw_section) {
+                print ""
+                print section_header
+                emit_key()
+            } else if (in_section && !replaced) {
+                emit_key()
+            }
+        }
+    ' "$CHEZMOI_CONFIG" > "$tmp"
+    mv "$tmp" "$CHEZMOI_CONFIG"
+}
+
+apply_if_requested() {
+    [ "$APPLY" = "1" ] || return 0
+    if command -v chezmoi >/dev/null 2>&1; then
+        chezmoi apply --force
+    else
+        die "chezmoi is not installed; config was updated but not applied"
+    fi
+}
+
+cmd_profile() {
+    local action="${1:-}"
+    case "$action" in
+        show)
+            parse_common_flags "${@:2}"
+            show_profile
+            ;;
+        set)
+            local profile="${2:-}"
+            [ -n "$profile" ] || die "missing profile"
+            valid_profile "$profile" || die "profile must be personal, work, or both"
+            parse_common_flags "${@:3}"
+            ensure_config
+            set_toml_value "data" "profile" "\"$profile\""
+            echo "dotfiles: profile set to $profile"
+            apply_if_requested
+            ;;
+        *) usage; exit 1 ;;
+    esac
+}
+
+cmd_features() {
+    local action="${1:-}"
+    case "$action" in
+        list)
+            parse_common_flags "${@:2}"
+            show_features
+            ;;
+        enable|disable)
+            shift
+            local value="true" key
+            [ "$action" = "disable" ] && value="false"
+            local keys=()
+            while [ $# -gt 0 ]; do
+                case "$1" in
+                    --no-apply|-h|--help) break ;;
+                    *) keys+=("$1") ;;
+                esac
+                shift
+            done
+            [ ${#keys[@]} -gt 0 ] || die "missing feature"
+            parse_common_flags "$@"
+            ensure_config
+            for key in "${keys[@]}"; do
+                valid_feature "$key" || die "unknown feature: $key"
+                set_toml_value "data.features" "$key" "$value"
+                echo "dotfiles: feature $key=$value"
+            done
+            apply_if_requested
+            ;;
+        set)
+            local key="${2:-}" value="${3:-}"
+            [ -n "$key" ] || die "missing feature"
+            valid_feature "$key" || die "unknown feature: $key"
+            case "$value" in true|false) ;; *) die "feature value must be true or false" ;; esac
+            parse_common_flags "${@:4}"
+            ensure_config
+            set_toml_value "data.features" "$key" "$value"
+            echo "dotfiles: feature $key=$value"
+            apply_if_requested
+            ;;
+        *) usage; exit 1 ;;
+    esac
+}
+
+main() {
+    local cmd="${1:-}"
+    case "$cmd" in
+        profile) shift; cmd_profile "$@" ;;
+        features) shift; cmd_features "$@" ;;
+        -h|--help|"") usage ;;
+        *) usage; exit 1 ;;
+    esac
+}
+
+main "$@"

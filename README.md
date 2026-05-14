@@ -6,7 +6,7 @@
 [![Catppuccin Frappé](https://img.shields.io/badge/Catppuccin-Frapp%C3%A9-f2d5cf?labelColor=303446)](https://github.com/catppuccin/catppuccin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command bootstraps a fresh Mac into a fully configured backend dev environment — terminal, multiplexer, prompt, editors, runtimes, cloud + Kubernetes tooling, and macOS system defaults all in their final state.
+> Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command bootstraps a fresh Mac into a clean backend workstation — terminal, multiplexer, prompt, editors, Devbox-powered project environments, GUI apps, and macOS system defaults all in their final state.
 
 ## Table of Contents
 
@@ -52,8 +52,8 @@ You'll meet a Vite/Clack-style guided wizard — arrow-key navigation, real chec
 │  Use ↑↓ to navigate, space to toggle, ↵ to confirm, ctrl-c to abort.
 │
 ◆  Which profile?
-│  ● personal — adds Brewfile.personal (Claude apps, etc.)
-│  ○ work     — adds Brewfile.work (the casks you fill in)
+│  ● personal — adds Brewfile.personal (personal-only apps)
+│  ○ work     — adds Brewfile.work (work-only apps, Claude Code)
 │  ○ both     — adds both
 │  ↑↓ navigate · ↵ select
 ```
@@ -73,15 +73,22 @@ DOTFILES_REPO=…   bash install.sh   # point at a fork
 DOTFILES_DIR=…    bash install.sh   # clone somewhere other than ~/Dev/Personal/dotfiles
 ```
 
+On an already-bootstrapped machine, use the short configuration path when you
+only want to change profile, identity, or feature toggles:
+
+```sh
+bash install.sh --configure-only
+```
+
 ### The six phases
 
 | Phase | Name | What it does |
 |---|---|---|
 | **A** | Discovery | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **B** | Choices | Profile picker (arrow-key radio). Identity (text input, defaults pulled from existing `git config`). 1Password (arrow-key Yes/No; if yes, paste the public key). Feature toggles — **one multi-select**, space to toggle each of cloud / IaC / databases / mac-apps. Existing-system handling (back up + remove legacy files? uninstall oh-my-zsh?). |
+| **B** | Choices | Profile picker (arrow-key radio). Identity (text input, defaults pulled from existing `git config`). 1Password (arrow-key Yes/No; if yes, paste the public key). Workstation extras — currently macOS quality-of-life apps. Existing-system handling (back up + remove legacy files? uninstall oh-my-zsh?). |
 | **C** | Confirm | One-screen summary of every choice. Last chance to abort. |
-| **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against the enabled feature modules + your profile's extras, plus VS Code extensions and macOS defaults (sudo once). |
-| **E** | Self-test | Functional checks for every core binary plus the feature-gated ones for whichever modules you enabled. Reports auth state for `gh`/`az`/`gcloud` as FYI. |
+| **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
+| **E** | Self-test | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
 | **F** | Next steps | Prints the exact follow-ups: sign in to 1Password, run `bootstrap-auth.sh`, `exec zsh`, restart. |
 
 After the wizard finishes:
@@ -90,7 +97,7 @@ After the wizard finishes:
 # 1. Sign in to 1Password (so SSH agent + git signing work) — skip if you said no in Phase B
 open -a 1Password
 
-# 2. Walk through CLI auth (gh, az, gcloud, GKE plugin, signing test). Idempotent.
+# 2. Walk through CLI auth (gh, az, gcloud, AKS/GKE plugins, signing test). Idempotent.
 bash ~/Dev/Personal/dotfiles/bootstrap-auth.sh
 
 # 3. Reload shell with the new config
@@ -102,28 +109,35 @@ sudo shutdown -r now
 
 ### Profiles & features
 
-Phase B asks two orthogonal questions: which **profile** you're on (which casks/aliases get layered in) and which **features** you want (which modules of the Brewfile get installed).
+Phase B asks two orthogonal questions: which **profile** you're on (which casks/aliases get layered in) and which workstation **extras** you want globally.
 
 **Profile** controls personal-vs-work cask + shell-config layering:
 
 | Profile | Brewfiles applied (on top of core) | Notes |
 |---|---|---|
-| `personal` | `Brewfile.personal` | Claude desktop + Claude Code CLI cask, plus any personal-only apps you add. Personal-only `.zshrc` block renders. |
-| `work` | `Brewfile.work` | Work-only apps you add (Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders, including `~/.storecode/bin` on PATH if installed. Personal Claude casks are *not* installed — work uses storecode-managed `~/.claude` per [`WORK-SETUP.md`](WORK-SETUP.md). |
+| `personal` | `Brewfile.personal` | Personal-only apps you add. Personal-only `.zshrc` block renders. |
+| `work` | `Brewfile.work` | Work-only apps you add (Claude Code, Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders, including `~/.storecode/bin` on PATH if installed. |
 | `both` | both | Single-machine-many-jobs. |
 
-**Features** are independent toggles. Each one decides whether a sibling `Brewfile.<feature>` gets layered in:
+**Features** are intentionally narrow. Project toolchains are Devbox-owned; Homebrew features are only for workstation-level preferences:
 
 | Feature | Brewfile | What's in it |
 |---|---|---|
-| `cloud` | `Brewfile.cloud` | Kubernetes (kubectl, kubectx, k9s, stern, helm), Azure CLI + kubelogin, Google Cloud SDK cask. |
-| `iac` | `Brewfile.iac` | Terraform (HashiCorp tap), tflint, terraform-docs. Easy to swap for OpenTofu. |
-| `databases` | `Brewfile.databases` | pgcli, redis (cli + on-demand server). Postgres-first — MySQL isn't in the default kit; uncomment `brew "mysql-client"` if you need it. CLI clients only — for servers, pin via per-project `devbox.json`. |
 | `macApps` | `Brewfile.mac-apps` | Rectangle, Raycast, Stats, Chrome, dive. Pure QoL — skip on a server-y machine. |
 
-The core `Brewfile` always installs (git, modern CLI, prompt, runtimes, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim). Anything fundamental to the documented "what you get" experience lives there; everything else is a feature toggle.
+The core `Brewfile` always installs the workstation baseline: git, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `direnv`, `az`, `gcloud`, and other shell primitives. Project-pinned Kubernetes tools, Terraform/OpenTofu, database clients/servers, and language runtimes belong in each project's `devbox.json`. Starter templates live under [`examples/devbox/`](examples/devbox/).
 
-To flip a feature on or off later, see [Toggling a feature on or off later](#toggling-a-feature-on-or-off-later).
+To flip a profile or feature later:
+
+```sh
+dotfiles profile set work
+dotfiles profile set personal
+dotfiles features list
+dotfiles features disable macApps
+```
+
+`dotfiles` with no arguments still jumps to the source repo. With arguments it
+updates `~/.config/chezmoi/chezmoi.toml` and runs `chezmoi apply --force`.
 
 ### Day-one secrets and signing
 
@@ -133,7 +147,7 @@ The bootstrap pulls config and tools, but **secrets aren't in this repo on purpo
 
 **Git commit signing** — chezmoi's init prompt asks for `signingKey`, which is your **public key** copied from the 1Password item. The corresponding private key never leaves 1Password; `op-ssh-sign` (bundled with the 1Password macOS app) signs commits via the agent. The git config template at `dot_config/git/config.tmpl` wires `[gpg "ssh"] program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign` for you. `bootstrap-auth.sh` runs a `git -S` smoke test against an empty repo to prove the whole chain (1Password unlocked → agent reachable → signing key found → signed commit succeeds) actually works.
 
-**Cloud auth tokens** — `gh`, `az`, and `gcloud` each store their own credentials under `~/.config/gh/`, `~/.azure/`, `~/.config/gcloud/`. `bootstrap-auth.sh` walks you through each. None of these directories are tracked in this repo.
+**Cloud auth tokens** — `gh`, `az`, and `gcloud` each store their own credentials under `~/.config/gh/`, `~/.azure/`, `~/.config/gcloud/`. These account CLIs are global because auth, subscriptions/projects, and bootstrap checks are workstation concerns. Project-specific CLIs still stay in Devbox. `bootstrap-auth.sh` walks through whichever CLIs are installed and skips the rest. None of these directories are tracked in this repo.
 
 **1Password CLI** (`op`) — separate from the GUI sign-in. First run on a machine: `op account add` (paste account URL + secret key), then `eval $(op signin)`. Subsequent shell sessions: `eval $(op signin)`.
 
@@ -161,9 +175,9 @@ Run `chezdoctor` for a reminder. The script can't verify these for you, but it p
 | **Prompt** | [Starship](https://starship.rs) with Catppuccin Frappé palette. Two-line prompt that surfaces git branch/status, language versions (Java/Node/Python/Go), Kubernetes context, and AWS profile only when contextually relevant — keeps it clean otherwise. See [the prompt examples](#what-the-prompt-looks-like) below. |
 | **Shell** | zsh with full XDG layout, direnv hook (auto-activates each project's devbox env on `cd`), fzf integration (`Ctrl-R` history search, `**<Tab>` completion), `zsh-completions` + `zsh-syntax-highlighting`, claude work/personal wrapper, modern CLI aliases (`ls→eza`, `cat→bat`, `find→fd`). |
 | **Git** | Identity + 1Password commit signing via `op-ssh-sign`, delta diffs, useful aliases (`s`, `lg`, `wip`, `undo`, `amend`, `fixup`), pull rebase, rerere. |
-| **Runtimes** | **Per-project** via [Devbox](https://www.jetify.com/devbox) (Nix-backed). Each project's repo carries its own `devbox.json` + `.envrc`; on `cd` direnv activates the project's pinned JDK/Kotlin/Postgres/Node/etc. without polluting the global PATH. Devbox itself isn't in homebrew — `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` handles both the Jetify curl-installer for the CLI and the Determinate Nix bootstrap for the `/nix` store, both non-interactively, so a fresh `chezmoi apply` ends with `devbox shell` ready to fire without prompts. No global runtime pin list in this repo; use `devbox global add jdk21 kotlin nodejs@lts` if you want fallback runtimes outside any project. |
-| **Brew** | ~50 packages (common tier) + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), Kubernetes (`kubectx`, `stern`, `k9s`), Azure (`az`, `kubelogin`), GCP (`gcloud`, `gke-gcloud-auth-plugin`), IaC (`terraform` from HashiCorp tap, `tflint`, `terraform-docs`), DB clients (`pgcli`, `redis-cli` — Postgres-first; add `mysql-client` if needed), container introspection (`dive`), backend HTTP/RPC (`grpcurl`, `mkcert`), plus the GUI app casks. |
-| **Editor (GUI)** | VS Code with Catppuccin Frappé, Material Icon Theme, JetBrainsMono ligatures, Python + Pylance + black-formatter + Containers extensions, format on save. |
+| **Runtimes and project CLIs** | **Per-project** via [Devbox](https://www.jetify.com/devbox) (Nix-backed). Each project's repo carries its own `devbox.json` + `.envrc`; on `cd` direnv activates the project's pinned JDK/Kotlin/Postgres/Node/Terraform/kubectl/etc. without polluting the global PATH. Devbox itself isn't in homebrew — `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` handles both the Jetify curl-installer for the CLI and the Determinate Nix bootstrap for the `/nix` store. Starter templates for backend, Kubernetes, Terraform, and OpenTofu projects live in [`examples/devbox/`](examples/devbox/). Azure/GCP account CLIs stay global; the project-specific Kubernetes/IaC tools stay pinned here. |
+| **Brew** | Workstation baseline + per-profile extras. Full list with one-line rationale per package in [`Brewfile`](Brewfile). Categories: modern CLI, git productivity (`lazygit`, `pre-commit`, `direnv`), shell/editor tools, global account CLIs (`gh`, `az`, `gcloud`), Docker Desktop, Ghostty, VS Code, 1Password, fonts, and optional GUI apps. Project-specific tools such as Kubernetes CLIs, Terraform/OpenTofu, DB clients/servers, and language runtimes are intentionally Devbox-owned. |
+| **Editor (GUI)** | VS Code is installed by Homebrew. User settings, keybindings, snippets, and extensions are left to VS Code Settings Sync. |
 | **Editor (terminal)** | [Neovim](https://neovim.io) with [LazyVim](https://www.lazyvim.org) and the Catppuccin Frappé flavor. First launch auto-installs `lazy.nvim`, then LazyVim pulls in LSP (via mason), treesitter, telescope, nvim-tree, which-key, gitsigns, and the standard distribution. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/Terraform/Markdown) ship commented-out in `lua/config/lazy.lua` — uncomment whichever you want. |
 | **macOS** | Fast key repeat, no autocorrect, full keyboard nav, Finder shows everything, Dock auto-hide, screenshots → `~/Pictures/Screenshots`, Safari dev menu, screensaver password immediately. Idempotent — `def_write` helper only writes when the value differs from current. |
 
@@ -228,30 +242,33 @@ git add . && git commit -m "..."
 
 ### Toggling a feature on or off later
 
-Features (cloud, IaC, databases, mac-apps) are independent booleans in `~/.config/chezmoi/chezmoi.toml`. Two ways to flip one:
+Features are workstation-level booleans in `~/.config/chezmoi/chezmoi.toml`. Project tools are not toggled here; add them to that project's `devbox.json` instead. Use the `dotfiles` command for day-to-day workstation changes:
 
 ```sh
-# Option A — re-run the wizard, answer "no" to re-using prior answers.
-bash ~/Dev/Personal/dotfiles/install.sh
+dotfiles features list
+dotfiles features disable macApps
+dotfiles features enable macApps
 
-# Option B — edit the toggle directly, then apply.
-$EDITOR ~/.config/chezmoi/chezmoi.toml          # flip features.cloud = false
-chezmoi apply -v                                # brew-bundle re-fires; that module's packages won't reinstall
+# Profiles use the same control path.
+dotfiles profile set work
+dotfiles profile set both
 ```
 
-Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove them:
+For a guided flow on an existing machine, run `bash ~/Dev/Personal/dotfiles/install.sh --configure-only`. It reuses the normal wizard prompts but skips Xcode/Homebrew/repo bootstrap.
+
+Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove the mac app extras:
 
 ```sh
-brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/Brewfile.cloud
+brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/Brewfile.mac-apps
 ```
 
-The same flow works for profiles: edit `profile = "..."` and `chezmoi apply`. The old profile's packages stay until you `cleanup` them.
+The old profile's packages stay until you `cleanup` them.
 
 ### Adding a new tool
 
 Two flavors, depending on whether you just want the binary or also a config file.
 
-**Just the binary** — add it to the right Brewfile tier, commit, push:
+**Workstation binary or app** — add it to the right Brewfile tier, commit, push:
 
 ```sh
 dotfiles                                                   # cd ~/Dev/Personal/dotfiles
@@ -259,6 +276,17 @@ echo 'brew "httpx"' >> Brewfile                            # or Brewfile.persona
 git add Brewfile && git commit -m "Add httpx" && git push
 chezmoi apply -v                                            # triggers brew-bundle re-run via hash change
 ```
+
+**Project toolchain** — add it to that project's Devbox config instead:
+
+```sh
+cd /path/to/project
+devbox add terraform tflint terraform-docs
+devbox add kubectl kubectx k9s stern kubernetes-helm
+devbox add postgresql_16 redis pgcli
+```
+
+For a starting point, copy one of [`examples/devbox/`](examples/devbox/) into the project as `devbox.json`.
 
 **With a config file you want to manage** — install, configure, then adopt:
 
@@ -338,9 +366,9 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 - **XDG layout** — no legacy `~/.zshrc`, `~/.gitconfig`, `~/.zprofile`; `~/.config/zsh/.zshrc` and `~/.zshenv` present.
 - **Claude routing** — wrapper loads, routes correctly from `/tmp` (personal) and `~/Dev/Work/` (work), `~/.claude` present if work profile.
 - **Git signing** — `op-ssh-sign` exists, signing key configured, smoke test of `git -S commit` actually succeeds.
-- **Brew packages** — every Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
+- **Brew packages** — every workstation/profile Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
 - **devbox + direnv + Nix** — devbox CLI installed, `/nix` store mounted, `nix-daemon` running, direnv hook wired into the shell, global direnv config present, no leftover `mise` on PATH.
-- **Cloud auth** — informational status of `gh`, `az`, `gcloud`, `op`, plus GKE plugin presence.
+- **Cloud auth** — informational status of `gh`, `az`, `gcloud`, `op` when present.
 - **Fonts** — JetBrainsMono Nerd Font installed.
 - **Privacy permissions** — printed checklist (these can't be checked programmatically).
 
@@ -363,13 +391,13 @@ Defined in your `.zshrc`. It does:
 1. `git pull --ff-only` in `~/Dev/Personal/dotfiles`
 2. `chez` — chezmoi status + a single-keypress confirm + `chezmoi apply -v --force`
 
-That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed packages in any Brewfile, modified scripts, new VS Code extensions in `.chezmoidata/packages.toml`. The brew-bundle script's hash-comments include every Brewfile module, so a single line moved between `Brewfile.cloud` and `Brewfile.iac` re-fires the bundle; you don't have to remember to re-run anything.
+That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, and modified scripts. Project-level Devbox changes are applied when you enter that project or run `devbox install` there. VS Code settings and extensions are handled by VS Code Settings Sync, not this repo.
 
 `chezup` is also a no-op when nothing changed — safe to run as often as you like (e.g., wire it into a launchd timer for a daily auto-sync if you want).
 
 ### The 5% case: the wizard's data model or chezmoi config changed
 
-Sometimes a push will add a new prompt to the wizard (a new feature toggle, a new boolean for "do you use X?"), or change a chezmoi-level setting like `[apply] force = true` or `[diff] pager`. When that happens, your existing `~/.config/chezmoi/chezmoi.toml` is stale — `chezmoi apply` reads the on-disk config and won't see the new sections. Templates have `dig … true …` defaults so nothing breaks for feature toggles, but `[apply]`/`[diff]` settings only take effect after a re-init.
+Sometimes a push will add a new prompt to the wizard (a new workstation feature toggle, a new boolean for "do you use X?"), or change a chezmoi-level setting like `[apply] force = true` or `[diff] pager`. When that happens, your existing `~/.config/chezmoi/chezmoi.toml` is stale — `chezmoi apply` reads the on-disk config and won't see the new sections. Templates use defensive defaults for feature toggles, but `[apply]`/`[diff]` settings only take effect after a re-init.
 
 To pull the new sections into your on-disk config:
 
@@ -381,7 +409,7 @@ That's `git pull` + `chezmoi init` + `chez`. `chezmoi init` re-renders `chezmoi.
 
 **Telltale sign you need `chezreinit` rather than `chezup`:** you're seeing prompts or behaviour from `chezmoi apply` that the docs say should be silent (e.g. per-file `diff/overwrite/skip` prompts after `[apply] force = true` was added, or unpaged diffs after `[diff] pager` was changed).
 
-If you'd rather walk through the full wizard again (e.g., to flip a feature toggle visually rather than by editing TOML), just rerun:
+If you'd rather walk through the full wizard again (e.g., to flip a workstation feature toggle visually rather than by editing TOML), just rerun:
 
 ```sh
 bash ~/Dev/Personal/dotfiles/install.sh
@@ -397,22 +425,21 @@ Knowing what triggers what makes the upgrade story less mysterious:
 |---|---|
 | Any file under `dot_*` or `private_dot_*` | chezmoi writes it to `$HOME` |
 | A `.tmpl` template | chezmoi re-renders it against your current `[data]` block |
-| Any `Brewfile*` | `run_onchange_after_02-brew-bundle.sh` re-fires (hash comment caught it) |
-| `.chezmoidata/packages.toml` | `run_onchange_after_03-vscode-extensions.sh` re-fires |
+| Any tracked `Brewfile*` | `run_onchange_after_02-brew-bundle.sh` re-fires (hash comment caught it) |
 | `.chezmoi.toml.tmpl` itself | **nothing automatic** — you must run `chezmoi init` (or `chezreinit`) to re-render `~/.config/chezmoi/chezmoi.toml`. This is the only common case where `chezup` alone is insufficient |
 | `macos-defaults.sh` | nothing — it's `run_once_after`. Manually run `macos-defaults` (the alias) to re-apply |
 
-If you forget which path you're on, `chezdiff` shows you everything pending at once: chezmoi's dotfile diff, brew-bundle drift across every Brewfile module, and which `run_*` scripts would re-fire. It's the "what would chezup actually do" preview.
+If you forget which path you're on, `chezdiff` shows you everything pending at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and which `run_*` scripts would re-fire. It's the "what would chezup actually do" preview.
 
 ### Cleaning up packages from features you've turned off
 
-Disabling a feature toggle (e.g., editing `features.cloud = false` then `chezmoi apply`) stops the cloud Brewfile from being re-applied, but does **not** uninstall the packages it pulled in — intentional, so you don't lose tools you might still use. To actually remove them:
+Disabling a feature toggle stops that Brewfile from being re-applied, but does **not** uninstall the packages it pulled in — intentional, so you don't lose tools you might still use. To actually remove the current mac-apps feature packages:
 
 ```sh
-brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/Brewfile.cloud
+brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/Brewfile.mac-apps
 ```
 
-Same recipe for any other module. `chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is the inverse — useful when you've manually `brew install`ed something and want to decide whether to promote it into a Brewfile or remove it.
+`chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is useful when you've manually `brew install`ed something and want to decide whether to promote it into a workstation Brewfile, move it into a project Devbox, or remove it.
 
 ### What to do after a long absence (machine sitting idle for weeks)
 
@@ -433,7 +460,7 @@ A wrapper function in `.zshrc` routes `claude` based on PWD:
 
 Override with `cw` (work) or `cme` (personal) aliases, or `CLAUDE_PROFILE=work claude …` for one-off.
 
-The CLI binary comes from the `cask "claude-code@latest"` line in `Brewfile.personal` (rolling channel — auto-updates as Anthropic ships). Switch to `cask "claude-code"` if you'd rather pin to the stable named release.
+The CLI binary comes from the `cask "claude-code"` line in `Brewfile.work`; it is intentionally installed only for the work profile.
 
 ### Global CLAUDE.md
 
@@ -447,8 +474,8 @@ The wizard is designed to be fork-friendly. If you cloned this and want to base 
 
 1. **Point `install.sh` at your fork.** Change the default `DOTFILES_REPO` near the top of `install.sh`, or invoke with `DOTFILES_REPO=https://github.com/<you>/dotfiles.git bash install.sh`.
 2. **Fill in `Brewfile.work`** with your employer's relevant apps (Slack, Zoom, Postman, JetBrains IDEs, …). Or empty it out entirely — it's allowed to be empty.
-3. **Edit `Brewfile.personal`** to match your "personal machine" preferences. The Claude casks are opinionated picks; remove them if you don't use Claude.
-4. **Trim feature modules to taste.** Don't do Kubernetes? Delete `Brewfile.cloud` and the matching toggle in `.chezmoi.toml.tmpl` + `run_onchange_after_02-brew-bundle.sh.tmpl`. Or just say "no" to it in Phase B and never look back.
+3. **Edit `Brewfile.personal`** to match your "personal machine" preferences.
+4. **Tune the boundary between Brew and Devbox.** Keep workstation tools in Brewfiles; put project runtimes and CLIs in `examples/devbox/` templates or directly in each project's `devbox.json`.
 5. **Replace `dot_config/claude/personal/CLAUDE.md`** with your own preferences. Currently encodes my style; almost certainly not yours.
 6. **Adjust `dot_config/git/config.tmpl`** if you don't want commit signing — the `[gpg "ssh"] program = …` block assumes 1Password's `op-ssh-sign`. The wizard's `useOnePassword` toggle controls whether the block renders.
 7. **Re-render the README badges** — the CI badge URL hardcodes my GitHub handle.
@@ -463,7 +490,7 @@ Three classes of files in this repo, plus chezmoi's own infrastructure.
 
 **1. Files chezmoi writes to `$HOME`** — anything prefixed `dot_` (becomes `.X`), `private_dot_` (also enforces mode 0600). Templates end in `.tmpl` and get rendered with chezmoi's data at apply time. So `dot_config/git/config.tmpl` becomes `~/.config/git/config` with your name/email/signing key substituted in. `dot_config/zsh/dot_zshrc.tmpl` includes profile-conditional blocks rendered only when `{{ .profile }}` matches.
 
-**2. Files chezmoi removes from `$HOME`** — three `remove_*` markers (empty sentinels whose filename encodes a delete instruction). `remove_dot_gitconfig` ensures `~/.gitconfig` doesn't exist (because git checks `~/.gitconfig` *before* `~/.config/git/config` and would silently shadow our XDG-managed config). `remove_dot_zshrc` and `remove_dot_zprofile` defend the `ZDOTDIR`-based zsh layout against legacy files.
+**2. Files chezmoi removes from `$HOME`** — `remove_*` markers are empty sentinels whose filename encodes a delete instruction. `remove_dot_gitconfig` ensures `~/.gitconfig` doesn't exist (because git checks `~/.gitconfig` *before* `~/.config/git/config` and would silently shadow our XDG-managed config). `remove_dot_zshrc` and `remove_dot_zprofile` defend the `ZDOTDIR`-based zsh layout. `remove_dot_bash_profile`, `remove_dot_bashrc`, and `remove_dot_profile` keep old bash/POSIX login hooks from accumulating stale bootstrap code in `$HOME`.
 
 **3. Files chezmoi ignores entirely** — listed in `.chezmoiignore`. Repo metadata (`README.md`, `MAPPING.md`, `WORK-SETUP.md`, `LICENSE`), the install scripts (`install.sh`, `doctor.sh`, `bootstrap-auth.sh`, `macos-defaults.sh`), every `Brewfile*` (the brew-bundle chezmoi script consumes them directly, not through chezmoi's home-state), CI (`.github/`), formatters (`.editorconfig`, `.gitattributes`), examples (`examples/`), git's own files.
 
@@ -514,7 +541,7 @@ To pick up this fix on an existing machine: `chezup` once, then re-run `chezmoi 
 
 Why this used to happen: chezmoi runs scripts with stdin disconnected by default. Casks like docker-desktop and 1password invoke sudo as part of their install; with stdin closed, sudo's password prompt fires but characters typed at the keyboard end up at the parent shell. Defence in depth: every script that might trigger sudo now does `exec </dev/tty` on entry to re-attach stdin, the pre-auth script prompts once on a clean terminal upfront, and `macos-defaults.sh` standalone-use also gets a settle pause + distinct prompt for the case when you run it via the `macos-defaults` alias outside of chezmoi.
 
-**Brew bundle fails: `Error: It seems there is already a Binary at '/opt/homebrew/bin/claude'`** — both `claude-code` and `claude-code@latest` casks install the same binary. The Brewfile pins to `claude-code@latest` (rolling channel). If you have plain `claude-code` installed, `brew uninstall --cask claude-code` and apply again.
+**Brew bundle fails: `Error: It seems there is already a Binary at '/opt/homebrew/bin/claude'`** — another Claude Code cask is already installed. This repo tracks `claude-code` in the work profile only; uninstall any conflicting Claude Code cask and apply again.
 
 **`chezmoi apply` seems to halt after the completion banner** — almost always a leftover sudo-keeper. The current code uses a double-fork detach + 2-second poll interval, so the keeper exits within 2 seconds of chezmoi finishing. If you're on a version from before that fix and see a halt: `pgrep -f "sudo -n true"` will show any orphaned keepers; `pkill -f "sudo -n true"` cleans them up. Run `chezup` once to pull the fix so it doesn't happen again.
 
@@ -583,14 +610,12 @@ Plus an upfront plan that tells you what's coming and roughly how long:
 
 ```text
 ═════════════════════════════════════════════════════════════════════
-[brew-bundle] apply step 3/5 — installing/updating brew packages
-[brew-bundle] modules to apply: 6
+[brew-bundle] apply step 3/4 — installing/updating brew packages
+[brew-bundle] modules to apply: 4
 [brew-bundle]   1. core (always)
-[brew-bundle]   2. IaC (Terraform + lint)
-[brew-bundle]   3. cloud (k8s + az + gcloud)
-[brew-bundle]   4. databases (pgcli + redis)
-[brew-bundle]   5. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
-[brew-bundle]   6. personal profile extras
+[brew-bundle]   2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
+[brew-bundle]   3. personal profile extras
+[brew-bundle]   4. work profile extras
 [brew-bundle] expected time on first install: ~5-15 min (downloads dominate)
 ═════════════════════════════════════════════════════════════════════
 ```
@@ -636,12 +661,10 @@ The `~/.dotfiles-backup-*` directories accumulate — one per install run. After
 - [`MAPPING.md`](MAPPING.md) — every file in the repo and where it lands in `$HOME`, plus chezmoi internals.
 - [`WORK-SETUP.md`](WORK-SETUP.md) — corporate Claude Code (`storecode`) install, separate from this repo.
 - [`install.sh`](install.sh) — the 6-phase wizard (fresh + existing Macs). `DRY_RUN=1` previews, `YES=1` accepts defaults.
-- [`bootstrap-auth.sh`](bootstrap-auth.sh) — post-install gh / az / gcloud / GKE / signing walkthrough. Idempotent.
+- [`bootstrap-auth.sh`](bootstrap-auth.sh) — post-install gh / az / gcloud / AKS / GKE / signing walkthrough. Idempotent.
 - [`doctor.sh`](doctor.sh) — read-only health check. Aliased as `chezdoctor`.
-- [`Brewfile`](Brewfile) — core, always installed. Plus the feature modules layered in by the wizard's toggles:
-  [`Brewfile.cloud`](Brewfile.cloud), [`Brewfile.iac`](Brewfile.iac), [`Brewfile.databases`](Brewfile.databases), [`Brewfile.mac-apps`](Brewfile.mac-apps).
-  Profile-specific extras: [`Brewfile.personal`](Brewfile.personal), [`Brewfile.work`](Brewfile.work).
-- [`examples/`](examples/) — drop-in starter files for `direnv` (`.envrc`) and `pre-commit` (`.pre-commit-config.yaml`) to use in your projects.
+- [`Brewfile`](Brewfile) — core, always installed. [`Brewfile.mac-apps`](Brewfile.mac-apps) is the optional workstation feature. Profile-specific extras: [`Brewfile.personal`](Brewfile.personal), [`Brewfile.work`](Brewfile.work).
+- [`examples/`](examples/) — drop-in starter files for `direnv`, `pre-commit`, and Devbox project templates.
 - [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — shellcheck + chezmoi template-render + macOS brew-bundle check on every PR.
 
 ---

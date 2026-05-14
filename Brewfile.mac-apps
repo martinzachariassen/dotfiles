@@ -10,5 +10,10 @@ cask "rectangle"                # window snapping (also: aerospace, raycast hotk
 cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
 cask "google-chrome"            # the only browser most web tooling assumes
-
+cask "google-drive"
+cask "obsidian"
 brew "dive"                     # explore docker image layers; spot bloat fast
+cask "spotify"
+cask "obs"
+cask "vlc"
+cask "postman"

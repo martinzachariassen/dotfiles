@@ -7,12 +7,9 @@
 #
 # Optional add-ons live in sibling Brewfile.<feature> files and are layered on
 # top of this one based on your answers to the install wizard. See:
-#   Brewfile.cloud      — Kubernetes + Azure + Google Cloud + Helm + kubelogin
-#   Brewfile.iac        — Terraform + tflint + terraform-docs
-#   Brewfile.databases  — pgcli + redis-cli (Postgres-first; MySQL omitted)
 #   Brewfile.mac-apps   — Rectangle, Raycast, Stats, Chrome, dive (mac-only QoL)
-#   Brewfile.personal   — Claude desktop + Claude Code CLI (rolling)
-#   Brewfile.work       — work-only casks (you fill in)
+#   Brewfile.personal   — personal-only casks (you fill in)
+#   Brewfile.work       — work-only casks, including Claude Code CLI
 #
 # Regenerate from a known-good machine:
 #   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile
@@ -22,6 +19,8 @@
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
 brew "gh"                      # GitHub CLI
+brew "azure-cli"               # global Azure account/subscription CLI; project kubectl stays in Devbox
+cask "gcloud-cli"              # global Google Cloud account/project CLI; project kubectl stays in Devbox
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
 # devbox: NOT a brew formula. Installed via Jetify's official curl-installer

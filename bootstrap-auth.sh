@@ -13,6 +13,7 @@
 # Environment variables:
 #   SKIP_GH=1       — skip gh auth login
 #   SKIP_AZ=1       — skip az login
+#   SKIP_AKS=1      — skip Azure kubelogin install
 #   SKIP_GCLOUD=1   — skip gcloud auth login
 #   SKIP_GKE=1      — skip gke-gcloud-auth-plugin install
 #   SKIP_OP=1       — skip 1Password CLI signin
@@ -42,10 +43,10 @@ ${DIM}Walks through the manual sign-in steps after install.sh.${RESET}
 ${BOLD}You'll be prompted by the following CLIs:${RESET}
   • 1Password   — open the GUI app and sign in (we just check the agent)
   • gh          — opens a browser for GitHub OAuth
-  • az          — opens a browser for Microsoft account
-  • gcloud      — opens a browser for Google account, then installs GKE plugin
+  • az          — opens a browser for Microsoft account and checks AKS kubelogin
+  • gcloud      — opens a browser for Google account and checks the GKE plugin
 
-Each is skipped if you're already signed in. Press ${BOLD}Enter${RESET} to begin.
+Each is skipped if you're already signed in. Missing CLIs are reported and skipped. Press ${BOLD}Enter${RESET} to begin.
 EOF
 [ -t 0 ] && read -r _
 
@@ -84,16 +85,29 @@ if [ "${SKIP_GH:-0}" != "1" ]; then
     fi
 fi
 
-# ─── 3. Azure CLI ─────────────────────────────────────────────────────────────
+# ─── 3. Azure CLI + AKS kubelogin ─────────────────────────────────────────────
 if [ "${SKIP_AZ:-0}" != "1" ]; then
     step "Azure CLI" "Sign in to Azure for AKS, Azure DevOps, etc."
     if ! command -v az >/dev/null 2>&1; then
-        warn "az not installed — skipping (install via Brewfile if you need it)"
+        warn "az not installed — skipping (run install.sh or brew bundle)"
     elif az account show >/dev/null 2>&1; then
         ok "az already authenticated as $(az account show --query user.name -o tsv 2>/dev/null || echo '?')"
     else
         info "running az login"
         az login || warn "az login was cancelled or failed"
+    fi
+
+    # Azure kubelogin (Microsoft's AKS credential plugin). Homebrew core also
+    # has a `kubelogin` formula, but that is int128's generic OIDC plugin, not
+    # the AKS-focused binary Microsoft documents for `az aks`.
+    if [ "${SKIP_AKS:-0}" != "1" ] && command -v az >/dev/null 2>&1; then
+        step "AKS kubelogin" "Required for kubectl against AKS clusters using Microsoft Entra ID."
+        if command -v kubelogin >/dev/null 2>&1 && kubelogin --version 2>/dev/null | grep -qi 'git hash:'; then
+            ok "Azure kubelogin already installed"
+        else
+            info "installing Azure kubelogin via az aks install-cli"
+            az aks install-cli || warn "Azure kubelogin install failed"
+        fi
     fi
 fi
 
@@ -101,7 +115,7 @@ fi
 if [ "${SKIP_GCLOUD:-0}" != "1" ]; then
     step "Google Cloud CLI" "Sign in for GCP/GKE work."
     if ! command -v gcloud >/dev/null 2>&1; then
-        warn "gcloud not installed — skipping (install via Brewfile if you need it)"
+        warn "gcloud not installed — skipping (run install.sh or brew bundle)"
     elif gcloud auth list 2>/dev/null | grep -q '\*'; then
         ok "gcloud already authenticated as $(gcloud config get-value account 2>/dev/null || echo '?')"
     else

@@ -27,6 +27,10 @@
 #   SKIP_BACKUP=1     — don't snapshot pre-existing legacy dotfiles
 #   YES=1             — assume defaults at every prompt (CI / unattended)
 #   NO_TUI=1          — force the plain-text fallback path
+#
+# Flags:
+#   --configure-only  — update chezmoi profile/features/identity and apply,
+#                       skipping Xcode/Homebrew/repo bootstrap
 
 set -uo pipefail
 
@@ -37,9 +41,35 @@ DRY_RUN="${DRY_RUN:-0}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 ASSUME_YES="${YES:-0}"
 NO_TUI="${NO_TUI:-0}"
+CONFIGURE_ONLY=0
+
+usage() {
+    cat <<EOF
+Usage: bash install.sh [--configure-only]
+
+Environment:
+  DRY_RUN=1         print state-changing commands without running them
+  YES=1             accept recommended defaults
+  NO_TUI=1          force plain-text fallback prompts
+  SKIP_BACKUP=1     do not snapshot pre-existing legacy dotfiles
+  DOTFILES_REPO=URL override upstream repo URL
+  DOTFILES_DIR=PATH override local source directory
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --configure-only) CONFIGURE_ONLY=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "install.sh: unknown option: $1" >&2; usage >&2; exit 1 ;;
+    esac
+    shift
+done
 
 # Feature toggle keys — kept in sync with .chezmoi.toml.tmpl's [data.features].
-FEATURE_KEYS=(cloud iac databases macApps)
+# Project toolchains live in per-project devbox.json files; Homebrew features
+# are reserved for workstation-level macOS preferences.
+FEATURE_KEYS=(macApps)
 
 # ─── Colors ───────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -174,10 +204,35 @@ tui_select_one() {
     local opts=("$@") n=$# cursor=0
 
     if ! tui_supported || ! _tui_acquire; then
-        # Fallback: first option wins.
-        printf -v "$__out" '%s' "${opts[0]}"
-        printf '%s  %s%s%s %s%s%s  %s(default)%s\n' \
-            "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${opts[0]}" "$RESET" "$DIM" "$RESET"
+        if [ "$ASSUME_YES" = "1" ] || ! have_tty; then
+            printf -v "$__out" '%s' "${opts[0]}"
+            printf '%s  %s%s%s %s%s%s  %s(default)%s\n' \
+                "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${opts[0]}" "$RESET" "$DIM" "$RESET"
+            return
+        fi
+
+        printf '%s  %s%s%s\n' "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
+        for ((i=0; i<n; i++)); do
+            printf '%s    %d) %s\n' "${CYAN}│${RESET}" $((i + 1)) "${opts[$i]}" > /dev/tty
+        done
+        while :; do
+            printf '%s  Select [1]: ' "${CYAN}│${RESET}" > /dev/tty
+            IFS= read -r cursor < /dev/tty || cursor=1
+            cursor="${cursor:-1}"
+            case "$cursor" in
+                ''|*[!0-9]*) warn "enter a number from 1 to $n" ;;
+                *)
+                    if [ "$cursor" -ge 1 ] && [ "$cursor" -le "$n" ]; then
+                        cursor=$((cursor - 1))
+                        break
+                    fi
+                    warn "enter a number from 1 to $n"
+                    ;;
+            esac
+        done
+        printf '%s  %s%s%s %s%s%s\n' \
+            "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${opts[$cursor]}" "$RESET"
+        printf -v "$__out" '%s' "${opts[$cursor]}"
         return
     fi
 
@@ -219,28 +274,46 @@ tui_select_one() {
 # ── tui_confirm __outvar TITLE [DEFAULT_YES=1]
 # Arrow-key Yes/No. Default to Yes unless DEFAULT_YES=0. Stores "true"/"false".
 tui_confirm() {
-    local __out="$1" title="$2" def_yes="${3:-1}"
-    local cursor
-    if [ "$def_yes" = "1" ]; then cursor=0; else cursor=1; fi
+    local __out="$1" title="$2" def_yes="${3:-1}" cursor answer prompt
+    if [ "$def_yes" = "1" ]; then cursor=0; prompt="Y/n"; else cursor=1; prompt="y/N"; fi
 
     if ! tui_supported || ! _tui_acquire; then
-        if [ "$def_yes" = "1" ]; then
-            printf -v "$__out" 'true'
-            printf '%s  %s%s%s %sYes%s  %s(default)%s\n' \
-                "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
-        else
-            printf -v "$__out" 'false'
-            printf '%s  %s%s%s %sNo%s  %s(default)%s\n' \
-                "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$YELLOW" "$RESET" "$DIM" "$RESET"
+        if [ "$ASSUME_YES" = "1" ] || ! have_tty; then
+            if [ "$def_yes" = "1" ]; then
+                printf -v "$__out" 'true'
+                printf '%s  %s%s%s %sYes%s  %s(default)%s\n' \
+                    "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
+            else
+                printf -v "$__out" 'false'
+                printf '%s  %s%s%s %sNo%s  %s(default)%s\n' \
+                    "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$YELLOW" "$RESET" "$DIM" "$RESET"
+            fi
+            return
         fi
-        return
+
+        while :; do
+            printf '%s  %s%s%s [%s] ' "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" "$prompt" > /dev/tty
+            IFS= read -r answer < /dev/tty || answer=""
+            [ -z "$answer" ] && { [ "$def_yes" = "1" ] && answer=y || answer=n; }
+            case "$answer" in
+                y|Y|yes|YES)
+                    printf -v "$__out" 'true'
+                    printf '%s  %s%s%s %sYes%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET"
+                    return ;;
+                n|N|no|NO)
+                    printf -v "$__out" 'false'
+                    printf '%s  %s%s%s %sNo%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$YELLOW" "$RESET"
+                    return ;;
+                *) warn "answer y or n" ;;
+            esac
+        done
     fi
 
-    local lines lc opts=("Yes" "No")
+    local lines lc row
     while :; do
         lines=()
         lines+=("${CYAN}◆${RESET}  ${BOLD}${title}${RESET}")
-        local row="${CYAN}│${RESET}  "
+        row="${CYAN}│${RESET}  "
         if [ "$cursor" -eq 0 ]; then
             row+="${CYAN}●${RESET} ${CYAN}Yes${RESET}    ${DIM}○ No${RESET}"
         else
@@ -251,21 +324,22 @@ tui_confirm() {
         _tui_emit "${lines[@]}"
         lc=$?
         case "$(_tui_key)" in
-            left|up|char:h)         cursor=0 ;;
-            right|down|char:l)      cursor=1 ;;
-            char:y|char:Y)          cursor=0; _tui_rewind "$lc"; break ;;
-            char:n|char:N)          cursor=1; _tui_rewind "$lc"; break ;;
-            enter)                  break ;;
-            abort|esc)              _tui_release; printf "\n%s  %s✗%s aborted\n" "${CYAN}│${RESET}" "$RED" "$RESET"; exit 130 ;;
+            left|up|char:h)    cursor=0 ;;
+            right|down|char:l) cursor=1 ;;
+            char:y|char:Y)     cursor=0; _tui_rewind "$lc"; break ;;
+            char:n|char:N)     cursor=1; _tui_rewind "$lc"; break ;;
+            enter)             break ;;
+            abort|esc)         _tui_release; printf "\n%s  %s✗%s aborted\n" "${CYAN}│${RESET}" "$RED" "$RESET"; exit 130 ;;
         esac
         _tui_rewind "$lc"
     done
+
     _tui_rewind "$lc"
     if [ "$cursor" -eq 0 ]; then
         printf '%s  %s%s%s %sYes%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" > /dev/tty
         printf -v "$__out" 'true'
     else
-        printf '%s  %s%s%s %sNo%s\n'  "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$YELLOW" "$RESET" > /dev/tty
+        printf '%s  %s%s%s %sNo%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$YELLOW" "$RESET" > /dev/tty
         printf -v "$__out" 'false'
     fi
     _tui_release
@@ -274,80 +348,79 @@ tui_confirm() {
 # ── tui_select_many __outvar TITLE LABEL1 LABEL2 [...]
 # Multi-select with checkboxes. Space toggles, Enter confirms. All start checked.
 # Stores result as space-separated "1"/"0" matching input order.
-#   tui_select_many BITS "Features" "Cloud" "IaC" "Databases" "Mac apps"
-#   read -ra arr <<< "$BITS"   # arr[0]==1 means Cloud is checked
 tui_select_many() {
     local __out="$1" title="$2"
     shift 2
-    local opts=("$@") n=$# cursor=0
-    local checked=() i
+    local opts=("$@") n=$# cursor=0 checked=() i
     for ((i=0; i<n; i++)); do checked[i]=1; done
 
     if ! tui_supported || ! _tui_acquire; then
-        # Fallback: all stay checked.
-        printf -v "$__out" '%s' "${checked[*]}"
-        printf '%s  %s%s%s  %s(all defaults)%s\n' \
-            "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$DIM" "$RESET"
+        if [ "$ASSUME_YES" = "1" ] || ! have_tty; then
+            printf -v "$__out" '%s' "${checked[*]}"
+            printf '%s  %s%s%s  %s(all defaults)%s\n' \
+                "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$DIM" "$RESET"
+            for ((i=0; i<n; i++)); do
+                printf '%s    %s◼%s %s\n' "${CYAN}│${RESET}" "$GREEN" "$RESET" "${opts[$i]}"
+            done
+            return
+        fi
+
+        local answer
+        printf '%s  %s%s%s\n' "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
         for ((i=0; i<n; i++)); do
-            printf '%s    %s◼%s %s\n' "${CYAN}│${RESET}" "$GREEN" "$RESET" "${opts[$i]}"
+            while :; do
+                printf '%s  Enable %s? [Y/n] ' "${CYAN}│${RESET}" "${opts[$i]}" > /dev/tty
+                IFS= read -r answer < /dev/tty || answer=""
+                answer="${answer:-y}"
+                case "$answer" in
+                    y|Y|yes|YES) checked[i]=1; break ;;
+                    n|N|no|NO)   checked[i]=0; break ;;
+                    *) warn "answer y or n" ;;
+                esac
+            done
         done
+        printf '%s  %s%s%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET"
+        for ((i=0; i<n; i++)); do
+            if [ "${checked[$i]}" = "1" ]; then
+                printf '%s    %s◼%s %s\n' "${CYAN}│${RESET}" "$GREEN" "$RESET" "${opts[$i]}"
+            else
+                printf '%s    %s◻ %s%s\n' "${CYAN}│${RESET}" "$DIM" "${opts[$i]}" "$RESET"
+            fi
+        done
+        printf -v "$__out" '%s' "${checked[*]}"
         return
     fi
 
-    local lines lc row
+    local lines lc row mark
     while :; do
         lines=()
         lines+=("${CYAN}◆${RESET}  ${BOLD}${title}${RESET}")
         for ((i=0; i<n; i++)); do
-            local mark
-            if [ "${checked[$i]}" = "1" ]; then
-                mark="${GREEN}◼${RESET}"
-            else
-                mark="${DIM}◻${RESET}"
-            fi
+            if [ "${checked[$i]}" = "1" ]; then mark="${GREEN}◼${RESET}"; else mark="${DIM}◻${RESET}"; fi
             if [ "$i" -eq "$cursor" ]; then
                 row="${CYAN}│${RESET}  ${mark} ${CYAN}${opts[$i]}${RESET}"
+            elif [ "${checked[$i]}" = "1" ]; then
+                row="${CYAN}│${RESET}  ${mark} ${opts[$i]}"
             else
-                if [ "${checked[$i]}" = "1" ]; then
-                    row="${CYAN}│${RESET}  ${mark} ${opts[$i]}"
-                else
-                    row="${CYAN}│${RESET}  ${mark} ${DIM}${opts[$i]}${RESET}"
-                fi
+                row="${CYAN}│${RESET}  ${mark} ${DIM}${opts[$i]}${RESET}"
             fi
             lines+=("$row")
         done
-        lines+=("${CYAN}│${RESET}  ${GREY}↑↓ navigate · space toggle · ↵ confirm${RESET}")
+        lines+=("${CYAN}│${RESET}  ${GREY}↑↓ navigate · space toggle · a all · i invert · ↵ confirm${RESET}")
         _tui_emit "${lines[@]}"
         lc=$?
-
         case "$(_tui_key)" in
-            up|char:k|char:K)
-                cursor=$(( (cursor - 1 + n) % n )) ;;
-            down|char:j|char:J)
-                cursor=$(( (cursor + 1) % n )) ;;
-            space)
-                if [ "${checked[$cursor]}" = "1" ]; then checked[cursor]=0; else checked[cursor]=1; fi
-                ;;
-            char:a|char:A)
-                # 'a' selects all
-                for ((i=0; i<n; i++)); do checked[i]=1; done ;;
-            char:i|char:I)
-                # 'i' inverts selection
-                for ((i=0; i<n; i++)); do
-                    if [ "${checked[$i]}" = "1" ]; then checked[i]=0; else checked[i]=1; fi
-                done ;;
-            enter)
-                _tui_rewind "$lc"
-                break ;;
-            abort|esc)
-                _tui_release
-                printf "\n%s  %s✗%s aborted\n" "${CYAN}│${RESET}" "$RED" "$RESET"
-                exit 130 ;;
+            up|char:k|char:K)   cursor=$(( (cursor - 1 + n) % n )) ;;
+            down|char:j|char:J) cursor=$(( (cursor + 1) % n )) ;;
+            space)              [ "${checked[$cursor]}" = "1" ] && checked[cursor]=0 || checked[cursor]=1 ;;
+            char:a|char:A)      for ((i=0; i<n; i++)); do checked[i]=1; done ;;
+            char:i|char:I)      for ((i=0; i<n; i++)); do [ "${checked[$i]}" = "1" ] && checked[i]=0 || checked[i]=1; done ;;
+            enter)              _tui_rewind "$lc"; break ;;
+            abort|esc)          _tui_release; printf "\n%s  %s✗%s aborted\n" "${CYAN}│${RESET}" "$RED" "$RESET"; exit 130 ;;
         esac
         _tui_rewind "$lc"
     done
 
-    # Collapse: print summary header + a clean list of just the checked items.
     printf '%s  %s%s%s\n' "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
     for ((i=0; i<n; i++)); do
         if [ "${checked[$i]}" = "1" ]; then
@@ -361,12 +434,11 @@ tui_select_many() {
 }
 
 # ── tui_text __outvar TITLE [DEFAULT] [HINT]
-# Single-line text input. Uses readline (no raw mode) since editing matters.
+# Single-line text input. Uses plain terminal input since editing matters.
 tui_text() {
-    local __out="$1" title="$2" default="${3:-}" hint="${4:-}"
-    local answer=""
+    local __out="$1" title="$2" default="${3:-}" hint="${4:-}" answer="" rewind_n=2
 
-    if ! have_tty || [ "$ASSUME_YES" = "1" ] || [ "$NO_TUI" = "1" ]; then
+    if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "$default"
         if [ -n "$default" ]; then
             printf '%s  %s%s%s %s%s%s  %s(default)%s\n' \
@@ -378,23 +450,17 @@ tui_text() {
         return
     fi
 
-    # Header
     printf '%s  %s%s%s\n' "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
-    [ -n "$hint" ] && printf '%s  %s%s%s\n' "${CYAN}│${RESET}" "$GREY" "$hint" "$RESET" > /dev/tty
-    local prompt_prefix
+    [ -n "$hint" ] && { printf '%s  %s%s%s\n' "${CYAN}│${RESET}" "$GREY" "$hint" "$RESET" > /dev/tty; rewind_n=3; }
     if [ -n "$default" ]; then
-        prompt_prefix="${CYAN}│${RESET}  ${DIM}[${default}]${RESET} ❯ "
+        printf '%s  %s[%s]%s ❯ ' "${CYAN}│${RESET}" "$DIM" "$default" "$RESET" > /dev/tty
     else
-        prompt_prefix="${CYAN}│${RESET}  ❯ "
+        printf '%s  ❯ ' "${CYAN}│${RESET}" > /dev/tty
     fi
-    printf '%s' "$prompt_prefix" > /dev/tty
     IFS= read -r answer < /dev/tty || answer=""
     [ -z "$answer" ] && answer="$default"
 
-    # Collapse: rewind 2 or 3 lines (header + optional hint + input).
-    local rewind_n=2
-    [ -n "$hint" ] && rewind_n=3
-    _tui_rewind "$rewind_n"
+    if tui_supported; then _tui_rewind "$rewind_n"; fi
     if [ -n "$answer" ]; then
         printf '%s  %s%s%s %s%s%s\n' \
             "${GREEN}◇${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$answer" "$RESET" > /dev/tty
@@ -421,7 +487,14 @@ banner() {
     fi
     printf "%s\n" "${CYAN}│${RESET}"
     printf "%s  %s\n" "${CYAN}│${RESET}" "Six phases: probe → choices → confirm → execute → self-test → next steps."
-    printf "%s  %s\n" "${CYAN}│${RESET}" "${DIM}~15 min, almost all of it Homebrew downloading.${RESET}"
+    if [ "$CONFIGURE_ONLY" = "1" ]; then
+        printf "%s  %s\n" "${CYAN}│${RESET}" "${YELLOW}${BOLD}CONFIGURE-ONLY — updating chezmoi data and applying dotfiles.${RESET}"
+    fi
+    if [ "$CONFIGURE_ONLY" = "1" ]; then
+        printf "%s  %s\n" "${CYAN}│${RESET}" "${DIM}Skips Xcode/Homebrew/repo bootstrap; only chezmoi data + apply run.${RESET}"
+    else
+        printf "%s  %s\n" "${CYAN}│${RESET}" "${DIM}~15 min, almost all of it Homebrew downloading.${RESET}"
+    fi
     if tui_supported; then
         printf "%s  %s\n" "${CYAN}│${RESET}" "${DIM}Use ↑↓ to navigate, space to toggle, ↵ to confirm, ctrl-c to abort.${RESET}"
     fi
@@ -530,16 +603,16 @@ choices() {
         if [ "$REUSE_PRIOR" = "true" ]; then
             local data_json
             data_json="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
-            CHOICE_NAME="$(printf '%s' "$data_json" | sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
-            CHOICE_EMAIL="$(printf '%s' "$data_json" | sed -n 's/.*"email":"\([^"]*\)".*/\1/p')"
-            CHOICE_SIGNINGKEY="$(printf '%s' "$data_json" | sed -n 's/.*"signingKey":"\([^"]*\)".*/\1/p')"
-            CHOICE_PROFILE="$(printf '%s' "$data_json" | sed -n 's/.*"profile":"\([^"]*\)".*/\1/p')"
+            CHOICE_NAME="$(json_string "$data_json" "name")"
+            CHOICE_EMAIL="$(json_string "$data_json" "email")"
+            CHOICE_SIGNINGKEY="$(json_string "$data_json" "signingKey")"
+            CHOICE_PROFILE="$(json_string "$data_json" "profile")"
             CHOICE_PROFILE="${CHOICE_PROFILE:-personal}"
-            CHOICE_USE_OP="$(printf '%s' "$data_json" | grep -o '"useOnePassword":[a-z]*' | cut -d: -f2)"
+            CHOICE_USE_OP="$(json_bool "$data_json" "useOnePassword")"
             CHOICE_USE_OP="${CHOICE_USE_OP:-true}"
             local key val
             for key in "${FEATURE_KEYS[@]}"; do
-                val="$(printf '%s' "$data_json" | grep -o "\"$key\":[a-z]*" | head -1 | cut -d: -f2)"
+                val="$(json_bool "$data_json" "$key")"
                 eval "CHOICE_FEAT_${key}=\"\${val:-true}\""
             done
             ok "re-using prior answers (skipping prompts)"
@@ -551,8 +624,8 @@ choices() {
 
     # ─── Profile ─────────────────────────────────────────────────────────────
     tui_select_one CHOICE_PROFILE "Which profile?" \
-        "personal — adds Brewfile.personal (Claude apps, etc.)" \
-        "work     — adds Brewfile.work (the casks you fill in)" \
+        "personal — adds Brewfile.personal (personal-only apps)" \
+        "work     — adds Brewfile.work (work-only apps, Claude Code)" \
         "both     — adds both"
     # Strip the description suffix
     CHOICE_PROFILE="${CHOICE_PROFILE%% *}"
@@ -573,13 +646,10 @@ choices() {
         CHOICE_SIGNINGKEY=""
     fi
 
-    # ─── Features (single multi-select) ──────────────────────────────────────
+    # ─── Workstation extras (single multi-select) ────────────────────────────
     local feat_bits
-    tui_select_many feat_bits "Optional features (space to toggle, ↵ to confirm)" \
-        "Cloud — Kubernetes (kubectl/k9s/kubectx/stern/helm) + Azure CLI + gcloud" \
-        "IaC   — Terraform + tflint + terraform-docs" \
-        "DBs   — pgcli + redis (Postgres-first)" \
-        "Apps  — Rectangle + Raycast + Stats + Chrome + dive"
+    tui_select_many feat_bits "Workstation extras (space to toggle, ↵ to confirm)" \
+        "Mac apps — Rectangle + Raycast + Stats + Chrome + dive"
     local i=0 key
     # shellcheck disable=SC2206
     local feat_arr=($feat_bits)
@@ -597,9 +667,27 @@ choices() {
     phase_close "Phase B"
 }
 
+json_string() {
+    local json="$1" key="$2"
+    printf '%s\n' "$json" \
+        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+        | sed '/^$/d' \
+        | tail -1
+}
+
+json_bool() {
+    local json="$1" key="$2"
+    printf '%s\n' "$json" \
+        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p" \
+        | tail -1
+}
+
 choices_existing_files() {
     CHOICE_BACKUP_LEGACY=true
     CHOICE_REMOVE_OMZ=false
+    if [ "$CONFIGURE_ONLY" = "1" ]; then
+        return
+    fi
     if [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
         tui_confirm CHOICE_BACKUP_LEGACY \
             "Back up ${#PROBE_LEGACY_FILES[@]} legacy file(s) + remove the originals?" 1
@@ -638,15 +726,21 @@ confirm_phase() {
     say "${BOLD}Email:${RESET}        ${CHOICE_EMAIL:-${DIM}(blank)${RESET}}"
     say "${BOLD}1Password:${RESET}    $([ "$CHOICE_USE_OP" = "true" ] && echo "${GREEN}yes${RESET}" || echo "${YELLOW}no${RESET}")"
     say "${BOLD}Signing key:${RESET}  $key_short"
-    say "${BOLD}Features:${RESET}     ${feat_summary[*]}"
+    say "${BOLD}Extras:${RESET}       ${feat_summary[*]}"
     say "${BOLD}Repo:${RESET}         $REPO"
     say "${BOLD}Source dir:${RESET}   $SOURCE_DIR"
-    say "${BOLD}Legacy backup:${RESET} $([ "${CHOICE_BACKUP_LEGACY:-true}" = "true" ] && echo yes || echo no)"
-    say "${BOLD}Remove OMZ:${RESET}   $([ "${CHOICE_REMOVE_OMZ:-false}" = "true" ] && echo yes || echo no)"
+    if [ "$CONFIGURE_ONLY" != "1" ]; then
+        say "${BOLD}Legacy backup:${RESET} $([ "${CHOICE_BACKUP_LEGACY:-true}" = "true" ] && echo yes || echo no)"
+        say "${BOLD}Remove OMZ:${RESET}   $([ "${CHOICE_REMOVE_OMZ:-false}" = "true" ] && echo yes || echo no)"
+    fi
 
     hr
     local proceed
-    tui_confirm proceed "Proceed with installation?" 1
+    if [ "$CONFIGURE_ONLY" = "1" ]; then
+        tui_confirm proceed "Apply this configuration?" 1
+    else
+        tui_confirm proceed "Proceed with installation?" 1
+    fi
     if [ "$proceed" != "true" ]; then
         info "aborted — nothing has changed"
         phase_close "Phase C"
@@ -660,6 +754,23 @@ confirm_phase() {
 # ═════════════════════════════════════════════════════════════════════════════
 execute() {
     phase_open "Phase D · Execute"
+
+    if [ "$CONFIGURE_ONLY" = "1" ]; then
+        if [ ! -d "$SOURCE_DIR/.git" ]; then
+            fail "configure-only requires an existing repo at $SOURCE_DIR"
+            exit 1
+        fi
+        if ! command -v chezmoi >/dev/null 2>&1; then
+            fail "configure-only requires chezmoi on PATH"
+            exit 1
+        fi
+        configure_chezmoi
+        info "Applying dotfiles for updated profile/features"
+        run chezmoi apply
+        ok "chezmoi apply complete"
+        phase_close "Phase D"
+        return
+    fi
 
     if [ "$SKIP_BACKUP" != "1" ] && [ "${CHOICE_BACKUP_LEGACY:-true}" = "true" ] && [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
         BACKUP_DIR="$HOME/.dotfiles-backup-$(date +%Y%m%d-%H%M%S)"
@@ -724,9 +835,19 @@ execute() {
         ok "already cloned"
     fi
 
+    configure_chezmoi
+
+    info "Applying dotfiles (brew bundle dominates — ~10–15 min)"
+    run chezmoi apply
+    ok "chezmoi apply complete"
+    phase_close "Phase D"
+}
+
+configure_chezmoi() {
     info "Configuring chezmoi with your answers from Phase B (no further prompts)"
     run mkdir -p "$HOME/.config/chezmoi"
-    local init_flags=(
+    local init_flags key var
+    init_flags=(
         "--source=$SOURCE_DIR"
         "--promptString=name=$CHOICE_NAME"
         "--promptString=email=$CHOICE_EMAIL"
@@ -741,11 +862,6 @@ execute() {
     done
     run chezmoi init "${init_flags[@]}"
     ok "chezmoi configured"
-
-    info "Applying dotfiles (brew bundle dominates — ~10–15 min)"
-    run chezmoi apply
-    ok "chezmoi apply complete"
-    phase_close "Phase D"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -786,30 +902,14 @@ self_test() {
     _v "delta"    delta --version
     _v "fzf"      fzf --version
 
-    if [ "${CHOICE_FEAT_cloud:-true}" = "true" ]; then
-        say "${DIM}cloud (enabled)${RESET}"
-        _v "kubectl"  kubectl version --client=true
-        _v "k9s"      k9s version
-        _v "gh"       gh --version
-        _v "az"       az --version
-        _v "gcloud"   gcloud --version
-    fi
-    if [ "${CHOICE_FEAT_iac:-true}" = "true" ]; then
-        say "${DIM}IaC (enabled)${RESET}"
-        _v "terraform" terraform version
-        _v "tflint"    tflint --version
-    fi
-    if [ "${CHOICE_FEAT_databases:-true}" = "true" ]; then
-        say "${DIM}DBs (enabled)${RESET}"
-        _v "pgcli"     pgcli --version
-        _v "redis-cli" redis-cli --version
-    fi
-
     say "${DIM}functional${RESET}"
-    _vf "chezmoi doctor passes"  "chezmoi doctor 2>&1 | grep -qv '^error' || true"
-    _vf "no legacy ~/.zshrc"     "[ ! -f \"\$HOME/.zshrc\" ]"
-    _vf "no legacy ~/.gitconfig" "[ ! -f \"\$HOME/.gitconfig\" ]"
-    _vf "no legacy ~/.zprofile"  "[ ! -f \"\$HOME/.zprofile\" ]"
+    _vf "chezmoi doctor passes"  "! chezmoi doctor 2>&1 | grep -q '^error'"
+    _vf "no legacy ~/.zshrc"        "[ ! -f \"\$HOME/.zshrc\" ]"
+    _vf "no legacy ~/.gitconfig"    "[ ! -f \"\$HOME/.gitconfig\" ]"
+    _vf "no legacy ~/.zprofile"     "[ ! -f \"\$HOME/.zprofile\" ]"
+    _vf "no legacy ~/.bash_profile" "[ ! -f \"\$HOME/.bash_profile\" ]"
+    _vf "no legacy ~/.bashrc"       "[ ! -f \"\$HOME/.bashrc\" ]"
+    _vf "no legacy ~/.profile"      "[ ! -f \"\$HOME/.profile\" ]"
     _vf "ZDOTDIR zshrc exists"   "[ -f \"\$HOME/.config/zsh/.zshrc\" ]"
 
     [ "$CHOICE_USE_OP" = "true" ] && _vf "op-ssh-sign present" "[ -x /Applications/1Password.app/Contents/MacOS/op-ssh-sign ]"
@@ -839,7 +939,7 @@ next_steps() {
         say "$n. ${BOLD}Sign in to 1Password${RESET} ${DIM}(Settings → Developer → SSH agent)${RESET}"
         n=$((n+1))
     fi
-    say "$n. ${BOLD}bash $SOURCE_DIR/bootstrap-auth.sh${RESET} ${DIM}— gh/az/gcloud sign-in + signing test${RESET}"
+    say "$n. ${BOLD}bash $SOURCE_DIR/bootstrap-auth.sh${RESET} ${DIM}— gh/az/gcloud sign-in + AKS/GKE checks + signing test${RESET}"
     n=$((n+1))
     say "$n. ${BOLD}exec zsh${RESET} ${DIM}— reload shell${RESET}"
     n=$((n+1))

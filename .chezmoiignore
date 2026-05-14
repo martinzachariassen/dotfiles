@@ -5,6 +5,7 @@ LICENSE
 install.sh
 doctor.sh
 bootstrap-auth.sh
+scripts/
 Brewfile
 Brewfile.cloud
 Brewfile.iac

@@ -31,6 +31,9 @@ Reference table showing exactly what each file in the repo does.
 | `remove_dot_gitconfig` | `~/.gitconfig` | Git checks `~/.gitconfig` before `~/.config/git/config`, so a legacy file there silently shadows the XDG-managed config. Active protection. |
 | `remove_dot_zshrc` | `~/.zshrc` | Real zshrc is at `~/.config/zsh/.zshrc` via `ZDOTDIR`. Legacy file would shadow it. |
 | `remove_dot_zprofile` | `~/.zprofile` | Real zprofile is at `~/.config/zsh/.zprofile`. Same reason. |
+| `remove_dot_bash_profile` | `~/.bash_profile` | Legacy login-shell file. This setup is zsh/XDG-based, so keeping it in `$HOME` creates stale bootstrap hooks. Active protection. |
+| `remove_dot_bashrc` | `~/.bashrc` | Legacy interactive bash file. Active protection. |
+| `remove_dot_profile` | `~/.profile` | Legacy POSIX login-shell file. Active protection. |
 | `dot_config/mise/remove_config.toml` | `~/.config/mise/config.toml` | **Transitional.** Empty file with the `remove_` prefix tells chezmoi to delete `~/.config/mise/config.toml` from $HOME on first apply (we migrated mise → devbox). Once every machine you own has applied at least once, you can delete the whole `dot_config/mise/` source dir: `rm -rf ~/Dev/Personal/dotfiles/dot_config/mise && git add -A && git commit -m "chore: drop mise removal marker"`. |
 
 **Note:** there is *no* `remove_dot_zsh_history` marker. We deliberately don't manage the legacy `~/.zsh_history` or `~/.config/zsh/.zsh_history` files because chezmoi tries to remove them, the live shell (with `SHARE_HISTORY` enabled) recreates them after every command, and the result is an endless "target has changed" prompt every time you run `chezmoi apply`. The new HISTFILE is at `~/.local/state/zsh/history` per `~/.zshenv` + `~/.config/zsh/.zshrc`; any old `.zsh_history` files on disk are inert and you can delete them by hand if you care: `rm -f ~/.zsh_history ~/.config/zsh/.zsh_history`.
@@ -50,7 +53,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | Script | What it does | When to run |
 |---|---|---|
 | `install.sh` | 7-step bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
-| `bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in + GKE plugin + git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts. |
+| `bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
 | `doctor.sh` | Reads-only health check. Verifies XDG layout, claude routing, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
 | `macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
 
@@ -58,15 +61,13 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 
 | File | Role |
 |---|---|
-| `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
-| `.chezmoidata/packages.toml` | Data file (vscode extension list) available to all templates. |
-| `Brewfile`, `Brewfile.personal`, `Brewfile.work` | Three-tier brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers `Brewfile.personal` and/or `Brewfile.work` based on the profile data var. |
+| `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile, workstation extras). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
+| `Brewfile`, `Brewfile.mac-apps`, `Brewfile.personal`, `Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional mac apps and profile extras based on chezmoi data. |
 | `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
 | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` | Runs once before any apply. macOS-only via template guard. |
 | `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` | Runs before apply. Two-step: (1) curl-installs devbox from `get.jetify.com/devbox` if missing (devbox isn't in homebrew); (2) if `/nix` doesn't exist, eagerly bootstraps the Nix store via Determinate Systems' installer (`install --determinate --no-confirm`) — same code path devbox would invoke lazily, just run upfront so the first `devbox shell` doesn't pause for a "press enter to continue" prompt. macOS-only. Both halves idempotent. Doesn't fail the apply if Nix bootstrap errors — falls back to lazy install. |
 | `.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl` | Runs after apply when Brewfile content hash changes. macOS-only. |
-| `.chezmoiscripts/run_onchange_after_03-vscode-extensions.sh.tmpl` | Runs after apply when extension list changes. macOS-only. |
 | `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
 | `.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl` | Prints a clear "✓ chezmoi apply complete" banner at the end of every apply. Always re-fires because the embedded `{{ now.Unix }}` timestamp makes the content hash differ on every render. The "99-" prefix sorts it after all other after-scripts. Pure UX — gives an unambiguous signal that chezmoi has finished its work. |
 | `macos-defaults.sh` (root) | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |

@@ -1,7 +1,7 @@
 # examples/
 
-Drop-in starter files you can copy into a project to make use of the tools the
-Brewfile installs (`devbox`, `direnv`, `pre-commit`). Not chezmoi-managed —
+Drop-in starter files you can copy into a project to make use of the global
+workstation tools (`devbox`, `direnv`, `pre-commit`). Not chezmoi-managed —
 these are references, not config that gets applied to `$HOME`.
 
 ## How to use
@@ -16,6 +16,12 @@ cd /path/to/project
 devbox init                                       # creates devbox.json
 devbox add jdk21 kotlin postgresql_16 gradle      # pin your toolchain
 # direnv allow                                     # only if the dir isn't under ~/Dev (the whitelisted root)
+
+# or start from one of the opinionated templates
+cp ~/Dev/Personal/dotfiles/examples/devbox/backend-devbox.json /path/to/project/devbox.json
+cp ~/Dev/Personal/dotfiles/examples/devbox/kubernetes-devbox.json /path/to/project/devbox.json
+cp ~/Dev/Personal/dotfiles/examples/devbox/terraform-devbox.json /path/to/project/devbox.json
+cp ~/Dev/Personal/dotfiles/examples/devbox/opentofu-devbox.json /path/to/project/devbox.json
 
 # pre-commit: git hooks for lint/format/sanity-checks
 cp ~/Dev/Personal/dotfiles/examples/pre-commit-config.yaml.example /path/to/project/.pre-commit-config.yaml
@@ -33,7 +39,10 @@ on first `chezmoi apply` (devbox isn't in homebrew). No further setup.
 ### Why per-project runtimes (devbox) instead of a global manager?
 
 `devbox.json` lives in the project's own repo, gets committed, and travels with
-the code. A teammate cloning the repo gets the exact same JDK/Postgres/Node
-versions on first `cd` in (after `devbox install` once). This dotfiles repo
-deliberately doesn't carry runtime pins — those belong to each project, not to
-your personal machine config. See the project README for the rationale.
+the code. A teammate cloning the repo gets the exact same JDK/Postgres/Node,
+Terraform/OpenTofu, or Kubernetes tool versions on first `cd` in (after
+`devbox install` once). This dotfiles repo deliberately doesn't carry runtime
+or project CLI pins in Homebrew — those belong to each project, not to your
+personal machine config. Account-level CLIs such as `az` and `gcloud` are the
+exception: they stay global so authentication and project/subscription context
+are available before entering a project shell.

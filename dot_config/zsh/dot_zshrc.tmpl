@@ -128,7 +128,8 @@ command -v bat >/dev/null && alias cat='bat --paging=never --style=plain'
 command -v fd  >/dev/null && alias find='fd'
 
 # ─── Tool shortcuts ───────────────────────────────────────────────────────────
-# Single/double-letter aliases for tools I run constantly.
+# Single/double-letter aliases for tools I run constantly. Some commands are
+# expected to come from a project's devbox environment rather than global brew.
 alias n='nvim'                  # editor
 alias lg='lazygit'              # git TUI — the daily-driver for staging/blame/branch ops
 alias d='docker'
@@ -168,8 +169,19 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # fresh Mac or after wiping a system pref pane back to defaults.
 alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/macos-defaults.sh"'
 
-# Quick `cd` into the dotfiles repo
-alias dotfiles='cd "$HOME/Dev/Personal/dotfiles"'
+# Dotfiles control panel. With no args it cd's into the source repo; with args
+# it dispatches to scripts/dotfiles-config.sh, e.g.
+#   dotfiles profile set work
+#   dotfiles features disable macApps
+dotfiles() {
+    local src
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    if [ "$#" -eq 0 ]; then
+        cd "$src" || return
+    else
+        bash "$src/scripts/dotfiles-config.sh" "$@"
+    fi
+}
 
 # Smart `chezmoi apply` wrapper. Use this instead of `chezmoi apply -v`.
 #
@@ -240,7 +252,7 @@ chezdiff() {
     echo
     echo "── brew bundle (missing packages) ────────────────────────────"
     # Check every Brewfile module that exists in source. The wildcard catches
-    # core + feature modules (Brewfile.cloud, Brewfile.iac, …) + profile extras.
+    # core + workstation extras + profile extras.
     for f in "$src"/Brewfile "$src"/Brewfile.*; do
         [ -f "$f" ] || continue
         case "$f" in *.lock.json) continue ;; esac

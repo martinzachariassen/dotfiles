@@ -32,11 +32,13 @@ else
 fi
 
 PASS=0
-WARN=0
+ACTION=0
+INFOCOUNT=0
 FAIL=0
 
 pass() { echo "  ${GREEN}✓${RESET}  $1"; PASS=$((PASS + 1)); }
-warn() { echo "  ${YELLOW}!${RESET}  $1"; WARN=$((WARN + 1)); }
+warn() { echo "  ${YELLOW}!${RESET}  $1"; ACTION=$((ACTION + 1)); }
+note() { echo "  ${BLUE}•${RESET}  $1"; INFOCOUNT=$((INFOCOUNT + 1)); }
 fail() { echo "  ${RED}✗${RESET}  $1"; FAIL=$((FAIL + 1)); }
 section() { echo; echo "${BOLD}${BLUE}── $1 ──${RESET}"; }
 
@@ -87,7 +89,7 @@ fi
 
 # ─── 3. XDG layout: legacy files must NOT exist ───────────────────────────────
 section "XDG layout"
-for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig"; do
+for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
     if [ -f "$legacy" ]; then
         fail "legacy $legacy present — would shadow XDG-managed config. Run \`chez\` to remove."
     else
@@ -304,11 +306,16 @@ fi
 section "Cloud auth (informational)"
 if command -v gh >/dev/null 2>&1; then
     if gh auth status >/dev/null 2>&1; then pass "gh authenticated"
-    else warn "gh not authenticated — run: gh auth login"; fi
+    else note "gh not authenticated — run when needed: gh auth login"; fi
 fi
 if command -v az >/dev/null 2>&1; then
     if az account show >/dev/null 2>&1; then pass "az authenticated"
-    else warn "az not authenticated — run: az login"; fi
+    else note "az not authenticated — run when needed: az login"; fi
+    if command -v kubelogin >/dev/null 2>&1 && kubelogin --version 2>/dev/null | grep -qi 'git hash:'; then
+        pass "Azure kubelogin installed"
+    else
+        warn "Azure kubelogin missing — run: az aks install-cli"
+    fi
 fi
 if command -v gcloud >/dev/null 2>&1; then
     if gcloud auth list 2>/dev/null | grep -q '\*'; then
@@ -320,7 +327,7 @@ if command -v gcloud >/dev/null 2>&1; then
             warn "gke-gcloud-auth-plugin missing — run: gcloud components install gke-gcloud-auth-plugin"
         fi
     else
-        warn "gcloud not authenticated — run: gcloud auth login"
+        note "gcloud not authenticated — run when needed: gcloud auth login"
     fi
 fi
 if command -v op >/dev/null 2>&1; then
@@ -338,7 +345,7 @@ if command -v op >/dev/null 2>&1; then
         if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             pass "1Password CLI signed in"
         else
-            warn "1Password CLI not signed in — run: eval \$(op signin)"
+            note "1Password CLI not signed in — run if you use op directly: eval \$(op signin)"
         fi
     else
         # No op CLI config at all — that's fine, the SSH agent + git signing
@@ -369,7 +376,7 @@ echo "  ${DIM}    • Developer Tools:     your terminal (avoids Gatekeeper fric
 # ─── Summary ──────────────────────────────────────────────────────────────────
 echo
 echo "${BOLD}── Summary ──${RESET}"
-echo "  ${GREEN}${PASS} pass${RESET}   ${YELLOW}${WARN} warn${RESET}   ${RED}${FAIL} fail${RESET}"
+echo "  ${GREEN}${PASS} pass${RESET}   ${YELLOW}${ACTION} action${RESET}   ${BLUE}${INFOCOUNT} info${RESET}   ${RED}${FAIL} fail${RESET}"
 
 if [ "$FAIL" -gt 0 ]; then
     exit 1

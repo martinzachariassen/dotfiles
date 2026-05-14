@@ -28,16 +28,15 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
       - name: Lint plain shell scripts
-        run: shellcheck --shell=bash install.sh macos-defaults.sh doctor.sh bootstrap-auth.sh
+        run: shellcheck --shell=bash install.sh macos-defaults.sh doctor.sh bootstrap-auth.sh scripts/*.sh
 
   # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
   # Renders every template in the repo. Catches Go template syntax errors,
   # undefined variables, stale references, and missing data prompts.
   #
-  # Strategy: write `~/.config/chezmoi/chezmoi.toml` directly with stub data,
-  # then run `chezmoi apply --dry-run`. This bypasses `chezmoi init`'s
-  # interactive prompts entirely — independent of which `--prompt*` CLI
-  # flags the installed chezmoi version supports.
+  # Strategy: scripts/render-check.sh creates a temporary HOME with stub
+  # chezmoi data, then runs `chezmoi apply --dry-run`. This bypasses
+  # interactive prompts entirely and keeps the CI setup reproducible locally.
   chezmoi:
     name: chezmoi templates
     runs-on: ubuntu-latest
@@ -49,23 +48,6 @@ jobs:
           sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Pre-populate chezmoi config with stub data
-        # Mirrors what `chezmoi init` would render from .chezmoi.toml.tmpl,
-        # but skips the interactive prompts. profile="both" ensures BOTH
-        # profile-conditional template branches (work + personal) get
-        # exercised by the dry-run below.
-        run: |
-          mkdir -p "$HOME/.config/chezmoi"
-          cat > "$HOME/.config/chezmoi/chezmoi.toml" <<EOF
-          sourceDir = "$PWD"
-
-          [data]
-              name       = "CI"
-              email      = "ci@example.com"
-              signingKey = "ssh-ed25519 AAAAci-placeholder"
-              profile    = "both"
-          EOF
-
       - name: Render every template via dry-run apply
         # `--dry-run` never writes to disk; it just resolves source state and
         # reports what would change. Any template parse error, undefined
@@ -75,66 +57,34 @@ jobs:
         # vscode-extensions, macos-defaults) all have a `{{ if ne .chezmoi.os
         # "darwin" }}exit 0{{ end }}` guard, so they don't need any
         # macOS-specific tooling on this Linux runner — they just exit 0.
-        run: chezmoi apply --dry-run --verbose
+        run: bash scripts/render-check.sh "$PWD"
 
-  # ─── Job 3: brew bundle sanity (macOS) ──────────────────────────────────────
-  # Runs `brew bundle check` against every Brewfile module on a real macOS
-  # runner. Catches deprecated/renamed casks, removed taps, and other things
-  # that only fail when Homebrew evaluates the Brewfile.
-  #
-  # We iterate `Brewfile Brewfile.*` so feature modules (Brewfile.cloud,
-  # Brewfile.iac, Brewfile.databases, Brewfile.mac-apps) AND profile extras
-  # (Brewfile.personal, Brewfile.work) all get checked. Lockfile is skipped
-  # explicitly.
-  #
-  # `continue-on-error: true` because GitHub-hosted macOS runners are slow,
-  # rate-limited, and flaky for brew operations — we want signal, not red CI
-  # every time Homebrew's CDN coughs.
-  brew:
-    name: brew bundle (macOS)
+  # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────
+  # Resolve every referenced formula/cask. This catches dead names and broken
+  # taps without installing anything, and should fail CI when the repo asks for
+  # packages Homebrew cannot evaluate.
+  brew-resolve:
+    name: brew package names
     runs-on: macos-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Show brew version
         run: brew --version
 
-      # `brew bundle check` reports what's missing; with `--verbose` it lists
-      # each tap/brew/cask. A bad cask name (e.g. an old "google-cloud-sdk")
-      # produces a non-zero exit and a clear error.
-      - name: Check every Brewfile module
-        run: |
-          set +e
-          for f in Brewfile Brewfile.*; do
-            case "$f" in *.lock.json) continue ;; esac
-            [ -f "$f" ] || continue
-            echo "── $f ──"
-            brew bundle check --verbose --file="$f" || true
-          done
-
-      # Stronger signal than `check`: actually try to resolve every formula and
-      # cask. If a name is dead, brew exits with a parse error here.
       - name: Resolve formulae and casks (no install)
-        run: |
-          set -e
-          # Strip comments and blank lines, then verify each `brew "X"` /
-          # `cask "X"` actually exists in homebrew-core or a tap we use.
-          # Iterates every Brewfile module so a typo in Brewfile.cloud is
-          # caught the same as one in the core Brewfile.
-          for f in Brewfile Brewfile.*; do
-            case "$f" in *.lock.json) continue ;; esac
-            [ -f "$f" ] || continue
-            echo "── $f ──"
-            grep -E '^(brew|cask) "' "$f" | while read -r line; do
-              name=$(echo "$line" | sed -E 's/^(brew|cask) "([^"]+)".*/\2/')
-              kind=$(echo "$line" | awk '{print $1}')
-              if [ "$kind" = "brew" ]; then
-                brew info --formula "$name" >/dev/null 2>&1 \
-                  || echo "  ✗ formula not found: $name"
-              else
-                brew info --cask "$name" >/dev/null 2>&1 \
-                  || echo "  ✗ cask not found: $name"
-              fi
-            done
-          done
+        run: bash scripts/brew-resolve.sh "$PWD"
+
+  # ─── Job 4: brew installed-state smoke (macOS, advisory) ───────────────────
+  # `brew bundle check` reports what is not installed on the runner. That is
+  # useful drift signal, but GitHub-hosted macOS runners are slow and flaky, so
+  # this job stays advisory while brew-resolve above is blocking.
+  brew-check:
+    name: brew bundle check
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check every Brewfile module
+        run: bash scripts/brew-check-modules.sh "$PWD"

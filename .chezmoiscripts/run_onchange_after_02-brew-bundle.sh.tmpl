@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
-# Runs `brew bundle` whenever any of the Brewfiles, the profile, the feature
-# toggles, or this script itself change. Hash comments below pull all of those
-# into the trigger.
-#
-# Upgrade safety: every feature toggle is read through `dig … true …` so that
-# users who installed BEFORE the features.* keys existed (and haven't re-run
-# `chezmoi init` yet) get the "all on" default instead of silently losing
-# Kubernetes/Terraform/etc. on their next chezmoi apply.
+# Runs `brew bundle` whenever any existing Brewfile module, the profile, the
+# workstation feature toggles, or this script itself change. Project toolchains
+# belong in per-project devbox.json files, not in global Homebrew modules.
 #
 # Brewfile (core)        hash: {{ include "Brewfile" | sha256sum }}
-# Brewfile.cloud         hash: {{ include "Brewfile.cloud" | sha256sum }}
-# Brewfile.iac           hash: {{ include "Brewfile.iac" | sha256sum }}
-# Brewfile.databases     hash: {{ include "Brewfile.databases" | sha256sum }}
 # Brewfile.mac-apps      hash: {{ include "Brewfile.mac-apps" | sha256sum }}
 # Brewfile.personal      hash: {{ include "Brewfile.personal" | sha256sum }}
 # Brewfile.work          hash: {{ include "Brewfile.work" | sha256sum }}
 # Profile in effect:           {{ .profile }}
-# Feature: cloud               {{ dig "features" "cloud" true . }}
-# Feature: iac                 {{ dig "features" "iac" true . }}
-# Feature: databases           {{ dig "features" "databases" true . }}
 # Feature: macApps             {{ dig "features" "macApps" true . }}
 
 set -euo pipefail
@@ -119,15 +108,6 @@ PLAN_FILES=()
 add_step() { PLAN_LABELS+=("$1"); PLAN_FILES+=("$SOURCE/$2"); }
 
 add_step "core (always)"                  "Brewfile"
-{{ if dig "features" "iac" true . -}}
-add_step "IaC (Terraform + lint)"         "Brewfile.iac"
-{{ end -}}
-{{ if dig "features" "cloud" true . -}}
-add_step "cloud (k8s + az + gcloud)"      "Brewfile.cloud"
-{{ end -}}
-{{ if dig "features" "databases" true . -}}
-add_step "databases (pgcli + redis)"  "Brewfile.databases"
-{{ end -}}
 {{ if dig "features" "macApps" true . -}}
 add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "Brewfile.mac-apps"
 {{ end -}}
@@ -152,15 +132,6 @@ echo "[brew-bundle] heartbeat every 45s during silent stretches"
 echo "═════════════════════════════════════════════════════════════════════"
 
 # Print disabled modules so users know nothing's being silently dropped.
-{{ if not (dig "features" "iac" true .) -}}
-echo "[brew-bundle]   · IaC module disabled (features.iac=false)"
-{{ end -}}
-{{ if not (dig "features" "cloud" true .) -}}
-echo "[brew-bundle]   · cloud module disabled (features.cloud=false)"
-{{ end -}}
-{{ if not (dig "features" "databases" true .) -}}
-echo "[brew-bundle]   · databases module disabled (features.databases=false)"
-{{ end -}}
 {{ if not (dig "features" "macApps" true .) -}}
 echo "[brew-bundle]   · mac-apps module disabled (features.macApps=false)"
 {{ end -}}
