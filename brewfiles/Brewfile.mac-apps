@@ -6,7 +6,6 @@
 # scripts. Skip the toggle if you prefer to install your own picks. Each line
 # is also fine to comment out individually.
 
-cask "rectangle"                # window snapping (also: aerospace, raycast hotkeys)
 cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
 cask "google-chrome"            # the only browser most web tooling assumes
@@ -15,4 +14,5 @@ cask "obsidian"
 cask "spotify"
 cask "obs"
 cask "vlc"
-cask "postman"
+cask "bruno"
+cask "jordanbaird-ice"
