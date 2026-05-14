@@ -14,6 +14,7 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Dev` (no per-project `direnv allow` required). |
 | `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile settings (CLAUDE_CONFIG_DIR points here). |
 | `dot_config/claude/personal/CLAUDE.md` | `~/.config/claude/personal/CLAUDE.md` | Global instructions auto-loaded into every personal Claude Code session — communication style, environment, code-style preferences, anti-patterns to avoid. Project-specific overrides go in `<project>/CLAUDE.md`. |
+| `dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` | Global Codex instructions auto-loaded into every personal Codex session — communication style, environment, code-style preferences, and commit conventions. Project-specific overrides go in `<project>/AGENTS.md`. |
 | `dot_docker/config.json` | `~/.docker/config.json` | Docker CLI config. Stays at `~/.docker/` because Docker Desktop hardcodes the path. |
 | `dot_docker/daemon.json` | `~/.docker/daemon.json` | Docker daemon config. |
 | `dot_config/ghostty/config` | `~/.config/ghostty/config` | Ghostty terminal config. Catppuccin Frappé theme is built into Ghostty, no theme file needed. |

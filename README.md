@@ -26,6 +26,7 @@
   - [Diagnosing problems: doctor.sh](#diagnosing-problems-doctorsh)
 - [Upgrading when upstream changes](#upgrading-when-upstream-changes)
 - [Claude Code: work vs personal](#claude-code-work-vs-personal)
+- [Codex global instructions](#codex-global-instructions)
 - [Forking this repo](#forking-this-repo)
 - [Architecture](#architecture)
 - [Troubleshooting](#troubleshooting)
@@ -477,6 +478,12 @@ The CLI binary comes from the `cask "claude-code"` line in `Brewfile.work`; it i
 
 ---
 
+## Codex global instructions
+
+[`dot_codex/AGENTS.md`](dot_codex/AGENTS.md) maps to `~/.codex/AGENTS.md` and is loaded into every personal Codex session before project-level instructions. It mirrors the same personal defaults as `CLAUDE.md`: communication style, local tooling, backend stack preferences, code-style choices, and commit conventions. Project-specific Codex instructions go in `<project>/AGENTS.md` and layer on top.
+
+---
+
 ## Forking this repo
 
 The wizard is designed to be fork-friendly. If you cloned this and want to base your own setup on it, here's the minimum surface area you'll want to touch:
@@ -485,7 +492,7 @@ The wizard is designed to be fork-friendly. If you cloned this and want to base 
 2. **Fill in `Brewfile.work`** with your employer's relevant apps (Slack, Zoom, Postman, JetBrains IDEs, …). Or empty it out entirely — it's allowed to be empty.
 3. **Edit `Brewfile.personal`** to match your "personal machine" preferences.
 4. **Tune the boundary between Brew and Devbox.** Keep workstation tools in Brewfiles; put project runtimes and CLIs in `examples/devbox/` templates or directly in each project's `devbox.json`.
-5. **Replace `dot_config/claude/personal/CLAUDE.md`** with your own preferences. Currently encodes my style; almost certainly not yours.
+5. **Replace `dot_config/claude/personal/CLAUDE.md` and `dot_codex/AGENTS.md`** with your own preferences. They currently encode my style; almost certainly not yours.
 6. **Adjust `dot_config/git/config.tmpl`** if you don't want commit signing — the `[gpg "ssh"] program = …` block assumes 1Password's `op-ssh-sign`. The wizard's `useOnePassword` toggle controls whether the block renders.
 7. **Re-render the README badges** — the CI badge URL hardcodes my GitHub handle.
 
