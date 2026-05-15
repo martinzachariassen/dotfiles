@@ -19,14 +19,14 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 Already bootstrapped and only changing profile, identity, or feature toggles:
 
 ```sh
-bash ~/Dev/Personal/dotfiles/install.sh --configure-only
+bash ~/Developer/personal/dotfiles/install.sh --configure-only
 ```
 
 After the wizard finishes:
 
 ```sh
 open -a 1Password                              # skip if you disabled 1Password
-bash ~/Dev/Personal/dotfiles/scripts/bootstrap-auth.sh # gh, az, gcloud, signing checks
+bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh # gh, az, gcloud, signing checks
 exec zsh
 sudo shutdown -r now
 ```
@@ -69,6 +69,7 @@ dotfiles profile set personal
 dotfiles profile set work
 dotfiles profile set both
 dotfiles features list
+dotfiles features enable ai
 dotfiles features enable macApps
 dotfiles features disable macApps
 ```
@@ -79,6 +80,7 @@ dotfiles features disable macApps
 |---|---|
 | Terminal | Ghostty, Zellij, Starship, Catppuccin Frappe, JetBrainsMono Nerd Font. |
 | Shell | zsh with XDG layout, fzf, zoxide, direnv, Carapace completions, syntax highlighting, and modern CLI aliases. |
+| Local AI | Optional `ai` feature with Ollama, `llm`, and a model bootstrap script. |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | Project tools | Devbox + direnv for per-project JDK/Kotlin/Postgres/Node/Terraform/Kubernetes tools. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |

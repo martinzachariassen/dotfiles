@@ -77,7 +77,7 @@ over-explain fundamentals.
 ## What I use
 
 This machine is set up via my chezmoi-managed dotfiles repo at
-`~/Dev/Personal/dotfiles`. The following are assumed available — when
+`~/Developer/personal/dotfiles`. The following are assumed available — when
 suggesting alternatives, default to these unless a specific project uses
 something else.
 
@@ -99,7 +99,7 @@ something else.
   <https://search.nixos.org/packages>.
 - **`direnv`** for project env vars + auto-activating devbox. The hook lives
   in `~/.config/zsh/.zshrc`; the whitelist in `~/.config/direnv/direnv.toml`
-  trusts `~/Dev` automatically, so no per-project `direnv allow` is needed
+  trusts `~/Developer` automatically, so no per-project `direnv allow` is needed
   for projects under there.
 - **No global runtime manager** (no mise, asdf, nvm, jenv, pyenv, sdkman, …).
   If I genuinely need a fallback JDK or Node outside any project, it's
@@ -300,7 +300,7 @@ refactor(api)!: rename /users → /accounts (drops backward compat)
 
 ## When working in this dotfiles repo
 
-The repo at `~/Dev/Personal/dotfiles` uses chezmoi conventions:
+The repo at `~/Developer/personal/dotfiles` uses chezmoi conventions:
 
 - Source files prefixed `dot_*` map to `~/.X`; `private_dot_*` adds mode 0600;
   `remove_*` markers delete the corresponding `~/.X`.

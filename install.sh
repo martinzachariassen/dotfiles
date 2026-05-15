@@ -23,7 +23,7 @@
 set -uo pipefail
 
 REPO="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
-SOURCE_DIR="${DOTFILES_DIR:-$HOME/Dev/Personal/dotfiles}"
+SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 ASSUME_YES="${YES:-0}"
@@ -31,7 +31,7 @@ CONFIGURE_ONLY=0
 RESET_BREW_REQUESTED=0
 MIRROR_BREW_REQUESTED=0
 
-FEATURE_KEYS=(macApps)
+FEATURE_KEYS=(macApps ai)
 
 usage() {
     cat <<EOF
@@ -219,17 +219,25 @@ prompt_phrase() {
 
 json_string() {
     local json="$1" key="$2"
-    printf '%s\n' "$json" \
-        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
-        | sed '/^$/d' \
-        | tail -1
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s\n' "$json" | jq -r --arg key "$key" '.[$key] // empty'
+    else
+        printf '%s\n' "$json" \
+            | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" \
+            | sed '/^$/d' \
+            | tail -1
+    fi
 }
 
 json_bool() {
     local json="$1" key="$2"
-    printf '%s\n' "$json" \
-        | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p" \
-        | tail -1
+    if command -v jq >/dev/null 2>&1; then
+        printf '%s\n' "$json" | jq -r --arg key "$key" '.[$key] // .features[$key] // empty'
+    else
+        printf '%s\n' "$json" \
+            | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p" \
+            | tail -1
+    fi
 }
 
 toml_string() {
@@ -244,6 +252,14 @@ toml_bool() {
     sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\\(true\\|false\\)[[:space:]]*$/\1/p" "$file" | tail -1
 }
 
+feature_default() {
+    case "$1" in
+        macApps) printf 'true' ;;
+        ai) printf 'false' ;;
+        *) printf 'false' ;;
+    esac
+}
+
 load_existing_answers() {
     EXISTING_NAME=""
     EXISTING_EMAIL=""
@@ -251,6 +267,7 @@ load_existing_answers() {
     EXISTING_PROFILE="personal"
     EXISTING_USE_OP="true"
     EXISTING_FEAT_macApps="true"
+    EXISTING_FEAT_ai="false"
 
     if command -v chezmoi >/dev/null 2>&1 && [ -f "$HOME/.config/chezmoi/chezmoi.toml" ]; then
         local data_json key val
@@ -262,7 +279,7 @@ load_existing_answers() {
         EXISTING_USE_OP="$(json_bool "$data_json" "useOnePassword")"
         for key in "${FEATURE_KEYS[@]}"; do
             val="$(json_bool "$data_json" "$key")"
-            eval "EXISTING_FEAT_${key}=\"\${val:-true}\""
+            eval "EXISTING_FEAT_${key}=\"\${val:-$(feature_default "$key")}\""
         done
     elif [ -f "$HOME/.config/chezmoi/chezmoi.toml" ]; then
         local cfg="$HOME/.config/chezmoi/chezmoi.toml"
@@ -272,6 +289,7 @@ load_existing_answers() {
         EXISTING_PROFILE="$(toml_string "$cfg" "profile")"
         EXISTING_USE_OP="$(toml_bool "$cfg" "useOnePassword")"
         EXISTING_FEAT_macApps="$(toml_bool "$cfg" "macApps")"
+        EXISTING_FEAT_ai="$(toml_bool "$cfg" "ai")"
     fi
 
     EXISTING_NAME="${EXISTING_NAME:-$(git config --global user.name 2>/dev/null || echo '')}"
@@ -279,6 +297,7 @@ load_existing_answers() {
     EXISTING_PROFILE="${EXISTING_PROFILE:-personal}"
     EXISTING_USE_OP="${EXISTING_USE_OP:-true}"
     EXISTING_FEAT_macApps="${EXISTING_FEAT_macApps:-true}"
+    EXISTING_FEAT_ai="${EXISTING_FEAT_ai:-false}"
 }
 
 banner() {
@@ -372,6 +391,10 @@ choices() {
     current_macapps="${EXISTING_FEAT_macApps:-true}"
     prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps?" "$([ "$current_macapps" = "true" ] && echo 1 || echo 0)"
 
+    local current_ai
+    current_ai="${EXISTING_FEAT_ai:-false}"
+    prompt_confirm CHOICE_FEAT_ai "Install local AI tooling (Ollama, llm)?" "$([ "$current_ai" = "true" ] && echo 1 || echo 0)"
+
     CHOICE_RESET_BREW=false
     CHOICE_MIRROR_BREW=false
     if [ "$CONFIGURE_ONLY" != "1" ]; then
@@ -421,6 +444,7 @@ confirm_phase() {
         say "${BOLD}Signing key:${RESET}  <none - set later>"
     fi
     say "${BOLD}Mac apps:${RESET}     $CHOICE_FEAT_macApps"
+    say "${BOLD}Local AI:${RESET}     $CHOICE_FEAT_ai"
     say "${BOLD}Repo:${RESET}         $REPO"
     say "${BOLD}Source dir:${RESET}   $SOURCE_DIR"
     if [ "$CONFIGURE_ONLY" != "1" ]; then
@@ -513,6 +537,9 @@ active_brewfiles() {
     printf '%s\n' "$SOURCE_DIR/Brewfile"
     if [ "${CHOICE_FEAT_macApps:-true}" = "true" ]; then
         printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
+    fi
+    if [ "${CHOICE_FEAT_ai:-false}" = "true" ]; then
+        printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.ai"
     fi
     case "${CHOICE_PROFILE:-personal}" in
         personal|both) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.personal" ;;
@@ -732,6 +759,10 @@ self_test() {
     _v "direnv" direnv version
     _v "delta" delta --version
     _v "fzf" fzf --version
+    if [ "${CHOICE_FEAT_ai:-false}" = "true" ]; then
+        _v "ollama" ollama --version
+        _v "llm" llm --version
+    fi
 
     say "${DIM}functional${RESET}"
     _vf "chezmoi doctor passes" "! chezmoi doctor 2>&1 | grep -q '^error'"

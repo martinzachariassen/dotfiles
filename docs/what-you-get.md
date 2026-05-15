@@ -21,19 +21,19 @@ Starship modules show up only when contextually relevant, so the prompt grows wi
 
 ```text
 # Plain directory, no git, no project — minimal noise
-~/Dev ❯
+~/Developer ❯
 
 # Inside a git repo on a clean branch
-~/Dev/Personal/dotfiles on  main ❯
+~/Developer/personal/dotfiles on  main ❯
 
 # Java project on a feature branch with 2 modified + 1 untracked file
-~/Dev/Work/api on  feat/auth  2 ?1  via  21.0.5 ❯
+~/Developer/work/api on  feat/auth  2 ?1  via  21.0.5 ❯
 
 # Same project, now with a Kubernetes context active because k8s/ exists
-~/Dev/Work/api on  feat/auth via  21.0.5 ⎈ prod (default) ❯
+~/Developer/work/api on  feat/auth via  21.0.5 ⎈ prod (default) ❯
 
 # After a slow command (>2s), the right-side block shows the duration
-~/Dev/Work/api on  main ❯ mvn test                              took 47s
+~/Developer/work/api on  main ❯ mvn test                              took 47s
 ```
 
 The `❯` prompt char turns red on a non-zero exit status. Language icons require a Nerd Font (JetBrainsMono Nerd Font, installed by the Brewfile and set in Ghostty).

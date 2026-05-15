@@ -10,8 +10,8 @@ chezup
 
 Defined in your `.zshrc`. It does:
 
-1. `git pull --ff-only` in `~/Dev/Personal/dotfiles`
-2. `chez` — chezmoi status + a single-keypress confirm + `chezmoi apply -v --force`
+1. `git pull --ff-only` in `~/Developer/personal/dotfiles`
+2. `chez` — chezmoi status + a single-keypress confirm + `chezmoi apply --force`
 
 That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, and modified scripts. Project-level Devbox changes are applied when you enter that project or run `devbox install` there. VS Code settings and extensions are handled by VS Code Settings Sync, not this repo.
 
@@ -34,7 +34,7 @@ That's `git pull` + `chezmoi init` + `chez`. `chezmoi init` re-renders `chezmoi.
 If you'd rather walk through the full wizard again (e.g., to flip a workstation feature toggle visually rather than by editing TOML), just rerun:
 
 ```sh
-bash ~/Dev/Personal/dotfiles/install.sh
+bash ~/Developer/personal/dotfiles/install.sh
 ```
 
 It'll detect your existing config in Phase A and ask whether to re-use prior answers; say no to get the full multi-select again.
@@ -58,7 +58,7 @@ If you forget which path you're on, `chezdiff` shows you everything pending at o
 Disabling a feature toggle stops that Brewfile from being re-applied, but does **not** uninstall the packages it pulled in — intentional, so you don't lose tools you might still use. To actually remove the current mac-apps feature packages:
 
 ```sh
-brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.mac-apps
+brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.mac-apps
 ```
 
 `chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is useful when you've manually `brew install`ed something and want to decide whether to promote it into a workstation Brewfile, move it into a project Devbox, or remove it.

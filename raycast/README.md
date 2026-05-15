@@ -10,7 +10,7 @@ Use this folder as the scheduled export target:
 3. Set the scheduled backup location to:
 
    ```text
-   ~/Dev/Personal/dotfiles/raycast
+   ~/Developer/personal/dotfiles/raycast
    ```
 
 The export can include settings, aliases, hotkeys, extensions, snippets,

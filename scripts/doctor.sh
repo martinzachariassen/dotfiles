@@ -2,7 +2,7 @@
 # doctor.sh — health check for the dotfiles install on this machine.
 #
 # Run anytime (idempotent, read-only):
-#   bash ~/Dev/Personal/dotfiles/scripts/doctor.sh
+#   bash ~/Developer/personal/dotfiles/scripts/doctor.sh
 #   chezdoctor                                 # zsh alias
 #
 # Output convention:
@@ -42,7 +42,7 @@ note() { echo "  ${BLUE}•${RESET}  $1"; INFOCOUNT=$((INFOCOUNT + 1)); }
 fail() { echo "  ${RED}✗${RESET}  $1"; FAIL=$((FAIL + 1)); }
 section() { echo; echo "${BOLD}${BLUE}── $1 ──${RESET}"; }
 
-SOURCE_DIR="${DOTFILES_DIR:-$HOME/Dev/Personal/dotfiles}"
+SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
 # ─── 1. Source repo present and up to date ────────────────────────────────────
 section "Source repo"
@@ -164,8 +164,33 @@ if command -v brew >/dev/null 2>&1; then
             warn "common Brewfile out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile"
         fi
     fi
-    # Profile-specific
-    profile=$(chezmoi data --format=json 2>/dev/null | grep -o '"profile":"[^"]*"' | cut -d'"' -f4 || echo "")
+    # Feature/profile-specific modules.
+    data_json="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
+    if command -v jq >/dev/null 2>&1; then
+        profile="$(printf '%s\n' "$data_json" | jq -r '.profile // empty')"
+        feature_ai="$(printf '%s\n' "$data_json" | jq -r '.features.ai // false')"
+        feature_macapps="$(printf '%s\n' "$data_json" | jq -r '.features.macApps // true')"
+    else
+        profile="$(printf '%s\n' "$data_json" | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tail -1)"
+        feature_ai="$(printf '%s\n' "$data_json" | sed -n 's/.*"ai"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
+        feature_macapps="$(printf '%s\n' "$data_json" | sed -n 's/.*"macApps"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
+        feature_ai="${feature_ai:-false}"
+        feature_macapps="${feature_macapps:-true}"
+    fi
+    if [ "$feature_ai" = "true" ]; then
+        if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.ai" >/dev/null 2>&1; then
+            pass "ai Brewfile satisfied"
+        else
+            warn "Brewfile.ai out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.ai"
+        fi
+    fi
+    if [ "$feature_macapps" = "true" ]; then
+        if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.mac-apps" >/dev/null 2>&1; then
+            pass "mac apps Brewfile satisfied"
+        else
+            warn "Brewfile.mac-apps out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
+        fi
+    fi
     case "$profile" in
         personal|both)
             if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.personal" >/dev/null 2>&1; then

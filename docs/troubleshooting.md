@@ -23,7 +23,7 @@ The distinct `[chezmoi] sudo password:` prompt is intentional — it's the visua
 
 If sudo is already cached when apply runs (recent `sudo` command in the same 5-min window), the pre-auth script is a silent no-op — you only get prompted when you actually need to be.
 
-To pick up this fix on an existing machine: `chezup` once, then re-run `chezmoi apply -v`. (Or just run the wizard again: `bash ~/Dev/Personal/dotfiles/install.sh`.)
+To pick up this fix on an existing machine: `chezup` once, then re-run `chezmoi apply -v`. (Or just run the wizard again: `bash ~/Developer/personal/dotfiles/install.sh`.)
 
 Why this used to happen: chezmoi runs scripts with stdin disconnected by default. Casks like docker-desktop and 1password invoke sudo as part of their install; with stdin closed, sudo's password prompt fires but characters typed at the keyboard end up at the parent shell. Defence in depth: every script that might trigger sudo now does `exec </dev/tty` on entry to re-attach stdin, the pre-auth script prompts once on a clean terminal upfront, and `scripts/macos-defaults.sh` standalone-use also gets a settle pause + distinct prompt for the case when you run it via the `macos-defaults` alias outside of chezmoi.
 

@@ -145,7 +145,7 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
 # Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
 # fresh Mac or after wiping a system pref pane back to defaults.
-alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/scripts/macos-defaults.sh"'
+alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/macos-defaults.sh"'
 
 # Dotfiles control panel. With no args it cd's into the source repo; with args
 # it dispatches to scripts/dotfiles-config.sh, e.g.
@@ -153,7 +153,7 @@ alias macos-defaults='bash "$HOME/Dev/Personal/dotfiles/scripts/macos-defaults.s
 #   dotfiles features disable macApps
 dotfiles() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     if [ "$#" -eq 0 ]; then
         cd "$src" || return
     else
@@ -197,11 +197,19 @@ chez() {
         echo "── Pending changes ───────────────────────────────────────────"
         echo "$status_output"
         echo "──────────────────────────────────────────────────────────────"
-        echo "  Codes:  A add   D remove   M modify   R run script"
-        echo "          left col = source→target,  right col = target drift"
-        echo "  Run \`chezmoi diff\` for full diffs."
+        echo "  What this means:"
+        echo "    chezmoi has changes to apply and/or managed files in \$HOME drifted."
         echo
-        printf "Apply (overwriting any local edits to managed files)? [y/N] "
+        echo "  Status codes:"
+        echo "    A add   M modify   D remove   R run script"
+        echo "    left column = source repo → \$HOME, right column = current \$HOME drift"
+        echo
+        echo "  Choices:"
+        echo "    y + Enter      apply now with \`chezmoi apply --force\`"
+        echo "                   this overwrites drift in managed \$HOME files"
+        echo "    n or Enter     abort; inspect first with \`chezmoi diff\` or \`chezdiff\`"
+        echo
+        printf "Apply these managed dotfile changes now? [y/N] "
         read -r response < /dev/tty
         case "$response" in
             [yY]|[yY][eE][sS]) ;;
@@ -215,7 +223,7 @@ chez() {
 # "I committed a change on another machine, sync this Mac to it."
 chezup() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     (cd "$src" && git pull --ff-only) && chez "$@"
 }
 
@@ -224,7 +232,7 @@ chezup() {
 # scripts would re-fire. The thing `chezmoi diff` alone DOESN'T tell you.
 chezdiff() {
     local src f
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     echo "── chezmoi diff (dotfile changes) ────────────────────────────"
     chezmoi diff
     echo
@@ -248,7 +256,7 @@ chezdiff() {
 # fields you haven't answered yet. Safe to run any time.
 chezreinit() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     (cd "$src" && git pull --ff-only) || return $?
     chezmoi init && chez "$@"
 }
@@ -259,13 +267,15 @@ chezreinit() {
 # Doesn't auto-commit — you review the diff and commit yourself.
 chezbump() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     echo "── brew update + upgrade ─────────────────────────────────────"
     brew update && brew upgrade
     echo
     echo "── brew bundle cleanup (preview) ──────────────────────────────"
     echo "  Packages installed locally but not in any Brewfile:"
-    brew bundle cleanup --file="$src/Brewfile" --file="$src/brewfiles/Brewfile.personal" \
+    brew bundle cleanup --file="$src/Brewfile" --file="$src/brewfiles/Brewfile.ai" \
+                        --file="$src/brewfiles/Brewfile.mac-apps" \
+                        --file="$src/brewfiles/Brewfile.personal" \
                         --file="$src/brewfiles/Brewfile.work" 2>/dev/null \
         || brew bundle cleanup --file="$src/Brewfile"
     echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
@@ -283,7 +293,7 @@ chezbump() {
 # casually and forgot to add to the repo.
 chezaudit() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     local tracked untracked leaves_tmp
     leaves_tmp=$(mktemp)
     brew leaves > "$leaves_tmp"
@@ -299,7 +309,8 @@ chezaudit() {
         echo "── Untracked (installed locally, not in any Brewfile) ────────"
         echo "$untracked"
         echo
-        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.personal / brewfiles/Brewfile.work),"
+        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.ai / brewfiles/Brewfile.mac-apps /"
+        echo "brewfiles/Brewfile.personal / brewfiles/Brewfile.work),"
         echo "or \`brew uninstall <name>\` if you don't actually use it."
     fi
 }
@@ -307,7 +318,7 @@ chezaudit() {
 # Full-stack health check (sources scripts/doctor.sh from the source dir).
 chezdoctor() {
     local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")"
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     bash "$src/scripts/doctor.sh"
 }
 

@@ -23,10 +23,11 @@
      devbox.json, not in global Homebrew modules. */ -}}
 {{- $useOnePassword := promptBoolOnce . "useOnePassword" "Use 1Password for SSH + git signing"          true -}}
 {{- $featMacApps    := promptBoolOnce . "features.macApps"   "Install Mac-only QoL apps (Rectangle, Raycast, …)" true -}}
+{{- $featAi         := promptBoolOnce . "features.ai"        "Install local AI tooling (Ollama, llm)" false -}}
 
-# Tell chezmoi the source repo lives under ~/Dev/Personal/dotfiles
+# Tell chezmoi the source repo lives under ~/Developer/personal/dotfiles
 # (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
-sourceDir = "{{ .chezmoi.homeDir }}/Dev/Personal/dotfiles"
+sourceDir = "{{ .chezmoi.homeDir }}/Developer/personal/dotfiles"
 
 # Note: the minimum chezmoi version is enforced by the `.chezmoiversion` file
 # at the repo root (not a config-file field). chezmoi refuses to interpret
@@ -41,6 +42,7 @@ sourceDir = "{{ .chezmoi.homeDir }}/Dev/Personal/dotfiles"
 
     [data.features]
         macApps   = {{ $featMacApps }}
+        ai        = {{ $featAi }}
 
 # delta is unconditionally in the core Brewfile, so we can wire chezmoi's
 # diff pager to it without `lookPath` gating. The path resolves on first

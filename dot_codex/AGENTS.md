@@ -77,7 +77,7 @@ over-explain fundamentals.
 ## What I use
 
 This machine is set up via my chezmoi-managed dotfiles repo at
-`~/Dev/Personal/dotfiles`. The following are assumed available. When suggesting
+`~/Developer/personal/dotfiles`. The following are assumed available. When suggesting
 alternatives, default to these unless a specific project uses something else.
 
 **Runtimes & version management**
@@ -295,7 +295,7 @@ chore(deps): bump spring-boot to 3.4
 
 ## When working in this dotfiles repo
 
-The repo at `~/Dev/Personal/dotfiles` uses chezmoi conventions:
+The repo at `~/Developer/personal/dotfiles` uses chezmoi conventions:
 
 - Source files prefixed `dot_*` map to `~/.X`; `private_dot_*` adds mode 0600;
   `remove_*` markers delete the corresponding `~/.X`.

@@ -17,7 +17,7 @@ chezmoi update                   # git pull + chezmoi apply
 
 1. Runs `chezmoi status` to summarize pending changes.
 2. If anything is pending, shows the list and asks once: *"Apply (overwriting any local edits)? [y/N]"*.
-3. If you say yes, runs `chezmoi apply -v --force` — which skips chezmoi's per-file confirmation prompts.
+3. If you say yes, runs `chezmoi apply --force` — which skips chezmoi's per-file confirmation prompts without dumping every file diff.
 
 Why this matters: plain `chezmoi apply` opens an interactive prompt every time a managed file in `$HOME` has been modified externally. Those prompts read *single keypresses* (`d`/`o`/`s`/`q`/`m`), which collide badly with the `macos-defaults` sudo password prompt later in the same apply — the first character of your password gets eaten as a menu choice and you land in a diff view instead of authenticating. `chez` consolidates all chezmoi prompts into one yes/no upfront, so the only prompt you see *during* the apply is the sudo password (when it fires), with nothing else competing for your keystrokes.
 
@@ -36,6 +36,7 @@ Features are workstation-level booleans in `~/.config/chezmoi/chezmoi.toml`. Pro
 
 ```sh
 dotfiles features list
+dotfiles features enable ai
 dotfiles features disable macApps
 dotfiles features enable macApps
 
@@ -44,12 +45,13 @@ dotfiles profile set work
 dotfiles profile set both
 ```
 
-For a guided flow on an existing machine, run `bash ~/Dev/Personal/dotfiles/install.sh --configure-only`. It reuses the normal wizard prompts but skips Xcode/Homebrew/repo bootstrap.
+For a guided flow on an existing machine, run `bash ~/Developer/personal/dotfiles/install.sh --configure-only`. It reuses the normal wizard prompts but skips Xcode/Homebrew/repo bootstrap.
 
-Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove the mac app extras:
+Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove a feature's packages:
 
 ```sh
-brew bundle cleanup --force --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.mac-apps
+brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.ai
+brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.mac-apps
 ```
 
 The old profile's packages stay until you `cleanup` them.
@@ -61,7 +63,7 @@ Two flavors, depending on whether you just want the binary or also a config file
 **Workstation binary or app** — add it to the right Brewfile tier, commit, push:
 
 ```sh
-dotfiles                                                   # cd ~/Dev/Personal/dotfiles
+dotfiles                                                   # cd ~/Developer/personal/dotfiles
 echo 'brew "httpx"' >> Brewfile                            # or brewfiles/Brewfile.personal / brewfiles/Brewfile.work
 git add Brewfile && git commit -m "Add httpx" && git push
 chezmoi apply -v                                            # triggers brew-bundle re-run via hash change
@@ -109,7 +111,7 @@ g, gs, gd, gl                # git, status -sb, diff, log --graph
 
 # Navigation
 ..,  ...                     # cd .. / cd ../..
-dotfiles                     # cd ~/Dev/Personal/dotfiles
+dotfiles                     # cd ~/Developer/personal/dotfiles
 
 # chezmoi
 chez                         # smart `chezmoi apply` — diff preview + auto-force, no mid-apply prompt collisions
@@ -145,7 +147,7 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 
 ### Diagnosing problems: doctor.sh
 
-`bash ~/Dev/Personal/dotfiles/scripts/doctor.sh` (or `chezdoctor`) is the single command for "is this machine in the state it should be?". It's read-only and idempotent. It reports pass / warn / fail across:
+`bash ~/Developer/personal/dotfiles/scripts/doctor.sh` (or `chezdoctor`) is the single command for "is this machine in the state it should be?". It's read-only and idempotent. It reports pass / warn / fail across:
 
 - **Source repo** — exists, on the right branch, in sync with origin, working tree clean.
 - **chezmoi** — installed, `chezmoi doctor` is clean, no source/$HOME drift.

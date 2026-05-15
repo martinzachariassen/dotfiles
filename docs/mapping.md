@@ -11,7 +11,7 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/zsh/dot_zprofile` | `~/.config/zsh/.zprofile` | Login shell init (brew shellenv). |
 | `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key. Git auto-detects this XDG path. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
-| `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Dev` (no per-project `direnv allow` required). |
+| `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Developer` (no per-project `direnv allow` required). |
 | `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile settings (CLAUDE_CONFIG_DIR points here). |
 | `dot_config/claude/personal/CLAUDE.md` | `~/.config/claude/personal/CLAUDE.md` | Global instructions auto-loaded into every personal Claude Code session — communication style, environment, code-style preferences, anti-patterns to avoid. Project-specific overrides go in `<project>/CLAUDE.md`. |
 | `dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` | Global Codex instructions auto-loaded into every personal Codex session — communication style, environment, code-style preferences, and commit conventions. Project-specific overrides go in `<project>/AGENTS.md`. |
@@ -35,7 +35,7 @@ Reference table showing exactly what each file in the repo does.
 | `remove_dot_bash_profile` | `~/.bash_profile` | Legacy login-shell file. This setup is zsh/XDG-based, so keeping it in `$HOME` creates stale bootstrap hooks. Active protection. |
 | `remove_dot_bashrc` | `~/.bashrc` | Legacy interactive bash file. Active protection. |
 | `remove_dot_profile` | `~/.profile` | Legacy POSIX login-shell file. Active protection. |
-| `dot_config/mise/remove_config.toml` | `~/.config/mise/config.toml` | **Transitional.** Empty file with the `remove_` prefix tells chezmoi to delete `~/.config/mise/config.toml` from $HOME on first apply (we migrated mise → devbox). Once every machine you own has applied at least once, you can delete the whole `dot_config/mise/` source dir: `rm -rf ~/Dev/Personal/dotfiles/dot_config/mise && git add -A && git commit -m "chore: drop mise removal marker"`. |
+| `dot_config/mise/remove_config.toml` | `~/.config/mise/config.toml` | **Transitional.** Empty file with the `remove_` prefix tells chezmoi to delete `~/.config/mise/config.toml` from $HOME on first apply (we migrated mise → devbox). Once every machine you own has applied at least once, you can delete the whole `dot_config/mise/` source dir: `rm -rf ~/Developer/personal/dotfiles/dot_config/mise && git add -A && git commit -m "chore: drop mise removal marker"`. |
 
 **Note:** there is *no* `remove_dot_zsh_history` marker. We deliberately don't manage the legacy `~/.zsh_history` or `~/.config/zsh/.zsh_history` files because chezmoi tries to remove them, the live shell (with `SHARE_HISTORY` enabled) recreates them after every command, and the result is an endless "target has changed" prompt every time you run `chezmoi apply`. The new HISTFILE is at `~/.local/state/zsh/history` per `~/.zshenv` + `~/.config/zsh/.zshrc`; any old `.zsh_history` files on disk are inert and you can delete them by hand if you care: `rm -f ~/.zsh_history ~/.config/zsh/.zsh_history`.
 
@@ -63,7 +63,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | File | Role |
 |---|---|
 | `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile, workstation extras). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
-| `Brewfile`, `brewfiles/Brewfile.mac-apps`, `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional mac apps and profile extras based on chezmoi data. |
+| `Brewfile`, `brewfiles/Brewfile.ai`, `brewfiles/Brewfile.mac-apps`, `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional AI tooling, mac apps, and profile extras based on chezmoi data. |
 | `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
 | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` | Runs once before any apply. macOS-only via template guard. |
@@ -72,6 +72,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `scripts/macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
 | `.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl` | Prints a clear "✓ chezmoi apply complete" banner at the end of every apply. Always re-fires because the embedded `{{ now.Unix }}` timestamp makes the content hash differ on every render. The "99-" prefix sorts it after all other after-scripts. Pure UX — gives an unambiguous signal that chezmoi has finished its work. |
 | `scripts/macos-defaults.sh` | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |
+| `scripts/setup-local-llm.sh` | Optional local AI bootstrap. Installs the `llm-ollama` plugin and pulls the default Ollama models after the `ai` feature installs `ollama` and `llm`. |
 
 ---
 

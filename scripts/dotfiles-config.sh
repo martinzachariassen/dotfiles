@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Dev/Personal/dotfiles")}"
+SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 CHEZMOI_CONFIG="${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}"
-FEATURE_KEYS=(macApps)
+FEATURE_KEYS=(macApps ai)
 APPLY=1
 
 usage() {
@@ -15,9 +15,9 @@ Usage:
   dotfiles profile show
   dotfiles profile set personal|work|both [--no-apply]
   dotfiles features list
-  dotfiles features enable macApps [--no-apply]
-  dotfiles features disable macApps [--no-apply]
-  dotfiles features set macApps true|false [--no-apply]
+  dotfiles features enable macApps|ai [--no-apply]
+  dotfiles features disable macApps|ai [--no-apply]
+  dotfiles features set macApps|ai true|false [--no-apply]
 
 Environment:
   CHEZMOI_CONFIG   path to chezmoi.toml (default: ~/.config/chezmoi/chezmoi.toml)
@@ -45,6 +45,14 @@ valid_feature() {
     return 1
 }
 
+feature_default() {
+    case "$1" in
+        macApps) printf 'true' ;;
+        ai) printf 'false' ;;
+        *) printf 'false' ;;
+    esac
+}
+
 parse_common_flags() {
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -64,10 +72,14 @@ ensure_config() {
 
 show_profile() {
     ensure_config
-    chezmoi data --format=json 2>/dev/null \
-        | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-        | sed '/^$/d' \
-        | tail -1
+    if command -v jq >/dev/null 2>&1; then
+        chezmoi data --format=json 2>/dev/null | jq -r '.profile // empty'
+    else
+        chezmoi data --format=json 2>/dev/null \
+            | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | sed '/^$/d' \
+            | tail -1
+    fi
 }
 
 show_features() {
@@ -75,8 +87,12 @@ show_features() {
     local data key val
     data="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
     for key in "${FEATURE_KEYS[@]}"; do
-        val="$(printf '%s\n' "$data" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\(true\\|false\\).*/\\1/p" | head -1)"
-        printf '%-10s %s\n' "$key" "${val:-true}"
+        if command -v jq >/dev/null 2>&1; then
+            val="$(printf '%s\n' "$data" | jq -r --arg key "$key" '.features[$key] // empty')"
+        else
+            val="$(printf '%s\n' "$data" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\(true\\|false\\).*/\\1/p" | head -1)"
+        fi
+        printf '%-10s %s\n' "$key" "${val:-$(feature_default "$key")}"
     done
 }
 
@@ -97,12 +113,15 @@ set_toml_value() {
                 print "    " key " = " value
             }
         }
-        /^\[[^]]+\]/ {
+        /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
             if (in_section && !replaced) {
                 emit_key()
                 replaced = 1
             }
-            in_section = ($0 == section_header)
+            header = $0
+            sub(/^[[:space:]]*/, "", header)
+            sub(/[[:space:]]*$/, "", header)
+            in_section = (header == section_header)
             if (in_section) {
                 saw_section = 1
             }

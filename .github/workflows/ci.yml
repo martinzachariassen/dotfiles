@@ -53,6 +53,7 @@ jobs:
       matrix:
         profile: [personal, work, both]
         mac_apps: [true, false]
+        ai: [true, false]
     steps:
       - uses: actions/checkout@v4
 
@@ -76,6 +77,7 @@ jobs:
         env:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: ${{ matrix.mac_apps }}
+          AI: ${{ matrix.ai }}
         run: bash scripts/render-check.sh "$PWD"
 
   # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────

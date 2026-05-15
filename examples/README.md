@@ -11,27 +11,27 @@ and edit. The comments inside each file explain the choices.
 
 ```sh
 # devbox + direnv: per-project runtimes + env vars
-cp ~/Dev/Personal/dotfiles/examples/envrc.example /path/to/project/.envrc
+cp ~/Developer/personal/dotfiles/examples/envrc.example /path/to/project/.envrc
 cd /path/to/project
 devbox init                                       # creates devbox.json
 devbox add jdk21 kotlin postgresql_16 gradle      # pin your toolchain
-# direnv allow                                     # only if the dir isn't under ~/Dev (the whitelisted root)
+# direnv allow                                     # only if the dir isn't under ~/Developer (the whitelisted root)
 
 # or start from one of the opinionated templates
-cp ~/Dev/Personal/dotfiles/examples/devbox/backend-devbox.json /path/to/project/devbox.json
-cp ~/Dev/Personal/dotfiles/examples/devbox/kubernetes-devbox.json /path/to/project/devbox.json
-cp ~/Dev/Personal/dotfiles/examples/devbox/terraform-devbox.json /path/to/project/devbox.json
-cp ~/Dev/Personal/dotfiles/examples/devbox/opentofu-devbox.json /path/to/project/devbox.json
+cp ~/Developer/personal/dotfiles/examples/devbox/backend-devbox.json /path/to/project/devbox.json
+cp ~/Developer/personal/dotfiles/examples/devbox/kubernetes-devbox.json /path/to/project/devbox.json
+cp ~/Developer/personal/dotfiles/examples/devbox/terraform-devbox.json /path/to/project/devbox.json
+cp ~/Developer/personal/dotfiles/examples/devbox/opentofu-devbox.json /path/to/project/devbox.json
 
 # pre-commit: git hooks for lint/format/sanity-checks
-cp ~/Dev/Personal/dotfiles/examples/pre-commit-config.yaml.example /path/to/project/.pre-commit-config.yaml
+cp ~/Developer/personal/dotfiles/examples/pre-commit-config.yaml.example /path/to/project/.pre-commit-config.yaml
 cd /path/to/project
 pre-commit install             # writes .git/hooks/pre-commit; runs on every git commit
 pre-commit run --all-files     # one-off: run all hooks against every tracked file
 ```
 
 All three tools are already wired into your shell — `direnv` and `pre-commit`
-land via the Brewfile (`direnv` also has its hook in `.zshrc` and the `~/Dev`
+land via the Brewfile (`direnv` also has its hook in `.zshrc` and the `~/Developer`
 whitelist in `~/.config/direnv/direnv.toml`), and `devbox` is installed via
 Jetify's official curl-installer by `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl`
 on first `chezmoi apply` (devbox isn't in homebrew). No further setup.

@@ -3,7 +3,7 @@
 # Installed on top of the core Brewfile when your profile is "personal" or
 # "both". Skipped when your profile is "work".
 #
-# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.personal
+# Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.personal
 
 # ─── OpenAI ───────────────────────────────────────────────────────────────────
 cask "codex"                    # OpenAI Codex CLI

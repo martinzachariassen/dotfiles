@@ -1,0 +1,11 @@
+# Brewfile.ai — optional local AI tooling.
+#
+# Enable with:
+#   dotfiles features enable ai
+#
+# Models are intentionally not pulled by brew bundle. Run
+# `scripts/setup-local-llm.sh` after enabling this feature.
+
+brew "ollama"                   # local model runner/server
+brew "llm"                      # Unix-style LLM CLI for shell pipelines
+

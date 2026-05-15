@@ -1,6 +1,6 @@
 # direnv — global config
 # Loaded by direnv on every shell that has run the `direnv hook zsh` line.
-# Source for this file: ~/Dev/Personal/dotfiles/dot_config/direnv/direnv.toml
+# Source for this file: ~/Developer/personal/dotfiles/dot_config/direnv/direnv.toml
 # (managed via chezmoi). Edit via `chezmoi edit ~/.config/direnv/direnv.toml`.
 
 [global]
@@ -26,5 +26,5 @@ hide_env_diff = true
 # in a repo anyway. If you're auditing an untrusted repo, clone to /tmp
 # (not whitelisted) or temporarily move the .envrc aside before cd-ing.
 prefix = [
-    "~/Dev",
+    "~/Developer",
 ]

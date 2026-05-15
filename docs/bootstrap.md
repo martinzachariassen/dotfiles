@@ -33,7 +33,7 @@ DRY_RUN=1         bash install.sh   # print state-changing commands without runn
 YES=1             bash install.sh   # accept recommended defaults at every prompt (good for CI / reinstalls)
 SKIP_BACKUP=1     bash install.sh   # don't snapshot pre-existing legacy dotfiles
 DOTFILES_REPO=…   bash install.sh   # point at a fork
-DOTFILES_DIR=…    bash install.sh   # clone somewhere other than ~/Dev/Personal/dotfiles
+DOTFILES_DIR=…    bash install.sh   # clone somewhere other than ~/Developer/personal/dotfiles
 ```
 
 For a Homebrew cleanup, there are two guarded modes:
@@ -57,7 +57,7 @@ bash install.sh --configure-only
 | Phase | Name | What it does |
 |---|---|---|
 | **A** | Discovery | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **B** | Choices | Numbered profile picker. Identity text fields with existing values as defaults. 1Password yes/no; if yes, paste the public signing key. Workstation extras — currently macOS quality-of-life apps. Existing-system handling (Homebrew mirror/reset? back up + remove legacy files? uninstall oh-my-zsh?). |
+| **B** | Choices | Numbered profile picker. Identity text fields with existing values as defaults. 1Password yes/no; if yes, paste the public signing key. Workstation extras such as local AI tooling and macOS quality-of-life apps. Existing-system handling (Homebrew mirror/reset? back up + remove legacy files? uninstall oh-my-zsh?). |
 | **C** | Confirm | One-screen summary of every choice. Last chance to abort. |
 | **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
 | **E** | Self-test | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
@@ -70,7 +70,7 @@ After the wizard finishes:
 open -a 1Password
 
 # 2. Walk through CLI auth (gh, az, gcloud, AKS/GKE plugins, signing test). Idempotent.
-bash ~/Dev/Personal/dotfiles/scripts/bootstrap-auth.sh
+bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh
 
 # 3. Reload shell with the new config
 exec zsh
@@ -95,6 +95,7 @@ Phase B asks two orthogonal questions: which **profile** you're on (which casks/
 
 | Feature | Brewfile | What's in it |
 |---|---|---|
+| `ai` | `brewfiles/Brewfile.ai` | Ollama + `llm` for local model runs and shell-pipeline prompts. Model downloads are manual via `scripts/setup-local-llm.sh` because they are large. |
 | `macApps` | `brewfiles/Brewfile.mac-apps` | Rectangle, Raycast, Stats, Chrome, dive. Pure QoL — skip on a server-y machine. |
 
 The core `Brewfile` always installs the workstation baseline: git, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `direnv`, `az`, `gcloud`, and other shell primitives. Project-pinned Kubernetes tools, Terraform/OpenTofu, database clients/servers, and language runtimes belong in each project's `devbox.json`. Starter templates live under [`examples/devbox/`](../examples/devbox/).
@@ -107,6 +108,7 @@ To flip a profile or feature later:
 dotfiles profile set work
 dotfiles profile set personal
 dotfiles features list
+dotfiles features enable ai
 dotfiles features disable macApps
 ```
 

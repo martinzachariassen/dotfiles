@@ -4,7 +4,7 @@
 # when your profile is "work" or "both". Skipped when your profile is
 # "personal".
 #
-# Run standalone: brew bundle install --file=~/Dev/Personal/dotfiles/brewfiles/Brewfile.work
+# Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.work
 
 # ─── Cloud / Kubernetes ───────────────────────────────────────────────────────
 brew "azure-cli"                # global Azure account/subscription CLI; project kubectl stays in Devbox

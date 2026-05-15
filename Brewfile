@@ -12,7 +12,7 @@
 #   brewfiles/Brewfile.work       — work-only casks (you fill in)
 #
 # Regenerate from a known-good machine:
-#   brew bundle dump --describe --force --file=~/Dev/Personal/dotfiles/Brewfile
+#   brew bundle dump --describe --force --file=~/Developer/personal/dotfiles/Brewfile
 # (then move feature-specific lines back into the matching brewfiles/Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
