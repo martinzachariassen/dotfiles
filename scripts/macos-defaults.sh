@@ -80,6 +80,10 @@ def_write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled   -bool false
 def_write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled    -bool false
 def_write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled   -bool false
 def_write NSGlobalDomain AppleKeyboardUIMode                    -int 3        # full keyboard access (Tab through dialogs)
+def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode     -bool true    # expanded save panels
+def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2    -bool true
+def_write NSGlobalDomain PMPrintingExpandedStateForPrint        -bool true    # expanded print panels
+def_write NSGlobalDomain PMPrintingExpandedStateForPrint2       -bool true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TRACKPAD
@@ -104,6 +108,7 @@ def_write com.apple.finder FXEnableExtensionChangeWarning -bool false
 def_write com.apple.finder WarnOnEmptyTrash          -bool   false
 def_write com.apple.finder NewWindowTarget           -string "PfHm"            # new window opens to ~
 def_write com.apple.finder NewWindowTargetPath       -string "file://${HOME}/"
+def_write com.apple.finder QuitMenuItem               -bool   true              # enable Cmd+Q / Finder → Quit Finder
 
 # Stop creating .DS_Store on network and USB volumes
 def_write com.apple.desktopservices DSDontWriteNetworkStores -bool true
@@ -135,21 +140,6 @@ def_write com.apple.screencapture location       -string "${HOME}/Pictures/Scree
 def_write com.apple.screencapture type           -string "png"
 def_write com.apple.screencapture disable-shadow -bool   true
 def_write com.apple.screencapture include-date   -bool   true
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# SAFARI — dev menu, full URL, no auto-open downloads
-# ═══════════════════════════════════════════════════════════════════════════════
-# NOTE: Safari is sandboxed on modern macOS. These writes only succeed if your
-# terminal app (Ghostty/Terminal/iTerm) has Full Disk Access in
-# System Settings → Privacy & Security → Full Disk Access.
-# We swallow errors here so the rest of the script still runs without it.
-{
-    defaults write com.apple.Safari ShowFullURLInSmartSearchField -bool true
-    defaults write com.apple.Safari IncludeDevelopMenu -bool true
-    defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true
-    defaults write com.apple.Safari "com.apple.Safari.ContentPageGroupIdentifier.WebKit2DeveloperExtrasEnabled" -bool true
-    defaults write com.apple.Safari AutoOpenSafeDownloads -bool false
-} 2>/dev/null || echo "  ⚠️  Safari defaults skipped — grant your terminal Full Disk Access if you want them applied."
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEXTEDIT — plain text default, UTF-8

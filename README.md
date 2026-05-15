@@ -83,7 +83,7 @@ dotfiles features disable macApps
 | Project tools | Devbox + direnv for per-project JDK/Kotlin/Postgres/Node/Terraform/Kubernetes tools. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |
 | Workstation apps | Homebrew-managed core apps, optional mac app extras, and profile-specific personal/work layers. |
-| macOS | Keyboard, Finder, Dock, screenshots, Safari developer settings, and security defaults. |
+| macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
 
 See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 

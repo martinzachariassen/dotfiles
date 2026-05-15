@@ -129,7 +129,7 @@ The bootstrap pulls config and tools, but **secrets aren't in this repo on purpo
 
 macOS won't let any script grant Privacy permissions; you have to click them in *System Settings → Privacy & Security*. None of these break on day one but several of your tools silently won't work right until granted. The checklist:
 
-- **Full Disk Access** → your terminal (Ghostty). Required for the Safari `defaults write` calls in `macos-defaults.sh` to actually apply, and for some `find` operations against protected dirs.
+- **Full Disk Access** → your terminal (Ghostty). Useful for `find` operations against protected dirs.
 - **Accessibility** → Rectangle, Raycast, and Karabiner-Elements (if you use it). Without this, Rectangle can't move windows and Raycast can't simulate keystrokes.
 - **Screen Recording** → Raycast (for screenshot features), and any screenshot/screen-share tools.
 - **Input Monitoring** → Karabiner-Elements (if used). Without it, Karabiner can't see your keystrokes.

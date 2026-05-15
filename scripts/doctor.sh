@@ -319,7 +319,7 @@ fi
 section "Privacy permissions (manual check)"
 echo "  ${DIM}macOS won't let scripts inspect Privacy permissions. Verify manually:${RESET}"
 echo "  ${DIM}  System Settings → Privacy & Security →${RESET}"
-echo "  ${DIM}    • Full Disk Access:    Ghostty (so Safari defaults apply)${RESET}"
+echo "  ${DIM}    • Full Disk Access:    Ghostty (for protected-dir scans)${RESET}"
 echo "  ${DIM}    • Accessibility:       Rectangle, Raycast, Karabiner (if used)${RESET}"
 echo "  ${DIM}    • Screen Recording:    Raycast / screenshot tools${RESET}"
 echo "  ${DIM}    • Input Monitoring:    Karabiner (if used)${RESET}"
