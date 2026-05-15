@@ -19,10 +19,6 @@
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
 brew "gh"                      # GitHub CLI
-brew "azure-cli"               # global Azure account/subscription CLI; project kubectl stays in Devbox
-brew "azure/kubelogin/kubelogin" # AKS Azure AD auth plugin for kubectl
-brew "kubectx"                 # provides kubectx and kubens for context/namespace switching
-cask "gcloud-cli"              # global Google Cloud account/project CLI; project kubectl stays in Devbox
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
 # devbox: NOT a brew formula. Installed via Jetify's official curl-installer
