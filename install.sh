@@ -622,6 +622,19 @@ configure_chezmoi() {
     ok "chezmoi configured"
 }
 
+create_developer_directories() {
+    info "Developer directories"
+    run mkdir -p \
+        "$HOME/Developer/work" \
+        "$HOME/Developer/personal" \
+        "$HOME/Developer/learning" \
+        "$HOME/Developer/experiments" \
+        "$HOME/Developer/tools" \
+        "$HOME/Developer/scripts" \
+        "$HOME/Developer/archive"
+    ok "Developer directory structure ready"
+}
+
 backup_legacy_files() {
     [ "$SKIP_BACKUP" = "1" ] && return 0
     [ "${CHOICE_BACKUP_LEGACY:-true}" = "true" ] || return 0
@@ -645,6 +658,7 @@ execute() {
     if [ "$CONFIGURE_ONLY" = "1" ]; then
         if [ ! -d "$SOURCE_DIR/.git" ]; then fail "configure-only requires an existing repo at $SOURCE_DIR"; exit 1; fi
         if ! command -v chezmoi >/dev/null 2>&1; then fail "configure-only requires chezmoi on PATH"; exit 1; fi
+        create_developer_directories
         configure_chezmoi
         info "Applying dotfiles for updated profile/features"
         run chezmoi apply --force
@@ -654,6 +668,7 @@ execute() {
     fi
 
     backup_legacy_files
+    create_developer_directories
     if [ "${CHOICE_REMOVE_OMZ:-false}" = "true" ] && [ -d "$HOME/.oh-my-zsh" ]; then
         info "uninstalling oh-my-zsh non-interactively"
         run bash -c 'yes | "$HOME/.oh-my-zsh/tools/uninstall.sh"' || warn "oh-my-zsh uninstaller errored; continuing"
