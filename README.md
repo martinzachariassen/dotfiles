@@ -78,7 +78,7 @@ dotfiles features disable macApps
 | Area | Baseline |
 |---|---|
 | Terminal | Ghostty, Zellij, Starship, Catppuccin Frappe, JetBrainsMono Nerd Font. |
-| Shell | zsh with XDG layout, fzf, direnv, completions, syntax highlighting, and modern CLI aliases. |
+| Shell | zsh with XDG layout, fzf, zoxide, direnv, Carapace completions, syntax highlighting, and modern CLI aliases. |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | Project tools | Devbox + direnv for per-project JDK/Kotlin/Postgres/Node/Terraform/Kubernetes tools. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |

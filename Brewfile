@@ -42,6 +42,8 @@ brew "bat"                     # cat
 brew "ripgrep"                 # grep
 brew "fd"                      # find
 brew "fzf"                     # fuzzy finder; integrated into zsh (Ctrl-R)
+brew "zoxide"                  # smarter cd based on directory frecency
+brew "carapace"                # richer shell completions for many CLIs
 brew "dust"                    # disk usage
 brew "duf"                     # df
 brew "btop"                    # top
