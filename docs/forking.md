@@ -10,4 +10,4 @@ The wizard is designed to be fork-friendly. If you cloned this and want to base 
 6. **Adjust `dot_config/git/config.tmpl`** if you don't want commit signing — the `[gpg "ssh"] program = …` block assumes 1Password's `op-ssh-sign`. The wizard's `useOnePassword` toggle controls whether the block renders.
 7. **Re-render the README badges** — the CI badge URL hardcodes my GitHub handle.
 
-Nothing in `install.sh` writes to the original `martinzachariassen` repo URL except the default for `DOTFILES_REPO`. As long as you replace that, every other personal value (name, email, signing key) comes from Phase B prompts and is stored locally in `~/.config/chezmoi/chezmoi.toml`, not in the source.
+Nothing in `install.sh` writes to the original `martinzachariassen` repo URL except the default for `DOTFILES_REPO`. As long as you replace that, every other personal value (name, email, signing key) comes from the setup prompts and is stored locally in `~/.config/chezmoi/chezmoi.toml`, not in the source.

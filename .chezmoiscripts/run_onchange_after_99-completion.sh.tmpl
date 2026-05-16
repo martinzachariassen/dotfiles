@@ -42,44 +42,31 @@ fi
 # ─── Output ──────────────────────────────────────────────────────────────────
 cat <<EOF
 
-${C}═════════════════════════════════════════════════════════════════════${R}
-  ${G}${B}✓ chezmoi apply complete${R}
-${C}═════════════════════════════════════════════════════════════════════${R}
+${C}╭────────────────────────────────────────────────────────────╮${R}
+${C}│${R}  ${G}${B}chezmoi apply complete${R}                                  ${C}│${R}
+${C}╰────────────────────────────────────────────────────────────╯${R}
 
-  ${B}Profile${R}        ${G}${PROFILE}${R}
-  ${B}Extras${R}         ${EXTRAS}
-  ${B}1Password${R}      $([ "$USE_OP" = "true" ] && printf "%senabled%s" "$G" "$R" || printf "%sdisabled%s" "$Y" "$R")
-  ${B}Source${R}         ${D}${SOURCE}${R}
+  ${B}Setup${R}
+    Profile       ${G}${PROFILE}${R}
+    Extras        ${EXTRAS}
+    1Password     $([ "$USE_OP" = "true" ] && printf "%senabled%s" "$G" "$R" || printf "%sdisabled%s" "$Y" "$R")
+    Source        ${D}${SOURCE}${R}
 
-${D}─── What's available now ────────────────────────────────────────────${R}
+  ${B}Next moves${R}
+    ${M}1.${R} ${C}exec zsh${R}
+       Reload the managed shell.
 
-  ${B}Daily workflow${R}  ${D}(defined in your zshrc)${R}
-    ${C}chez${R}          smart apply — status preview + safe overwrite
-    ${C}chezup${R}        git pull + chez — the everyday upgrade
-    ${C}chezreinit${R}    pull + re-init + apply — after wizard data changes
-    ${C}chezdiff${R}      show everything pending (dotfiles + brew + scripts)
-    ${C}chezdoctor${R}    full health check
-    ${C}chezbump${R}      routine brew + devbox global version bump
-    ${C}chezaudit${R}     find brew packages not tracked in any Brewfile
+    ${M}2.${R} ${C}bash ${SOURCE}/scripts/bootstrap-auth.sh${R}
+       Sign in to gh, az, gcloud, and verify git signing.
 
-  ${B}Day-to-day shortcuts${R}
-    ${C}g  / gs / gd${R}      git / status -sb / diff
-    ${C}k  / kgp / klf${R}    kubectl / get pods / logs -f
-    ${C}lg${R}                lazygit (interactive git TUI)
-    ${C}zj${R}                zellij attach (terminal multiplexer)
-    ${C}cw / cme${R}          Claude Code work / personal profile
-    ${C}n${R}                 nvim
-    ${C}macos-defaults${R}    re-apply system settings (sudo prompt)
-    ${C}code${R}              VS Code with repo-managed settings/extensions
+    ${M}3.${R} ${C}chezdoctor${R}
+       Run a health check after auth is done.
 
-${D}─── Suggested next steps ────────────────────────────────────────────${R}
+  ${B}Daily commands${R}
+    ${C}chez${R}       preview and apply dotfile changes
+    ${C}chezup${R}     pull latest dotfiles and apply
+    ${C}chezdiff${R}   inspect dotfile, brew, and script drift
+    ${C}chezaudit${R}  find Homebrew packages not tracked here
 
-  ${M}1.${R}  ${C}exec zsh${R}                     ${D}reload shell if you changed shell config${R}
-  ${M}2.${R}  ${C}chezdoctor${R}                   ${D}verify everything is healthy${R}
-  ${M}3.${R}  ${C}bash ${SOURCE}/scripts/bootstrap-auth.sh${R}
-                                  ${D}gh / az / gcloud sign-in + AKS/GKE checks${R}
-
-${D}Re-run this apply anytime with ${C}chezup${D} — or ${C}bash ${SOURCE}/install.sh${D} to walk the wizard again.${R}
-
-${C}═════════════════════════════════════════════════════════════════════${R}
+${D}Walk the wizard again with ${C}bash ${SOURCE}/install.sh${D}.${R}
 EOF

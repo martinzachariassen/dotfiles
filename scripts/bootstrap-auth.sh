@@ -23,30 +23,32 @@ set -uo pipefail
 
 if [ -t 1 ]; then
     BOLD=$'\033[1m'; DIM=$'\033[2m'
-    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'; RED=$'\033[31m'
+    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'; RED=$'\033[31m'; CYAN=$'\033[36m'
     RESET=$'\033[0m'
 else
-    BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; RESET=""
+    BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
 fi
 
-step() { echo; echo "${BOLD}${BLUE}══ $1 ══${RESET}"; echo "${DIM}$2${RESET}"; echo; }
+step() { echo; echo "${CYAN}◆${RESET}  ${BOLD}$1${RESET}"; echo "${DIM}   $2${RESET}"; echo; }
 ok()   { echo "  ${GREEN}✓${RESET}  $1"; }
-info() { echo "  ${BLUE}ℹ${RESET}  $1"; }
+info() { echo "  ${BLUE}→${RESET}  $1"; }
 warn() { echo "  ${YELLOW}!${RESET}  $1"; }
 fail() { echo "  ${RED}✗${RESET}  $1"; }
 
 cat <<EOF
 
-${BOLD}Bootstrap auth${RESET}
-${DIM}Walks through the manual sign-in steps after install.sh.${RESET}
+${CYAN}╭────────────────────────────────────────────────────────────╮${RESET}
+${CYAN}│${RESET}  ${BOLD}Bootstrap Auth${RESET}                                           ${CYAN}│${RESET}
+${CYAN}╰────────────────────────────────────────────────────────────╯${RESET}
 
-${BOLD}You'll be prompted by the following CLIs:${RESET}
-  • 1Password   — open the GUI app and sign in (we just check the agent)
-  • gh          — opens a browser for GitHub OAuth
-  • az          — opens a browser for Microsoft account and checks AKS kubelogin
-  • gcloud      — opens a browser for Google account and checks the GKE plugin
+This finishes the account side of setup. Already-authenticated tools are skipped.
 
-Each is skipped if you're already signed in. Missing CLIs are reported and skipped. Press ${BOLD}Enter${RESET} to begin.
+  1Password   checks the desktop SSH agent
+  gh          opens GitHub OAuth if needed
+  az          signs in and checks AKS kubelogin
+  gcloud      signs in and checks the GKE plugin
+
+Press ${BOLD}Enter${RESET} to begin.
 EOF
 [ -t 0 ] && read -r _
 
@@ -198,12 +200,14 @@ fi
 # ─── Done ─────────────────────────────────────────────────────────────────────
 cat <<EOF
 
-${BOLD}${GREEN}Auth bootstrap complete.${RESET}
+${CYAN}╭────────────────────────────────────────────────────────────╮${RESET}
+${CYAN}│${RESET}  ${GREEN}${BOLD}Auth bootstrap complete${RESET}                              ${CYAN}│${RESET}
+${CYAN}╰────────────────────────────────────────────────────────────╯${RESET}
 
-${BOLD}Suggested next:${RESET}
-  • ${BOLD}exec zsh${RESET}                      reload your shell
-  • ${BOLD}chezdoctor${RESET}                    run the full health check
-  • ${BOLD}Restart your Mac${RESET}              some macOS defaults need a reboot to take effect
+Next:
+  ${BOLD}exec zsh${RESET}       reload your shell
+  ${BOLD}chezdoctor${RESET}     run the full health check
+  ${BOLD}Restart macOS${RESET}  finish any system defaults that need a reboot
 
 ${DIM}Re-run this script anytime — it skips steps already done.${RESET}
 EOF

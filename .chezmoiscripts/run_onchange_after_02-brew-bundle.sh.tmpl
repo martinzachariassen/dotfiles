@@ -15,7 +15,7 @@
 set -euo pipefail
 
 {{ if ne .chezmoi.os "darwin" -}}
-echo "[brew-bundle] not on macOS, skipping"
+echo "→ Homebrew packages: not on macOS, skipping"
 exit 0
 {{ end -}}
 
@@ -25,7 +25,7 @@ exit 0
 if [ -e /dev/tty ] && [ -r /dev/tty ]; then
     exec </dev/tty
 else
-    echo "[brew-bundle] no TTY available (CI / non-interactive); casks needing sudo may be skipped"
+    echo "! no terminal available; casks needing sudo may skip or ask later"
 fi
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -59,7 +59,7 @@ start_heartbeat() {
                 elapsed=$((now - start_ts))
                 mins=$((elapsed / 60))
                 secs=$((elapsed % 60))
-                printf "[brew-bundle]   … still working on %s — %dm%02ds elapsed\n" "$label" "$mins" "$secs"
+                printf "  … still working on %s — %dm%02ds elapsed\n" "$label" "$mins" "$secs"
                 since_msg=0
             fi
         done
@@ -79,12 +79,12 @@ trap stop_heartbeat EXIT
 bundle_one() {
     local label="$1" file="$2" step="$3" total="$4"
     if [ ! -f "$file" ]; then
-        echo "[brew-bundle]   ! $label: $file not found, skipping"
+        echo "! $label: $file not found, skipping"
         return 0
     fi
     local start_ts
     start_ts="$(date +%s)"
-    printf "[brew-bundle] ┌── %d/%d  %s  (%s)\n" "$step" "$total" "$label" "$(basename "$file")"
+    printf "→ %d/%d  %s  (%s)\n" "$step" "$total" "$label" "$(basename "$file")"
     start_heartbeat "$label"
     # `|| true` because we want to print the closing line even on failure,
     # then bubble the failure up.
@@ -97,9 +97,9 @@ bundle_one() {
     mins=$((elapsed / 60))
     secs=$((elapsed % 60))
     if [ "$rc" -eq 0 ]; then
-        printf "[brew-bundle] └── ✓ %d/%d  %s  done in %dm%02ds\n" "$step" "$total" "$label" "$mins" "$secs"
+        printf "✓ %d/%d  %s  done in %dm%02ds\n" "$step" "$total" "$label" "$mins" "$secs"
     else
-        printf "[brew-bundle] └── ✗ %d/%d  %s  FAILED after %dm%02ds (rc=%d)\n" "$step" "$total" "$label" "$mins" "$secs" "$rc"
+        printf "✗ %d/%d  %s  failed after %dm%02ds (rc=%d)\n" "$step" "$total" "$label" "$mins" "$secs" "$rc"
         return "$rc"
     fi
 }
@@ -125,23 +125,21 @@ esac
 
 TOTAL=${#PLAN_LABELS[@]}
 
-echo "═════════════════════════════════════════════════════════════════════"
-echo "[brew-bundle] apply step 3/5 — installing/updating brew packages"
-echo "[brew-bundle] active profile: {{ .profile }}"
-echo "[brew-bundle] modules to apply: $TOTAL"
+echo "◆ Apply 3/5: Homebrew packages"
+echo "  Profile: {{ .profile }}"
+echo "  Modules: $TOTAL"
 for i in $(seq 0 $((TOTAL - 1))); do
-    printf "[brew-bundle]   %d. %s\n" $((i + 1)) "${PLAN_LABELS[$i]}"
+    printf "    %d. %s\n" $((i + 1)) "${PLAN_LABELS[$i]}"
 done
-echo "[brew-bundle] expected time on first install: ~5-15 min (downloads dominate)"
-echo "[brew-bundle] heartbeat every 45s during silent stretches"
-echo "═════════════════════════════════════════════════════════════════════"
+echo "  First install usually takes 5-15 minutes. Downloads dominate."
+echo "  Quiet stretches print a heartbeat every 45 seconds."
 
 # Print disabled modules so users know nothing's being silently dropped.
 {{ if not (dig "features" "ai" false .) -}}
-echo "[brew-bundle]   · ai module disabled (features.ai=false)"
+echo "  ai module disabled"
 {{ end -}}
 {{ if not (dig "features" "macApps" true .) -}}
-echo "[brew-bundle]   · mac-apps module disabled (features.macApps=false)"
+echo "  mac-apps module disabled"
 {{ end -}}
 
 # ─── Execute the plan ─────────────────────────────────────────────────────────
@@ -160,4 +158,4 @@ OVERALL_SEC=$((OVERALL_ELAPSED % 60))
 # Strip those bits proactively.
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
 
-printf "[brew-bundle] ✓ all %d module(s) up to date — total %dm%02ds\n" "$TOTAL" "$OVERALL_MIN" "$OVERALL_SEC"
+printf "✓ Homebrew packages up to date — %d module(s), total %dm%02ds\n" "$TOTAL" "$OVERALL_MIN" "$OVERALL_SEC"

@@ -6,22 +6,34 @@ On a fresh Mac (or an existing one), open Terminal and run:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. Every prompt is batched in Phase B; once you confirm in Phase C the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Homebrew downloading.
+You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. The default path asks for your profile, name, email, and an optional 1Password signing public key; package cleanup and feature toggles live behind the customize option. Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Homebrew downloading.
 
 ```text
-+  Dotfiles setup
-|  Reliable numbered wizard for a fresh or existing Mac.
-|
->  Phase B - Choices
-|
-|  How to use this screen: enter numbers for menus, type text into fields,
-|  or press Enter to keep the shown default.
-|
->  Profile
-|    1. personal - personal extras only
-|    2. work - work extras only
-|    3. both - personal and work extras (current)
-|  Choose 1-3, or leave blank for both:
+╭────────────────────────────────────────────────────────────╮
+│  Dotfiles Setup                                             │
+│  Plug-and-play macOS workstation bootstrap.                  │
+╰────────────────────────────────────────────────────────────╯
+│  The default path asks for identity, profile, and optional git signing.
+│  Advanced cleanup and feature toggles stay available when you need them.
+│
+◆  2/5 - Choose setup
+│
+│  Essentials first. Press Enter to keep any detected value.
+│
+◆  Profile
+│    1. personal - personal extras only
+│    2. work - work extras only
+│    3. both - personal and work extras (current)
+│  Choose 1-3, or leave blank for both:
+│
+│  Recommended setup
+│    1Password          yes
+│    Mac apps           yes
+│    Local AI           no
+│    Homebrew cleanup   keep local packages
+◆  Setup style
+│    1. Continue with recommended setup
+│    2. Customize packages, signing, cleanup, and migration
 ```
 
 The wizard is idempotent. Re-run it any time — it detects existing state, shows current values as defaults, lets you change profile/identity/features, and skips steps that are already done.
@@ -52,21 +64,21 @@ only want to change profile, identity, or feature toggles:
 bash install.sh --configure-only
 ```
 
-### The six phases
+### The install flow
 
 | Phase | Name | What it does |
 |---|---|---|
-| **A** | Discovery | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **B** | Choices | Numbered profile picker. Identity text fields with existing values as defaults. 1Password yes/no; if yes, paste the public signing key. Workstation extras such as local AI tooling and macOS quality-of-life apps. Existing-system handling (Homebrew mirror/reset? back up + remove legacy files? uninstall oh-my-zsh?). |
-| **C** | Confirm | One-screen summary of every choice. Last chance to abort. |
-| **D** | Execute | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
-| **E** | Self-test | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
-| **F** | Next steps | Prints the exact follow-ups: sign in to 1Password, run `bootstrap-auth.sh`, `exec zsh`, restart. |
+| **1/5** | Check this Mac | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
+| **2/5** | Choose setup | Essentials first: profile, name, email, and the optional 1Password signing public key. The recommended path keeps 1Password enabled, installs macOS app extras, leaves local Homebrew packages alone, backs up legacy dotfiles, and removes oh-my-zsh if found. Choose customize to change signing, feature toggles, Homebrew mirror/reset, or migration behavior. |
+| **3/5** | Review plan | One-screen summary of every choice. Last chance to abort. Destructive Homebrew cleanup modes require typing `MIRROR BREW` or `RESET BREW`. |
+| **4/5** | Install and apply | Backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 20 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to `brew bundle` against core + workstation/profile extras, plus macOS defaults (sudo once). |
+| **5/5** | Verify | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
+| **Next steps** | Finish accounts | Prints the exact follow-ups: sign in to 1Password, run `bootstrap-auth.sh`, `exec zsh`, restart. |
 
 After the wizard finishes:
 
 ```sh
-# 1. Sign in to 1Password (so SSH agent + git signing work) — skip if you said no in Phase B
+# 1. Sign in to 1Password (so SSH agent + git signing work) — skip if disabled in customize
 open -a 1Password
 
 # 2. Walk through CLI auth (gh, az, gcloud, AKS/GKE plugins, signing test). Idempotent.
@@ -81,7 +93,7 @@ sudo shutdown -r now
 
 ### Profiles & features
 
-Phase B asks two orthogonal questions: which **profile** you're on (which casks/aliases get layered in) and which workstation **extras** you want globally.
+The setup screen asks two orthogonal questions: which **profile** you're on (which casks/aliases get layered in) and, when you choose customize, which workstation **extras** you want globally.
 
 **Profile** controls personal-vs-work cask + shell-config layering:
 

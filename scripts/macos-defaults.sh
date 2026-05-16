@@ -7,7 +7,8 @@
 # Each `defaults write` is annotated; comment out anything you don't want.
 
 set -euo pipefail
-echo "Applying macOS defaults — sudo will be requested for some changes."
+echo "◆ macOS defaults"
+echo "  Applying Finder, Dock, keyboard, screenshots, security, and developer preferences."
 
 # When this script runs as part of `chezmoi apply`, the run_before_00-sudo-cache
 # script already prompted upfront and cached the credentials; sudo -v here is a
@@ -148,7 +149,7 @@ def_write com.apple.screencapture include-date   -bool   true
     defaults write com.apple.TextEdit RichText -int 0
     defaults write com.apple.TextEdit PlainTextEncoding -int 4
     defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
-} 2>/dev/null || echo "  ⚠️  TextEdit defaults skipped (sandbox)."
+} 2>/dev/null || echo "  ! TextEdit defaults skipped (sandbox)."
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECURITY & PRIVACY
@@ -198,10 +199,10 @@ if [ "$macos_major" -ge 14 ]; then
         fi
         printf '# Managed by dotfiles macos-defaults.sh\nauth       sufficient     pam_tid.so\n' \
             | sudo tee -a "$SUDO_LOCAL" >/dev/null
-        echo "  ✓ Touch ID for sudo enabled (next sudo will prompt)"
+        echo "  ✓ Touch ID for sudo enabled"
     fi
 else
-    echo "  ⚠️  Touch ID for sudo skipped — requires macOS Sonoma (14+)"
+    echo "  ! Touch ID for sudo skipped — requires macOS Sonoma (14+)"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -226,4 +227,5 @@ restart_if_changed Finder         com.apple.finder com.apple.desktopservices
 restart_if_changed Dock           com.apple.dock
 restart_if_changed SystemUIServer com.apple.screencapture com.apple.systemuiserver
 
-echo "Done. ${#CHANGED_DOMAINS[@]} write(s) applied. Some changes (keyboard repeat, screenshot location) may need a logout to take full effect."
+echo "✓ macOS defaults complete — ${#CHANGED_DOMAINS[@]} write(s) applied"
+echo "  A logout or reboot may be needed for keyboard repeat and screenshot changes."

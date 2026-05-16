@@ -11,7 +11,7 @@ set -euo pipefail
 
 # Skip on non-macOS (chezmoi runs scripts on every platform unless guarded)
 {{ if ne .chezmoi.os "darwin" -}}
-echo "[macos-defaults] not on macOS, skipping"
+echo "→ macOS defaults: not on macOS, skipping"
 exit 0
 {{ end -}}
 
@@ -20,17 +20,18 @@ exit 0
 # stdin from the controlling terminal if one exists, so sudo can read the
 # password normally. In CI or other no-tty contexts, skip cleanly with a
 # helpful message rather than hang.
-echo "[macos-defaults] apply step 5/5 — applying system settings (one-time, sudo prompt)"
+echo "◆ Apply 5/5: macOS defaults"
+echo "  One-time system preferences pass. Some changes need a reboot."
 
 if [ -e /dev/tty ] && [ -r /dev/tty ]; then
     exec </dev/tty
 else
-    echo "[macos-defaults] no TTY available (CI / non-interactive shell); skipping."
-    echo "[macos-defaults] Run manually later with: macos-defaults  (zsh alias)"
-    echo "[macos-defaults] Or:                       bash {{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"
+    echo "! no terminal available; skipping macOS defaults"
+    echo "  Run later with: macos-defaults"
+    echo "  Or: bash {{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"
     exit 0
 fi
 
 bash "{{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"
 
-echo "[macos-defaults] ✓ system settings applied"
+echo "✓ macOS defaults applied"

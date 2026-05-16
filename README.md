@@ -6,7 +6,7 @@
 [![Catppuccin Frappe](https://img.shields.io/badge/Catppuccin-Frapp%C3%A9-f2d5cf?labelColor=303446)](https://github.com/catppuccin/catppuccin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Git signing, Homebrew apps, Devbox project environments, and macOS defaults wired up.
+Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Git signing, Homebrew apps, Devbox project environments, and macOS defaults wired up. The installer defaults to a short recommended path, with cleanup and feature toggles available from a customize screen.
 
 ## Start here
 
@@ -25,10 +25,10 @@ bash ~/Developer/personal/dotfiles/install.sh --configure-only
 After the wizard finishes:
 
 ```sh
-open -a 1Password                              # skip if you disabled 1Password
-bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh # gh, az, gcloud, signing checks
-exec zsh
-sudo shutdown -r now
+open -a 1Password                                      # skip if disabled
+bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh
+exec zsh                                               # reload managed shell
+sudo shutdown -r now                                   # finish macOS defaults
 ```
 
 <details>

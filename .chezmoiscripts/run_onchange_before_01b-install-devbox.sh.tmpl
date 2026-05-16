@@ -31,23 +31,22 @@
 set -euo pipefail
 
 {{ if ne .chezmoi.os "darwin" -}}
-echo "[devbox] not on macOS, skipping"
+echo "→ Devbox: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Apply-lifecycle step 2 of 4 (sudo-cache → devbox+Nix → brew-bundle →
-# macos-defaults). The "1/2" / "2/2" below are internal
-# to this script (devbox CLI install + Nix bootstrap), not the lifecycle.
+# Apply-lifecycle step 2 of 5. The "1/2" / "2/2" below are internal to this
+# script (devbox CLI install + Nix bootstrap), not the lifecycle.
 
 # ─── Part 1: devbox CLI ───────────────────────────────────────────────────────
-echo "[devbox] apply step 2/5 — devbox CLI + Nix bootstrap"
-echo "[devbox]   substep 1/2 — checking devbox CLI"
+echo "◆ Apply 2/5: project runtime foundation"
+echo "→ Checking devbox CLI"
 
 if command -v devbox >/dev/null 2>&1; then
-    echo "[devbox] ✓ devbox CLI already installed: $(devbox version 2>&1 | head -1)"
+    echo "✓ devbox already installed: $(devbox version 2>&1 | head -1)"
 else
-    echo "[devbox] installing devbox via Jetify's official installer"
-    echo "[devbox]   (https://get.jetify.com/devbox — devbox isn't in homebrew)"
+    echo "→ Installing devbox with Jetify's official installer"
+    echo "  devbox is intentionally outside Homebrew so project toolchains stay Nix-backed."
 
     # Re-attach stdin to /dev/tty in case chezmoi disconnected it. The Jetify
     # installer is non-interactive in the common case, but if /usr/local/bin
@@ -70,12 +69,12 @@ else
         if [ -x /usr/local/bin/devbox ]; then
             export PATH="/usr/local/bin:$PATH"
         else
-            echo "[devbox] ✗ install ran but binary isn't on PATH."
-            echo "[devbox]   Expected at /usr/local/bin/devbox — investigate."
+            echo "✗ devbox install ran, but the binary is not on PATH"
+            echo "  Expected /usr/local/bin/devbox"
             exit 1
         fi
     fi
-    echo "[devbox] ✓ devbox CLI installed: $(devbox version 2>&1 | head -1)"
+    echo "✓ devbox installed: $(devbox version 2>&1 | head -1)"
 fi
 
 # ─── Part 2: Nix store ────────────────────────────────────────────────────────
@@ -91,18 +90,15 @@ fi
 #     sandbox users) is the only path that scales to multiple devbox users
 #     on the same Mac and is what Jetify recommends.
 
-echo "[devbox]   substep 2/2 — checking Nix store"
+echo "→ Checking Nix store"
 
 if [ -d /nix ]; then
-    echo "[devbox] ✓ Nix store already present at /nix"
+    echo "✓ Nix store already present at /nix"
     exit 0
 fi
 
-echo "[devbox] bootstrapping Nix via Determinate Systems' installer (~1-2 min)"
-echo "[devbox]   - creates APFS volume \"Nix Store\" mounted at /nix"
-echo "[devbox]   - registers org.nixos.nix-daemon LaunchDaemon"
-echo "[devbox]   - adds _nixbld1..32 build sandbox users"
-echo "[devbox]   - uninstall later with: /nix/nix-installer uninstall"
+echo "→ Bootstrapping Nix via Determinate Systems. Usually 1-2 minutes."
+echo "  Creates the /nix APFS volume and registers the nix-daemon."
 
 exec </dev/tty 2>/dev/null || true
 
@@ -112,19 +108,15 @@ exec </dev/tty 2>/dev/null || true
 # sudo-cache from run_before_00 means no prompt fires in the common case.
 if curl -fsSL https://install.determinate.systems/nix | \
         sh -s -- install --determinate --no-confirm; then
-    echo "[devbox] ✓ Nix store created at /nix"
-    echo "[devbox]   Note: \`nix\` won't be on PATH in THIS script's shell, but"
-    echo "[devbox]   /etc/zshrc has been updated, so new shells (and the next"
-    echo "[devbox]   chezmoi apply step) see it. devbox itself doesn't need"
-    echo "[devbox]   \`nix\` on PATH — it talks to /nix/ directly."
+    echo "✓ Nix store created at /nix"
+    echo "  New shells will see nix on PATH; devbox can use /nix immediately."
 else
     # Don't fail the whole apply for a Nix bootstrap glitch. devbox CLI works;
     # the user can retry via \`chezup\` or trigger devbox usage manually to
     # fall back to the lazy install path. Most failures here are transient
     # (network, sudo timeout) — easy to recover from.
-    echo "[devbox] ⚠ Nix bootstrap failed (rc=$?). devbox CLI is installed,"
-    echo "[devbox]   but the first \`devbox\` command in a project will retry"
-    echo "[devbox]   the Nix install interactively. Re-run \`chez\` to retry"
-    echo "[devbox]   from this script."
+    echo "! Nix bootstrap failed (rc=$?). devbox CLI is installed."
+    echo "  The first devbox command in a project will retry interactively."
+    echo "  Re-run chez to retry this non-interactive bootstrap."
     exit 0
 fi

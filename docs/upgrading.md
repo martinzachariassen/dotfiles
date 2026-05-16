@@ -37,7 +37,7 @@ If you'd rather walk through the full wizard again (e.g., to flip a workstation 
 bash ~/Developer/personal/dotfiles/install.sh
 ```
 
-It'll detect your existing config in Phase A and ask whether to re-use prior answers; say no to get the full multi-select again.
+It'll detect your existing config during the Mac check, reuse those answers as defaults, and let you choose customize if you want to revisit feature toggles or cleanup behavior.
 
 ### How the invalidation rules work
 

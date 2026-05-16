@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # install.sh - guided installer for this dotfiles repo.
 #
-# The first version of this wizard used raw terminal mode for arrow-key menus.
-# That looked nice, but it was too fragile: some terminals did not deliver the
-# escape sequences as expected, and text fields could feel broken. This version
-# keeps the visual structure, but uses plain, reliable numbered menus and normal
-# line input for every answer.
+# The wizard intentionally sticks to numbered menus and normal line input. That
+# is less flashy than raw-mode arrow-key prompts, but it survives plain Terminal,
+# Ghostty, SSH sessions, and pasted `curl | bash` installs.
 #
 # Usage:
 #   bash install.sh
@@ -75,30 +73,49 @@ else
     BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
 fi
 
-say()   { printf "%s  %s\n" "${CYAN}|${RESET}" "$1"; }
-ok()    { printf "%s  %s✓%s %s\n" "${CYAN}|${RESET}" "$GREEN" "$RESET" "$1"; }
-info()  { printf "%s  %s•%s %s\n" "${CYAN}|${RESET}" "$BLUE" "$RESET" "$1"; }
-warn()  { printf "%s  %s!%s %s\n" "${CYAN}|${RESET}" "$YELLOW" "$RESET" "$1"; }
-fail()  { printf "%s  %s✗%s %s\n" "${CYAN}|${RESET}" "$RED" "$RESET" "$1"; }
-dim()   { printf "%s  %s%s%s\n" "${CYAN}|${RESET}" "$DIM" "$1" "$RESET"; }
-hr()    { printf "%s\n" "${CYAN}|${RESET}"; }
+say()   { printf "%s  %s\n" "${CYAN}│${RESET}" "$1"; }
+ok()    { printf "%s  %s✓%s %s\n" "${CYAN}│${RESET}" "$GREEN" "$RESET" "$1"; }
+info()  { printf "%s  %s→%s %s\n" "${CYAN}│${RESET}" "$BLUE" "$RESET" "$1"; }
+warn()  { printf "%s  %s!%s %s\n" "${CYAN}│${RESET}" "$YELLOW" "$RESET" "$1"; }
+fail()  { printf "%s  %s✗%s %s\n" "${CYAN}│${RESET}" "$RED" "$RESET" "$1"; }
+dim()   { printf "%s  %s%s%s\n" "${CYAN}│${RESET}" "$DIM" "$1" "$RESET"; }
+hr()    { printf "%s\n" "${CYAN}│${RESET}"; }
+
+setting() {
+    local label="$1" value="$2"
+    printf "%s    %-18s %s\n" "${CYAN}│${RESET}" "$label" "$value"
+}
+
+bool_label() {
+    case "${1:-false}" in
+        true|1|yes) printf 'yes' ;;
+        *) printf 'no' ;;
+    esac
+}
 
 phase_open() {
     local title="$1"
-    printf "%s\n" "${CYAN}|${RESET}"
-    printf "%s  %s%s%s\n" "${CYAN}>${RESET}" "$BOLD" "$title" "$RESET"
-    printf "%s\n" "${CYAN}|${RESET}"
+    printf "%s\n" "${CYAN}│${RESET}"
+    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET"
+    printf "%s\n" "${CYAN}│${RESET}"
 }
 
 phase_close() {
     local title="$1"
-    printf "%s\n" "${CYAN}|${RESET}"
-    printf "%s  %s%s done%s\n" "${GREEN}=${RESET}" "$DIM" "$title" "$RESET"
+    printf "%s\n" "${CYAN}│${RESET}"
+    printf "%s  %s%s complete%s\n" "${GREEN}✓${RESET}" "$DIM" "$title" "$RESET"
 }
 
 run() {
     if [ "$DRY_RUN" = "1" ]; then
-        printf "%s    %sDRY-RUN \$%s %s\n" "${CYAN}|${RESET}" "$DIM" "$RESET" "$*"
+        local display=() arg
+        for arg in "$@"; do
+            case "$arg" in
+                --promptString=signingKey=*) display+=("--promptString=signingKey=<set>") ;;
+                *) display+=("$arg") ;;
+            esac
+        done
+        printf "%s    %sdry-run $%s %s\n" "${CYAN}│${RESET}" "$DIM" "$RESET" "${display[*]}"
     else
         "$@"
     fi
@@ -110,7 +127,7 @@ have_tty() {
 
 prompt_read() {
     local __out="$1" prompt="$2" response
-    printf "%s  %s" "${CYAN}|${RESET}" "$prompt" > /dev/tty
+    printf "%s  %s" "${CYAN}│${RESET}" "$prompt" > /dev/tty
     IFS= read -r response < /dev/tty || response=""
     printf -v "$__out" '%s' "$response"
 }
@@ -120,19 +137,19 @@ prompt_text() {
 
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "$default"
-        printf "%s  %s%s:%s %s%s%s\n" "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${default:-<blank>}" "$RESET"
+        printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${default:-<blank>}" "$RESET"
         return
     fi
 
-    printf "%s  %s%s%s\n" "${CYAN}>${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
-    [ -n "$hint" ] && printf "%s  %s%s%s\n" "${CYAN}|${RESET}" "$DIM" "$hint" "$RESET" > /dev/tty
+    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
+    [ -n "$hint" ] && printf "%s  %s%s%s\n" "${CYAN}│${RESET}" "$DIM" "$hint" "$RESET" > /dev/tty
     if [ -n "$default" ]; then
         prompt_read answer "Current: ${BOLD}$default${RESET}. Enter new value or leave blank to keep: "
         [ -z "$answer" ] && answer="$default"
     else
         prompt_read answer "Enter value, or leave blank to skip: "
     fi
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${answer:-<blank>}" "$RESET"
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${answer:-<blank>}" "$RESET"
     printf -v "$__out" '%s' "$answer"
 }
 
@@ -144,7 +161,7 @@ prompt_confirm() {
         [ "$default_yes" = "1" ] && result=true || result=false
         printf -v "$__out" '%s' "$result"
         printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
-            "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET" "$DIM" "$RESET"
+            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET" "$DIM" "$RESET"
         return
     fi
 
@@ -161,7 +178,7 @@ prompt_confirm() {
     done
     printf -v "$__out" '%s' "$result"
     printf "%s  %s%s:%s %s%s%s\n" \
-        "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
+        "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
 }
 
 prompt_choice() {
@@ -172,18 +189,18 @@ prompt_choice() {
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "$default"
         printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
-            "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
+            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
         return
     fi
 
-    printf "%s  %s%s%s\n" "${CYAN}>${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
+    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
     for ((i=0; i<n; i++)); do
         value="${opts[$i]%%|*}"
         label="${opts[$i]#*|}"
         if [ "$value" = "$default" ]; then
-            printf "%s    %d. %s %s%s(current)%s\n" "${CYAN}|${RESET}" $((i + 1)) "$label" "$DIM" "$RESET" "$DIM" > /dev/tty
+            printf "%s    %d. %s %s%s(current)%s\n" "${CYAN}│${RESET}" $((i + 1)) "$label" "$DIM" "$RESET" "$DIM" > /dev/tty
         else
-            printf "%s    %d. %s\n" "${CYAN}|${RESET}" $((i + 1)) "$label" > /dev/tty
+            printf "%s    %d. %s\n" "${CYAN}│${RESET}" $((i + 1)) "$label" > /dev/tty
         fi
     done
 
@@ -202,7 +219,36 @@ prompt_choice() {
                 ;;
         esac
     done
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}=${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+}
+
+prompt_continue_or_customize() {
+    local __out="$1" title="$2" answer
+
+    if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
+        printf -v "$__out" '%s' "recommended"
+        printf "%s  %s%s:%s %srecommended%s %s(default)%s\n" \
+            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
+        return
+    fi
+
+    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
+    printf "%s    1. Continue with recommended setup\n" "${CYAN}│${RESET}" > /dev/tty
+    printf "%s    2. Customize packages, signing, cleanup, and migration\n" "${CYAN}│${RESET}" > /dev/tty
+
+    while :; do
+        prompt_read answer "Press Enter for recommended, or choose 1-2: "
+        case "${answer:-1}" in
+            1)
+                printf -v "$__out" '%s' "recommended"
+                break ;;
+            2)
+                printf -v "$__out" '%s' "custom"
+                break ;;
+            *) warn "enter 1 or 2" ;;
+        esac
+    done
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
 }
 
 prompt_phrase() {
@@ -302,28 +348,30 @@ load_existing_answers() {
 
 banner() {
     printf "\n"
-    printf "%s  %sDotfiles setup%s\n" "${CYAN}+${RESET}" "$BOLD" "$RESET"
-    printf "%s  Reliable numbered wizard for a fresh or existing Mac.\n" "${CYAN}|${RESET}"
-    printf "%s\n" "${CYAN}|${RESET}"
+    printf "%s\n" "${CYAN}╭────────────────────────────────────────────────────────────╮${RESET}"
+    printf "%s  %sDotfiles Setup%s                                             %s\n" "${CYAN}│${RESET}" "$BOLD" "$RESET" "${CYAN}│${RESET}"
+    printf "%s  Plug-and-play macOS workstation bootstrap.                  %s\n" "${CYAN}│${RESET}" "${CYAN}│${RESET}"
+    printf "%s\n" "${CYAN}╰────────────────────────────────────────────────────────────╯${RESET}"
     if [ "$DRY_RUN" = "1" ]; then
-        printf "%s  %sDRY-RUN MODE - no changes will be made.%s\n" "${CYAN}|${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sDry run:%s no changes will be made.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
     fi
     if [ "$ASSUME_YES" = "1" ]; then
-        printf "%s  %sYES MODE - accepting recommended defaults. Homebrew reset/mirror remains off unless explicitly flagged.%s\n" "${CYAN}|${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sYes mode:%s recommended defaults accepted. Homebrew cleanup stays off unless flagged.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
     fi
     if [ "$CONFIGURE_ONLY" = "1" ]; then
-        printf "%s  %sCONFIGURE-ONLY - updating chezmoi profile, identity, features, then applying.%s\n" "${CYAN}|${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sConfigure only:%s update profile, identity, features, then apply.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
     fi
-    printf "%s  Phases: discovery -> choices -> confirm -> execute -> self-test -> next steps.\n" "${CYAN}|${RESET}"
+    printf "%s  The default path asks for identity, profile, and optional git signing.\n" "${CYAN}│${RESET}"
+    printf "%s  Advanced cleanup and feature toggles stay available when you need them.\n" "${CYAN}│${RESET}"
     if have_tty && [ "$ASSUME_YES" != "1" ]; then
         local _
-        printf "%s\n" "${CYAN}|${RESET}"
+        printf "%s\n" "${CYAN}│${RESET}"
         prompt_read _ "Press Enter to begin "
     fi
 }
 
 probe() {
-    phase_open "Phase A - Discovery"
+    phase_open "1/5 - Check this Mac"
 
     if [ "$(uname -s)" != "Darwin" ]; then
         fail "this installer only supports macOS (current OS: $(uname -s))"
@@ -338,9 +386,9 @@ probe() {
         warn "macOS $PROBE_OS_VER on Intel - this repo targets Apple Silicon"
     fi
 
-    if xcode-select -p >/dev/null 2>&1; then ok "Xcode Command Line Tools present"; else info "Xcode CLT missing - installer will open Apple's installer"; fi
-    if command -v brew >/dev/null 2>&1; then ok "Homebrew at $(command -v brew)"; else info "Homebrew missing - installer will install it"; fi
-    if command -v chezmoi >/dev/null 2>&1; then ok "$(chezmoi --version 2>/dev/null | head -1)"; else info "chezmoi missing - installer will install it"; fi
+    if xcode-select -p >/dev/null 2>&1; then ok "Xcode Command Line Tools present"; else info "Xcode CLT missing - setup will open Apple's installer"; fi
+    if command -v brew >/dev/null 2>&1; then ok "Homebrew at $(command -v brew)"; else info "Homebrew missing - setup will install it"; fi
+    if command -v chezmoi >/dev/null 2>&1; then ok "$(chezmoi --version 2>/dev/null | head -1)"; else info "chezmoi missing - setup will install it"; fi
 
     PROBE_CHEZMOI_CONFIG="$HOME/.config/chezmoi/chezmoi.toml"
     if [ -f "$PROBE_CHEZMOI_CONFIG" ]; then ok "existing chezmoi config found"; else info "no existing chezmoi config"; fi
@@ -362,14 +410,14 @@ probe() {
 
     if [ -d "$HOME/.oh-my-zsh" ]; then PROBE_OMZ=1; warn "oh-my-zsh found at ~/.oh-my-zsh"; else PROBE_OMZ=0; fi
 
-    phase_close "Phase A"
+    phase_close "Mac check"
 }
 
 choices() {
-    phase_open "Phase B - Choices"
+    phase_open "2/5 - Choose setup"
     load_existing_answers
 
-    say "${BOLD}How to use this screen:${RESET} enter numbers for menus, type text into fields, or press Enter to keep the shown default."
+    say "${BOLD}Essentials first.${RESET} Press Enter to keep any detected value."
     hr
 
     prompt_choice CHOICE_PROFILE "Profile" "$EXISTING_PROFILE" \
@@ -380,23 +428,58 @@ choices() {
     prompt_text CHOICE_NAME "Full name" "$EXISTING_NAME" "Written to ~/.config/git/config as git user.name."
     prompt_text CHOICE_EMAIL "Git email" "$EXISTING_EMAIL" "Written to ~/.config/git/config as git user.email. GitHub noreply addresses are fine."
 
-    prompt_confirm CHOICE_USE_OP "Use 1Password for SSH auth and git signing?" "$([ "$EXISTING_USE_OP" = "true" ] && echo 1 || echo 0)"
-    if [ "$CHOICE_USE_OP" = "true" ]; then
-        prompt_text CHOICE_SIGNINGKEY "SSH signing public key" "$EXISTING_SIGNINGKEY" "Paste the public key line from 1Password, or leave blank to set it later."
-    else
-        CHOICE_SIGNINGKEY=""
-    fi
-
-    local current_macapps
-    current_macapps="${EXISTING_FEAT_macApps:-true}"
-    prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps?" "$([ "$current_macapps" = "true" ] && echo 1 || echo 0)"
-
-    local current_ai
-    current_ai="${EXISTING_FEAT_ai:-false}"
-    prompt_confirm CHOICE_FEAT_ai "Install local AI tooling (Ollama, llm)?" "$([ "$current_ai" = "true" ] && echo 1 || echo 0)"
-
+    CHOICE_USE_OP="${EXISTING_USE_OP:-true}"
+    CHOICE_SIGNINGKEY="$EXISTING_SIGNINGKEY"
+    CHOICE_FEAT_macApps="${EXISTING_FEAT_macApps:-true}"
+    CHOICE_FEAT_ai="${EXISTING_FEAT_ai:-false}"
     CHOICE_RESET_BREW=false
     CHOICE_MIRROR_BREW=false
+    CHOICE_BACKUP_LEGACY=true
+    CHOICE_REMOVE_OMZ=false
+
+    if [ "$CONFIGURE_ONLY" != "1" ] && [ "$PROBE_OMZ" = "1" ]; then
+        CHOICE_REMOVE_OMZ=true
+    fi
+
+    hr
+    say "${BOLD}Recommended setup${RESET}"
+    setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
+    setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
+    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
+    setting "Homebrew cleanup" "keep local packages"
+    if [ "$CONFIGURE_ONLY" != "1" ] && [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
+        setting "Legacy files" "back up, then remove shadowing files"
+    fi
+    if [ "$CONFIGURE_ONLY" != "1" ] && [ "$PROBE_OMZ" = "1" ]; then
+        setting "oh-my-zsh" "uninstall before applying plain zsh"
+    fi
+    dim "    Choose customize if you want to change package extras, signing, or cleanup."
+
+    CHOICE_SETUP_MODE="recommended"
+    if [ "$RESET_BREW_REQUESTED" = "1" ] || [ "$MIRROR_BREW_REQUESTED" = "1" ]; then
+        CHOICE_SETUP_MODE="custom"
+    else
+        prompt_continue_or_customize CHOICE_SETUP_MODE "Setup style"
+    fi
+
+    if [ "$CHOICE_SETUP_MODE" = "custom" ]; then
+        hr
+        say "${BOLD}Advanced options${RESET}"
+        prompt_confirm CHOICE_USE_OP "Use 1Password for SSH auth and git signing?" "$([ "$CHOICE_USE_OP" = "true" ] && echo 1 || echo 0)"
+        if [ "$CHOICE_USE_OP" = "true" ]; then
+            prompt_text CHOICE_SIGNINGKEY "SSH signing public key" "$EXISTING_SIGNINGKEY" "Paste the public key line from 1Password, or leave blank to set it later."
+        else
+            CHOICE_SIGNINGKEY=""
+        fi
+
+        prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps?" "$([ "$CHOICE_FEAT_macApps" = "true" ] && echo 1 || echo 0)"
+        prompt_confirm CHOICE_FEAT_ai "Install local AI tooling (Ollama, llm)?" "$([ "$CHOICE_FEAT_ai" = "true" ] && echo 1 || echo 0)"
+    elif [ "$CHOICE_USE_OP" != "true" ]; then
+        CHOICE_SIGNINGKEY=""
+    elif [ -z "$CHOICE_SIGNINGKEY" ]; then
+        prompt_text CHOICE_SIGNINGKEY "Git signing public key (optional)" "" "Copy the public key line from 1Password. Leave blank to set it later."
+    fi
+
     if [ "$CONFIGURE_ONLY" != "1" ]; then
         if [ "$RESET_BREW_REQUESTED" = "1" ]; then
             CHOICE_RESET_BREW=true
@@ -404,7 +487,7 @@ choices() {
         elif [ "$MIRROR_BREW_REQUESTED" = "1" ]; then
             CHOICE_MIRROR_BREW=true
             warn "Homebrew mirror requested by --mirror-brew"
-        elif command -v brew >/dev/null 2>&1; then
+        elif [ "$CHOICE_SETUP_MODE" = "custom" ] && command -v brew >/dev/null 2>&1; then
             local brew_cleanup_mode
             warn "Optional Homebrew cleanup."
             dim "    Mirror removes packages not present in the active Brewfiles. Reset removes everything first, then reinstalls."
@@ -419,39 +502,39 @@ choices() {
         fi
     fi
 
-    CHOICE_BACKUP_LEGACY=true
-    CHOICE_REMOVE_OMZ=false
-    if [ "$CONFIGURE_ONLY" != "1" ] && [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
+    if [ "$CHOICE_SETUP_MODE" = "custom" ] && [ "$CONFIGURE_ONLY" != "1" ] && [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
         prompt_confirm CHOICE_BACKUP_LEGACY "Back up legacy files and remove originals?" 1
     fi
-    if [ "$CONFIGURE_ONLY" != "1" ] && [ "$PROBE_OMZ" = "1" ]; then
+    if [ "$CHOICE_SETUP_MODE" = "custom" ] && [ "$CONFIGURE_ONLY" != "1" ] && [ "$PROBE_OMZ" = "1" ]; then
         prompt_confirm CHOICE_REMOVE_OMZ "Uninstall oh-my-zsh before applying dotfiles?" 1
     fi
 
-    phase_close "Phase B"
+    phase_close "Setup choices"
 }
 
 confirm_phase() {
-    phase_open "Phase C - Confirm"
+    phase_open "3/5 - Review plan"
 
-    say "${BOLD}Profile:${RESET}      $CHOICE_PROFILE"
-    say "${BOLD}Name:${RESET}         ${CHOICE_NAME:-<blank>}"
-    say "${BOLD}Email:${RESET}        ${CHOICE_EMAIL:-<blank>}"
-    say "${BOLD}1Password:${RESET}    $CHOICE_USE_OP"
+    say "${BOLD}This is what will be applied.${RESET}"
+    setting "Setup style" "${CHOICE_SETUP_MODE:-recommended}"
+    setting "Profile" "$CHOICE_PROFILE"
+    setting "Name" "${CHOICE_NAME:-<blank>}"
+    setting "Email" "${CHOICE_EMAIL:-<blank>}"
+    setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
     if [ -n "$CHOICE_SIGNINGKEY" ]; then
-        say "${BOLD}Signing key:${RESET}  ${CHOICE_SIGNINGKEY:0:44}..."
+        setting "Signing key" "${CHOICE_SIGNINGKEY:0:44}..."
     else
-        say "${BOLD}Signing key:${RESET}  <none - set later>"
+        setting "Signing key" "<none - set later>"
     fi
-    say "${BOLD}Mac apps:${RESET}     $CHOICE_FEAT_macApps"
-    say "${BOLD}Local AI:${RESET}     $CHOICE_FEAT_ai"
-    say "${BOLD}Repo:${RESET}         $REPO"
-    say "${BOLD}Source dir:${RESET}   $SOURCE_DIR"
+    setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
+    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
+    setting "Repo" "$REPO"
+    setting "Source dir" "$SOURCE_DIR"
     if [ "$CONFIGURE_ONLY" != "1" ]; then
-        say "${BOLD}Legacy backup:${RESET} $CHOICE_BACKUP_LEGACY"
-        say "${BOLD}Remove OMZ:${RESET}    $CHOICE_REMOVE_OMZ"
-        say "${BOLD}Reset Homebrew:${RESET} $CHOICE_RESET_BREW"
-        say "${BOLD}Mirror Homebrew:${RESET} $CHOICE_MIRROR_BREW"
+        setting "Legacy backup" "$(bool_label "$CHOICE_BACKUP_LEGACY")"
+        setting "Remove OMZ" "$(bool_label "$CHOICE_REMOVE_OMZ")"
+        setting "Reset Homebrew" "$(bool_label "$CHOICE_RESET_BREW")"
+        setting "Mirror Homebrew" "$(bool_label "$CHOICE_MIRROR_BREW")"
     fi
 
     if [ "$CHOICE_RESET_BREW" = "true" ] || [ "$CHOICE_MIRROR_BREW" = "true" ]; then
@@ -482,11 +565,11 @@ confirm_phase() {
     fi
     if [ "$proceed" != "true" ]; then
         info "aborted - nothing changed"
-        phase_close "Phase C"
+        phase_close "Review"
         exit 0
     fi
 
-    phase_close "Phase C"
+    phase_close "Review"
 }
 
 reset_homebrew() {
@@ -629,7 +712,7 @@ install_homebrew() {
 }
 
 configure_chezmoi() {
-    info "Configuring chezmoi with the answers from Phase B"
+    info "Configuring chezmoi with the selected setup"
     run mkdir -p "$HOME/.config/chezmoi"
 
     local init_flags key var
@@ -680,7 +763,7 @@ backup_legacy_files() {
 }
 
 execute() {
-    phase_open "Phase D - Execute"
+    phase_open "4/5 - Install and apply"
 
     if [ "$CONFIGURE_ONLY" = "1" ]; then
         if [ ! -d "$SOURCE_DIR/.git" ]; then fail "configure-only requires an existing repo at $SOURCE_DIR"; exit 1; fi
@@ -690,7 +773,7 @@ execute() {
         info "Applying dotfiles for updated profile/features"
         run chezmoi apply --force
         ok "chezmoi apply complete"
-        phase_close "Phase D"
+        phase_close "Install and apply"
         return
     fi
 
@@ -725,14 +808,14 @@ execute() {
     run chezmoi apply --force
     ok "chezmoi apply complete"
     [ "$CHOICE_MIRROR_BREW" = "true" ] && mirror_homebrew
-    phase_close "Phase D"
+    phase_close "Install and apply"
 }
 
 self_test() {
-    phase_open "Phase E - Self-test"
+    phase_open "5/5 - Verify"
     if [ "$DRY_RUN" = "1" ]; then
         ok "DRY-RUN: skipping checks"
-        phase_close "Phase E"
+        phase_close "Verify"
         return
     fi
 
@@ -782,31 +865,42 @@ self_test() {
     _v "VS Code.app" test -d "/Applications/Visual Studio Code.app"
     [ "$CHOICE_USE_OP" = "true" ] && _v "1Password.app" test -d /Applications/1Password.app
 
-    say "${DIM}auth state (fix in Phase F if needed)${RESET}"
+    say "${DIM}auth state (fix from Next steps if needed)${RESET}"
     if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then ok "gh authenticated"; else warn "gh not authenticated"; fi
     if command -v az >/dev/null && az account show >/dev/null 2>&1; then ok "az authenticated"; else warn "az not authenticated"; fi
     if command -v gcloud >/dev/null && gcloud auth list 2>/dev/null | grep -q '\*'; then ok "gcloud authenticated"; else warn "gcloud not authenticated"; fi
 
-    phase_close "Phase E"
+    phase_close "Verify"
 }
 
 next_steps() {
-    phase_open "Phase F - Next steps"
+    phase_open "Done"
+    say "${BOLD}Your workstation baseline is installed.${RESET}"
+    setting "Profile" "$CHOICE_PROFILE"
+    setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
+    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
+    setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
+    hr
+    say "${BOLD}Finish these when the prompt returns:${RESET}"
     local n=1
     if [ "$CHOICE_USE_OP" = "true" ]; then
-        say "$n. ${BOLD}Sign in to 1Password${RESET} and enable Settings -> Developer -> SSH agent"
+        say "$n. ${BOLD}1Password${RESET} - sign in and enable Settings -> Developer -> SSH agent"
         n=$((n + 1))
     fi
-    say "$n. ${BOLD}bash $SOURCE_DIR/scripts/bootstrap-auth.sh${RESET} - gh/az/gcloud sign-in and signing checks"
+    say "$n. ${BOLD}bootstrap auth${RESET} - gh, az, gcloud, AKS/GKE, git signing"
+    dim "    bash $SOURCE_DIR/scripts/bootstrap-auth.sh"
     n=$((n + 1))
-    say "$n. ${BOLD}exec zsh${RESET} - reload shell configuration"
+    say "$n. ${BOLD}reload shell${RESET} - start using the managed zsh config"
+    dim "    exec zsh"
     n=$((n + 1))
-    say "$n. ${BOLD}Restart your Mac${RESET} - some macOS defaults need a reboot"
+    say "$n. ${BOLD}restart macOS${RESET} - some defaults only take full effect after reboot"
     hr
-    say "${DIM}Diagnose anytime:${RESET} ${BOLD}bash $SOURCE_DIR/scripts/doctor.sh${RESET}"
-    say "${DIM}Re-run configuration only:${RESET} ${BOLD}bash $SOURCE_DIR/install.sh --configure-only${RESET}"
-    printf "%s\n" "${CYAN}|${RESET}"
-    printf "%s  %sWizard complete.%s\n" "${GREEN}+${RESET}" "$BOLD" "$RESET"
+    say "${BOLD}Useful commands${RESET}"
+    setting "health check" "bash $SOURCE_DIR/scripts/doctor.sh"
+    setting "change setup" "bash $SOURCE_DIR/install.sh --configure-only"
+    setting "upgrade later" "chezup"
+    printf "%s\n" "${CYAN}│${RESET}"
+    printf "%s  %sWizard complete.%s\n" "${GREEN}✓${RESET}" "$BOLD" "$RESET"
     printf "\n"
 }
 

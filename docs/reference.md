@@ -1,7 +1,7 @@
 # Reference
 
 - [Mapping](mapping.md) — every file in the repo and where it lands in `$HOME`, plus chezmoi internals.
-- [`install.sh`](../install.sh) — the 6-phase wizard (fresh + existing Macs). `DRY_RUN=1` previews, `YES=1` accepts defaults.
+- [`install.sh`](../install.sh) — the 5-step setup wizard for fresh and existing Macs. `DRY_RUN=1` previews, `YES=1` accepts defaults.
 - [`scripts/bootstrap-auth.sh`](../scripts/bootstrap-auth.sh) — post-install gh / az / gcloud / AKS / GKE / signing walkthrough. Idempotent.
 - [`scripts/doctor.sh`](../scripts/doctor.sh) — read-only health check. Aliased as `chezdoctor`.
 - [`Brewfile`](../Brewfile) — core, always installed. [`brewfiles/Brewfile.ai`](../brewfiles/Brewfile.ai) and [`brewfiles/Brewfile.mac-apps`](../brewfiles/Brewfile.mac-apps) are optional workstation features. Profile-specific extras: [`brewfiles/Brewfile.personal`](../brewfiles/Brewfile.personal), [`brewfiles/Brewfile.work`](../brewfiles/Brewfile.work).

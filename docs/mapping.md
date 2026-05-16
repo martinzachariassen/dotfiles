@@ -54,7 +54,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 
 | Script | What it does | When to run |
 |---|---|---|
-| `install.sh` | 7-step bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
+| `install.sh` | Guided bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
 | `scripts/bootstrap-auth.sh` | Walks through gh / az / gcloud / 1Password sign-in, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
 | `scripts/doctor.sh` | Reads-only health check. Verifies XDG layout, Claude personal config, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
 | `scripts/macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |

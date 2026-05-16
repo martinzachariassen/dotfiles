@@ -83,25 +83,25 @@ LESS=-RX chezmoi diff              # one-shot less override (always pages, no -F
 **Brew bundle looks frozen — no output for minutes** — long downloads (large casks, slow networks) can sit silently because brew streams output only as steps complete. The brew-bundle script now prints a heartbeat every 45 seconds during silent stretches:
 
 ```text
-[brew-bundle] ┌── 1/7  core (always)  (Brewfile)
+→ 1/4  core (always)  (Brewfile)
 ...brew bundle output...
-[brew-bundle]   … still working on core (always) — 1m30s elapsed
-[brew-bundle]   … still working on core (always) — 2m15s elapsed
-[brew-bundle] └── ✓ 1/7  core (always)  done in 2m48s
+  … still working on core (always) — 1m30s elapsed
+  … still working on core (always) — 2m15s elapsed
+✓ 1/4  core (always)  done in 2m48s
 ```
 
 Plus an upfront plan that tells you what's coming and roughly how long:
 
 ```text
-═════════════════════════════════════════════════════════════════════
-[brew-bundle] apply step 3/4 — installing/updating brew packages
-[brew-bundle] modules to apply: 4
-[brew-bundle]   1. core (always)
-[brew-bundle]   2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
-[brew-bundle]   3. personal profile extras
-[brew-bundle]   4. work profile extras
-[brew-bundle] expected time on first install: ~5-15 min (downloads dominate)
-═════════════════════════════════════════════════════════════════════
+◆ Apply 3/5: Homebrew packages
+  Profile: both
+  Modules: 4
+    1. core (always)
+    2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
+    3. personal profile extras
+    4. work profile extras
+  First install usually takes 5-15 minutes. Downloads dominate.
+  Quiet stretches print a heartbeat every 45 seconds.
 ```
 
 If you genuinely think brew is frozen (heartbeat stopped firing too), `ps aux | grep brew` will show whether brew is still working — most often it's stuck on a `curl` for a slow mirror.

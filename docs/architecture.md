@@ -11,7 +11,7 @@ Three classes of files in this repo, plus chezmoi's own infrastructure.
 **chezmoi infrastructure**:
 
 - `.chezmoi.toml.tmpl` — init prompts. Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`.
-- `.chezmoiscripts/` — auto-run hooks. Four user-visible steps per apply, in order:
+- `.chezmoiscripts/` — auto-run hooks. Five user-visible steps per apply, in order:
 
   | # | Script | Phase | Runs when | What it does |
   |---|---|---|---|---|
@@ -22,4 +22,4 @@ Three classes of files in this repo, plus chezmoi's own infrastructure.
   | 4 | `run_once_after_04-macos-defaults` | after, once | first apply only | Runs `scripts/macos-defaults.sh`. Never re-fires automatically — re-apply edits via the `macos-defaults` zsh alias. |
   | — | `run_onchange_after_99-completion` | after, every apply | always | Prints the `✓ chezmoi apply complete` banner with the day-to-day reference card. Re-fires because the rendered content embeds `{{ now.Unix }}`. |
 
-  The "step N/4" prefixes you see in apply output (`[brew-bundle] apply step 3/4 …`) match this numbering, so a wall of brew-bundle output never leaves you wondering what's left.
+  The `Apply N/5` headings you see in output match this numbering, so a wall of brew-bundle output never leaves you wondering what's left.

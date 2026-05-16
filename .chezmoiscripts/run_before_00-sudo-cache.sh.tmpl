@@ -44,13 +44,13 @@ exit 0
 
 # 1) Fast path — sudo cache already warm.
 if sudo -n true 2>/dev/null; then
-    echo "[sudo-cache] sudo already cached, skipping pre-auth"
+    echo "✓ sudo already cached"
     exit 0
 fi
 
 # 2) Non-interactive — nobody to ask. Don't hang; just warn.
 if [ ! -e /dev/tty ] || [ ! -r /dev/tty ]; then
-    echo "[sudo-cache] non-interactive context; sudo-requiring scripts may be skipped or fail"
+    echo "! no terminal available for sudo pre-auth; sudo steps may ask later or skip"
     exit 0
 fi
 
@@ -59,14 +59,12 @@ exec </dev/tty
 
 cat <<'EOF'
 
-── Sudo pre-authentication (apply step 1/5) ─────────────────────
-  A few scripts in this apply need sudo (Nix bootstrap, cask
-  installs, macOS defaults). Entering your password here — once,
-  on a clean terminal — caches it for the rest of the apply so
-  brew bundle's output can't compete for your keystrokes later.
+◆ Apply 1/5: sudo access
+
+  Some later steps need admin access for Nix, Homebrew casks, and macOS
+  defaults. Enter the password once here, before the noisy install output.
 
   If Touch ID for sudo is already enabled, just tap your finger.
-──────────────────────────────────────────────────────────────────
 EOF
 
 # Brief settle pause so any pending terminal output from chezmoi's own
@@ -77,7 +75,7 @@ sleep 0.2
 # Custom prompt makes it visually obvious we're at the sudo prompt rather
 # than at any other interactive question that might appear later.
 if ! sudo -v -p "[chezmoi] sudo password: "; then
-    echo "[sudo-cache] authentication failed or cancelled; scripts that need sudo will be skipped or fail"
+    echo "! sudo was not cached; steps that need admin access may skip or ask again"
     exit 0
 fi
 
@@ -113,4 +111,4 @@ CHEZMOI_PID=$PPID
 # After this line, the outer subshell has exited cleanly. The inner keeper
 # is running detached. Nothing in our process tree is waiting for it.
 
-echo "[sudo-cache] ✓ cached (background keeper watching chezmoi PID $CHEZMOI_PID, will exit within 2s of it)"
+echo "✓ sudo cached for this apply"
