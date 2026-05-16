@@ -12,6 +12,8 @@
     "workbench.editor.labelFormat": "short",
     "workbench.tree.indent": 16,
     "breadcrumbs.enabled": true,
+    "workbench.settings.enableNaturalLanguageSearch": false,
+    "workbench.enableExperiments": false,
 
     // =========================================================
     // FONT & EDITOR
@@ -42,6 +44,10 @@
     },
 
     "editor.inlineSuggest.enabled": true,
+    "editor.rulers": [100, 120],
+    "editor.cursorSurroundingLines": 4,
+    "editor.linkedEditing": true,
+    "editor.accessibilitySupport": "off",
 
     // =========================================================
     // FILES
@@ -52,6 +58,16 @@
 
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
+    "files.hotExit": "onExitAndWindowClose",
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/.gradle/**": true,
+        "**/build/**": true,
+        "**/dist/**": true,
+        "**/node_modules/**": true,
+        "**/target/**": true
+    },
 
     "files.exclude": {
         "**/.DS_Store": true,
@@ -85,6 +101,12 @@
     "git.enableSmartCommit": true,
     "git.confirmSync": false,
     "git.autofetch": true,
+    "git.openRepositoryInParentFolders": "never",
+    "git.pruneOnFetch": true,
+    "git.rebaseWhenSync": true,
+
+    "github.gitAuthentication": true,
+    "githubPullRequests.pullBranch": "never",
 
     // =========================================================
     // TERMINAL
@@ -95,6 +117,7 @@
     "terminal.integrated.defaultProfile.osx": "zsh",
     "terminal.integrated.scrollback": 10000,
     "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.enablePersistentSessions": false,
 
     // =========================================================
     // VIM
@@ -177,6 +200,25 @@
     "chat.editor.fontSize": 14,
 
     // =========================================================
+    // BACKEND / INFRA
+    // =========================================================
+
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.inlayHints.parameterNames.enabled": "literals",
+    "java.saveActions.organizeImports": true,
+
+    "spring-boot.ls.problem.application-properties.enabled": true,
+    "spring-boot.ls.problem.application-yaml.enabled": true,
+
+    "terraform.languageServer.enable": true,
+
+    "yaml.validate": true,
+    "yaml.format.enable": true,
+
+    "cSpell.language": "en-US,nb",
+
+    // =========================================================
     // LANGUAGE-SPECIFIC
     // =========================================================
 
@@ -204,10 +246,13 @@
     // PERFORMANCE
     // =========================================================
 
-    "extensions.ignoreRecommendations": false,
+    "extensions.ignoreRecommendations": true,
     "telemetry.telemetryLevel": "off",
+    "redhat.telemetry.enabled": false,
+    "gitlens.telemetry.enabled": false,
 
     "update.mode": "manual",
+
 
     // =========================================================
     // SECURITY

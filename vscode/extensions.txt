@@ -6,14 +6,19 @@ davidanson.vscode-markdownlint
 eamodio.gitlens
 editorconfig.editorconfig
 esbenp.prettier-vscode
+github.vscode-pull-request-github
 github.copilot-chat
+hashicorp.terraform
+humao.rest-client
 ms-azuretools.vscode-containers
+ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
 ms-vscode-remote.remote-containers
 pkief.material-icon-theme
 redhat.java
 redhat.vscode-yaml
 streetsidesoftware.code-spell-checker
+streetsidesoftware.code-spell-checker-norwegian-bokmal
 tamasfe.even-better-toml
 usernamehw.errorlens
 vscjava.vscode-gradle
@@ -23,3 +28,4 @@ vscjava.vscode-java-pack
 vscjava.vscode-java-test
 vscjava.vscode-maven
 vscodevim.vim
+vmware.vscode-spring-boot
