@@ -8,6 +8,7 @@ editorconfig.editorconfig
 esbenp.prettier-vscode
 github.copilot-chat
 ms-azuretools.vscode-containers
+ms-ossdata.vscode-pgsql
 ms-vscode-remote.remote-containers
 pkief.material-icon-theme
 redhat.java
@@ -21,3 +22,4 @@ vscjava.vscode-java-dependency
 vscjava.vscode-java-pack
 vscjava.vscode-java-test
 vscjava.vscode-maven
+vscodevim.vim
