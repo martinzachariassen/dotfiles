@@ -1,0 +1,23 @@
+# Marketplace extensions installed by .chezmoiscripts/run_after_03-vscode.sh.tmpl.
+# JetBrains Kotlin is installed separately from the upstream VSIX release.
+catppuccin.catppuccin-vsc
+continue.continue
+davidanson.vscode-markdownlint
+eamodio.gitlens
+editorconfig.editorconfig
+esbenp.prettier-vscode
+github.copilot-chat
+ms-azuretools.vscode-containers
+ms-vscode-remote.remote-containers
+pkief.material-icon-theme
+redhat.java
+redhat.vscode-yaml
+streetsidesoftware.code-spell-checker
+tamasfe.even-better-toml
+usernamehw.errorlens
+vscjava.vscode-gradle
+vscjava.vscode-java-debug
+vscjava.vscode-java-dependency
+vscjava.vscode-java-pack
+vscjava.vscode-java-test
+vscjava.vscode-maven

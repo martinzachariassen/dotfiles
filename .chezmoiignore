@@ -7,6 +7,7 @@ scripts/
 Brewfile
 Brewfile.lock.json
 brewfiles/
+vscode/
 .editorconfig
 .gitattributes
 .github/

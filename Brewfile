@@ -63,7 +63,8 @@ brew "zellij"                  # terminal multiplexer (modern tmux alternative)
 
 # ─── GUI essentials (terminal + 1Password are foundational here) ──────────────
 cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
-cask "visual-studio-code"      # VS Code app; settings/extensions sync via VS Code cloud
+cask "visual-studio-code"      # VS Code app; settings/extensions managed by chezmoi
+cask "kotlin-lsp"              # JetBrains Kotlin LSP CLI for non-VS Code clients
 cask "1password"               # GUI app — SSH agent + git signing live here
 cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
 cask "docker-desktop"          # if you'd rather use colima/podman, swap this line

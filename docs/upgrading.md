@@ -13,7 +13,7 @@ Defined in your `.zshrc`. It does:
 1. `git pull --ff-only` in `~/Developer/personal/dotfiles`
 2. `chez` — chezmoi status + a single-keypress confirm + `chezmoi apply --force`
 
-That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, and modified scripts. Project-level Devbox changes are applied when you enter that project or run `devbox install` there. VS Code settings and extensions are handled by VS Code Settings Sync, not this repo.
+That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, modified scripts, and VS Code settings/extensions. Project-level Devbox changes are applied when you enter that project or run `devbox install` there.
 
 `chezup` is also a no-op when nothing changed — safe to run as often as you like (e.g., wire it into a launchd timer for a daily auto-sync if you want).
 

@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Installs VS Code extensions from the repo manifest and refreshes the
+# JetBrains Kotlin VSIX from Kotlin/kotlin-lsp releases.
+#
+# Marketplace extension manifest hash: {{ include "vscode/extensions.txt" | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[vscode] not on macOS, skipping"
+exit 0
+{{ end -}}
+
+SOURCE="{{ .chezmoi.sourceDir }}"
+EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
+
+if ! command -v code >/dev/null 2>&1; then
+    echo "[vscode] code CLI not found; VS Code extension install skipped"
+    exit 0
+fi
+
+installed_extensions() {
+    code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
+}
+
+install_marketplace_extensions() {
+    if [ ! -f "$EXTENSIONS_FILE" ]; then
+        echo "[vscode] extension manifest missing: $EXTENSIONS_FILE"
+        return 0
+    fi
+
+    local installed ext line
+    installed="$(installed_extensions)"
+    while IFS= read -r line || [ -n "$line" ]; do
+        ext="${line%%#*}"
+        ext="$(printf '%s' "$ext" | xargs)"
+        [ -n "$ext" ] || continue
+
+        if printf '%s\n' "$installed" | grep -qi "^${ext}$"; then
+            echo "[vscode] extension already installed: $ext"
+        else
+            echo "[vscode] installing extension: $ext"
+            code --install-extension "$ext"
+        fi
+    done < "$EXTENSIONS_FILE"
+}
+
+latest_kotlin_release_json() {
+    curl -fsSL \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/Kotlin/kotlin-lsp/releases/latest"
+}
+
+kotlin_vsix_url() {
+    local release_json="$1" arch_suffix
+    case "$(uname -m)" in
+        arm64) arch_suffix="mac-aarch64.vsix" ;;
+        x86_64) arch_suffix="mac-x64.vsix" ;;
+        *)
+            echo "[vscode] unsupported architecture for Kotlin VSIX: $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    printf '%s\n' "$release_json" \
+        | jq -r --arg suffix "$arch_suffix" '
+            .body
+            | scan("https://download-cdn\\.jetbrains\\.com/kotlin-lsp/[^)[:space:]]+")
+            | select(endswith($suffix))
+            | select(contains(".vsix"))
+        ' \
+        | head -1
+}
+
+install_kotlin_vsix() {
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "[vscode] jq not found; Kotlin VSIX install skipped"
+        return 0
+    fi
+
+    local release_json latest_version installed_version url checksum_url tmpdir vsix expected actual
+    release_json="$(latest_kotlin_release_json)" || {
+        echo "[vscode] could not read latest Kotlin LSP release; Kotlin VSIX install skipped"
+        return 0
+    }
+
+    latest_version="$(printf '%s\n' "$release_json" | jq -r '.tag_name | sub("^kotlin-lsp/v"; "")')"
+    installed_version="$(code --list-extensions --show-versions 2>/dev/null \
+        | awk -F@ 'tolower($1) == "jetbrains.kotlin" { print $2; exit }' || true)"
+
+    if [ -n "$installed_version" ] && [ "$installed_version" = "$latest_version" ]; then
+        echo "[vscode] JetBrains Kotlin extension already current: $installed_version"
+        return 0
+    fi
+
+    url="$(kotlin_vsix_url "$release_json")"
+    if [ -z "$url" ] || [ "$url" = "null" ]; then
+        echo "[vscode] latest Kotlin LSP release did not include a macOS VSIX URL"
+        return 0
+    fi
+
+    checksum_url="$url.sha256"
+    tmpdir="$(mktemp -d)"
+    vsix="$tmpdir/kotlin-lsp.vsix"
+    trap 'rm -rf "$tmpdir"' RETURN
+
+    echo "[vscode] downloading JetBrains Kotlin extension $latest_version"
+    curl -fsSL "$url" -o "$vsix"
+
+    expected="$(curl -fsSL "$checksum_url" | awk '{ print $1; exit }')"
+    actual="$(shasum -a 256 "$vsix" | awk '{ print $1; exit }')"
+    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+        echo "[vscode] Kotlin VSIX checksum mismatch" >&2
+        return 1
+    fi
+
+    code --install-extension "$vsix" --force
+    echo "[vscode] JetBrains Kotlin extension installed: $latest_version"
+}
+
+echo "═════════════════════════════════════════════════════════════════════"
+echo "[vscode] apply step 4/5 — installing VS Code extensions"
+echo "[vscode] manifest: $EXTENSIONS_FILE"
+echo "═════════════════════════════════════════════════════════════════════"
+
+install_marketplace_extensions
+install_kotlin_vsix
+
+echo "[vscode] ✓ VS Code extensions are managed"

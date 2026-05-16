@@ -13,7 +13,6 @@ brew "kubectx"                  # provides kubectx and kubens for context/namesp
 cask "gcloud-cli"               # global Google Cloud account/project CLI; project kubectl stays in Devbox
 
 # ─── Work apps ────────────────────────────────────────────────────────────────
-cask "intellij-idea"            # if Java work
 cask "microsoft-teams"
 cask "slack"
 cask "microsoft-outlook"

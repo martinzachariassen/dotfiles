@@ -8,7 +8,7 @@
 #   and here's what's available to you now" signal.
 #
 # Naming considerations:
-# - "99-" prefix sorts last numerically among the after-scripts (02, 04, 99).
+# - "99-" prefix sorts last numerically among the after-scripts (02, 03, 04, 99).
 # - `onchange_` (rather than plain `run_after_`) ensures we sort *after* both
 #   `once_after_*` and other `onchange_after_*` siblings.
 # - The timestamp comment below intentionally changes every render so chezmoi
@@ -70,6 +70,7 @@ ${D}─── What's available now ───────────────
     ${C}cw / cme${R}          Claude Code work / personal profile
     ${C}n${R}                 nvim
     ${C}macos-defaults${R}    re-apply system settings (sudo prompt)
+    ${C}code${R}              VS Code with repo-managed settings/extensions
 
 ${D}─── Suggested next steps ────────────────────────────────────────────${R}
 
