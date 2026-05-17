@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">dotfiles terminal preview</title>
+  <desc id="desc">A stylized terminal showing the dotfiles setup commands and prompt.</desc>
+  <defs>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#303446"/>
+      <stop offset="1" stop-color="#232634"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#11111b" flood-opacity=".35"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="520" fill="#c6d0f5"/>
+  <rect x="54" y="48" width="852" height="424" rx="18" fill="url(#frame)" filter="url(#shadow)"/>
+  <rect x="54" y="48" width="852" height="54" rx="18" fill="#292c3c"/>
+  <path d="M54 84h852v18H54z" fill="#292c3c"/>
+
+  <circle cx="88" cy="75" r="8" fill="#e78284"/>
+  <circle cx="114" cy="75" r="8" fill="#e5c890"/>
+  <circle cx="140" cy="75" r="8" fill="#a6d189"/>
+  <text x="480" y="81" text-anchor="middle" fill="#b5bfe2" font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="15">~/Developer/personal/dotfiles</text>
+
+  <g font-family="JetBrains Mono, SFMono-Regular, Menlo, monospace" font-size="20">
+    <text x="92" y="148" fill="#a6d189">➜</text>
+    <text x="126" y="148" fill="#8caaee">dotfiles</text>
+    <text x="240" y="148" fill="#c6d0f5">chezdoctor</text>
+
+    <text x="126" y="190" fill="#a6d189">pass</text>
+    <text x="210" y="190" fill="#c6d0f5">chezmoi source clean and current</text>
+    <text x="126" y="226" fill="#a6d189">pass</text>
+    <text x="210" y="226" fill="#c6d0f5">Ghostty, Zellij, Starship ready</text>
+    <text x="126" y="262" fill="#e5c890">warn</text>
+    <text x="210" y="262" fill="#c6d0f5">optional AI models not downloaded</text>
+
+    <text x="92" y="326" fill="#a6d189">➜</text>
+    <text x="126" y="326" fill="#8caaee">dotfiles</text>
+    <text x="240" y="326" fill="#c6d0f5">dotfiles features enable ai</text>
+    <text x="126" y="368" fill="#f4b8e4">profile</text>
+    <text x="230" y="368" fill="#c6d0f5">personal + macApps + ai</text>
+
+    <text x="92" y="432" fill="#a6d189">➜</text>
+    <text x="126" y="432" fill="#8caaee">dotfiles</text>
+    <text x="240" y="432" fill="#c6d0f5">chez</text>
+    <rect x="296" y="414" width="12" height="24" fill="#f2d5cf">
+      <animate attributeName="opacity" values="1;1;0;0;1" dur="1.1s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>

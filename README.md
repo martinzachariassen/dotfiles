@@ -8,6 +8,8 @@
 
 Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Git signing, Homebrew apps, Devbox project environments, and macOS defaults wired up. The installer defaults to a short recommended path, with cleanup and feature toggles available from a customize screen.
 
+![Terminal preview](docs/terminal-preview.svg)
+
 ## Start here
 
 Fresh Mac or existing machine:

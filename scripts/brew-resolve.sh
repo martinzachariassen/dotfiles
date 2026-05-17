@@ -24,6 +24,11 @@ for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
     case "$f" in *.lock.json) continue ;; esac
     echo "── $(basename "$f") ──"
     while IFS= read -r line; do
+        if [[ "$line" =~ ^[[:space:]]*tap[[:space:]]+\"([^\"]+)\" ]]; then
+            tap="${BASH_REMATCH[1]}"
+            brew tap | grep -Fxq "$tap" || brew tap "$tap" >/dev/null
+            continue
+        fi
         if [[ "$line" =~ ^[[:space:]]*(brew|cask)[[:space:]]+\"([^\"]+)\" ]]; then
             kind="${BASH_REMATCH[1]}"
             name="${BASH_REMATCH[2]}"
