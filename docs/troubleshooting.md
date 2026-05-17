@@ -4,6 +4,24 @@ If `chezmoi apply` ever prompts you about a file in `$HOME` having changed, the 
 
 A few specific issues worth knowing about:
 
+**VS Code says `java.jdt.ls.java.home` points to a missing folder for a devbox Java project** — don't set `java.jdt.ls.java.home` globally to `${env:JAVA_HOME}` or `${workspaceFolder}/.devbox/...`. GUI-launched VS Code often does not inherit `JAVA_HOME`, and Red Hat's Java extension does not expand `${workspaceFolder}` for that setting. The global dotfiles intentionally leave it unset so the extension can use its bundled JRE to launch the language server.
+
+For devbox-backed Java projects, commit a `.envrc` next to `devbox.json`:
+
+```sh
+eval "$(devbox generate direnv --print-envrc)"
+```
+
+The VS Code direnv extension then exports the project's JDK/Maven/Gradle environment for the workspace. The Jetify Devbox extension is also installed; for projects where an extension starts before direnv has updated the window environment, run `Devbox: Reopen in Devbox shell environment` from the command palette.
+
+Only use a workspace-local `.vscode/settings.json` as a fallback when Red Hat Java still cannot find a JDK. That setting needs an **absolute** path to that project's devbox profile:
+
+```json
+{
+  "java.jdt.ls.java.home": "/absolute/path/to/project/.devbox/nix/profile/default"
+}
+```
+
 **`./install.sh: permission denied`** — run it as `bash install.sh` instead, or `chmod +x install.sh` first. To make the bit stick across clones: `git update-index --chmod=+x install.sh && git commit`.
 
 **The sudo password prompt during `chezmoi apply` gets eaten, treated as a command, or "doesn't work the first time"** — fixed at the chezmoi level: a `run_before_00-sudo-cache` script now runs at the very start of every apply (regardless of whether you invoked it via `chez`, `chezup`, or plain `chezmoi apply -v`). It prompts for sudo *once*, on a clean terminal, before brew bundle or any other heavy output starts. A background keeper refreshes the credentials every 50s for the duration of the apply, so every subsequent sudo call inside cask installs and macos-defaults runs silently — even if brew bundle takes 20 minutes.

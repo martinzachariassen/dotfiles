@@ -11,11 +11,12 @@
 # Edit by:      direnv edit            # opens in $EDITOR, re-allows on save
 
 # ─── Runtime toolchain via devbox ────────────────────────────────────────────
-# `use_devbox` is the direnv stdlib hook for devbox. It reads devbox.json in
-# this directory and exports the project's Nix-built JDK / Kotlin / Postgres /
-# Node / etc. into the shell — scoped to this dir only, reverted on `cd` out.
-# Two projects on different JDK majors coexist without PATH gymnastics.
-use_devbox
+# Ask devbox to emit the direnv integration for this project. It reads
+# devbox.json in this directory and exports the project's Nix-built JDK /
+# Kotlin / Postgres / Node / etc. into the shell, scoped to this dir only and
+# reverted on `cd` out. Two projects on different JDK majors coexist without
+# PATH gymnastics.
+eval "$(devbox generate direnv --print-envrc)"
 
 # ─── Project-local environment variables ─────────────────────────────────────
 # These exist while you're in this directory, gone when you leave.

@@ -85,9 +85,9 @@ something else.
 
 - **`devbox`** (Jetify, Nix-backed) for per-project runtimes — Java/Kotlin/
   Postgres/Node/etc. Each project's repo carries its own `devbox.json`
-  (committed) and `.envrc` (with `use_devbox`); on `cd` direnv activates the
-  pinned toolchain for that project only. Two services on different JDK
-  majors coexist without PATH gymnastics.
+  (committed) and `.envrc` (with `eval "$(devbox generate direnv --print-envrc)"`);
+  on `cd` direnv activates the pinned toolchain for that project only. Two
+  services on different JDK majors coexist without PATH gymnastics.
 - For a new Spring Boot service the scaffold is:
   ```sh
   devbox init
@@ -276,8 +276,9 @@ refactor(api)!: rename /users → /accounts (drops backward compat)
   `rbenv`, `asdf`, `volta`, `sdkman`, or installing language runtimes via
   `brew` directly.
 - **For new projects, propose a committed `devbox.json` + `.envrc`** with
-  `use_devbox`. The toolchain travels with the project repo, so onboarding is
-  `git clone && cd` and direnv handles the rest.
+  `eval "$(devbox generate direnv --print-envrc)"`. The toolchain travels with
+  the project repo, so onboarding is `git clone && cd` and direnv handles the
+  rest.
 - **For Node, prefer `pnpm`** (add it via `devbox add nodejs pnpm` per project).
 - **For installing dev CLIs globally** (things you want available outside any
   project — `kubectl`, `terraform`, etc.), add them to my Brewfile rather than

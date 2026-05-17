@@ -14,9 +14,10 @@ setopt CORRECT                  # offer command corrections on typos
 
 # ─── Tooling ──────────────────────────────────────────────────────────────────
 # direnv: per-directory env vars + the activation hook for devbox. Drop a
-# `.envrc` into any project (typically containing `use_devbox`) and it loads
-# automatically when you `cd` in. Per-project runtimes (JDK, Kotlin, Postgres,
-# Node, …) come from each project's own `devbox.json`, not from this repo.
+# `.envrc` into any project (typically `eval "$(devbox generate direnv --print-envrc)"`)
+# and it loads automatically when you `cd` in. Per-project runtimes (JDK,
+# Kotlin, Postgres, Node, …) come from each project's own `devbox.json`, not
+# from this repo.
 # Whitelist of trusted dirs lives in ~/.config/direnv/direnv.toml so projects
 # under those roots don't need a per-project `direnv allow`.
 command -v direnv >/dev/null && eval "$(direnv hook zsh)"

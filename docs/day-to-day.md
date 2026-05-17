@@ -80,6 +80,45 @@ devbox add postgresql_16 redis pgcli
 
 For a starting point, copy one of [`examples/devbox/`](../examples/devbox/) into the project as `devbox.json`.
 
+### Starting a project with Devbox + direnv
+
+Use this for any project with repo-local tooling: Java, Kotlin, Node, Terraform,
+Kubernetes, database clients, or anything else where the version should travel
+with the repo instead of your global machine. Devbox defines the toolchain;
+direnv activates it automatically when you enter the directory and unloads it
+when you leave.
+
+```sh
+cd /path/to/project
+devbox init
+devbox add jdk21 maven              # replace with the tools this project needs
+devbox generate direnv
+```
+
+Commit the generated files:
+
+```sh
+git add devbox.json devbox.lock .envrc
+git commit -m "chore(devbox): add project toolchain"
+```
+
+`devbox generate direnv` writes an `.envrc` equivalent to:
+
+```sh
+eval "$(devbox generate direnv --print-envrc)"
+```
+
+That line asks devbox to emit the current environment for this project. Keeping
+it generated instead of hand-writing `PATH`/`JAVA_HOME` avoids baking Nix store
+paths or machine-local details into the repo.
+
+For projects under `~/Developer`, this dotfiles setup auto-trusts `.envrc`
+files. Elsewhere, run `direnv allow` once after reviewing the file.
+
+You do not need this for projects that have no local toolchain or environment
+variables. When a repo does use devbox, pair it with direnv by default; otherwise
+every terminal and editor session needs a manual `devbox shell`.
+
 **With a config file you want to manage** — install, configure, then adopt:
 
 ```sh

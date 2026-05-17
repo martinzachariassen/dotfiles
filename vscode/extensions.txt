@@ -1,6 +1,7 @@
 # Marketplace extensions installed by .chezmoiscripts/run_after_03-vscode.sh.tmpl.
 # JetBrains Kotlin is installed separately from the upstream VSIX release.
 catppuccin.catppuccin-vsc
+bierner.markdown-mermaid
 continue.continue
 davidanson.vscode-markdownlint
 eamodio.gitlens
@@ -10,6 +11,8 @@ github.vscode-pull-request-github
 github.copilot-chat
 hashicorp.terraform
 humao.rest-client
+jetpack-io.devbox
+mkhl.direnv
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql

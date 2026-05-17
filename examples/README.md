@@ -11,10 +11,10 @@ and edit. The comments inside each file explain the choices.
 
 ```sh
 # devbox + direnv: per-project runtimes + env vars
-cp ~/Developer/personal/dotfiles/examples/envrc.example /path/to/project/.envrc
 cd /path/to/project
 devbox init                                       # creates devbox.json
 devbox add jdk21 kotlin postgresql_16 gradle      # pin your toolchain
+devbox generate direnv                            # creates .envrc
 # direnv allow                                     # only if the dir isn't under ~/Developer (the whitelisted root)
 
 # or start from one of the opinionated templates
@@ -22,6 +22,8 @@ cp ~/Developer/personal/dotfiles/examples/devbox/backend-devbox.json /path/to/pr
 cp ~/Developer/personal/dotfiles/examples/devbox/kubernetes-devbox.json /path/to/project/devbox.json
 cp ~/Developer/personal/dotfiles/examples/devbox/terraform-devbox.json /path/to/project/devbox.json
 cp ~/Developer/personal/dotfiles/examples/devbox/opentofu-devbox.json /path/to/project/devbox.json
+cd /path/to/project
+devbox generate direnv
 
 # pre-commit: git hooks for lint/format/sanity-checks
 cp ~/Developer/personal/dotfiles/examples/pre-commit-config.yaml.example /path/to/project/.pre-commit-config.yaml
@@ -35,6 +37,10 @@ land via the Brewfile (`direnv` also has its hook in `.zshrc` and the `~/Develop
 whitelist in `~/.config/direnv/direnv.toml`), and `devbox` is installed via
 Jetify's official curl-installer by `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl`
 on first `chezmoi apply` (devbox isn't in homebrew). No further setup.
+
+`examples/envrc.example` is still useful when you want a documented `.envrc`
+with extra project environment variables, `PATH_add ./bin`, or `.envrc.local`
+support. For the common case, prefer `devbox generate direnv`.
 
 ### Why per-project runtimes (devbox) instead of a global manager?
 
