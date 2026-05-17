@@ -10,7 +10,7 @@ cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
 cask "google-chrome"            # the only browser most web tooling assumes
 cask "google-drive"
-cask "obsidian"
+cask "notion"
 cask "spotify"
 cask "obs"
 cask "vlc"
