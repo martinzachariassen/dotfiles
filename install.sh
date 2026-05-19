@@ -158,7 +158,12 @@ stop_long_step() {
     LONG_STEP_PID=""
 }
 
-trap stop_long_step EXIT
+cleanup_background_jobs() {
+    stop_long_step
+    stop_sudo_keepalive
+}
+
+trap cleanup_background_jobs EXIT
 
 timed_run() {
     local label="$1"
@@ -179,6 +184,49 @@ timed_run() {
         fail "$label failed after ${mins}m${secs}s"
         return "$rc"
     fi
+}
+
+SUDO_KEEPALIVE_PID=""
+
+stop_sudo_keepalive() {
+    [ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+    wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    SUDO_KEEPALIVE_PID=""
+}
+
+start_sudo_keepalive() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    local parent_pid=$$
+    (
+        while kill -0 "$parent_pid" 2>/dev/null; do
+            sudo -n true 2>/dev/null || exit
+            sleep 60
+        done
+    ) &
+    SUDO_KEEPALIVE_PID=$!
+}
+
+cache_sudo_for_homebrew() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    sudo -n true 2>/dev/null && return 0
+
+    if ! have_tty; then
+        fail "Homebrew needs sudo on a fresh Mac, but no terminal is available for the password prompt"
+        say "Run the installer from an interactive terminal:"
+        dim "    curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash"
+        exit 1
+    fi
+
+    hr
+    say "${BOLD}Homebrew needs admin access.${RESET}"
+    say "Enter your macOS password once so Homebrew can create /opt/homebrew."
+    exec </dev/tty
+    sleep 0.2
+    if ! sudo -v -p "[install.sh] sudo password: "; then
+        fail "could not cache sudo credentials for Homebrew"
+        exit 1
+    fi
+    ok "sudo cached for Homebrew"
 }
 
 have_tty() {
@@ -736,6 +784,46 @@ EOF_BREWFILES
     phase_close "Homebrew mirror"
 }
 
+ensure_homebrew_packages() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    command -v brew >/dev/null 2>&1 || { fail "brew is not on PATH; cannot install Brewfile packages"; exit 1; }
+
+    phase_open "Homebrew packages"
+    say "${BOLD}Verifying active Brewfiles.${RESET}"
+
+    local file label missing=0
+    while IFS= read -r file; do
+        [ -n "$file" ] || continue
+        label="$(basename "$file")"
+        if [ ! -f "$file" ]; then
+            fail "expected Brewfile missing: $file"
+            exit 1
+        fi
+        if brew bundle check --file="$file" >/dev/null 2>&1; then
+            ok "$label already satisfied"
+        else
+            missing=1
+            info "$label has missing packages"
+            cache_sudo_for_homebrew
+            start_sudo_keepalive
+            if ! timed_run "$label install" brew bundle install --file="$file"; then
+                stop_sudo_keepalive
+                exit 1
+            fi
+            stop_sudo_keepalive
+        fi
+    done <<EOF_BREWFILES
+$(active_brewfiles)
+EOF_BREWFILES
+
+    if [ "$missing" = "0" ]; then
+        ok "all selected Brewfiles are installed"
+    else
+        ok "selected Brewfiles installed"
+    fi
+    phase_close "Homebrew packages"
+}
+
 install_xcode_clt() {
     info "Xcode Command Line Tools"
     if ! xcode-select -p >/dev/null 2>&1; then
@@ -769,11 +857,21 @@ install_xcode_clt() {
 install_homebrew() {
     info "Homebrew"
     if ! command -v brew >/dev/null 2>&1; then
+        cache_sudo_for_homebrew
         dim "    Apple's CLT install may continue in the background; Homebrew can be slow while it waits for that toolchain."
-        timed_run "Homebrew installer" install_homebrew_script
+        start_sudo_keepalive
+        if ! timed_run "Homebrew installer" install_homebrew_script; then
+            stop_sudo_keepalive
+            exit 1
+        fi
+        stop_sudo_keepalive
     fi
     if [ "$DRY_RUN" != "1" ] && [ -x /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
+    if [ "$DRY_RUN" != "1" ] && ! command -v brew >/dev/null 2>&1; then
+        fail "Homebrew installer finished, but brew is still not on PATH"
+        exit 1
     fi
     ok "Homebrew at $(command -v brew 2>/dev/null || echo '<dry-run>')"
 }
@@ -793,7 +891,7 @@ install_homebrew_script() {
 
 configure_chezmoi() {
     info "Configuring chezmoi with the selected setup"
-    run mkdir -p "$HOME/.config/chezmoi"
+    run mkdir -p "$HOME/.config/chezmoi" || exit 1
 
     local init_flags key var
     init_flags=(
@@ -808,7 +906,7 @@ configure_chezmoi() {
         var="CHOICE_FEAT_${key}"
         init_flags+=("--promptBool=features.${key}=${!var}")
     done
-    run chezmoi init "${init_flags[@]}"
+    run chezmoi init "${init_flags[@]}" || exit 1
     ok "chezmoi configured"
 }
 
@@ -821,7 +919,7 @@ create_developer_directories() {
         "$HOME/Developer/experiments" \
         "$HOME/Developer/tools" \
         "$HOME/Developer/scripts" \
-        "$HOME/Developer/archive"
+        "$HOME/Developer/archive" || exit 1
     ok "Developer directory structure ready"
 }
 
@@ -835,9 +933,9 @@ backup_legacy_files() {
     local f rel
     for f in "${PROBE_LEGACY_FILES[@]}"; do
         rel="${f#"$HOME"/}"
-        run mkdir -p "$BACKUP_DIR/$(dirname "$rel")"
-        run cp -p "$f" "$BACKUP_DIR/$rel"
-        run rm -f "$f"
+        run mkdir -p "$BACKUP_DIR/$(dirname "$rel")" || exit 1
+        run cp -p "$f" "$BACKUP_DIR/$rel" || exit 1
+        run rm -f "$f" || exit 1
     done
     ok "legacy files backed up and removed"
 }
@@ -861,8 +959,9 @@ execute() {
         create_developer_directories
         configure_chezmoi
         info "Applying dotfiles for updated profile/features"
-        run chezmoi apply --force
+        run chezmoi apply --force || exit 1
         ok "chezmoi apply complete"
+        ensure_homebrew_packages
         phase_close "Install and apply"
         return
     fi
@@ -880,14 +979,14 @@ execute() {
 
     info "chezmoi"
     if ! command -v chezmoi >/dev/null 2>&1; then
-        timed_run "chezmoi Homebrew install" brew install chezmoi
+        timed_run "chezmoi Homebrew install" brew install chezmoi || exit 1
     fi
     ok "chezmoi at $(command -v chezmoi 2>/dev/null || echo '<dry-run>')"
 
     info "Repository at $SOURCE_DIR"
     if [ ! -d "$SOURCE_DIR/.git" ]; then
-        run mkdir -p "$(dirname "$SOURCE_DIR")"
-        timed_run "dotfiles repository clone" git clone "$REPO" "$SOURCE_DIR"
+        run mkdir -p "$(dirname "$SOURCE_DIR")" || exit 1
+        timed_run "dotfiles repository clone" git clone "$REPO" "$SOURCE_DIR" || exit 1
     else
         ok "already cloned"
     fi
@@ -895,8 +994,9 @@ execute() {
     configure_chezmoi
 
     info "Applying dotfiles. Homebrew is split into per-package installs with progress and resume-friendly reruns."
-    run chezmoi apply --force
+    run chezmoi apply --force || exit 1
     ok "chezmoi apply complete"
+    ensure_homebrew_packages
     [ "$CHOICE_MIRROR_BREW" = "true" ] && mirror_homebrew
     phase_close "Install and apply"
 }
@@ -925,7 +1025,7 @@ self_test() {
     _v "chezmoi" chezmoi --version
     _v "devbox" devbox version
     _vf "Nix store /nix" "[ -d /nix ]"
-    _vf "nix-daemon running" "launchctl list 2>/dev/null | grep -q org.nixos.nix-daemon"
+    _vf "nix-daemon running" "launchctl list 2>/dev/null | grep -Eq '(org\\.nixos|systems\\.determinate)\\.nix-daemon'"
     _v "starship" starship --version
     _v "zellij" zellij --version
     _v "lazygit" lazygit --version
