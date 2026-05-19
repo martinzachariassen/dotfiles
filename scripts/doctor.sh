@@ -76,8 +76,9 @@ if command -v chezmoi >/dev/null 2>&1; then
     else
         pass "chezmoi doctor clean"
     fi
-    # Drift between source and $HOME
-    drift=$(chezmoi status 2>/dev/null | wc -l | tr -d ' ')
+    # Drift between source and $HOME. Exclude scripts because run_* entries can
+    # remain pending after a successful apply by design.
+    drift=$(chezmoi status --exclude scripts 2>/dev/null | wc -l | tr -d ' ')
     if [ "$drift" = "0" ]; then
         pass "no drift between source and \$HOME"
     else

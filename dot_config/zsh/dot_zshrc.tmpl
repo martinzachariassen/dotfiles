@@ -172,7 +172,8 @@ dotfiles() {
 #   but the upfront-status preview here is still valuable.)
 #
 # This wrapper:
-#   1. Runs `chezmoi status` upfront to summarise pending changes.
+#   1. Runs `chezmoi status --exclude scripts` upfront to summarise pending
+#      file changes.
 #   2. Asks ONCE for confirmation if anything is pending.
 #   3. Runs `chezmoi apply --force` (no `-v`) so the apply is QUIET — the
 #      per-file content diffs that `-v` prints don't spam the terminal.
@@ -185,24 +186,26 @@ dotfiles() {
 #   chezmoi apply -v --force
 #
 # Sudo pre-auth is handled by .chezmoiscripts/run_before_00-sudo-cache, which
-# runs at the start of every `chezmoi apply` regardless of caller.
+# runs at the start of every `chezmoi apply` regardless of caller. Script
+# entries are intentionally excluded from the prompt below because run_*
+# scripts can remain pending after a successful apply by design.
 #
 # `--force` overwrites any local edits to managed files. The status preview
 # tells you what would be clobbered before you approve. To preserve specific
 # local edits, run `chezmoi re-add ~/.X` first to capture them into source.
 chez() {
     local status_output response
-    status_output=$(chezmoi status 2>&1)
+    status_output=$(chezmoi status --exclude scripts 2>&1)
     if [ -n "$status_output" ]; then
         echo
         echo "── Pending changes ───────────────────────────────────────────"
         echo "$status_output"
         echo "──────────────────────────────────────────────────────────────"
         echo "  What this means:"
-        echo "    chezmoi has changes to apply and/or managed files in \$HOME drifted."
+        echo "    chezmoi has file changes to apply and/or managed files in \$HOME drifted."
         echo
         echo "  Status codes:"
-        echo "    A add   M modify   D remove   R run script"
+        echo "    A add   M modify   D remove"
         echo "    left column = source repo → \$HOME, right column = current \$HOME drift"
         echo
         echo "  Choices:"
@@ -228,14 +231,14 @@ chezup() {
     (cd "$src" && git pull --ff-only) && chez "$@"
 }
 
-# Show every flavor of pending change in one shot — chezmoi diff (dotfiles),
-# brew bundle drift (uninstalled packages from any Brewfile), and which
-# scripts would re-fire. The thing `chezmoi diff` alone DOESN'T tell you.
+# Show every flavor of pending change in one shot — chezmoi diff (managed
+# files), brew bundle drift (uninstalled packages from any Brewfile), and which
+# scripts would re-fire.
 chezdiff() {
     local src f
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
-    echo "── chezmoi diff (dotfile changes) ────────────────────────────"
-    chezmoi diff
+    echo "── chezmoi diff (managed file changes) ───────────────────────"
+    chezmoi diff --exclude scripts
     echo
     echo "── brew bundle (missing packages) ────────────────────────────"
     # Check every Brewfile module that exists in source. The wildcard catches
@@ -248,7 +251,7 @@ chezdiff() {
     done
     echo
     echo "── chezmoi scripts that would re-fire ────────────────────────"
-    chezmoi apply --dry-run -v 2>&1 | grep -E '^run_' || echo "  none"
+    chezmoi status --include scripts 2>/dev/null || echo "  none"
 }
 
 # Reinitialise chezmoi data and apply — the "the upstream wizard prompts
