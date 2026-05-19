@@ -49,12 +49,21 @@ sourceDir = "$SOURCE_DIR"
 EOF
 
 echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS ai=$AI useOnePassword=$USE_ONE_PASSWORD"
-HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
-    --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
-    --destination="$tmpdir" \
-    --source="$SOURCE_DIR" \
-    --no-pager \
-    --color=false
+render_output="$tmpdir/chezmoi-render.out"
+if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
+        --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
+        --destination="$tmpdir" \
+        --source="$SOURCE_DIR" \
+        --no-pager \
+        --color=false >"$render_output" 2>&1; then
+    cat "$render_output"
+    exit 1
+fi
+
+# The test fixture intentionally supplies a static chezmoi.toml while the repo
+# contains .chezmoi.toml.tmpl. That warning is expected here; any other output
+# is still shown so real render drift remains visible.
+sed '/^chezmoi: warning: config file template has changed, run chezmoi init to regenerate config file$/d' "$render_output"
 
 for template in "$SOURCE_DIR"/.chezmoiscripts/*.sh.tmpl; do
     [ -f "$template" ] || continue

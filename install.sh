@@ -1124,7 +1124,7 @@ next_steps() {
         say "$n. ${BOLD}1Password${RESET} - sign in and enable Settings -> Developer -> SSH agent"
         n=$((n + 1))
     fi
-    say "$n. ${BOLD}bootstrap auth${RESET} - gh, az, gcloud, AKS/GKE, git signing"
+    say "$n. ${BOLD}bootstrap auth${RESET} - gh, optional cloud auth, git signing"
     dim "    bash $SOURCE_DIR/scripts/bootstrap-auth.sh"
     n=$((n + 1))
     say "$n. ${BOLD}reload shell${RESET} - start using the managed zsh config"

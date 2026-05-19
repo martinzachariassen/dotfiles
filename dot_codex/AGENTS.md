@@ -130,13 +130,13 @@ alternatives, default to these unless a specific project uses something else.
 
 **Kubernetes**
 
-- `kubectl`, `kubectx`/`kubens`, `k9s`, `stern`, `helm`.
-- AKS auth: `kubelogin`.
+- Project tools: `kubectl`, `k9s`, `stern`, `helm` via per-project Devbox.
+- Work-profile helpers: `kubectx`/`kubens`, AKS `kubelogin`, and GCP `gcloud`.
 - GKE auth: `gke-gcloud-auth-plugin`.
 
 **Cloud CLIs**
 
-- `az` (Azure), `gcloud` (GCP). My cloud stack is Azure + GCP.
+- Work-profile tools only: `az` (Azure), `gcloud` (GCP). My cloud stack is Azure + GCP.
 
 **Infrastructure-as-Code**
 
