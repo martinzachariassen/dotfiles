@@ -18,6 +18,8 @@ Fresh Mac or existing machine:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
+Run that as your normal macOS user, not with `sudo`. Homebrew and the macOS setup steps request your sudo password themselves when they need privileged changes.
+
 Fresh installs show progress before and during the heavy parts: Xcode CLT/Homebrew bootstrap gets a heartbeat, then Homebrew packages split into individual taps/formulae/casks with per-item progress. Reruns skip packages that already landed.
 
 Already bootstrapped and only changing profile, identity, or feature toggles:

@@ -126,6 +126,14 @@ Plus an upfront plan that tells you what's coming, how many modules will run, an
 
 If a package fails or the process is interrupted, re-run `chezmoi apply` or the installer. Completed Homebrew items are skipped by the next run, and the output resumes with the next missing item. If you genuinely think brew is frozen (heartbeat stopped firing too), `ps aux | grep brew` will show whether brew is still working — most often it's stuck on a `curl` for a slow mirror.
 
+**Should I use sudo for the installer?** — no. Run the bootstrap as your normal macOS user:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
+```
+
+Do not use `curl ... | sudo bash`. Homebrew expects to be installed by the target user and asks for sudo internally when it needs to create privileged paths. Running the whole dotfiles installer as root would also point `$HOME` at root's home instead of yours. If you accidentally do that, the installer fails early with a "do not run this installer with sudo" message.
+
 **The first install stage takes forever before packages appear** — that is usually Xcode Command Line Tools or Homebrew bootstrapping itself. A brand-new Mac often has to install Apple's compiler toolchain before Homebrew can build or verify anything. Phase 4 now prints a sub-plan before it starts:
 
 ```text

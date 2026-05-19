@@ -81,6 +81,16 @@ fail()  { printf "%s  %s✗%s %s\n" "${CYAN}│${RESET}" "$RED" "$RESET" "$1"; }
 dim()   { printf "%s  %s%s%s\n" "${CYAN}│${RESET}" "$DIM" "$1" "$RESET"; }
 hr()    { printf "%s\n" "${CYAN}│${RESET}"; }
 
+require_non_root() {
+    if [ "${EUID:-$(id -u)}" -eq 0 ]; then
+        fail "do not run this installer with sudo"
+        say "Run it as your normal macOS user:"
+        dim "    curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash"
+        say "Homebrew and macOS steps will ask for your sudo password only when they need it."
+        exit 1
+    fi
+}
+
 setting() {
     local label="$1" value="$2"
     printf "%s    %-18s %s\n" "${CYAN}│${RESET}" "$label" "$value"
@@ -985,6 +995,7 @@ next_steps() {
 }
 
 main() {
+    require_non_root
     banner
     probe
     choices

@@ -6,6 +6,8 @@ On a fresh Mac (or an existing one), open Terminal and run:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
+Run that command as your normal macOS user, not with `sudo`. `sudo curl ... | bash` only makes the download privileged, not the installer. `curl ... | sudo bash` runs the whole setup as root, which breaks Homebrew and writes dotfiles into the wrong home directory. The installer and Homebrew will ask for your sudo password at the specific steps that need it.
+
 You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. The default path asks for your profile, name, email, and an optional 1Password signing public key; package cleanup and feature toggles live behind the customize option. Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
 
 ```text
