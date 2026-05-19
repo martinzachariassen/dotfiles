@@ -948,7 +948,7 @@ execute() {
         setting "4.2" "Xcode Command Line Tools"
         setting "4.3" "Homebrew and chezmoi"
         setting "4.4" "clone dotfiles repo"
-        setting "4.5" "apply dotfiles and package plan"
+        setting "4.5" "install packages, then apply dotfiles"
         dim "    Long external installers print a 30-second heartbeat while they run."
         hr
     fi
@@ -958,6 +958,7 @@ execute() {
         if ! command -v chezmoi >/dev/null 2>&1; then fail "configure-only requires chezmoi on PATH"; exit 1; fi
         create_developer_directories
         configure_chezmoi
+        ensure_homebrew_packages
         info "Applying dotfiles for updated profile/features"
         run chezmoi apply --force || exit 1
         ok "chezmoi apply complete"
@@ -993,7 +994,8 @@ execute() {
 
     configure_chezmoi
 
-    info "Applying dotfiles. Homebrew is split into per-package installs with progress and resume-friendly reruns."
+    ensure_homebrew_packages
+    info "Applying dotfiles after package verification."
     run chezmoi apply --force || exit 1
     ok "chezmoi apply complete"
     ensure_homebrew_packages
