@@ -121,6 +121,56 @@ run() {
     fi
 }
 
+LONG_STEP_PID=""
+
+start_long_step() {
+    [ "$DRY_RUN" = "1" ] && return 0
+    local label="$1" parent_pid=$$ start_ts
+    start_ts="$(date +%s)"
+    (
+        sleep 30
+        while kill -0 "$parent_pid" 2>/dev/null; do
+            local now elapsed mins secs
+            now="$(date +%s)"
+            elapsed=$((now - start_ts))
+            mins=$((elapsed / 60))
+            secs=$((elapsed % 60))
+            printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "${CYAN}│${RESET}" "$DIM" "$label" "$mins" "$secs" "$RESET"
+            sleep 30
+        done
+    ) &
+    LONG_STEP_PID=$!
+}
+
+stop_long_step() {
+    [ -n "$LONG_STEP_PID" ] && kill "$LONG_STEP_PID" 2>/dev/null
+    wait "$LONG_STEP_PID" 2>/dev/null || true
+    LONG_STEP_PID=""
+}
+
+trap stop_long_step EXIT
+
+timed_run() {
+    local label="$1"
+    shift
+    local start_ts end_ts elapsed mins secs rc
+    start_ts="$(date +%s)"
+    start_long_step "$label"
+    rc=0
+    run "$@" || rc=$?
+    stop_long_step
+    end_ts="$(date +%s)"
+    elapsed=$((end_ts - start_ts))
+    mins=$((elapsed / 60))
+    secs=$((elapsed % 60))
+    if [ "$rc" -eq 0 ]; then
+        ok "$label finished in ${mins}m${secs}s"
+    else
+        fail "$label failed after ${mins}m${secs}s"
+        return "$rc"
+    fi
+}
+
 have_tty() {
     ( exec </dev/tty >/dev/tty ) 2>/dev/null
 }
@@ -682,16 +732,23 @@ install_xcode_clt() {
         info "opening Apple's Command Line Tools installer"
         run xcode-select --install || true
         if [ "$DRY_RUN" != "1" ]; then
+            dim "    Complete Apple's installer dialog if it is still open. Fresh Macs can spend 20-60 minutes here."
             printf "%s    %swaiting for CLT install to complete" "${CYAN}|${RESET}" "$DIM"
             local i
-            for i in $(seq 1 240); do
+            for i in $(seq 1 720); do
                 if xcode-select -p >/dev/null 2>&1; then printf "%s\n" "$RESET"; break; fi
-                printf "."
+                if [ $((i % 12)) -eq 0 ]; then
+                    printf "%s\n" "$RESET"
+                    dim "    still waiting for Xcode CLT - $((i / 12))m elapsed"
+                    printf "%s    %swaiting" "${CYAN}|${RESET}" "$DIM"
+                else
+                    printf "."
+                fi
                 sleep 5
             done
             if ! xcode-select -p >/dev/null 2>&1; then
                 printf "%s\n" "$RESET"
-                fail "Xcode CLT install timed out after 20 minutes; re-run the installer after it finishes"
+                fail "Xcode CLT install timed out after 60 minutes; re-run the installer after it finishes"
                 exit 1
             fi
         fi
@@ -702,8 +759,8 @@ install_xcode_clt() {
 install_homebrew() {
     info "Homebrew"
     if ! command -v brew >/dev/null 2>&1; then
-        info "installing Homebrew non-interactively"
-        run /bin/bash -c "NONINTERACTIVE=1 \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        dim "    Apple's CLT install may continue in the background; Homebrew can be slow while it waits for that toolchain."
+        timed_run "Homebrew installer" /bin/bash -c "NONINTERACTIVE=1 \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
     fi
     if [ "$DRY_RUN" != "1" ] && [ -x /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -764,6 +821,16 @@ backup_legacy_files() {
 
 execute() {
     phase_open "4/5 - Install and apply"
+    if [ "$CONFIGURE_ONLY" != "1" ]; then
+        say "${BOLD}Fresh Mac bootstrap can pause on Apple and Homebrew installers.${RESET}"
+        setting "4.1" "prepare directories and legacy files"
+        setting "4.2" "Xcode Command Line Tools"
+        setting "4.3" "Homebrew and chezmoi"
+        setting "4.4" "clone dotfiles repo"
+        setting "4.5" "apply dotfiles and package plan"
+        dim "    Long external installers print a 30-second heartbeat while they run."
+        hr
+    fi
 
     if [ "$CONFIGURE_ONLY" = "1" ]; then
         if [ ! -d "$SOURCE_DIR/.git" ]; then fail "configure-only requires an existing repo at $SOURCE_DIR"; exit 1; fi
@@ -790,21 +857,21 @@ execute() {
 
     info "chezmoi"
     if ! command -v chezmoi >/dev/null 2>&1; then
-        run brew install chezmoi
+        timed_run "chezmoi Homebrew install" brew install chezmoi
     fi
     ok "chezmoi at $(command -v chezmoi 2>/dev/null || echo '<dry-run>')"
 
     info "Repository at $SOURCE_DIR"
     if [ ! -d "$SOURCE_DIR/.git" ]; then
         run mkdir -p "$(dirname "$SOURCE_DIR")"
-        run git clone "$REPO" "$SOURCE_DIR"
+        timed_run "dotfiles repository clone" git clone "$REPO" "$SOURCE_DIR"
     else
         ok "already cloned"
     fi
 
     configure_chezmoi
 
-    info "Applying dotfiles. Homebrew downloads dominate first install time."
+    info "Applying dotfiles. Homebrew is split into per-package installs with progress and resume-friendly reruns."
     run chezmoi apply --force
     ok "chezmoi apply complete"
     [ "$CHOICE_MIRROR_BREW" = "true" ] && mirror_homebrew

@@ -98,17 +98,18 @@ GIT_PAGER=cat git diff             # one-shot pager override
 LESS=-RX chezmoi diff              # one-shot less override (always pages, no -F)
 ```
 
-**Brew bundle looks frozen — no output for minutes** — long downloads (large casks, slow networks) can sit silently because brew streams output only as steps complete. The brew-bundle script now prints a heartbeat every 45 seconds during silent stretches:
+**Brew bundle looks frozen — no output for minutes** — long downloads (large casks, slow networks) can sit silently because brew streams output only as steps complete. The brew-bundle script splits the active Brewfiles into individual taps/formulae/casks and prints a heartbeat every 30 seconds during silent stretches:
 
 ```text
-→ 1/4  core (always)  (Brewfile)
+→ Module 1/4: core (always) (Brewfile, 43 item(s))
+→ 35/59  core (always): cask docker-desktop
 ...brew bundle output...
-  … still working on core (always) — 1m30s elapsed
-  … still working on core (always) — 2m15s elapsed
-✓ 1/4  core (always)  done in 2m48s
+  … still working on cask docker-desktop — 1m00s elapsed
+  … still working on cask docker-desktop — 1m30s elapsed
+✓ 35/59  core (always): cask docker-desktop done in 2m48s
 ```
 
-Plus an upfront plan that tells you what's coming and roughly how long:
+Plus an upfront plan that tells you what's coming, how many modules will run, and how many Homebrew items are in the selected setup:
 
 ```text
 ◆ Apply 3/5: Homebrew packages
@@ -118,11 +119,28 @@ Plus an upfront plan that tells you what's coming and roughly how long:
     2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
     3. personal profile extras
     4. work profile extras
+  Items: 59 taps/formulae/casks split into individual installs.
   First install usually takes 5-15 minutes. Downloads dominate.
-  Quiet stretches print a heartbeat every 45 seconds.
+  Quiet stretches print a heartbeat every 30 seconds.
 ```
 
-If you genuinely think brew is frozen (heartbeat stopped firing too), `ps aux | grep brew` will show whether brew is still working — most often it's stuck on a `curl` for a slow mirror.
+If a package fails or the process is interrupted, re-run `chezmoi apply` or the installer. Completed Homebrew items are skipped by the next run, and the output resumes with the next missing item. If you genuinely think brew is frozen (heartbeat stopped firing too), `ps aux | grep brew` will show whether brew is still working — most often it's stuck on a `curl` for a slow mirror.
+
+**The first install stage takes forever before packages appear** — that is usually Xcode Command Line Tools or Homebrew bootstrapping itself. A brand-new Mac often has to install Apple's compiler toolchain before Homebrew can build or verify anything. Phase 4 now prints a sub-plan before it starts:
+
+```text
+◆  4/5 - Install and apply
+│
+│  Fresh Mac bootstrap can pause on Apple and Homebrew installers.
+│    4.1                prepare directories and legacy files
+│    4.2                Xcode Command Line Tools
+│    4.3                Homebrew and chezmoi
+│    4.4                clone dotfiles repo
+│    4.5                apply dotfiles and package plan
+│  Long external installers print a 30-second heartbeat while they run.
+```
+
+If Xcode CLT is missing, the script opens Apple's installer and polls for up to 60 minutes with elapsed-time messages. If Homebrew, `brew install chezmoi`, or `git clone` are slow, they print a heartbeat every 30 seconds. If the Mac sleeps or the network drops, rerun `install.sh`; completed steps are detected and skipped.
 
 **`chezmoi apply -v` hangs at `tightening permissions on /opt/homebrew/share/zsh*`** — should finish in <1s now (scoped to just the zsh dirs). If it hangs longer, you're probably running an old version of the script — Ctrl-C, `git pull` (or just re-run `chezmoi apply` from the source dir), and re-apply.
 
