@@ -238,6 +238,18 @@ have_tty() {
     ( exec </dev/tty >/dev/tty ) 2>/dev/null
 }
 
+adopt_homebrew_path() {
+    command -v brew >/dev/null 2>&1 && return 0
+
+    if [ -x /opt/homebrew/bin/brew ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -x /usr/local/bin/brew ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+
+    command -v brew >/dev/null 2>&1
+}
+
 prompt_read() {
     local __out="$1" prompt="$2" response
     printf "%s  %s" "${CYAN}│${RESET}" "$prompt" > /dev/tty
@@ -498,6 +510,8 @@ probe() {
     else
         warn "macOS $PROBE_OS_VER on Intel - this repo targets Apple Silicon"
     fi
+
+    adopt_homebrew_path || true
 
     if xcode-select -p >/dev/null 2>&1; then ok "Xcode Command Line Tools present"; else info "Xcode CLT missing - setup will open Apple's installer"; fi
     if command -v brew >/dev/null 2>&1; then ok "Homebrew at $(command -v brew)"; else info "Homebrew missing - setup will install it"; fi
@@ -861,6 +875,7 @@ install_xcode_clt() {
 
 install_homebrew() {
     info "Homebrew"
+    adopt_homebrew_path || true
     if ! command -v brew >/dev/null 2>&1; then
         cache_sudo_for_homebrew
         dim "    Apple's CLT install may continue in the background; Homebrew can be slow while it waits for that toolchain."
@@ -871,9 +886,7 @@ install_homebrew() {
         fi
         stop_sudo_keepalive
     fi
-    if [ "$DRY_RUN" != "1" ] && [ -x /opt/homebrew/bin/brew ]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
+    adopt_homebrew_path || true
     if [ "$DRY_RUN" != "1" ] && ! command -v brew >/dev/null 2>&1; then
         fail "Homebrew installer finished, but brew is still not on PATH"
         exit 1
@@ -892,6 +905,32 @@ install_homebrew_script() {
     rc=$?
     rm -f "$installer"
     return "$rc"
+}
+
+install_chezmoi() {
+    info "chezmoi"
+    if command -v chezmoi >/dev/null 2>&1; then
+        ok "chezmoi at $(command -v chezmoi)"
+        return 0
+    fi
+
+    adopt_homebrew_path || true
+    if ! command -v brew >/dev/null 2>&1; then
+        fail "Homebrew is required before installing chezmoi"
+        exit 1
+    fi
+
+    timed_run "chezmoi Homebrew install" brew install chezmoi || exit 1
+    if [ "$DRY_RUN" = "1" ]; then
+        ok "chezmoi at <dry-run>"
+        return 0
+    fi
+    hash -r 2>/dev/null || true
+    if ! command -v chezmoi >/dev/null 2>&1; then
+        fail "chezmoi install finished, but chezmoi is still not on PATH"
+        exit 1
+    fi
+    ok "chezmoi at $(command -v chezmoi)"
 }
 
 configure_chezmoi() {
@@ -960,6 +999,7 @@ execute() {
 
     if [ "$CONFIGURE_ONLY" = "1" ]; then
         if [ ! -d "$SOURCE_DIR/.git" ]; then fail "configure-only requires an existing repo at $SOURCE_DIR"; exit 1; fi
+        adopt_homebrew_path || true
         if ! command -v chezmoi >/dev/null 2>&1; then fail "configure-only requires chezmoi on PATH"; exit 1; fi
         create_developer_directories
         configure_chezmoi
@@ -983,11 +1023,7 @@ execute() {
     install_homebrew
     [ "$CHOICE_RESET_BREW" = "true" ] && reset_homebrew
 
-    info "chezmoi"
-    if ! command -v chezmoi >/dev/null 2>&1; then
-        timed_run "chezmoi Homebrew install" brew install chezmoi || exit 1
-    fi
-    ok "chezmoi at $(command -v chezmoi 2>/dev/null || echo '<dry-run>')"
+    install_chezmoi
 
     info "Repository at $SOURCE_DIR"
     if [ ! -d "$SOURCE_DIR/.git" ]; then
