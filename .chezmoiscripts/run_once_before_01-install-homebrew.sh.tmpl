@@ -20,8 +20,12 @@ if command -v brew >/dev/null 2>&1; then
 fi
 
 echo "→ Installing Homebrew. This is usually about a minute on a fresh Mac."
-NONINTERACTIVE=1 /bin/bash -c \
-    "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+installer="$(mktemp)"
+trap 'rm -f "$installer"' EXIT
+curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$installer"
+NONINTERACTIVE=1 /bin/bash "$installer"
+rm -f "$installer"
+trap - EXIT
 
 # Apple Silicon path
 if [ -x /opt/homebrew/bin/brew ]; then

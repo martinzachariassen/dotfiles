@@ -769,8 +769,16 @@ install_homebrew() {
 }
 
 install_homebrew_script() {
-    NONINTERACTIVE=1 /bin/bash -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    local installer rc
+    installer="$(mktemp)"
+    if ! curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$installer"; then
+        rm -f "$installer"
+        return 1
+    fi
+    NONINTERACTIVE=1 /bin/bash "$installer"
+    rc=$?
+    rm -f "$installer"
+    return "$rc"
 }
 
 configure_chezmoi() {
