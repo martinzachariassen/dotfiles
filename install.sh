@@ -760,12 +760,17 @@ install_homebrew() {
     info "Homebrew"
     if ! command -v brew >/dev/null 2>&1; then
         dim "    Apple's CLT install may continue in the background; Homebrew can be slow while it waits for that toolchain."
-        timed_run "Homebrew installer" /bin/bash -c "NONINTERACTIVE=1 \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        timed_run "Homebrew installer" install_homebrew_script
     fi
     if [ "$DRY_RUN" != "1" ] && [ -x /opt/homebrew/bin/brew ]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     fi
     ok "Homebrew at $(command -v brew 2>/dev/null || echo '<dry-run>')"
+}
+
+install_homebrew_script() {
+    NONINTERACTIVE=1 /bin/bash -c \
+        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 }
 
 configure_chezmoi() {
