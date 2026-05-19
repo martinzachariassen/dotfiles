@@ -95,4 +95,4 @@ These are the dotfiles/dirs that will remain — and the reason each one can't g
 | `~/.CFUserTextEncoding`, `~/.Trash/` | macOS system files. |
 | `Applications/`, `Desktop/`, `Documents/`, `Downloads/`, `Library/`, `Movies/`, `Music/`, `Pictures/`, `Public/`, `Dev/` | User folders, not dotfiles. |
 
-That's the floor. ~11 dotfile entries instead of the 14 you started with, and each remaining one has a concrete technical reason.
+That's the floor: the remaining unmanaged entries are either local state/cache, macOS-managed files, or app-hardcoded directories with managed config inside them.

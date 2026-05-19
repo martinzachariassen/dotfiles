@@ -264,10 +264,5 @@
     // SECURITY
     // =========================================================
 
-    "security.workspace.trust.enabled": true,
-    "yaml.schemas": {
-        "file:///Users/martin/.vscode/extensions/continue.continue-1.2.22-darwin-arm64/config-yaml-schema.json": [
-            ".continue/**/*.yaml"
-        ]
-    }
+    "security.workspace.trust.enabled": true
 }

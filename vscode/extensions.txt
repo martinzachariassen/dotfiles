@@ -2,7 +2,6 @@
 # JetBrains Kotlin is installed separately from the upstream VSIX release.
 catppuccin.catppuccin-vsc
 bierner.markdown-mermaid
-continue.continue
 davidanson.vscode-markdownlint
 eamodio.gitlens
 editorconfig.editorconfig
