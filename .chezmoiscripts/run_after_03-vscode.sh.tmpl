@@ -13,6 +13,9 @@ exit 0
 
 SOURCE="{{ .chezmoi.sourceDir }}"
 EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
+DEPRECATED_EXTENSIONS=(
+    "continue.continue"
+)
 
 if ! command -v code >/dev/null 2>&1; then
     echo "! VS Code CLI not found; extension install skipped"
@@ -43,6 +46,18 @@ install_marketplace_extensions() {
             code --install-extension "$ext"
         fi
     done < "$EXTENSIONS_FILE"
+}
+
+uninstall_deprecated_extensions() {
+    local installed ext
+    installed="$(installed_extensions)"
+
+    for ext in "${DEPRECATED_EXTENSIONS[@]}"; do
+        if printf '%s\n' "$installed" | grep -qi "^${ext}$"; then
+            echo "→ uninstalling deprecated extension: $ext"
+            code --uninstall-extension "$ext"
+        fi
+    done
 }
 
 latest_kotlin_release_json() {
@@ -123,6 +138,7 @@ echo "◆ Apply 4/5: VS Code extensions"
 echo "  Manifest: $EXTENSIONS_FILE"
 
 install_marketplace_extensions
+uninstall_deprecated_extensions
 install_kotlin_vsix
 
 echo "✓ VS Code extensions are managed"
