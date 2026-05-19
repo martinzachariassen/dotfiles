@@ -47,9 +47,6 @@ start_heartbeat() {
     local start_ts
     start_ts="$(date +%s)"
     (
-        # Wait 30s before the first message — quick installs shouldn't
-        # trigger heartbeat noise at all.
-        sleep 30
         local since_msg=0
         while kill -0 "$parent_pid" 2>/dev/null; do
             sleep 2

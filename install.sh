@@ -138,15 +138,19 @@ start_long_step() {
     local label="$1" parent_pid=$$ start_ts
     start_ts="$(date +%s)"
     (
-        sleep 30
+        local since_msg=0
         while kill -0 "$parent_pid" 2>/dev/null; do
-            local now elapsed mins secs
-            now="$(date +%s)"
-            elapsed=$((now - start_ts))
-            mins=$((elapsed / 60))
-            secs=$((elapsed % 60))
-            printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "${CYAN}│${RESET}" "$DIM" "$label" "$mins" "$secs" "$RESET"
-            sleep 30
+            sleep 2
+            since_msg=$((since_msg + 2))
+            if [ "$since_msg" -ge 30 ]; then
+                local now elapsed mins secs
+                now="$(date +%s)"
+                elapsed=$((now - start_ts))
+                mins=$((elapsed / 60))
+                secs=$((elapsed % 60))
+                printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "${CYAN}│${RESET}" "$DIM" "$label" "$mins" "$secs" "$RESET"
+                since_msg=0
+            fi
         done
     ) &
     LONG_STEP_PID=$!
