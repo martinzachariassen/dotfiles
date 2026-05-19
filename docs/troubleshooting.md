@@ -139,7 +139,7 @@ Do not use `curl ... | sudo bash`. Homebrew expects to be installed by the targe
 ```text
 ◆  4/5 - Install and apply
 │
-│  Fresh Mac bootstrap can pause on Apple and Homebrew installers.
+│  Fresh macOS bootstrap can pause on Apple and Homebrew installers.
 │    4.1                prepare directories and legacy files
 │    4.2                Xcode Command Line Tools
 │    4.3                Homebrew and chezmoi

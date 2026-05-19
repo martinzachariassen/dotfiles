@@ -1,6 +1,6 @@
 # Bootstrap
 
-On a fresh Mac (or an existing one), open Terminal and run:
+On a fresh Mac, open any terminal and run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
@@ -8,28 +8,35 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 
 Run that command as your normal macOS user, not with `sudo`. `sudo curl ... | bash` only makes the download privileged, not the installer. `curl ... | sudo bash` runs the whole setup as root, which breaks Homebrew and writes dotfiles into the wrong home directory. The installer and Homebrew will ask for your sudo password at the specific steps that need it.
 
-You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. The default path asks for your profile, name, email, and an optional 1Password signing public key if you already know it; otherwise `bootstrap-auth.sh` records it after 1Password is installed and signed in. Package cleanup and feature toggles live behind the customize option. Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
+You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. If the terminal cannot render box-drawing characters, the wizard falls back to plain ASCII while keeping the same layout.
+
+The default path is aimed at a fresh macOS install: it asks only for profile, git name, and git email. It does not ask for a 1Password signing public key before 1Password exists on the machine. Git signing is finished by `bootstrap-auth.sh` after 1Password is installed and signed in. Package cleanup, feature toggles, and manual signing-key entry live behind the customize option.
+
+Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
 
 ```text
 ╭────────────────────────────────────────────────────────────╮
 │  Dotfiles Setup                                             │
-│  Plug-and-play macOS workstation bootstrap.                  │
+│  Fresh macOS workstation bootstrap.                          │
 ╰────────────────────────────────────────────────────────────╯
-│  The default path asks for identity, profile, and optional git signing.
+│  The default path only asks for inputs available on a fresh Mac.
+│  Git signing is finished later, after 1Password is installed and signed in.
 │  Advanced cleanup and feature toggles stay available when you need them.
 │
 ◆  2/5 - Choose setup
 │
-│  Essentials first. Press Enter to keep any detected value.
+│  Essentials first. Press Enter keeps the detected value.
+│      Fresh installs only need profile, git name, and git email here.
 │
 ◆  Profile
 │    1. personal - personal extras only
 │    2. work - work extras only
 │    3. both - personal and work extras (current)
-│  Choose 1-3, or leave blank for both:
+│  Choose 1-3, or press Enter for both:
 │
 │  Recommended setup
 │    1Password          yes
+│    Git signing        finish later in bootstrap-auth.sh
 │    Mac apps           yes
 │    Local AI           no
 │    Homebrew cleanup   keep local packages
@@ -71,9 +78,9 @@ bash install.sh --configure-only
 | Phase | Name | What it does |
 |---|---|---|
 | **1/5** | Check this Mac | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **2/5** | Choose setup | Essentials first: profile, name, email, and the optional 1Password signing public key when already available. The recommended path keeps 1Password enabled, installs macOS app extras, leaves local Homebrew packages alone, backs up legacy dotfiles, and removes oh-my-zsh if found. Choose customize to change signing, feature toggles, Homebrew mirror/reset, or migration behavior. |
+| **2/5** | Choose setup | Essentials first: profile, name, and email. Existing signing keys are preserved, but fresh installs leave signing for the post-install auth step because the key comes from 1Password. The recommended path keeps 1Password enabled, installs macOS app extras, leaves local Homebrew packages alone, backs up legacy dotfiles, and removes oh-my-zsh if found. Choose customize to change signing, feature toggles, Homebrew mirror/reset, or migration behavior. |
 | **3/5** | Review plan | One-screen summary of every choice. Last chance to abort. Destructive Homebrew cleanup modes require typing `MIRROR BREW` or `RESET BREW`. |
-| **4/5** | Install and apply | Shows a fresh-Mac sub-plan, backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 60 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to per-package Homebrew bundle runs across core + workstation/profile extras, plus macOS defaults (sudo once). Long external installers print a 30-second heartbeat. |
+| **4/5** | Install and apply | Shows a fresh-Mac sub-plan, backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 60 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which installs Homebrew packages once in a split per-item progress view, applies dotfiles, installs VS Code extensions, and runs macOS defaults (sudo once). Long external installers print a 30-second heartbeat. |
 | **5/5** | Verify | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
 | **Next steps** | Finish accounts | Prints the exact follow-ups: sign in to 1Password, run `bootstrap-auth.sh`, `exec zsh`, restart. |
 

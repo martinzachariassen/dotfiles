@@ -6,7 +6,7 @@
 [![Catppuccin Frappe](https://img.shields.io/badge/Catppuccin-Frapp%C3%A9-f2d5cf?labelColor=303446)](https://github.com/catppuccin/catppuccin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Git signing, Homebrew apps, Devbox project environments, and macOS defaults wired up. The installer defaults to a short recommended path, with cleanup and feature toggles available from a customize screen.
+Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Homebrew apps, Devbox project environments, and macOS defaults wired up. The installer defaults to a short fresh-Mac path, with cleanup, feature toggles, and git signing setup available when the required software is actually installed.
 
 ![Terminal preview](docs/terminal-preview.svg)
 
@@ -20,7 +20,9 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 
 Run that as your normal macOS user, not with `sudo`. Homebrew and the macOS setup steps request your sudo password themselves when they need privileged changes.
 
-Fresh installs show progress before and during the heavy parts: Xcode CLT/Homebrew bootstrap gets a heartbeat, then Homebrew packages split into individual taps/formulae/casks with per-item progress. Reruns skip packages that already landed.
+Fresh installs ask only for profile, git name, and git email up front. Git signing is finished later by `bootstrap-auth.sh`, after 1Password is installed and signed in. The wizard explains each prompt inline, uses normal text input instead of special key handling, and falls back to plain ASCII when the terminal cannot render box-drawing characters.
+
+The heavy parts have visible progress: Xcode CLT/Homebrew bootstrap gets a heartbeat, then Homebrew packages split into individual taps/formulae/casks with per-item progress. Reruns skip packages that already landed.
 
 Already bootstrapped and only changing profile, identity, or feature toggles:
 

@@ -73,13 +73,29 @@ else
     BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
 fi
 
-say()   { printf "%s  %s\n" "${CYAN}│${RESET}" "$1"; }
-ok()    { printf "%s  %s✓%s %s\n" "${CYAN}│${RESET}" "$GREEN" "$RESET" "$1"; }
-info()  { printf "%s  %s→%s %s\n" "${CYAN}│${RESET}" "$BLUE" "$RESET" "$1"; }
-warn()  { printf "%s  %s!%s %s\n" "${CYAN}│${RESET}" "$YELLOW" "$RESET" "$1"; }
-fail()  { printf "%s  %s✗%s %s\n" "${CYAN}│${RESET}" "$RED" "$RESET" "$1"; }
-dim()   { printf "%s  %s%s%s\n" "${CYAN}│${RESET}" "$DIM" "$1" "$RESET"; }
-hr()    { printf "%s\n" "${CYAN}│${RESET}"; }
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *UTF-8*|*utf8*|*UTF8*)
+        BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
+        BOX_TOP="╭────────────────────────────────────────────────────────────╮"
+        BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
+        ;;
+    *)
+        BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
+        BOX_TOP="+------------------------------------------------------------+"
+        BOX_BOTTOM="+------------------------------------------------------------+"
+        ;;
+esac
+
+line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
+node_prefix() { printf "%s%s%s" "$CYAN" "$NODE" "$RESET"; }
+
+say()   { printf "%s  %s\n" "$(line_prefix)" "$1"; }
+ok()    { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+info()  { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
+warn()  { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
+fail()  { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
+dim()   { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
+hr()    { printf "%s\n" "$(line_prefix)"; }
 
 require_non_root() {
     if [ "${EUID:-$(id -u)}" -eq 0 ]; then
@@ -93,7 +109,7 @@ require_non_root() {
 
 setting() {
     local label="$1" value="$2"
-    printf "%s    %-18s %s\n" "${CYAN}│${RESET}" "$label" "$value"
+    printf "%s    %-18s %s\n" "$(line_prefix)" "$label" "$value"
 }
 
 bool_label() {
@@ -105,15 +121,15 @@ bool_label() {
 
 phase_open() {
     local title="$1"
-    printf "%s\n" "${CYAN}│${RESET}"
-    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET"
-    printf "%s\n" "${CYAN}│${RESET}"
+    printf "%s\n" "$(line_prefix)"
+    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET"
+    printf "%s\n" "$(line_prefix)"
 }
 
 phase_close() {
     local title="$1"
-    printf "%s\n" "${CYAN}│${RESET}"
-    printf "%s  %s%s complete%s\n" "${GREEN}✓${RESET}" "$DIM" "$title" "$RESET"
+    printf "%s\n" "$(line_prefix)"
+    printf "%s  %s%s complete%s\n" "${GREEN}${OK_MARK}${RESET}" "$DIM" "$title" "$RESET"
 }
 
 run() {
@@ -137,7 +153,7 @@ run() {
                 *) display+=("$arg") ;;
             esac
         done
-        printf "%s    %sdry-run $%s %s\n" "${CYAN}│${RESET}" "$DIM" "$RESET" "${display[*]}"
+        printf "%s    %sdry-run $%s %s\n" "$(line_prefix)" "$DIM" "$RESET" "${display[*]}"
     else
         "$@"
     fi
@@ -160,7 +176,7 @@ start_long_step() {
                 elapsed=$((now - start_ts))
                 mins=$((elapsed / 60))
                 secs=$((elapsed % 60))
-                printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "${CYAN}│${RESET}" "$DIM" "$label" "$mins" "$secs" "$RESET"
+                printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "$(line_prefix)" "$DIM" "$label" "$mins" "$secs" "$RESET"
                 since_msg=0
             fi
         done
@@ -266,7 +282,7 @@ adopt_homebrew_path() {
 
 prompt_read() {
     local __out="$1" prompt="$2" response
-    printf "%s  %s" "${CYAN}│${RESET}" "$prompt" > /dev/tty
+    printf "%s  %s" "$(line_prefix)" "$prompt" > /dev/tty
     IFS= read -r response < /dev/tty || response=""
     printf -v "$__out" '%s' "$response"
 }
@@ -276,19 +292,19 @@ prompt_text() {
 
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "$default"
-        printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${default:-<blank>}" "$RESET"
+        printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${default:-<blank>}" "$RESET"
         return
     fi
 
-    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
-    [ -n "$hint" ] && printf "%s  %s%s%s\n" "${CYAN}│${RESET}" "$DIM" "$hint" "$RESET" > /dev/tty
+    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
+    [ -n "$hint" ] && printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$hint" "$RESET" > /dev/tty
     if [ -n "$default" ]; then
-        prompt_read answer "Current: ${BOLD}$default${RESET}. Enter new value or leave blank to keep: "
+        prompt_read answer "Current: ${BOLD}$default${RESET}. Press Enter to keep it, or type a new value: "
         [ -z "$answer" ] && answer="$default"
     else
-        prompt_read answer "Enter value, or leave blank to skip: "
+        prompt_read answer "Type a value, or press Enter to skip: "
     fi
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${answer:-<blank>}" "$RESET"
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${answer:-<blank>}" "$RESET"
     printf -v "$__out" '%s' "$answer"
 }
 
@@ -300,12 +316,16 @@ prompt_confirm() {
         [ "$default_yes" = "1" ] && result=true || result=false
         printf -v "$__out" '%s' "$result"
         printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
-            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET" "$DIM" "$RESET"
+            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET" "$DIM" "$RESET"
         return
     fi
 
     while :; do
-        prompt_read answer "${BOLD}${title}${RESET} [$default_label] "
+        if [ "$default_yes" = "1" ]; then
+            prompt_read answer "${BOLD}${title}${RESET} [$default_label] Press Enter for yes, or type n: "
+        else
+            prompt_read answer "${BOLD}${title}${RESET} [$default_label] Press Enter for no, or type y: "
+        fi
         case "${answer:-default}" in
             default)
                 [ "$default_yes" = "1" ] && result=true || result=false
@@ -317,7 +337,7 @@ prompt_confirm() {
     done
     printf -v "$__out" '%s' "$result"
     printf "%s  %s%s:%s %s%s%s\n" \
-        "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
+        "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
 }
 
 prompt_choice() {
@@ -328,23 +348,23 @@ prompt_choice() {
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "$default"
         printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
-            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
+            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
         return
     fi
 
-    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
+    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
     for ((i=0; i<n; i++)); do
         value="${opts[$i]%%|*}"
         label="${opts[$i]#*|}"
         if [ "$value" = "$default" ]; then
-            printf "%s    %d. %s %s%s(current)%s\n" "${CYAN}│${RESET}" $((i + 1)) "$label" "$DIM" "$RESET" "$DIM" > /dev/tty
+            printf "%s    %d. %s %s%s(current)%s\n" "$(line_prefix)" $((i + 1)) "$label" "$DIM" "$RESET" "$DIM" > /dev/tty
         else
-            printf "%s    %d. %s\n" "${CYAN}│${RESET}" $((i + 1)) "$label" > /dev/tty
+            printf "%s    %d. %s\n" "$(line_prefix)" $((i + 1)) "$label" > /dev/tty
         fi
     done
 
     while :; do
-        prompt_read answer "Choose 1-$n, or leave blank for ${BOLD}$default${RESET}: "
+        prompt_read answer "Choose 1-$n, or press Enter for ${BOLD}$default${RESET}: "
         [ -z "$answer" ] && { printf -v "$__out" '%s' "$default"; break; }
         case "$answer" in
             ''|*[!0-9]*) warn "enter a number from 1 to $n" ;;
@@ -358,7 +378,7 @@ prompt_choice() {
                 ;;
         esac
     done
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
 }
 
 prompt_continue_or_customize() {
@@ -367,16 +387,16 @@ prompt_continue_or_customize() {
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
         printf -v "$__out" '%s' "recommended"
         printf "%s  %s%s:%s %srecommended%s %s(default)%s\n" \
-            "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
+            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
         return
     fi
 
-    printf "%s  %s%s%s\n" "${CYAN}◆${RESET}" "$BOLD" "$title" "$RESET" > /dev/tty
-    printf "%s    1. Continue with recommended setup\n" "${CYAN}│${RESET}" > /dev/tty
-    printf "%s    2. Customize packages, signing, cleanup, and migration\n" "${CYAN}│${RESET}" > /dev/tty
+    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
+    printf "%s    1. Continue with recommended setup\n" "$(line_prefix)" > /dev/tty
+    printf "%s    2. Customize packages, signing, cleanup, and migration\n" "$(line_prefix)" > /dev/tty
 
     while :; do
-        prompt_read answer "Press Enter for recommended, or choose 1-2: "
+        prompt_read answer "Press Enter for recommended setup, or type 2 to customize: "
         case "${answer:-1}" in
             1)
                 printf -v "$__out" '%s' "recommended"
@@ -387,7 +407,7 @@ prompt_continue_or_customize() {
             *) warn "enter 1 or 2" ;;
         esac
     done
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}✓${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
 }
 
 prompt_phrase() {
@@ -488,25 +508,26 @@ load_existing_answers() {
 
 banner() {
     printf "\n"
-    printf "%s\n" "${CYAN}╭────────────────────────────────────────────────────────────╮${RESET}"
-    printf "%s  %sDotfiles Setup%s                                             %s\n" "${CYAN}│${RESET}" "$BOLD" "$RESET" "${CYAN}│${RESET}"
-    printf "%s  Plug-and-play macOS workstation bootstrap.                  %s\n" "${CYAN}│${RESET}" "${CYAN}│${RESET}"
-    printf "%s\n" "${CYAN}╰────────────────────────────────────────────────────────────╯${RESET}"
+    printf "%s\n" "${CYAN}${BOX_TOP}${RESET}"
+    printf "%s  %sDotfiles Setup%s                                             %s\n" "$(line_prefix)" "$BOLD" "$RESET" "$(line_prefix)"
+    printf "%s  Fresh macOS workstation bootstrap.                          %s\n" "$(line_prefix)" "$(line_prefix)"
+    printf "%s\n" "${CYAN}${BOX_BOTTOM}${RESET}"
     if [ "$DRY_RUN" = "1" ]; then
-        printf "%s  %sDry run:%s no changes will be made.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sDry run:%s no changes will be made.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
     fi
     if [ "$ASSUME_YES" = "1" ]; then
-        printf "%s  %sYes mode:%s recommended defaults accepted. Homebrew cleanup stays off unless flagged.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sYes mode:%s recommended defaults accepted. Homebrew cleanup stays off unless flagged.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
     fi
     if [ "$CONFIGURE_ONLY" = "1" ]; then
-        printf "%s  %sConfigure only:%s update profile, identity, features, then apply.\n" "${CYAN}│${RESET}" "$YELLOW$BOLD" "$RESET"
+        printf "%s  %sConfigure only:%s update profile, identity, features, then apply.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
     fi
-    printf "%s  The default path asks for identity, profile, and optional git signing.\n" "${CYAN}│${RESET}"
-    printf "%s  Advanced cleanup and feature toggles stay available when you need them.\n" "${CYAN}│${RESET}"
+    printf "%s  The default path only asks for inputs available on a fresh Mac.\n" "$(line_prefix)"
+    printf "%s  Git signing is finished later, after 1Password is installed and signed in.\n" "$(line_prefix)"
+    printf "%s  Advanced cleanup and feature toggles stay available when you need them.\n" "$(line_prefix)"
     if have_tty && [ "$ASSUME_YES" != "1" ]; then
         local _
-        printf "%s\n" "${CYAN}│${RESET}"
-        prompt_read _ "Press Enter to begin "
+        printf "%s\n" "$(line_prefix)"
+        prompt_read _ "Press Enter to begin the setup check "
     fi
 }
 
@@ -559,7 +580,8 @@ choices() {
     phase_open "2/5 - Choose setup"
     load_existing_answers
 
-    say "${BOLD}Essentials first.${RESET} Press Enter to keep any detected value."
+    say "${BOLD}Essentials first.${RESET} Press Enter keeps the detected value."
+    dim "    Fresh installs only need profile, git name, and git email here."
     hr
 
     prompt_choice CHOICE_PROFILE "Profile" "$EXISTING_PROFILE" \
@@ -586,6 +608,11 @@ choices() {
     hr
     say "${BOLD}Recommended setup${RESET}"
     setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
+    if [ -n "$CHOICE_SIGNINGKEY" ]; then
+        setting "Git signing" "already configured"
+    else
+        setting "Git signing" "finish later in bootstrap-auth.sh"
+    fi
     setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
     setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
     setting "Homebrew cleanup" "keep local packages"
@@ -618,8 +645,6 @@ choices() {
         prompt_confirm CHOICE_FEAT_ai "Install local AI tooling (Ollama, llm)?" "$([ "$CHOICE_FEAT_ai" = "true" ] && echo 1 || echo 0)"
     elif [ "$CHOICE_USE_OP" != "true" ]; then
         CHOICE_SIGNINGKEY=""
-    elif [ -z "$CHOICE_SIGNINGKEY" ]; then
-        prompt_text CHOICE_SIGNINGKEY "Git signing public key (optional)" "" "Copy the public key line from 1Password. Leave blank to set it later."
     fi
 
     if [ "$CONFIGURE_ONLY" != "1" ]; then
@@ -818,46 +843,6 @@ EOF_BREWFILES
     phase_close "Homebrew mirror"
 }
 
-ensure_homebrew_packages() {
-    [ "$DRY_RUN" = "1" ] && return 0
-    command -v brew >/dev/null 2>&1 || { fail "brew is not on PATH; cannot install Brewfile packages"; exit 1; }
-
-    phase_open "Homebrew packages"
-    say "${BOLD}Verifying active Brewfiles.${RESET}"
-
-    local file label missing=0
-    while IFS= read -r file; do
-        [ -n "$file" ] || continue
-        label="$(basename "$file")"
-        if [ ! -f "$file" ]; then
-            fail "expected Brewfile missing: $file"
-            exit 1
-        fi
-        if brew bundle check --file="$file" >/dev/null 2>&1; then
-            ok "$label already satisfied"
-        else
-            missing=1
-            info "$label has missing packages"
-            cache_sudo_for_homebrew
-            start_sudo_keepalive
-            if ! timed_run "$label install" brew bundle install --file="$file"; then
-                stop_sudo_keepalive
-                exit 1
-            fi
-            stop_sudo_keepalive
-        fi
-    done <<EOF_BREWFILES
-$(active_brewfiles)
-EOF_BREWFILES
-
-    if [ "$missing" = "0" ]; then
-        ok "all selected Brewfiles are installed"
-    else
-        ok "selected Brewfiles installed"
-    fi
-    phase_close "Homebrew packages"
-}
-
 install_xcode_clt() {
     info "Xcode Command Line Tools"
     if ! xcode-select -p >/dev/null 2>&1; then
@@ -865,14 +850,14 @@ install_xcode_clt() {
         run xcode-select --install || true
         if [ "$DRY_RUN" != "1" ]; then
             dim "    Complete Apple's installer dialog if it is still open. Fresh Macs can spend 20-60 minutes here."
-            printf "%s    %swaiting for CLT install to complete" "${CYAN}|${RESET}" "$DIM"
+            printf "%s    %swaiting for CLT install to complete" "$(line_prefix)" "$DIM"
             local i
             for i in $(seq 1 720); do
                 if xcode-select -p >/dev/null 2>&1; then printf "%s\n" "$RESET"; break; fi
                 if [ $((i % 12)) -eq 0 ]; then
                     printf "%s\n" "$RESET"
                     dim "    still waiting for Xcode CLT - $((i / 12))m elapsed"
-                    printf "%s    %swaiting" "${CYAN}|${RESET}" "$DIM"
+                    printf "%s    %swaiting" "$(line_prefix)" "$DIM"
                 else
                     printf "."
                 fi
@@ -1002,12 +987,12 @@ backup_legacy_files() {
 execute() {
     phase_open "4/5 - Install and apply"
     if [ "$CONFIGURE_ONLY" != "1" ]; then
-        say "${BOLD}Fresh Mac bootstrap can pause on Apple and Homebrew installers.${RESET}"
+        say "${BOLD}Fresh macOS bootstrap can pause on Apple and Homebrew installers.${RESET}"
         setting "4.1" "prepare directories and legacy files"
         setting "4.2" "Xcode Command Line Tools"
         setting "4.3" "Homebrew and chezmoi"
         setting "4.4" "clone dotfiles repo"
-        setting "4.5" "install packages, then apply dotfiles"
+        setting "4.5" "apply dotfiles and package plan"
         dim "    Long external installers print a 30-second heartbeat while they run."
         hr
     fi
@@ -1018,11 +1003,9 @@ execute() {
         if ! command -v chezmoi >/dev/null 2>&1; then fail "configure-only requires chezmoi on PATH"; exit 1; fi
         create_developer_directories
         configure_chezmoi
-        ensure_homebrew_packages
         info "Applying dotfiles for updated profile/features"
         run chezmoi apply --force || exit 1
         ok "chezmoi apply complete"
-        ensure_homebrew_packages
         phase_close "Install and apply"
         return
     fi
@@ -1050,11 +1033,9 @@ execute() {
 
     configure_chezmoi
 
-    ensure_homebrew_packages
-    info "Applying dotfiles after package verification."
+    info "Applying dotfiles. Chezmoi will install Homebrew packages in a split progress view."
     run chezmoi apply --force || exit 1
     ok "chezmoi apply complete"
-    ensure_homebrew_packages
     [ "$CHOICE_MIRROR_BREW" = "true" ] && mirror_homebrew
     phase_close "Install and apply"
 }
@@ -1155,8 +1136,8 @@ next_steps() {
     setting "health check" "bash $SOURCE_DIR/scripts/doctor.sh"
     setting "change setup" "bash $SOURCE_DIR/install.sh --configure-only"
     setting "upgrade later" "chezup"
-    printf "%s\n" "${CYAN}│${RESET}"
-    printf "%s  %sWizard complete.%s\n" "${GREEN}✓${RESET}" "$BOLD" "$RESET"
+    printf "%s\n" "$(line_prefix)"
+    printf "%s  %sWizard complete.%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$RESET"
     printf "\n"
 }
 
