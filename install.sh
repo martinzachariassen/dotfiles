@@ -198,9 +198,14 @@ start_sudo_keepalive() {
     [ "$DRY_RUN" = "1" ] && return 0
     local parent_pid=$$
     (
+        local refresh_in=0
         while kill -0 "$parent_pid" 2>/dev/null; do
-            sudo -n true 2>/dev/null || exit
-            sleep 60
+            if [ "$refresh_in" -le 0 ]; then
+                sudo -n true 2>/dev/null || exit
+                refresh_in=240
+            fi
+            sleep 2
+            refresh_in=$((refresh_in - 2))
         done
     ) &
     SUDO_KEEPALIVE_PID=$!
