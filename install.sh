@@ -118,10 +118,22 @@ phase_close() {
 
 run() {
     if [ "$DRY_RUN" = "1" ]; then
-        local display=() arg
+        local display=() arg mask_prompt_string=0
         for arg in "$@"; do
+            if [ "$mask_prompt_string" = "1" ]; then
+                case "$arg" in
+                    signingKey=*) display+=("signingKey=<set>") ;;
+                    *) display+=("$arg") ;;
+                esac
+                mask_prompt_string=0
+                continue
+            fi
             case "$arg" in
                 --promptString=signingKey=*) display+=("--promptString=signingKey=<set>") ;;
+                --promptString)
+                    display+=("$arg")
+                    mask_prompt_string=1
+                    ;;
                 *) display+=("$arg") ;;
             esac
         done
@@ -652,7 +664,7 @@ confirm_phase() {
     setting "Email" "${CHOICE_EMAIL:-<blank>}"
     setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
     if [ -n "$CHOICE_SIGNINGKEY" ]; then
-        setting "Signing key" "${CHOICE_SIGNINGKEY:0:44}..."
+        setting "Signing key" "<set>"
     else
         setting "Signing key" "<none - set later>"
     fi
@@ -943,15 +955,15 @@ configure_chezmoi() {
     local init_flags key var
     init_flags=(
         "--source=$SOURCE_DIR"
-        "--promptString=name=$CHOICE_NAME"
-        "--promptString=email=$CHOICE_EMAIL"
-        "--promptString=signingKey=$CHOICE_SIGNINGKEY"
-        "--promptChoice=profile=$CHOICE_PROFILE"
-        "--promptBool=useOnePassword=$CHOICE_USE_OP"
+        "--promptString" "name=$CHOICE_NAME"
+        "--promptString" "email=$CHOICE_EMAIL"
+        "--promptString" "signingKey=$CHOICE_SIGNINGKEY"
+        "--promptChoice" "profile=$CHOICE_PROFILE"
+        "--promptBool" "useOnePassword=$CHOICE_USE_OP"
     )
     for key in "${FEATURE_KEYS[@]}"; do
         var="CHOICE_FEAT_${key}"
-        init_flags+=("--promptBool=features.${key}=${!var}")
+        init_flags+=("--promptBool" "features.${key}=${!var}")
     done
     run chezmoi init "${init_flags[@]}" || exit 1
     ok "chezmoi configured"

@@ -1,29 +1,29 @@
-{{/* chezmoi init prompts — used as a fallback if the install wizard didn't
-     pre-populate ~/.config/chezmoi/chezmoi.toml.
+{{/* chezmoi init prompts — used as a fallback if the install wizard does not
+     pre-populate the init command.
 
-     The wizard in install.sh writes all of these values up front so this file
-     just rubber-stamps them on first init. On a re-run, promptOnce / promptOnceBool
-     short-circuit and reuse the existing answers, so this template is
-     idempotent.
+     The wizard in install.sh loads any existing answers, asks once, then passes
+     those values to `chezmoi init` with --promptString/--promptChoice/--promptBool.
+     Plain prompt helpers consume those supplied values; prompt*Once would prompt
+     again during first init.
 
      Defaults are intentionally empty for identity fields so forks of this
      repo don't inherit private values. */ -}}
 
-{{- $name       := promptStringOnce . "name"       "Full name"                                  "" -}}
-{{- $email      := promptStringOnce . "email"      "Git email (noreply works fine)"             "" -}}
-{{- $signingKey := promptStringOnce . "signingKey" "SSH signing key (1Password public key)"     "" -}}
+{{- $name       := promptString "name"       "" -}}
+{{- $email      := promptString "email"      "" -}}
+{{- $signingKey := promptString "signingKey" "" -}}
 
 {{/* Profile picker — controls which casks get installed and which config blocks
      activate. `personal` and `work` install only their respective extras on top
      of the core Brewfile; `both` installs everything. */ -}}
-{{- $profile    := promptChoiceOnce . "profile" "Profile" (list "personal" "work" "both") "personal" -}}
+{{- $profile    := promptChoice "profile" (list "personal" "work" "both") "personal" -}}
 
 {{/* Workstation feature toggles. Project toolchains (Kubernetes, Terraform,
      database clients/servers, language runtimes) belong in each project's
      devbox.json, not in global Homebrew modules. */ -}}
-{{- $useOnePassword := promptBoolOnce . "useOnePassword" "Use 1Password for SSH + git signing"          true -}}
-{{- $featMacApps    := promptBoolOnce . "features.macApps"   "Install Mac-only QoL apps (Rectangle, Raycast, …)" true -}}
-{{- $featAi         := promptBoolOnce . "features.ai"        "Install local AI tooling (Ollama, llm)" false -}}
+{{- $useOnePassword := promptBool "useOnePassword" true -}}
+{{- $featMacApps    := promptBool "features.macApps" true -}}
+{{- $featAi         := promptBool "features.ai" false -}}
 
 # Tell chezmoi the source repo lives under ~/Developer/personal/dotfiles
 # (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
