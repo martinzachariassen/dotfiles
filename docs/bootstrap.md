@@ -8,7 +8,7 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 
 Run that command as your normal macOS user, not with `sudo`. `sudo curl ... | bash` only makes the download privileged, not the installer. `curl ... | sudo bash` runs the whole setup as root, which breaks Homebrew and writes dotfiles into the wrong home directory. The installer and Homebrew will ask for your sudo password at the specific steps that need it.
 
-You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. The default path asks for your profile, name, email, and an optional 1Password signing public key; package cleanup and feature toggles live behind the customize option. Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
+You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. The default path asks for your profile, name, email, and an optional 1Password signing public key if you already know it; otherwise `bootstrap-auth.sh` records it after 1Password is installed and signed in. Package cleanup and feature toggles live behind the customize option. Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
 
 ```text
 ╭────────────────────────────────────────────────────────────╮
@@ -71,7 +71,7 @@ bash install.sh --configure-only
 | Phase | Name | What it does |
 |---|---|---|
 | **1/5** | Check this Mac | Read-only probe of macOS version + arch, Xcode CLT, Homebrew, chezmoi, existing repo clone, prior chezmoi config, 1Password.app, and legacy files (`~/.zshrc`, `~/.gitconfig`, oh-my-zsh, …). Nothing changes here. |
-| **2/5** | Choose setup | Essentials first: profile, name, email, and the optional 1Password signing public key. The recommended path keeps 1Password enabled, installs macOS app extras, leaves local Homebrew packages alone, backs up legacy dotfiles, and removes oh-my-zsh if found. Choose customize to change signing, feature toggles, Homebrew mirror/reset, or migration behavior. |
+| **2/5** | Choose setup | Essentials first: profile, name, email, and the optional 1Password signing public key when already available. The recommended path keeps 1Password enabled, installs macOS app extras, leaves local Homebrew packages alone, backs up legacy dotfiles, and removes oh-my-zsh if found. Choose customize to change signing, feature toggles, Homebrew mirror/reset, or migration behavior. |
 | **3/5** | Review plan | One-screen summary of every choice. Last chance to abort. Destructive Homebrew cleanup modes require typing `MIRROR BREW` or `RESET BREW`. |
 | **4/5** | Install and apply | Shows a fresh-Mac sub-plan, backs up legacy files (to `~/.dotfiles-backup-<timestamp>/`), optionally resets Homebrew, installs Xcode CLT (polls the GUI dialog up to 60 min), Homebrew, chezmoi, clones the repo, runs `chezmoi init` with all answers pre-supplied (zero prompts), then `chezmoi apply` — which fans out to per-package Homebrew bundle runs across core + workstation/profile extras, plus macOS defaults (sudo once). Long external installers print a 30-second heartbeat. |
 | **5/5** | Verify | Functional checks for the workstation baseline. Reports auth state for `gh`/`az`/`gcloud` as FYI when those tools are present. |
@@ -124,10 +124,11 @@ dotfiles profile set personal
 dotfiles features list
 dotfiles features enable ai
 dotfiles features disable macApps
+dotfiles signing set
 ```
 
 `dotfiles` with no arguments still jumps to the source repo. With arguments it
-updates `~/.config/chezmoi/chezmoi.toml` and runs `chezmoi apply --force`.
+updates `~/.config/chezmoi/chezmoi.toml` and applies the affected managed files.
 
 ### Day-one secrets and signing
 
@@ -135,7 +136,7 @@ The bootstrap pulls config and tools, but **secrets aren't in this repo on purpo
 
 **SSH keys** — both authentication and git signing use the **1Password SSH agent**, not files on disk. Once you sign in to 1Password and enable *Settings → Developer → SSH agent*, every SSH key in your vault becomes available to `ssh`, `git`, and anything else that talks to `$SSH_AUTH_SOCK`. There are no `~/.ssh/id_*` private keys to copy across machines — that's the whole point. Public keys for known_hosts you'll have to accept once per host.
 
-**Git commit signing** — chezmoi's init prompt asks for `signingKey`, which is your **public key** copied from the 1Password item. The corresponding private key never leaves 1Password; `op-ssh-sign` (bundled with the 1Password macOS app) signs commits via the agent. The git config template at `dot_config/git/config.tmpl` wires `[gpg "ssh"] program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign` for you. `bootstrap-auth.sh` runs a `git -S` smoke test against an empty repo to prove the whole chain (1Password unlocked → agent reachable → signing key found → signed commit succeeds) actually works.
+**Git commit signing** — the private key never leaves 1Password; `op-ssh-sign` (bundled with the 1Password macOS app) signs commits via the agent. If the public signing key is known during install, chezmoi renders signing immediately. On a fresh Mac it usually is not known yet, so `bootstrap-auth.sh` prompts for the public key after 1Password is installed and signed in, writes it to chezmoi data, reapplies `dot_config/git/config.tmpl`, and runs a `git -S` smoke test against an empty repo. The template also writes `~/.config/git/allowed_signers` so local SSH signature verification works.
 
 **Cloud auth tokens** — `gh`, `az`, and `gcloud` each store their own credentials under `~/.config/gh/`, `~/.azure/`, `~/.config/gcloud/`. These account CLIs are global because auth, subscriptions/projects, and bootstrap checks are workstation concerns. Project-specific CLIs still stay in Devbox. `bootstrap-auth.sh` walks through whichever CLIs are installed and skips the rest. None of these directories are tracked in this repo.
 

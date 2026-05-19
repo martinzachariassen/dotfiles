@@ -9,7 +9,8 @@ Reference table showing exactly what each file in the repo does.
 | `dot_zshenv` | `~/.zshenv` | Tiny stub, sets ZDOTDIR + XDG vars + tool env vars. Only file that MUST stay in `$HOME`. |
 | `dot_config/zsh/dot_zshrc` | `~/.config/zsh/.zshrc` | Interactive shell config (aliases, completions, Claude personal wrapper). Found via ZDOTDIR. |
 | `dot_config/zsh/dot_zprofile` | `~/.config/zsh/.zprofile` | Login shell init (brew shellenv). |
-| `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key. Git auto-detects this XDG path. |
+| `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key and SSH signing settings. Git auto-detects this XDG path. |
+| `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` | Templated allowed signers file so Git can verify local SSH commit signatures. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
 | `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Developer` (no per-project `direnv allow` required). |
 | `dot_config/claude/personal/settings.json` | `~/.config/claude/personal/settings.json` | Personal Claude profile settings (CLAUDE_CONFIG_DIR points here). |

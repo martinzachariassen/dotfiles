@@ -467,6 +467,7 @@ load_existing_answers() {
 
     EXISTING_NAME="${EXISTING_NAME:-$(git config --global user.name 2>/dev/null || echo '')}"
     EXISTING_EMAIL="${EXISTING_EMAIL:-$(git config --global user.email 2>/dev/null || echo '')}"
+    EXISTING_SIGNINGKEY="${EXISTING_SIGNINGKEY:-$(git config --global user.signingkey 2>/dev/null || echo '')}"
     EXISTING_PROFILE="${EXISTING_PROFILE:-personal}"
     EXISTING_USE_OP="${EXISTING_USE_OP:-true}"
     EXISTING_FEAT_macApps="${EXISTING_FEAT_macApps:-true}"
@@ -1092,7 +1093,15 @@ self_test() {
     _vf "no legacy ~/.profile" "[ ! -f \"\$HOME/.profile\" ]"
     _vf "ZDOTDIR zshrc exists" "[ -f \"\$HOME/.config/zsh/.zshrc\" ]"
 
-    [ "$CHOICE_USE_OP" = "true" ] && _vf "op-ssh-sign present" "[ -x /Applications/1Password.app/Contents/MacOS/op-ssh-sign ]"
+    if [ "$CHOICE_USE_OP" = "true" ] && [ -n "$CHOICE_SIGNINGKEY" ]; then
+        _vf "op-ssh-sign present" "[ -x /Applications/1Password.app/Contents/MacOS/op-ssh-sign ]"
+        _vf "git commit signing enabled" "[ \"\$(git config --global commit.gpgsign 2>/dev/null)\" = true ]"
+        _vf "git SSH signing format" "[ \"\$(git config --global gpg.format 2>/dev/null)\" = ssh ]"
+        _vf "git 1Password SSH signer" "[ \"\$(git config --global gpg.ssh.program 2>/dev/null)\" = /Applications/1Password.app/Contents/MacOS/op-ssh-sign ]"
+        _vf "git allowed signers file" "[ -f \"\$(git config --global --path gpg.ssh.allowedSignersFile 2>/dev/null)\" ]"
+    elif [ "$CHOICE_USE_OP" = "true" ]; then
+        warn "git signing pending - run scripts/bootstrap-auth.sh after signing in to 1Password"
+    fi
     _vf "JetBrainsMono Nerd Font" "ls \"\$HOME/Library/Fonts\" /Library/Fonts 2>/dev/null | grep -qi 'JetBrainsMono.*Nerd' || ls /opt/homebrew/Caskroom/font-jetbrains-mono-nerd-font 2>/dev/null | grep -q ."
 
     say "${DIM}apps${RESET}"

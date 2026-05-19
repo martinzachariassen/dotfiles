@@ -43,9 +43,12 @@ dotfiles features enable macApps
 # Profiles use the same control path.
 dotfiles profile set work
 dotfiles profile set both
+
+# Git signing can be updated after 1Password is signed in.
+dotfiles signing set
 ```
 
-For a guided flow on an existing machine, run `bash ~/Developer/personal/dotfiles/install.sh --configure-only`. It reuses the normal wizard prompts but skips Xcode/Homebrew/repo bootstrap.
+For a guided flow on an existing machine, run `bash ~/Developer/personal/dotfiles/install.sh --configure-only`. It reuses the normal wizard prompts but skips Xcode/Homebrew/repo bootstrap. The signing command is narrower: it reapplies only the managed Git config files.
 
 Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove a feature's packages:
 

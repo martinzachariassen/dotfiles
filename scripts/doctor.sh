@@ -134,8 +134,29 @@ fi
 gitkey=$(git config --global user.signingkey 2>/dev/null || true)
 if [ -n "$gitkey" ]; then
     pass "git signing key configured"
+    if [ "$(git config --global commit.gpgsign 2>/dev/null || true)" = "true" ]; then
+        pass "git commit signing enabled"
+    else
+        warn "git commit.gpgsign is not true — run \`chezmoi apply\`"
+    fi
+    if [ "$(git config --global gpg.format 2>/dev/null || true)" = "ssh" ]; then
+        pass "git SSH signing format configured"
+    else
+        warn "git gpg.format is not ssh — run \`chezmoi apply\`"
+    fi
+    if [ "$(git config --global gpg.ssh.program 2>/dev/null || true)" = "$SSH_SIGN" ]; then
+        pass "git 1Password SSH signer configured"
+    else
+        warn "git gpg.ssh.program is not op-ssh-sign — run \`chezmoi apply\`"
+    fi
+    allowed_signers="$(git config --global --path gpg.ssh.allowedSignersFile 2>/dev/null || true)"
+    if [ -n "$allowed_signers" ] && [ -f "$allowed_signers" ]; then
+        pass "git allowed signers file present"
+    else
+        warn "git allowed signers file missing — run \`chezmoi apply\`"
+    fi
 else
-    warn "no git signing key set — run \`chezmoi init\` to re-prompt or edit ~/.config/git/config"
+    warn "no git signing key set — run bootstrap-auth.sh after signing in to 1Password"
 fi
 # Smoke-test signing in a tmp repo (proves agent is reachable + key matches).
 if [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then

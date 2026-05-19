@@ -1,0 +1,4 @@
+{{- $useOP := dig "useOnePassword" true . -}}
+{{- if and $useOP .email .signingKey -}}
+{{ .email }} {{ .signingKey }}
+{{- end }}

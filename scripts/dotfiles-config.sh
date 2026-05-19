@@ -18,6 +18,8 @@ Usage:
   dotfiles features enable macApps|ai [--no-apply]
   dotfiles features disable macApps|ai [--no-apply]
   dotfiles features set macApps|ai true|false [--no-apply]
+  dotfiles signing show
+  dotfiles signing set [<ssh-public-key>] [--no-apply]
 
 Environment:
   CHEZMOI_CONFIG   path to chezmoi.toml (default: ~/.config/chezmoi/chezmoi.toml)
@@ -51,6 +53,31 @@ feature_default() {
         ai) printf 'false' ;;
         *) printf 'false' ;;
     esac
+}
+
+toml_quote() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '"%s"' "$value"
+}
+
+valid_signing_key() {
+    case "$1" in
+        ssh-ed25519\ *|ssh-rsa\ *|ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+read_signing_key() {
+    if [ -t 0 ]; then
+        printf "SSH signing public key: " >&2
+        IFS= read -r REPLY
+        printf '%s' "$REPLY"
+    else
+        IFS= read -r REPLY || return 1
+        printf '%s' "$REPLY"
+    fi
 }
 
 parse_common_flags() {
@@ -156,6 +183,15 @@ apply_if_requested() {
     fi
 }
 
+apply_git_if_requested() {
+    [ "$APPLY" = "1" ] || return 0
+    if command -v chezmoi >/dev/null 2>&1; then
+        chezmoi apply --force "$HOME/.config/git/config" "$HOME/.config/git/allowed_signers"
+    else
+        die "chezmoi is not installed; config was updated but not applied"
+    fi
+}
+
 cmd_profile() {
     local action="${1:-}"
     case "$action" in
@@ -221,11 +257,57 @@ cmd_features() {
     esac
 }
 
+cmd_signing() {
+    local action="${1:-}"
+    case "$action" in
+        show)
+            parse_common_flags "${@:2}"
+            ensure_config
+            if command -v jq >/dev/null 2>&1; then
+                chezmoi data --format=json 2>/dev/null | jq -r '.signingKey // empty'
+            else
+                chezmoi data --format=json 2>/dev/null \
+                    | sed -n 's/.*"signingKey"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+                    | sed '/^$/d' \
+                    | tail -1
+            fi
+            ;;
+        set)
+            local signing_key=""
+            shift
+            while [ $# -gt 0 ]; do
+                case "$1" in
+                    --no-apply) APPLY=0 ;;
+                    -h|--help) usage; exit 0 ;;
+                    -* ) die "unknown option: $1" ;;
+                    * )
+                        [ -z "$signing_key" ] || die "only one signing key can be provided"
+                        signing_key="$1"
+                        ;;
+                esac
+                shift
+            done
+            if [ -z "$signing_key" ]; then
+                signing_key="$(read_signing_key)" || die "missing SSH public signing key"
+            fi
+            [ -n "$signing_key" ] || die "missing SSH public signing key"
+            valid_signing_key "$signing_key" || die "signing key must be an SSH public key line"
+            ensure_config
+            set_toml_value "data" "signingKey" "$(toml_quote "$signing_key")"
+            set_toml_value "data" "useOnePassword" "true"
+            echo "dotfiles: git signing key configured"
+            apply_git_if_requested
+            ;;
+        *) usage; exit 1 ;;
+    esac
+}
+
 main() {
     local cmd="${1:-}"
     case "$cmd" in
         profile) shift; cmd_profile "$@" ;;
         features) shift; cmd_features "$@" ;;
+        signing) shift; cmd_signing "$@" ;;
         -h|--help|"") usage ;;
         *) usage; exit 1 ;;
     esac
