@@ -66,7 +66,6 @@ start_heartbeat() {
 }
 stop_heartbeat() {
     [ -n "$HEARTBEAT_PID" ] && kill "$HEARTBEAT_PID" 2>/dev/null
-    wait "$HEARTBEAT_PID" 2>/dev/null || true
     HEARTBEAT_PID=""
 }
 

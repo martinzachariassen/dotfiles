@@ -158,7 +158,6 @@ start_long_step() {
 
 stop_long_step() {
     [ -n "$LONG_STEP_PID" ] && kill "$LONG_STEP_PID" 2>/dev/null
-    wait "$LONG_STEP_PID" 2>/dev/null || true
     LONG_STEP_PID=""
 }
 
@@ -194,7 +193,6 @@ SUDO_KEEPALIVE_PID=""
 
 stop_sudo_keepalive() {
     [ -n "$SUDO_KEEPALIVE_PID" ] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
-    wait "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
     SUDO_KEEPALIVE_PID=""
 }
 
