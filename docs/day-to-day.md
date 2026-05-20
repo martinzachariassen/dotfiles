@@ -140,7 +140,7 @@ git add . && git commit -m "Add httpx + config" && git push
 chezmoi diff                                                # what would change in $HOME
 git diff                                                    # all source-side changes (incl. Brewfile)
 brew bundle check --verbose --file=Brewfile                 # what brew bundle would install
-chezmoi apply --dry-run -v 2>&1 | grep run_                 # which chezmoi scripts would re-fire
+chezmoi apply --dry-run -v 2>&1 | grep run_                 # raw script re-runs, including every-apply hooks
 ```
 
 ### Shell aliases & shortcuts
@@ -159,7 +159,7 @@ dotfiles                     # cd ~/Developer/personal/dotfiles
 chez                         # smart `chezmoi apply` — diff preview + auto-force, no mid-apply prompt collisions
 chezup                       # `git pull --ff-only` in the source repo, then chez — most common upgrade workflow
 chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + chez. Use after a data-model change upstream
-chezdiff                     # chezmoi diff + brew bundle drift across every Brewfile module + which scripts would re-fire
+chezdiff                     # chezmoi diff + brew bundle drift + actionable script re-runs
 chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + devbox global update
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
 chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)

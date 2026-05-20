@@ -231,11 +231,12 @@ chezup() {
     (cd "$src" && git pull --ff-only) && chez "$@"
 }
 
-# Show every flavor of pending change in one shot — chezmoi diff (managed
-# files), brew bundle drift (uninstalled packages from any Brewfile), and which
-# scripts would re-fire.
+# Show every actionable flavor of pending change in one shot — chezmoi diff
+# (managed files), brew bundle drift (uninstalled packages from any Brewfile),
+# and scripts that would re-fire for reasons other than the normal every-apply
+# hooks.
 chezdiff() {
-    local src f
+    local src f pending_scripts
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     echo "── chezmoi diff (managed file changes) ───────────────────────"
     chezmoi diff --exclude scripts
@@ -250,8 +251,16 @@ chezdiff() {
             | grep -E '^(Brewfile|→|✗)' || echo "  $(basename "$f") satisfied"
     done
     echo
-    echo "── chezmoi scripts that would re-fire ────────────────────────"
-    chezmoi status --include scripts 2>/dev/null || echo "  none"
+    echo "── chezmoi scripts with actionable changes ───────────────────"
+    pending_scripts="$(
+        chezmoi status --include scripts 2>/dev/null \
+            | grep -vE '^[[:space:]]*R[[:space:]]+\.chezmoiscripts/(00-sudo-cache|99-completion)\.sh$'
+    )"
+    if [ -n "$pending_scripts" ]; then
+        printf '%s\n' "$pending_scripts"
+    else
+        echo "  none (00-sudo-cache and 99-completion run every apply by design)"
+    fi
 }
 
 # Reinitialise chezmoi data and apply — the "the upstream wizard prompts

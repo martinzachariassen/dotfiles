@@ -67,7 +67,7 @@ bash install.sh --reset-brew   # uninstall everything first, then reinstall
 | `chez` | Preview and apply dotfile changes with one confirmation. |
 | `chezup` | Pull latest repo changes, then run `chez`. |
 | `chezreinit` | Pull, re-render chezmoi config, then apply. Use after wizard/data-model changes. |
-| `chezdiff` | Preview dotfile drift, brew drift, and scripts that would re-run. |
+| `chezdiff` | Preview dotfile drift, brew drift, and actionable script re-runs. |
 | `chezdoctor` | Read-only health check for repo, chezmoi, brew, auth, signing, Devbox, and shell layout. |
 
 Common profile and feature changes:

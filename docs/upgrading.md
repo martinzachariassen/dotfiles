@@ -51,7 +51,7 @@ Knowing what triggers what makes the upgrade story less mysterious:
 | `.chezmoi.toml.tmpl` itself | **nothing automatic** — you must run `chezmoi init` (or `chezreinit`) to re-render `~/.config/chezmoi/chezmoi.toml`. This is the only common case where `chezup` alone is insufficient |
 | `scripts/macos-defaults.sh` | nothing — it's `run_once_after`. Manually run `macos-defaults` (the alias) to re-apply |
 
-If you forget which path you're on, `chezdiff` shows you everything pending at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and which `run_*` scripts would re-fire. It's the "what would chezup actually do" preview.
+If you forget which path you're on, `chezdiff` shows you everything actionable at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and `run_*` scripts that would re-fire for reasons other than the normal every-apply hooks. It's the "what would chezup actually do" preview.
 
 ### Cleaning up packages from features you've turned off
 
