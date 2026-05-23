@@ -5,9 +5,11 @@
 #
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.personal
 
-# ─── OpenAI ───────────────────────────────────────────────────────────────────
+# ─── AI ───────────────────────────────────────────────────────────────────
 cask "codex"                    # OpenAI Codex CLI
 cask "chatgpt"                  # OpenAI ChatGPT desktop app
+cask "claude"                   # Anthropic Claude desktop app
+cask "claude-code"              # Anthropic Claude Code CLI
 
 # ─── Add your other personal-only apps below ──────────────────────────────────
 cask "discord"
