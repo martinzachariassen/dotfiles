@@ -9,12 +9,8 @@
 #
 # Naming considerations:
 # - "99-" prefix sorts last numerically among the after-scripts (02, 03, 04, 99).
-# - `onchange_` (rather than plain `run_after_`) ensures we sort *after* both
-#   `once_after_*` and other `onchange_after_*` siblings.
-# - The timestamp comment below intentionally changes every render so chezmoi
-#   treats this script as "changed" and re-runs it on every apply.
-#
-# Last-render timestamp (forces re-run): {{ now.Unix }}
+# - `onchange_` keeps the summary from running when nothing about this script
+#   changed, so `chezmoi diff` can stay clean after apply.
 
 set -euo pipefail
 

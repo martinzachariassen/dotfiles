@@ -43,7 +43,12 @@ setopt SHARE_HISTORY           # share across sessions
 ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump"
 [ -d "${ZSH_COMPDUMP%/*}" ] || mkdir -p "${ZSH_COMPDUMP%/*}"
 
-# zsh-completions (brew) — must be on fpath BEFORE compinit
+# Homebrew completions — must be on fpath BEFORE compinit. Formulae install
+# their own completions into site-functions; zsh-completions is the extra
+# community completion pack.
+if [ -d /opt/homebrew/share/zsh/site-functions ]; then
+    fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
+fi
 if [ -d /opt/homebrew/share/zsh-completions ]; then
     fpath=(/opt/homebrew/share/zsh-completions $fpath)
 fi
@@ -80,7 +85,7 @@ command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 if command -v carapace >/dev/null; then
     export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense'
     zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
-    source <(carapace _carapace)
+    source <(carapace _carapace zsh)
 fi
 
 # ─── Starship prompt ──────────────────────────────────────────────────────────
@@ -254,12 +259,12 @@ chezdiff() {
     echo "── chezmoi scripts with actionable changes ───────────────────"
     pending_scripts="$(
         chezmoi status --include scripts 2>/dev/null \
-            | grep -vE '^[[:space:]]*R[[:space:]]+\.chezmoiscripts/(00-sudo-cache|99-completion)\.sh$'
+            | grep -vE '^[[:space:]]*R[[:space:]]+\.chezmoiscripts/00-sudo-cache\.sh$'
     )"
     if [ -n "$pending_scripts" ]; then
         printf '%s\n' "$pending_scripts"
     else
-        echo "  none (00-sudo-cache and 99-completion run every apply by design)"
+        echo "  none (00-sudo-cache runs every apply by design)"
     fi
 }
 

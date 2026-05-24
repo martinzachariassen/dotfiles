@@ -1,5 +1,18 @@
 # ~/.config/zsh/.zprofile — login shell setup
 # Found via ZDOTDIR. Runs once at login, before .zshrc.
 
-# Homebrew (Apple Silicon path)
-eval "$(/opt/homebrew/bin/brew shellenv zsh)"
+# Homebrew (Apple Silicon path). Keep login startup pure shell; running
+# `brew shellenv` here adds an external process to every `/bin/zsh -l`.
+if [ -d /opt/homebrew ]; then
+    export HOMEBREW_PREFIX="/opt/homebrew"
+    export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
+    export HOMEBREW_REPOSITORY="/opt/homebrew"
+
+    case ":$PATH:" in
+        *:/opt/homebrew/bin:/opt/homebrew/sbin:*) ;;
+        *) export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH" ;;
+    esac
+
+    export MANPATH="/opt/homebrew/share/man${MANPATH+:$MANPATH}:"
+    export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
+fi
