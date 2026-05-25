@@ -113,12 +113,11 @@ Plus an upfront plan that tells you what's coming, how many modules will run, an
 
 ```text
 ◆ Apply 3/5: Homebrew packages
-  Profile: both
-  Modules: 4
+  Profile: personal
+  Modules: 3
     1. core (always)
     2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
     3. personal profile extras
-    4. work profile extras
   Items: 59 taps/formulae/casks split into individual installs.
   First install usually takes 5-15 minutes. Downloads dominate.
   Quiet stretches print a heartbeat every 30 seconds.

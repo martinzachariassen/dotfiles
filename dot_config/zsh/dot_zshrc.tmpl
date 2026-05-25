@@ -92,10 +92,10 @@ fi
 # Replaces zsh's default prompt. Config at ~/.config/starship.toml.
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
-# ─── Claude Code personal profile ─────────────────────────────────────────────
-CLAUDE_PERSONAL_DIR="$XDG_CONFIG_HOME/claude/personal"
+# ─── Claude Code profile ({{ .profile }}) ─────────────────────────────────────
+CLAUDE_PROFILE_DIR="$XDG_CONFIG_HOME/claude/{{ .profile }}"
 claude() {
-    CLAUDE_CONFIG_DIR="$CLAUDE_PERSONAL_DIR" command claude "$@"
+    CLAUDE_CONFIG_DIR="$CLAUDE_PROFILE_DIR" command claude "$@"
 }
 
 # ─── Modern CLI replacements (installed via Brewfile) ─────────────────────────
@@ -355,9 +355,9 @@ alias zj='zellij attach -c default'
 #     zellij attach -c default
 # fi
 
-{{ if or (eq .profile "work") (eq .profile "both") -}}
+{{ if eq .profile "work" -}}
 # ─── Work-only shell config (rendered because profile = {{ .profile }}) ───────
-# Edit by changing the `{{`{{`}} if or (eq .profile "work") ... block in
+# Edit by changing the `{{`{{`}} if eq .profile "work" ... block in
 # dot_config/zsh/dot_zshrc.tmpl, then `chezmoi apply -v`.
 
 # Add work-only env vars, aliases, or hooks below as needed:
@@ -365,7 +365,7 @@ alias zj='zellij attach -c default'
 # alias k="kubectl --context=work-prod"
 {{ end -}}
 
-{{ if or (eq .profile "personal") (eq .profile "both") -}}
+{{ if eq .profile "personal" -}}
 # ─── Personal-only shell config (rendered because profile = {{ .profile }}) ───
 # Add personal-only env vars, aliases, or hooks below as needed:
 # alias music='open -a "Spotify"'

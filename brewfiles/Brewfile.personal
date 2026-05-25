@@ -1,7 +1,7 @@
 # Brewfile.personal — extras for the `personal` profile.
 #
-# Installed on top of the core Brewfile when your profile is "personal" or
-# "both". Skipped when your profile is "work".
+# Installed on top of the core Brewfile when your profile is "personal".
+# Skipped when your profile is "work".
 #
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.personal
 

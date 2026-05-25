@@ -13,7 +13,7 @@ usage() {
     cat <<EOF
 Usage:
   dotfiles profile show
-  dotfiles profile set personal|work|both [--no-apply]
+  dotfiles profile set personal|work [--no-apply]
   dotfiles features list
   dotfiles features enable macApps|ai [--no-apply]
   dotfiles features disable macApps|ai [--no-apply]
@@ -34,7 +34,7 @@ die() {
 
 valid_profile() {
     case "$1" in
-        personal|work|both) return 0 ;;
+        personal|work) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -202,7 +202,7 @@ cmd_profile() {
         set)
             local profile="${2:-}"
             [ -n "$profile" ] || die "missing profile"
-            valid_profile "$profile" || die "profile must be personal, work, or both"
+            valid_profile "$profile" || die "profile must be personal or work"
             parse_common_flags "${@:3}"
             ensure_config
             set_toml_value "data" "profile" "\"$profile\""

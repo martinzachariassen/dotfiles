@@ -75,7 +75,6 @@ Common profile and feature changes:
 ```sh
 dotfiles profile set personal
 dotfiles profile set work
-dotfiles profile set both
 dotfiles features list
 dotfiles features enable ai
 dotfiles features enable macApps

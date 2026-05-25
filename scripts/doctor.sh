@@ -16,7 +16,7 @@
 #
 # Why a script and not just `chezmoi doctor`:
 #   chezmoi's built-in doctor checks chezmoi's own state. This script checks the
-#   *whole stack* this repo expects — XDG layout, claude personal config, op
+#   *whole stack* this repo expects — XDG layout, claude config, op
 #   signing, brew bundle drift, auth state — anything that can quietly break and
 #   bite you a week later.
 
@@ -110,14 +110,19 @@ else
     fail "~/.zshenv missing — run: chezmoi apply"
 fi
 
-# ─── 4. Claude personal config ────────────────────────────────────────────────
-section "Claude personal config"
+# ─── 4. Claude config ─────────────────────────────────────────────────────────
+section "Claude config"
 if zsh -c 'source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1; type claude >/dev/null 2>&1'; then
     pass "claude wrapper loads"
-    if [ -d "$HOME/.config/claude/personal" ]; then
-        pass "~/.config/claude/personal present"
+    if [ -f "$HOME/.config/claude/CLAUDE.shared.md" ]; then
+        pass "~/.config/claude/CLAUDE.shared.md present"
     else
-        fail "~/.config/claude/personal missing — run: chezmoi apply"
+        fail "~/.config/claude/CLAUDE.shared.md missing — run: chezmoi apply"
+    fi
+    if [ -f "$HOME/.config/claude/personal/CLAUDE.md" ] || [ -f "$HOME/.config/claude/work/CLAUDE.md" ]; then
+        pass "active profile CLAUDE.md present"
+    else
+        fail "no profile CLAUDE.md (~/.config/claude/{personal,work}/CLAUDE.md) — run: chezmoi apply"
     fi
 else
     fail "claude wrapper not loaded by zshrc — run: chezmoi apply"
@@ -214,7 +219,7 @@ if command -v brew >/dev/null 2>&1; then
         fi
     fi
     case "$profile" in
-        personal|both)
+        personal)
             if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.personal" >/dev/null 2>&1; then
                 pass "personal Brewfile satisfied"
             else
@@ -223,7 +228,7 @@ if command -v brew >/dev/null 2>&1; then
             ;;
     esac
     case "$profile" in
-        work|both)
+        work)
             if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.work" >/dev/null 2>&1; then
                 pass "work Brewfile satisfied"
             else

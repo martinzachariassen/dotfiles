@@ -42,7 +42,6 @@ dotfiles features enable macApps
 
 # Profiles use the same control path.
 dotfiles profile set work
-dotfiles profile set both
 
 # Git signing can be updated after 1Password is signed in.
 dotfiles signing set

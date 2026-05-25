@@ -51,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [personal, work, both]
+        profile: [personal, work]
         mac_apps: [true, false]
         ai: [true, false]
     steps:

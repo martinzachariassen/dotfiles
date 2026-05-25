@@ -4,14 +4,14 @@
 set -euo pipefail
 
 SOURCE_DIR="${1:-$(pwd)}"
-PROFILE="${PROFILE:-both}"
+PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
 AI="${AI:-false}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 case "$PROFILE" in
-    personal|work|both) ;;
-    *) echo "PROFILE must be one of: personal, work, both" >&2; exit 2 ;;
+    personal|work) ;;
+    *) echo "PROFILE must be one of: personal, work" >&2; exit 2 ;;
 esac
 
 case "$MAC_APPS" in

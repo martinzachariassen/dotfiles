@@ -29,10 +29,9 @@ Once you confirm, the install runs unattended except for system prompts such as 
 │      Fresh installs only need profile, git name, and git email here.
 │
 ◆  Profile
-│    1. personal - personal extras only
+│    1. personal - personal extras only (current)
 │    2. work - work extras only
-│    3. both - personal and work extras (current)
-│  Choose 1-3, or press Enter for both:
+│  Choose 1-2, or press Enter for personal:
 │
 │  Recommended setup
 │    1Password          yes
@@ -110,7 +109,6 @@ The setup screen asks two orthogonal questions: which **profile** you're on (whi
 |---|---|---|
 | `personal` | `brewfiles/Brewfile.personal` | Personal-only apps you add. Personal-only `.zshrc` block renders. |
 | `work` | `brewfiles/Brewfile.work` | Work-only apps you add (Slack, Teams, Postman, etc.). Work-only `.zshrc` block renders. |
-| `both` | both | Single-machine-many-jobs. |
 
 **Features** are intentionally narrow. Project toolchains are Devbox-owned; Homebrew features are only for workstation-level preferences:
 
@@ -119,7 +117,7 @@ The setup screen asks two orthogonal questions: which **profile** you're on (whi
 | `ai` | `brewfiles/Brewfile.ai` | Ollama + `llm` for local model runs and shell-pipeline prompts. Model downloads are manual via `scripts/setup-local-llm.sh` because they are large. |
 | `macApps` | `brewfiles/Brewfile.mac-apps` | Rectangle, Raycast, Stats, Chrome, dive. Pure QoL — skip on a server-y machine. |
 
-The core `Brewfile` always installs the workstation baseline: git, GitHub CLI, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `direnv`, and other shell primitives. Azure and Google Cloud account CLIs live in the work profile (`brewfiles/Brewfile.work`) and are installed when the selected profile is `work` or `both`. Project-pinned Kubernetes tools, Terraform/OpenTofu, database clients/servers, and language runtimes belong in each project's `devbox.json`. Starter templates live under [`examples/devbox/`](../examples/devbox/).
+The core `Brewfile` always installs the workstation baseline: git, GitHub CLI, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `direnv`, and other shell primitives. Azure and Google Cloud account CLIs live in the work profile (`brewfiles/Brewfile.work`) and are installed when the selected profile is `work`. Project-pinned Kubernetes tools, Terraform/OpenTofu, database clients/servers, and language runtimes belong in each project's `devbox.json`. Starter templates live under [`examples/devbox/`](../examples/devbox/).
 
 Raycast config is backed up through Raycast's encrypted `.rayconfig` export format rather than a live dotfile. After Raycast is installed, open *Raycast Settings → Advanced → Export*, set an export passphrase stored in 1Password, and use [`raycast/`](../raycast/) as the scheduled backup location. On a new Mac, run Raycast's `Import Settings & Data` command and choose the latest export from that folder.
 
@@ -145,7 +143,7 @@ The bootstrap pulls config and tools, but **secrets aren't in this repo on purpo
 
 **Git commit signing** — the private key never leaves 1Password; `op-ssh-sign` (bundled with the 1Password macOS app) signs commits via the agent. If the public signing key is known during install, chezmoi renders signing immediately. On a fresh Mac it usually is not known yet, so `bootstrap-auth.sh` prompts for the public key after 1Password is installed and signed in, writes it to chezmoi data, reapplies `dot_config/git/config.tmpl`, and runs a `git -S` smoke test against an empty repo. The template also writes `~/.config/git/allowed_signers` so local SSH signature verification works.
 
-**Cloud auth tokens** — `gh`, `az`, and `gcloud` each store their own credentials under `~/.config/gh/`, `~/.azure/`, `~/.config/gcloud/`. GitHub CLI is part of the core setup. Azure and Google Cloud CLIs are profile extras for `work`/`both` because not every personal Mac needs cloud account tooling. Project-specific CLIs still stay in Devbox. `bootstrap-auth.sh` walks through whichever CLIs are installed and skips the rest. None of these directories are tracked in this repo.
+**Cloud auth tokens** — `gh`, `az`, and `gcloud` each store their own credentials under `~/.config/gh/`, `~/.azure/`, `~/.config/gcloud/`. GitHub CLI is part of the core setup. Azure and Google Cloud CLIs are extras for the `work` profile because not every personal Mac needs cloud account tooling. Project-specific CLIs still stay in Devbox. `bootstrap-auth.sh` walks through whichever CLIs are installed and skips the rest. None of these directories are tracked in this repo.
 
 **1Password CLI** (`op`) — separate from the GUI sign-in. First run on a machine: `op account add` (paste account URL + secret key), then `eval $(op signin)`. Subsequent shell sessions: `eval $(op signin)`.
 

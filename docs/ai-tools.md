@@ -19,13 +19,18 @@ Keep it short; the detailed instructions live in `AGENTS.md`.
 
 ## Claude Code
 
-A wrapper function in `.zshrc` sets the personal config directory before invoking `claude`:
+A wrapper function in `.zshrc` sets the profile config directory before invoking `claude`, keyed to the chezmoi `profile` value:
 
-- `CLAUDE_CONFIG_DIR=~/.config/claude/personal`
+- `CLAUDE_CONFIG_DIR=~/.config/claude/<profile>` — `personal` or `work`
 
-### Global CLAUDE.md
+### Shared base + profile files
 
-[`dot_config/claude/personal/CLAUDE.md`](../dot_config/claude/personal/CLAUDE.md) is auto-loaded into every personal Claude Code session — covers communication style, the tool environment Claude can assume is available, language-specific code-style preferences, and explicit anti-patterns ("don't suggest tmux, I use Zellij"). Edit via `chezmoi edit ~/.config/claude/personal/CLAUDE.md` to keep it in sync with your source. Project-specific instructions go in `<project>/CLAUDE.md` and merge on top of this global one.
+Claude Code's global config is split into two layers:
+
+- [`dot_config/claude/CLAUDE.shared.md`](../dot_config/claude/CLAUDE.shared.md) — the **shared base**, loaded for every session regardless of profile. Covers communication style, the tool environment Claude can assume, language-specific code-style preferences, and explicit anti-patterns ("don't suggest tmux, I use Zellij").
+- `dot_config/claude/personal/CLAUDE.md` and `dot_config/claude/work/CLAUDE.md` — thin **profile files**. Each `@import`s the shared base and adds profile-specific posture (personal = experiment-friendly; work = PR-based and conservative). A templated `.chezmoiignore` applies only the file matching the active profile.
+
+Edit via `chezmoi edit ~/.config/claude/CLAUDE.shared.md` (or the active profile file) to keep source in sync. Project-specific instructions go in `<project>/CLAUDE.md` and merge on top.
 
 ## Codex global instructions
 
@@ -45,8 +50,8 @@ serving and [`llm`](https://llm.datasette.io/) as a small Unix-style AI utility.
 The setup script installs the `llm-ollama` plugin and pulls:
 
 - `qwen2.5-coder:14b`
-- `gemma3:12b`
-- `llama3.1:8b`
+- `qwen3-coder:30b`
+- `gpt-oss:20b`
 
 Model downloads are intentionally separate from `brew bundle`: they are large,
 machine-specific, and should not surprise-run during every dotfiles apply.

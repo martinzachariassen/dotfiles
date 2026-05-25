@@ -21,7 +21,7 @@ export GRADLE_USER_HOME="$XDG_CONFIG_HOME/gradle"   # was ~/.gradle
 export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"       # was ~/.npm
 export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
 # git auto-detects ~/.config/git/{config,ignore} — no env var needed.
-# claude-personal lives under ~/.config/claude/personal — see wrapper in .zshrc.
+# claude config lives under ~/.config/claude/<profile> — see the claude() wrapper in .zshrc.
 
 # ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
 export SHELL_SESSIONS_DISABLE=1

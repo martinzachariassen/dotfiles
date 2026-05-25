@@ -1,8 +1,7 @@
 # Brewfile.work — extras for the `work` profile.
 #
 # Installed by the brew-bundle chezmoi script ON TOP of the common `Brewfile`
-# when your profile is "work" or "both". Skipped when your profile is
-# "personal".
+# when your profile is "work". Skipped when your profile is "personal".
 #
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.work
 

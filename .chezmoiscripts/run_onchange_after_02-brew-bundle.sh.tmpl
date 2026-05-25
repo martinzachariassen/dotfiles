@@ -188,10 +188,10 @@ add_step "ai tooling (Ollama/llm)"        "brewfiles/Brewfile.ai"
 add_step "mac apps (Rectangle/Raycast/Stats/Chrome/dive)"  "brewfiles/Brewfile.mac-apps"
 {{ end -}}
 case "{{ .profile }}" in
-    personal|both) add_step "personal profile extras"  "brewfiles/Brewfile.personal" ;;
+    personal) add_step "personal profile extras"  "brewfiles/Brewfile.personal" ;;
 esac
 case "{{ .profile }}" in
-    work|both)     add_step "work profile extras"      "brewfiles/Brewfile.work" ;;
+    work)     add_step "work profile extras"      "brewfiles/Brewfile.work" ;;
 esac
 
 TOTAL=${#PLAN_LABELS[@]}

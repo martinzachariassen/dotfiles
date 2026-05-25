@@ -14,9 +14,9 @@
 {{- $signingKey := promptString "signingKey" "" -}}
 
 {{/* Profile picker — controls which casks get installed and which config blocks
-     activate. `personal` and `work` install only their respective extras on top
-     of the core Brewfile; `both` installs everything. */ -}}
-{{- $profile    := promptChoice "profile" (list "personal" "work" "both") "personal" -}}
+     activate. `personal` and `work` each install only their respective extras
+     on top of the core Brewfile. */ -}}
+{{- $profile    := promptChoice "profile" (list "personal" "work") "personal" -}}
 
 {{/* Workstation feature toggles. Project toolchains (Kubernetes, Terraform,
      database clients/servers, language runtimes) belong in each project's

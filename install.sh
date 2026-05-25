@@ -586,8 +586,7 @@ choices() {
 
     prompt_choice CHOICE_PROFILE "Profile" "$EXISTING_PROFILE" \
         "personal|personal - personal extras only" \
-        "work|work - work extras only" \
-        "both|both - personal and work extras"
+        "work|work - work extras only"
 
     prompt_text CHOICE_NAME "Full name" "$EXISTING_NAME" "Written to ~/.config/git/config as git user.name."
     prompt_text CHOICE_EMAIL "Git email" "$EXISTING_EMAIL" "Written to ~/.config/git/config as git user.email. GitHub noreply addresses are fine."
@@ -792,10 +791,10 @@ active_brewfiles() {
         printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.ai"
     fi
     case "${CHOICE_PROFILE:-personal}" in
-        personal|both) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.personal" ;;
+        personal) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.personal" ;;
     esac
     case "${CHOICE_PROFILE:-personal}" in
-        work|both) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.work" ;;
+        work) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.work" ;;
     esac
 }
 
