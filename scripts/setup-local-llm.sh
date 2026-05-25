@@ -2,13 +2,39 @@
 # Configure local LLM tooling after enabling the optional AI Brewfile.
 #
 # Installs the llm-ollama plugin and pulls the default Ollama model set.
+#
+# User guide: llm-ollama
+#
+# Ollama is the local model runner. It can be used directly:
+#
+#   ollama run qwen2.5-coder:14b
+#
+# The llm-ollama plugin is only needed when using the `llm` CLI as a
+# Unix-style prompt tool for Ollama models. This gives the same `llm` interface
+# for local models and any other providers/plugins you configure.
+#
+# Common commands:
+#
+#   llm models
+#   llm -m qwen2.5-coder:14b 'Explain this git error in one paragraph'
+#   git diff --staged | llm -m qwen2.5-coder:14b 'Write a commit message'
+#   tail -n 200 app.log | llm -m gpt-oss:20b 'Summarize the failures'
+#   llm -m qwen3-coder:30b 'Review this design for implementation risks'
+#
+# Use `ollama run` for direct interactive model sessions. Use `llm` for
+# shell-pipeline prompts, quick transformations, summaries, and scripts where a
+# provider-neutral CLI is useful.
+#
+# If Ollama is running somewhere other than the local default, set OLLAMA_HOST:
+#
+#   OLLAMA_HOST=http://localhost:11434 llm -m qwen2.5-coder:14b 'hello'
 
 set -euo pipefail
 
 MODELS=(
     "qwen2.5-coder:14b"
-    "gemma3:12b"
-    "llama3.1:8b"
+    "qwen3-coder:30b"
+    "gpt-oss:20b"
 )
 
 usage() {
@@ -104,4 +130,3 @@ install_llm_ollama
 pull_models
 
 echo "Local LLM setup complete."
-
