@@ -7,7 +7,6 @@
 
 # ─── Cloud / Kubernetes ───────────────────────────────────────────────────────
 tap "Azure/kubelogin"
-
 brew "azure-cli"                # global Azure account/subscription CLI; project kubectl stays in Devbox
 brew "Azure/kubelogin/kubelogin" # AKS Azure AD auth plugin for kubectl
 brew "kubectx"                  # provides kubectx and kubens for context/namespace switching

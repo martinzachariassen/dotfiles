@@ -8,4 +8,7 @@
 
 brew "ollama"                   # local model runner/server
 brew "llm"                      # Unix-style LLM CLI for shell pipelines
-
+cask "codex"                    # OpenAI Codex CLI
+cask "chatgpt"                  # OpenAI ChatGPT desktop app
+cask "claude"                   # Anthropic Claude desktop app
+cask "claude-code"              # Anthropic Claude Code CLI
