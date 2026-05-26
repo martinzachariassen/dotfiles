@@ -8,3 +8,6 @@
 - [`examples/`](../examples/) — drop-in starter files for `direnv`, `pre-commit`, and Devbox project templates.
 - [`raycast/`](../raycast/) — holding folder for encrypted Raycast `.rayconfig` exports. Ignored by chezmoi so it does not render into `$HOME`.
 - [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — shell parser checks, error-level ShellCheck, chezmoi template-render, and macOS brew checks on every PR.
+- [`AGENTS.md`](../AGENTS.md) — repo-local brief for AI agents (Claude Code, Codex, Copilot) editing this repo. Source of truth; the bridges below all point at it. See [AI tools](ai-tools.md) for the full layering.
+- [`CLAUDE.md`](../CLAUDE.md) — one-line bridge (`@AGENTS.md`) so Claude Code picks up `AGENTS.md` (it only auto-loads `CLAUDE.md`).
+- [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — Copilot bridge to `AGENTS.md`.

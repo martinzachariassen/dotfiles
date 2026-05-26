@@ -6,7 +6,7 @@ Three classes of files in this repo, plus chezmoi's own infrastructure.
 
 **2. Files chezmoi removes from `$HOME`** — `remove_*` markers are empty sentinels whose filename encodes a delete instruction. `remove_dot_gitconfig` ensures `~/.gitconfig` doesn't exist (because git checks `~/.gitconfig` *before* `~/.config/git/config` and would silently shadow our XDG-managed config). `remove_dot_zshrc` and `remove_dot_zprofile` defend the `ZDOTDIR`-based zsh layout. `remove_dot_bash_profile`, `remove_dot_bashrc`, and `remove_dot_profile` keep old bash/POSIX login hooks from accumulating stale bootstrap code in `$HOME`.
 
-**3. Files chezmoi ignores entirely** — listed in `.chezmoiignore`. Repo documentation (`README.md`, `docs/`, `LICENSE`), the public installer (`install.sh`), helper scripts (`scripts/`), the Homebrew bundle files (`Brewfile`, `brewfiles/`), CI (`.github/`), formatters (`.editorconfig`, `.gitattributes`), examples (`examples/`), git's own files.
+**3. Files chezmoi ignores entirely** — listed in `.chezmoiignore`. Repo documentation (`README.md`, `docs/`, `LICENSE`), the public installer (`install.sh`), helper scripts (`scripts/`), the Homebrew bundle files (`Brewfile`, `brewfiles/`), CI (`.github/`), formatters (`.editorconfig`, `.gitattributes`), examples (`examples/`), git's own files, and the repo-local AI instructions (`AGENTS.md`, `CLAUDE.md`). The AI files are explicitly ignored because `CLAUDE.md` rendered into `$HOME` would shadow the user-level `~/.config/claude/CLAUDE.md`.
 
 **chezmoi infrastructure**:
 

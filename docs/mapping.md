@@ -7,15 +7,16 @@ Reference table showing exactly what each file in the repo does.
 | Source (in repo) | Destination (in `$HOME`) | Notes |
 |---|---|---|
 | `dot_zshenv` | `~/.zshenv` | Tiny stub, sets ZDOTDIR + XDG vars + tool env vars. Only file that MUST stay in `$HOME`. |
-| `dot_config/zsh/dot_zshrc` | `~/.config/zsh/.zshrc` | Interactive shell config (aliases, completions, profile-aware Claude wrapper). Found via ZDOTDIR. |
+| `dot_config/zsh/dot_zshrc` | `~/.config/zsh/.zshrc` | Interactive shell config (aliases, completions). Found via ZDOTDIR. |
 | `dot_config/zsh/dot_zprofile` | `~/.config/zsh/.zprofile` | Login shell init (brew shellenv). |
 | `dot_config/git/config.tmpl` | `~/.config/git/config` | Templated with name/email/signing key and SSH signing settings. Git auto-detects this XDG path. |
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` | Templated allowed signers file so Git can verify local SSH commit signatures. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
 | `dot_config/direnv/direnv.toml` | `~/.config/direnv/direnv.toml` | direnv global config — warn timeout, hidden env diff, and the whitelist that auto-trusts `.envrc` files under `~/Developer` (no per-project `direnv allow` required). |
-| `dot_config/claude/CLAUDE.shared.md` | `~/.config/claude/CLAUDE.shared.md` | Shared Claude Code base — communication style, environment, code-style preferences, anti-patterns. `@import`ed by whichever profile file is active. Always applied. |
-| `dot_config/claude/personal/CLAUDE.md` | `~/.config/claude/personal/CLAUDE.md` | Personal-profile Claude Code config: `@import`s the shared base + personal posture. Applied only when `profile = personal` (templated `.chezmoiignore`). `CLAUDE_CONFIG_DIR` points here. |
-| `dot_config/claude/work/CLAUDE.md` | `~/.config/claude/work/CLAUDE.md` | Work-profile Claude Code config: `@import`s the shared base + work posture. Applied only when `profile = work` (templated `.chezmoiignore`). `CLAUDE_CONFIG_DIR` points here. |
+| `dot_config/claude/CLAUDE.shared.md` | `~/.config/claude/CLAUDE.shared.md` | Shared Claude Code base — communication style, environment, code-style preferences, anti-patterns. `@import`ed by the rendered `CLAUDE.md`. Always applied. |
+| `dot_config/claude/CLAUDE.md.tmpl` | `~/.config/claude/CLAUDE.md` | Active-profile Claude Code memory. Renders by including `.chezmoitemplates/claude/<profile>.md`; its first line is `@~/.config/claude/CLAUDE.shared.md`, so the shared base layers in at memory-load time. `CLAUDE_CONFIG_DIR=~/.config/claude` (set in `.zshenv`) tells Claude Code to read this. |
+| `.chezmoitemplates/claude/personal.md` | *(not copied to $HOME)* | Personal-profile body. Pulled into `CLAUDE.md` via `includeTemplate` when `profile = personal`. |
+| `.chezmoitemplates/claude/work.md` | *(not copied to $HOME)* | Work-profile body. Pulled into `CLAUDE.md` via `includeTemplate` when `profile = work`. |
 | `dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` | Global Codex instructions auto-loaded into every personal Codex session — communication style, environment, code-style preferences, and commit conventions. Project-specific overrides go in `<project>/AGENTS.md`. |
 | `Library/Application Support/Code/User/settings.json` | `~/Library/Application Support/Code/User/settings.json` | VS Code user settings. This path is not XDG; VS Code on macOS hardcodes it under `~/Library/Application Support`. |
 | `dot_docker/config.json` | `~/.docker/config.json` | Docker CLI config. Stays at `~/.docker/` because Docker Desktop hardcodes the path. |
@@ -47,13 +48,14 @@ Reference table showing exactly what each file in the repo does.
 
 Listed in `.chezmoiignore`:
 
-`README.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `vscode/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`, `raycast/`
+`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `vscode/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`, `raycast/`
 
-These are repo metadata, install scripts, or holding-pen files for things we removed.
+These are repo metadata, install scripts, holding-pen files for things we removed, or AI-agent instructions that must stay repo-local. `CLAUDE.md` is explicitly ignored because if it rendered into `$HOME` it would shadow the user-level `~/.config/claude/CLAUDE.md`; the repo-local copy is a one-line `@AGENTS.md` bridge that Claude Code picks up when started inside this repo. See [AI tools](ai-tools.md).
 
-`.chezmoiignore` is itself a template: it additionally skips the *inactive* Claude
-profile directory — `.config/claude/work` on a personal machine, `.config/claude/personal`
-on a work machine — so only the selected profile's `CLAUDE.md` is applied.
+The Claude Code profile split is now handled inside `dot_config/claude/CLAUDE.md.tmpl`,
+which uses `includeTemplate (printf "claude/%s.md" .profile)` to pull the active
+profile body from `.chezmoitemplates/claude/`. Only one `CLAUDE.md` lands in
+`$HOME` regardless of profile; no `.chezmoiignore` gating needed.
 
 ## Utility scripts (run by hand or via aliases)
 
