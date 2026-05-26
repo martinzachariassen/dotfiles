@@ -104,6 +104,7 @@
     "git.openRepositoryInParentFolders": "never",
     "git.pruneOnFetch": true,
     "git.rebaseWhenSync": true,
+    "gitlens.currentLine.enabled": false,
 
     "github.gitAuthentication": true,
     "githubPullRequests.pullBranch": "never",
@@ -221,6 +222,9 @@
 
     "yaml.validate": true,
     "yaml.format.enable": true,
+    "yaml.completion": true,
+    "yaml.hover": true,
+    "yaml.schemaStore.enable": true,
 
     "cSpell.language": "en-US,nb",
 
@@ -230,6 +234,17 @@
 
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
+    },
+
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+
+    "[spring-boot-properties-yaml]": {
+        "yaml.validate": false,
+        "editor.quickSuggestions": {
+            "strings": true
+        }
     },
 
     "[kotlin]": {
