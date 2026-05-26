@@ -21,7 +21,12 @@ export GRADLE_USER_HOME="$XDG_CONFIG_HOME/gradle"   # was ~/.gradle
 export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"       # was ~/.npm
 export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
 # git auto-detects ~/.config/git/{config,ignore} — no env var needed.
-# claude config lives under ~/.config/claude/<profile> — see the claude() wrapper in .zshrc.
+
+# Claude Code reads its config dir from $CLAUDE_CONFIG_DIR (default: ~/.claude).
+# Point it at the XDG location so ~/.config/claude/CLAUDE.md is the user memory.
+# Set in .zshenv (not .zshrc) so every zsh invocation — including non-interactive
+# scripts and editor/IDE-spawned subshells — sees it.
+export CLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/claude"
 
 # ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
 export SHELL_SESSIONS_DISABLE=1

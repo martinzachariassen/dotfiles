@@ -193,7 +193,7 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 - **Source repo** — exists, on the right branch, in sync with origin, working tree clean.
 - **chezmoi** — installed, `chezmoi doctor` is clean, no source/$HOME drift.
 - **XDG layout** — no legacy `~/.zshrc`, `~/.gitconfig`, `~/.zprofile`; `~/.config/zsh/.zshrc` and `~/.zshenv` present.
-- **Claude personal config** — wrapper loads and `~/.config/claude/personal` is present.
+- **Claude config** — `CLAUDE_CONFIG_DIR` points at `~/.config/claude`, and both `CLAUDE.shared.md` and the profile-rendered `CLAUDE.md` are present.
 - **Git signing** — `op-ssh-sign` exists, signing key configured, smoke test of `git -S commit` actually succeeds.
 - **Brew packages** — every workstation/profile Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
 - **devbox + direnv + Nix** — devbox CLI installed, `/nix` store mounted, `nix-daemon` running, direnv hook wired into the shell, global direnv config present, no leftover `mise` on PATH.

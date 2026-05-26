@@ -112,20 +112,21 @@ fi
 
 # ─── 4. Claude config ─────────────────────────────────────────────────────────
 section "Claude config"
-if zsh -c 'source "$HOME/.config/zsh/.zshrc" >/dev/null 2>&1; type claude >/dev/null 2>&1'; then
-    pass "claude wrapper loads"
-    if [ -f "$HOME/.config/claude/CLAUDE.shared.md" ]; then
-        pass "~/.config/claude/CLAUDE.shared.md present"
-    else
-        fail "~/.config/claude/CLAUDE.shared.md missing — run: chezmoi apply"
-    fi
-    if [ -f "$HOME/.config/claude/personal/CLAUDE.md" ] || [ -f "$HOME/.config/claude/work/CLAUDE.md" ]; then
-        pass "active profile CLAUDE.md present"
-    else
-        fail "no profile CLAUDE.md (~/.config/claude/{personal,work}/CLAUDE.md) — run: chezmoi apply"
-    fi
+ccdir=$(zsh -c 'source "$HOME/.zshenv" >/dev/null 2>&1; printf %s "${CLAUDE_CONFIG_DIR:-}"')
+if [ "$ccdir" = "$HOME/.config/claude" ]; then
+    pass "CLAUDE_CONFIG_DIR points at ~/.config/claude"
 else
-    fail "claude wrapper not loaded by zshrc — run: chezmoi apply"
+    fail "CLAUDE_CONFIG_DIR is '${ccdir:-unset}' (expected ~/.config/claude) — run: chezmoi apply"
+fi
+if [ -f "$HOME/.config/claude/CLAUDE.shared.md" ]; then
+    pass "~/.config/claude/CLAUDE.shared.md present"
+else
+    fail "~/.config/claude/CLAUDE.shared.md missing — run: chezmoi apply"
+fi
+if [ -f "$HOME/.config/claude/CLAUDE.md" ]; then
+    pass "~/.config/claude/CLAUDE.md present (active profile)"
+else
+    fail "~/.config/claude/CLAUDE.md missing — run: chezmoi apply"
 fi
 
 # ─── 5. Git signing via 1Password ─────────────────────────────────────────────

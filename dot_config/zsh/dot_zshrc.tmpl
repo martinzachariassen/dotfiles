@@ -92,12 +92,6 @@ fi
 # Replaces zsh's default prompt. Config at ~/.config/starship.toml.
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
-# ─── Claude Code profile ({{ .profile }}) ─────────────────────────────────────
-CLAUDE_PROFILE_DIR="$XDG_CONFIG_HOME/claude/{{ .profile }}"
-claude() {
-    CLAUDE_CONFIG_DIR="$CLAUDE_PROFILE_DIR" command claude "$@"
-}
-
 # ─── Modern CLI replacements (installed via Brewfile) ─────────────────────────
 # Only alias if the tool is present, so the shell still works on a fresh box.
 command -v eza >/dev/null && {

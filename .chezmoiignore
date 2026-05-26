@@ -1,5 +1,6 @@
 README.md
 AGENTS.md
+CLAUDE.md
 docs/
 LICENSE
 install.sh
@@ -15,11 +16,3 @@ vscode/
 .DS_Store
 examples/
 raycast/
-
-# Apply only the Claude Code config for the active profile.
-{{ if ne .profile "personal" }}
-.config/claude/personal/
-{{ end }}
-{{ if ne .profile "work" }}
-.config/claude/work/
-{{ end }}
