@@ -28,6 +28,7 @@ Session.vim
 *.tmp
 *.log
 .cache/
+.storecode/
 
 # ─── chezmoi internal state (should never appear here, but belt-and-suspenders) ─
 .chezmoistate*
