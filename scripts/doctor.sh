@@ -44,6 +44,14 @@ section() { echo; echo "${BOLD}${BLUE}── $1 ──${RESET}"; }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
+# Shared helpers (semver_extract / semver_lt). Loaded from next to this script
+# so the version check below works even when DOTFILES_DIR is overridden.
+_DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=lib/semver.sh
+if [ -r "$_DOCTOR_DIR/lib/semver.sh" ]; then
+    . "$_DOCTOR_DIR/lib/semver.sh"
+fi
+
 # ─── 1. Source repo present and up to date ────────────────────────────────────
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
@@ -71,6 +79,21 @@ fi
 section "chezmoi"
 if command -v chezmoi >/dev/null 2>&1; then
     pass "chezmoi installed: $(chezmoi --version | head -1)"
+    # Compare installed version against the repo's pinned minimum
+    # (.chezmoiversion). chezmoi refuses to read the source if it's too old, but
+    # being far ahead is worth knowing too since template helpers shift between
+    # releases.
+    if command -v semver_lt >/dev/null 2>&1 && [ -r "$SOURCE_DIR/.chezmoiversion" ]; then
+        min_ver="$(semver_extract "$(cat "$SOURCE_DIR/.chezmoiversion")")"
+        cur_ver="$(semver_extract "$(chezmoi --version 2>/dev/null)")"
+        if [ -n "$min_ver" ] && [ -n "$cur_ver" ]; then
+            if semver_lt "$cur_ver" "$min_ver"; then
+                fail "chezmoi $cur_ver is older than the repo minimum $min_ver — run: brew upgrade chezmoi"
+            else
+                pass "chezmoi $cur_ver meets repo minimum $min_ver"
+            fi
+        fi
+    fi
     if chezmoi doctor 2>&1 | grep -q '^error'; then
         fail "chezmoi doctor reports errors — run: chezmoi doctor"
     else

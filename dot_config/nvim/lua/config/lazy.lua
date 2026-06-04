@@ -1,5 +1,19 @@
 -- LazyVim bootstrap — pinned to stable, auto-clones lazy.nvim on first run.
 -- Edit via: chezmoi edit ~/.config/nvim/lua/config/lazy.lua
+--
+-- Plugin version pinning: `defaults.version = false` below means each plugin
+-- tracks its latest commit, so a fresh machine gets "whatever is current today"
+-- — not a reproducible set. To pin exact plugin revisions across machines,
+-- commit lazy.nvim's lockfile into chezmoi (it is NOT tracked by default):
+--
+--     nvim                         # let plugins install on first launch
+--     :Lazy sync                   # resolve + write ~/.config/nvim/lazy-lock.json
+--     chezmoi add ~/.config/nvim/lazy-lock.json
+--     chezmoi cd && git add . && git commit -m "chore(nvim): pin plugin lockfile"
+--
+-- After that, `:Lazy restore` (or a fresh install) reproduces the pinned set,
+-- and you bump versions deliberately with `:Lazy update` + re-`chezmoi add`.
+-- See docs/day-to-day.md → "Pinning Neovim plugins".
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then

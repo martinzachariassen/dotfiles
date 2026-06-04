@@ -48,7 +48,7 @@ Reference table showing exactly what each file in the repo does.
 
 Listed in `.chezmoiignore`:
 
-`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `vscode/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`, `raycast/`
+`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/`, `LICENSE`, `install.sh`, `scripts/`, `Brewfile`, `Brewfile.lock.json`, `brewfiles/`, `vscode/`, `.editorconfig`, `.gitattributes`, `.github/`, `.gitignore`, `.DS_Store`, `examples/`, `tests/`, `raycast/`
 
 These are repo metadata, install scripts, holding-pen files for things we removed, or AI-agent instructions that must stay repo-local. `CLAUDE.md` is explicitly ignored because if it rendered into `$HOME` it would shadow the user-level `~/.config/claude/CLAUDE.md`; the repo-local copy is a one-line `@AGENTS.md` bridge that Claude Code picks up when started inside this repo. See [AI tools](ai-tools.md).
 
@@ -66,7 +66,9 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `install.sh` | Guided bootstrap for a fresh Mac. Idempotent. | Once on a new machine; safe to re-run anytime. |
 | `scripts/bootstrap-auth.sh` | Walks through 1Password, gh, optional az/gcloud auth, AKS/GKE plugin checks, and git-signing smoke test. | Once after `install.sh`. Safe to re-run — skips already-signed-in accounts and missing CLIs. |
 | `scripts/doctor.sh` | Reads-only health check. Verifies XDG layout, Claude personal config, op signing, brew bundle drift, auth state, etc. Pass/warn/fail per check. | Anytime something feels off. Aliased as `chezdoctor`. |
-| `scripts/macos-defaults.sh` | Idempotent system defaults. | Once on first apply (via chezmoi `run_once_after_*`); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
+| `scripts/macos-defaults.sh` | Idempotent system defaults. | On first apply and again whenever this script changes (chezmoi `run_onchange_after_*` keyed on its sha256); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
+| `scripts/lib/semver.sh` | Sourced helper: `semver_extract` / `semver_lt`. Used by `doctor.sh` for the chezmoi version-minimum check. Unit-tested by `tests/semver.bats`. | Never run directly. |
+| `tests/*.bats` | bats-core unit tests for shared shell helpers and zsh functions. Run in CI; run locally with `bats tests/`. | When changing shell helpers. |
 
 ## chezmoi infrastructure (not files in `$HOME`, but used by chezmoi itself)
 
@@ -81,7 +83,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl` | Runs before apply. Two-step: (1) curl-installs devbox from `get.jetify.com/devbox` if missing (devbox isn't in homebrew); (2) if `/nix` doesn't exist, eagerly bootstraps the Nix store via Determinate Systems' installer (`install --determinate --no-confirm`) — same code path devbox would invoke lazily, just run upfront so the first `devbox shell` doesn't pause for a "press enter to continue" prompt. macOS-only. Both halves idempotent. Doesn't fail the apply if Nix bootstrap errors — falls back to lazy install. |
 | `.chezmoiscripts/run_onchange_after_02-brew-bundle.sh.tmpl` | Runs after apply when Brewfile content hash changes. macOS-only. |
 | `.chezmoiscripts/run_onchange_after_03-vscode.sh.tmpl` | Installs VS Code marketplace extensions from `vscode/extensions.txt`, uninstalls deprecated extensions such as Continue, and installs/updates the JetBrains Kotlin VSIX from the latest `Kotlin/kotlin-lsp` GitHub release. macOS-only. Runs when the script or extension manifest changes. |
-| `.chezmoiscripts/run_once_after_04-macos-defaults.sh.tmpl` | Runs `scripts/macos-defaults.sh` exactly **once per machine** (`run_once_*`, not `run_onchange_*`). chezmoi records the run and never repeats it, even if you edit the script. To re-apply edits, run the `macos-defaults` zsh alias manually. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
+| `.chezmoiscripts/run_onchange_after_04-macos-defaults.sh.tmpl` | Runs `scripts/macos-defaults.sh` on first apply and again **whenever that script changes** (`run_onchange_*`, keyed on a sha256 `include` of the defaults script). A routine apply that doesn't touch the script is a no-op, so you don't get a sudo prompt every time — but editing the defaults script now re-applies automatically, instead of silently doing nothing as the old `run_once_*` did. To re-apply without editing, run the `macos-defaults` zsh alias. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
 | `.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl` | Prints a clear "✓ chezmoi apply complete" banner at the end of every apply. Always re-fires because the embedded `{{ now.Unix }}` timestamp makes the content hash differ on every render. The "99-" prefix sorts it after all other after-scripts. Pure UX — gives an unambiguous signal that chezmoi has finished its work. |
 | `scripts/macos-defaults.sh` | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |
 | `scripts/setup-local-llm.sh` | Optional local AI bootstrap. Installs the `llm-ollama` plugin and pulls the default Ollama models after the `ai` feature installs `ollama` and `llm`. |

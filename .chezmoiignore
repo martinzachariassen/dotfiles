@@ -15,5 +15,6 @@ vscode/
 .gitignore
 .DS_Store
 examples/
+tests/
 raycast/
 .storecode/
