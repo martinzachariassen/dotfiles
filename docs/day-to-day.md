@@ -36,7 +36,6 @@ Features are workstation-level booleans in `~/.config/chezmoi/chezmoi.toml`. Pro
 
 ```sh
 dotfiles features list
-dotfiles features enable ai
 dotfiles features disable macApps
 dotfiles features enable macApps
 
@@ -52,7 +51,6 @@ For a guided flow on an existing machine, run `bash ~/Developer/personal/dotfile
 Disabling a feature does **not** uninstall the packages it pulled in — that's intentional, so you don't lose tools you've come to rely on. To actually remove a feature's packages:
 
 ```sh
-brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.ai
 brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.mac-apps
 ```
 

@@ -29,7 +29,7 @@ CONFIGURE_ONLY=0
 RESET_BREW_REQUESTED=0
 MIRROR_BREW_REQUESTED=0
 
-FEATURE_KEYS=(macApps ai)
+FEATURE_KEYS=(macApps)
 
 usage() {
     cat <<EOF
@@ -666,7 +666,6 @@ toml_bool() {
 feature_default() {
     case "$1" in
         macApps) printf 'true' ;;
-        ai) printf 'false' ;;
         *) printf 'false' ;;
     esac
 }
@@ -678,7 +677,6 @@ load_existing_answers() {
     EXISTING_PROFILE="personal"
     EXISTING_USE_OP="true"
     EXISTING_FEAT_macApps="true"
-    EXISTING_FEAT_ai="false"
 
     if command -v chezmoi >/dev/null 2>&1 && [ -f "$HOME/.config/chezmoi/chezmoi.toml" ]; then
         local data_json key val
@@ -700,7 +698,6 @@ load_existing_answers() {
         EXISTING_PROFILE="$(toml_string "$cfg" "profile")"
         EXISTING_USE_OP="$(toml_bool "$cfg" "useOnePassword")"
         EXISTING_FEAT_macApps="$(toml_bool "$cfg" "macApps")"
-        EXISTING_FEAT_ai="$(toml_bool "$cfg" "ai")"
     fi
 
     EXISTING_NAME="${EXISTING_NAME:-$(git config --global user.name 2>/dev/null || echo '')}"
@@ -709,7 +706,6 @@ load_existing_answers() {
     EXISTING_PROFILE="${EXISTING_PROFILE:-personal}"
     EXISTING_USE_OP="${EXISTING_USE_OP:-true}"
     EXISTING_FEAT_macApps="${EXISTING_FEAT_macApps:-true}"
-    EXISTING_FEAT_ai="${EXISTING_FEAT_ai:-false}"
 }
 
 banner() {
@@ -817,7 +813,6 @@ choices() {
     CHOICE_USE_OP="${EXISTING_USE_OP:-true}"
     CHOICE_SIGNINGKEY="$EXISTING_SIGNINGKEY"
     CHOICE_FEAT_macApps="${EXISTING_FEAT_macApps:-true}"
-    CHOICE_FEAT_ai="${EXISTING_FEAT_ai:-false}"
     CHOICE_RESET_BREW=false
     CHOICE_MIRROR_BREW=false
     CHOICE_BACKUP_LEGACY=true
@@ -836,7 +831,6 @@ choices() {
         setting "Git signing" "finish later in bootstrap-auth.sh"
     fi
     setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
-    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
     setting "Homebrew cleanup" "keep local packages"
     if [ "$CONFIGURE_ONLY" != "1" ] && [ ${#PROBE_LEGACY_FILES[@]} -gt 0 ]; then
         setting "Legacy files" "back up, then remove shadowing files"
@@ -863,8 +857,7 @@ choices() {
             CHOICE_SIGNINGKEY=""
         fi
 
-        prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps?" "$([ "$CHOICE_FEAT_macApps" = "true" ] && echo 1 || echo 0)"
-        prompt_confirm CHOICE_FEAT_ai "Install local AI tooling (Ollama, llm)?" "$([ "$CHOICE_FEAT_ai" = "true" ] && echo 1 || echo 0)"
+        prompt_confirm CHOICE_FEAT_macApps "Install workstation Mac apps (incl. AI tooling)?" "$([ "$CHOICE_FEAT_macApps" = "true" ] && echo 1 || echo 0)"
     elif [ "$CHOICE_USE_OP" != "true" ]; then
         CHOICE_SIGNINGKEY=""
     fi
@@ -917,7 +910,6 @@ confirm_phase() {
         setting "Signing key" "<none - set later>"
     fi
     setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
-    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
     setting "Repo" "$REPO"
     setting "Source dir" "$SOURCE_DIR"
     if [ "$CONFIGURE_ONLY" != "1" ]; then
@@ -1010,9 +1002,6 @@ active_brewfiles() {
     printf '%s\n' "$SOURCE_DIR/Brewfile"
     if [ "${CHOICE_FEAT_macApps:-true}" = "true" ]; then
         printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
-    fi
-    if [ "${CHOICE_FEAT_ai:-false}" = "true" ]; then
-        printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.ai"
     fi
     case "${CHOICE_PROFILE:-personal}" in
         personal) printf '%s\n' "$SOURCE_DIR/brewfiles/Brewfile.personal" ;;
@@ -1294,9 +1283,8 @@ self_test() {
     _v "direnv" direnv version
     _v "delta" delta --version
     _v "fzf" fzf --version
-    if [ "${CHOICE_FEAT_ai:-false}" = "true" ]; then
+    if [ "${CHOICE_FEAT_macApps:-true}" = "true" ]; then
         _v "ollama" ollama --version
-        _v "llm" llm --version
     fi
 
     say "${DIM}functional${RESET}"
@@ -1339,7 +1327,6 @@ next_steps() {
     rule
     setting "Profile" "$CHOICE_PROFILE"
     setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
-    setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
     setting "1Password" "$(bool_label "$CHOICE_USE_OP")"
     hr
     say "${BOLD}Finish these when the prompt returns:${RESET}"

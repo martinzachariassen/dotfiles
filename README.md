@@ -76,7 +76,6 @@ Common profile and feature changes:
 dotfiles profile set personal
 dotfiles profile set work
 dotfiles features list
-dotfiles features enable ai
 dotfiles features enable macApps
 dotfiles features disable macApps
 ```
@@ -87,7 +86,7 @@ dotfiles features disable macApps
 |---|---|
 | Terminal | Ghostty, Zellij, Starship, Catppuccin Frappe, JetBrainsMono Nerd Font. |
 | Shell | zsh with XDG layout, fzf, zoxide, direnv, Carapace completions, syntax highlighting, and modern CLI aliases. |
-| Local AI | Optional `ai` feature with Ollama, `llm`, and a model bootstrap script. |
+| Local AI | Part of the default `macApps` module: Ollama (run as a brew service) plus the Codex, ChatGPT, Claude, and Claude Code apps. Pull models manually with `ollama pull`. |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | Project tools | Devbox + direnv for per-project JDK/Kotlin/Postgres/Node/Terraform/Kubernetes tools. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |

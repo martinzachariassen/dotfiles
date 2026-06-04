@@ -184,7 +184,6 @@ def_write NSGlobalDomain CGDisableCursorLocationMagnification -bool true
 #
 # Skipped on pre-Sonoma. Skipped if the line is already present. Single
 # `sudo tee` so we don't read the file (which is owned by root).
-TOUCHID_LINE="auth       sufficient     pam_tid.so"
 SUDO_LOCAL=/etc/pam.d/sudo_local
 SUDO_LOCAL_TEMPLATE=/etc/pam.d/sudo_local.template
 macos_major=$(sw_vers -productVersion | cut -d. -f1)

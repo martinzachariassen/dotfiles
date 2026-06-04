@@ -38,7 +38,6 @@ Once you confirm, the install runs unattended except for system prompts such as 
 │    1Password          yes
 │    Git signing        finish later in bootstrap-auth.sh
 │    Mac apps           yes
-│    Local AI           no
 │    Homebrew cleanup   keep local packages
 ◆  Setup style  → ↑/↓ Enter
 │    ❯ ● Continue with recommended setup
@@ -117,8 +116,7 @@ The setup screen asks two orthogonal questions: which **profile** you're on (whi
 
 | Feature | Brewfile | What's in it |
 |---|---|---|
-| `ai` | `brewfiles/Brewfile.ai` | Ollama + `llm` for local model runs and shell-pipeline prompts. Model downloads are manual via `scripts/setup-local-llm.sh` because they are large. |
-| `macApps` | `brewfiles/Brewfile.mac-apps` | Rectangle, Raycast, Stats, Chrome, dive. Pure QoL — skip on a server-y machine. |
+| `macApps` | `brewfiles/Brewfile.mac-apps` | Raycast, Stats, Chrome, and other GUI quality-of-life apps, plus AI tooling: Ollama (local model runner) and the Codex, ChatGPT, Claude, and Claude Code apps. `scripts/setup-ollama.sh` starts Ollama as a brew service; models are pulled manually via `ollama pull` because they are large. Skip on a server-y machine. |
 
 The core `Brewfile` always installs the workstation baseline: git, GitHub CLI, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `direnv`, and other shell primitives. Azure and Google Cloud account CLIs live in the work profile (`brewfiles/Brewfile.work`) and are installed when the selected profile is `work`. Project-pinned Kubernetes tools, Terraform/OpenTofu, database clients/servers, and language runtimes belong in each project's `devbox.json`. Starter templates live under [`examples/devbox/`](../examples/devbox/).
 
@@ -130,8 +128,8 @@ To flip a profile or feature later:
 dotfiles profile set work
 dotfiles profile set personal
 dotfiles features list
-dotfiles features enable ai
 dotfiles features disable macApps
+dotfiles features enable macApps
 dotfiles signing set
 ```
 

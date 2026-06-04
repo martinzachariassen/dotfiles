@@ -20,13 +20,20 @@
 #   signing, brew bundle drift, auth state — anything that can quietly break and
 #   bite you a week later.
 
+# Tilde in the user-facing status strings throughout this script is intentional
+# — those are display messages, not paths passed to commands, so they stay
+# literal. File-level disable must precede the first command below.
+# shellcheck disable=SC2088
 set -uo pipefail
 
-# ─── Color ────────────────────────────────────────────────────────────────────
-if [ -t 1 ]; then
-    BOLD=$'\033[1m'; DIM=$'\033[2m'
-    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'; RED=$'\033[31m'
-    RESET=$'\033[0m'
+# ─── Color + shared helpers ───────────────────────────────────────────────────
+# Loaded from next to this script so they work even when DOTFILES_DIR is
+# overridden or the script is invoked from another directory.
+_DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=lib/ui.sh
+if [ -r "$_DOCTOR_DIR/lib/ui.sh" ]; then
+    . "$_DOCTOR_DIR/lib/ui.sh"
+    ui_init_colors
 else
     BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; RESET=""
 fi
@@ -44,9 +51,8 @@ section() { echo; echo "${BOLD}${BLUE}── $1 ──${RESET}"; }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-# Shared helpers (semver_extract / semver_lt). Loaded from next to this script
-# so the version check below works even when DOTFILES_DIR is overridden.
-_DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# Shared semver helpers (semver_extract / semver_lt) for the chezmoi
+# version-minimum check below. Same script-relative dir resolved above.
 # shellcheck source=lib/semver.sh
 if [ -r "$_DOCTOR_DIR/lib/semver.sh" ]; then
     . "$_DOCTOR_DIR/lib/semver.sh"
@@ -219,27 +225,26 @@ if command -v brew >/dev/null 2>&1; then
     data_json="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
     if command -v jq >/dev/null 2>&1; then
         profile="$(printf '%s\n' "$data_json" | jq -r '.profile // empty')"
-        feature_ai="$(printf '%s\n' "$data_json" | jq -r '.features.ai // false')"
         feature_macapps="$(printf '%s\n' "$data_json" | jq -r '.features.macApps // true')"
     else
         profile="$(printf '%s\n' "$data_json" | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tail -1)"
-        feature_ai="$(printf '%s\n' "$data_json" | sed -n 's/.*"ai"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
         feature_macapps="$(printf '%s\n' "$data_json" | sed -n 's/.*"macApps"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
-        feature_ai="${feature_ai:-false}"
         feature_macapps="${feature_macapps:-true}"
-    fi
-    if [ "$feature_ai" = "true" ]; then
-        if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.ai" >/dev/null 2>&1; then
-            pass "ai Brewfile satisfied"
-        else
-            warn "Brewfile.ai out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.ai"
-        fi
     fi
     if [ "$feature_macapps" = "true" ]; then
         if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.mac-apps" >/dev/null 2>&1; then
             pass "mac apps Brewfile satisfied"
         else
             warn "Brewfile.mac-apps out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
+        fi
+        # Ollama ships in the mac-apps module and runs as a brew service
+        # (models are pulled manually).
+        if command -v ollama >/dev/null 2>&1; then
+            if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
+                pass "Ollama service running"
+            else
+                warn "Ollama service not started — run: scripts/setup-ollama.sh"
+            fi
         fi
     fi
     case "$profile" in
@@ -384,8 +389,19 @@ fi
 
 # ─── 9. Fonts ─────────────────────────────────────────────────────────────────
 section "Fonts"
-if ls "$HOME/Library/Fonts" /Library/Fonts 2>/dev/null | grep -qi 'JetBrainsMono.*Nerd' \
-   || ls /opt/homebrew/Caskroom/font-jetbrains-mono-nerd-font 2>/dev/null | grep -q .; then
+# Glob the install locations directly (avoids `ls | grep`, which mangles
+# non-alphanumeric names). The Caskroom path proves the cask is installed even
+# if the font files live elsewhere.
+jetbrains_nerd_font_installed() {
+    local f
+    for f in "$HOME/Library/Fonts"/JetBrainsMono*Nerd* \
+             /Library/Fonts/JetBrainsMono*Nerd* \
+             /opt/homebrew/Caskroom/font-jetbrains-mono-nerd-font/*; do
+        [ -e "$f" ] && return 0
+    done
+    return 1
+}
+if jetbrains_nerd_font_installed; then
     pass "JetBrainsMono Nerd Font installed"
 else
     warn "JetBrainsMono Nerd Font not found — terminal icons will look broken"

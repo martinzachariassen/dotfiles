@@ -6,7 +6,6 @@ set -euo pipefail
 SOURCE_DIR="${1:-$(pwd)}"
 PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
-AI="${AI:-false}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 case "$PROFILE" in
@@ -17,11 +16,6 @@ esac
 case "$MAC_APPS" in
     true|false) ;;
     *) echo "MAC_APPS must be true or false" >&2; exit 2 ;;
-esac
-
-case "$AI" in
-    true|false) ;;
-    *) echo "AI must be true or false" >&2; exit 2 ;;
 esac
 
 case "$USE_ONE_PASSWORD" in
@@ -45,10 +39,9 @@ sourceDir = "$SOURCE_DIR"
 
     [data.features]
         macApps   = $MAC_APPS
-        ai        = $AI
 EOF
 
-echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS ai=$AI useOnePassword=$USE_ONE_PASSWORD"
+echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
 render_output="$tmpdir/chezmoi-render.out"
 if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
         --config="$tmpdir/.config/chezmoi/chezmoi.toml" \

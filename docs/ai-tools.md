@@ -93,24 +93,25 @@ top.
 
 ## Local LLMs
 
-Local AI tooling is an optional workstation feature:
+Local AI tooling ships in the `macApps` workstation module (on by default), so
+no separate toggle is needed:
 
 ```sh
-dotfiles features enable ai
-scripts/setup-local-llm.sh
+scripts/setup-ollama.sh          # starts Ollama as a brew service
 ```
 
-The `ai` feature installs [`ollama`](https://docs.ollama.com/) for local model
-serving and [`llm`](https://llm.datasette.io/) as a small Unix-style AI utility.
-The setup script installs the `llm-ollama` plugin and pulls:
+The `macApps` feature installs [`ollama`](https://docs.ollama.com/) for local
+model serving, plus the Codex, ChatGPT, Claude, and Claude Code apps (see
+[`brewfiles/Brewfile.mac-apps`](../brewfiles/Brewfile.mac-apps)).
+`scripts/setup-ollama.sh` runs Ollama as a background service via
+`brew services` — it is idempotent and pulls no models.
 
-- `qwen2.5-coder:14b`
-- `qwen3-coder:30b`
-- `gpt-oss:20b`
+Models are intentionally **not** downloaded for you: they are large and
+machine-specific, so nothing surprise-runs during a dotfiles apply. Pull the
+ones you want by hand:
 
-Model downloads are intentionally separate from `brew bundle`: they are large,
-machine-specific, and should not surprise-run during every dotfiles apply.
-
-Use `llm` for shell-pipeline work, not as another coding agent. Good fits are
-summarizing logs, turning diffs into release notes, extracting JSON from text,
-or asking a quick local model question without starting Codex or Claude Code.
+```sh
+ollama pull qwen2.5-coder:14b
+ollama run  qwen2.5-coder:14b 'Explain this git error in one paragraph'
+ollama list
+```

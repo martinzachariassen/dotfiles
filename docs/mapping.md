@@ -75,7 +75,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | File | Role |
 |---|---|
 | `.chezmoi.toml.tmpl` | Init prompts (name, email, signingKey, profile, workstation extras). Renders to `~/.config/chezmoi/chezmoi.toml` on `chezmoi init`. The `profile` value is available in every chezmoi script and template as `{{ .profile }}`. |
-| `Brewfile`, `brewfiles/Brewfile.ai`, `brewfiles/Brewfile.mac-apps`, `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers optional AI tooling, mac apps, and profile extras based on chezmoi data. |
+| `Brewfile`, `brewfiles/Brewfile.mac-apps`, `brewfiles/Brewfile.personal`, `brewfiles/Brewfile.work` | Workstation brew package list. `Brewfile` is always installed; the brew-bundle chezmoi script layers the mac apps module (GUI apps + AI tooling) and profile extras based on chezmoi data. |
 | `vscode/extensions.txt` | VS Code marketplace extension manifest. The VS Code chezmoi script reads it directly from the source repo; it is not copied into `$HOME`. |
 | `dot_config/zsh/dot_zshrc.tmpl` | Templated zshrc — includes profile-conditional blocks rendered only when `{{ .profile }}` matches. |
 | `.chezmoiignore` | List of patterns to skip. |
@@ -86,7 +86,8 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `.chezmoiscripts/run_onchange_after_04-macos-defaults.sh.tmpl` | Runs `scripts/macos-defaults.sh` on first apply and again **whenever that script changes** (`run_onchange_*`, keyed on a sha256 `include` of the defaults script). A routine apply that doesn't touch the script is a no-op, so you don't get a sudo prompt every time — but editing the defaults script now re-applies automatically, instead of silently doing nothing as the old `run_once_*` did. To re-apply without editing, run the `macos-defaults` zsh alias. The wrapper reopens stdin from `/dev/tty` so sudo's password prompt works through chezmoi's non-interactive script context. |
 | `.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl` | Prints a clear "✓ chezmoi apply complete" banner at the end of every apply. Always re-fires because the embedded `{{ now.Unix }}` timestamp makes the content hash differ on every render. The "99-" prefix sorts it after all other after-scripts. Pure UX — gives an unambiguous signal that chezmoi has finished its work. |
 | `scripts/macos-defaults.sh` | The actual defaults script. Invoked by chezmoi on first apply (via the wrapper above) and re-runnable on demand via the `macos-defaults` zsh alias. |
-| `scripts/setup-local-llm.sh` | Optional local AI bootstrap. Installs the `llm-ollama` plugin and pulls the default Ollama models after the `ai` feature installs `ollama` and `llm`. |
+| `scripts/setup-ollama.sh` | Optional local AI bootstrap. Starts Ollama as a brew service (Ollama ships in the mac-apps module). Pulls no models — download them manually with `ollama pull <model>`. |
+| `scripts/lib/ui.sh` | Sourced helpers: `ui_init_colors` / `ui_init_glyphs`. Shared terminal color + glyph setup used by `doctor.sh`, `bootstrap-auth.sh`, and `setup-ollama.sh`. Never run directly. |
 
 ---
 

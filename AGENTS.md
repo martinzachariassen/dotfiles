@@ -16,9 +16,10 @@ edits that preserve existing patterns.
 ## Brewfiles
 
 - `Brewfile` — core CLIs, always installed.
-- `brewfiles/Brewfile.{ai,mac-apps,personal,work}` — layered in by the
-  brew-bundle script based on `chezmoi.toml` `profile` and
-  `features.{ai,macApps}` flags.
+- `brewfiles/Brewfile.{mac-apps,personal,work}` — layered in by the
+  brew-bundle script based on `chezmoi.toml` `profile` and the `macApps`
+  feature flag. `Brewfile.mac-apps` holds GUI apps + AI tooling (Ollama, the
+  Claude/Codex/ChatGPT apps).
 - Per-project runtimes and CLIs live in that project's `devbox.json`.
 - No runtime managers (mise, asdf, nvm, jenv, pyenv, rbenv, Volta, SDKMAN).
 

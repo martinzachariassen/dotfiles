@@ -18,3 +18,12 @@ cask "bruno"
 cask "pearcleaner"
 cask "jordanbaird-ice@beta"
 cask "intellij-idea"
+
+# ─── AI tooling + apps ────────────────────────────────────────────────────────
+# Ollama runs models locally. It's installed here but pulls no models — start it
+# with `scripts/setup-ollama.sh`, then `ollama pull <model>` for the ones you want.
+brew "ollama"                   # local model runner/server
+cask "codex"                    # OpenAI Codex CLI
+cask "chatgpt"                  # OpenAI ChatGPT desktop app
+cask "claude"                   # Anthropic Claude desktop app
+cask "claude-code"              # Anthropic Claude Code CLI
