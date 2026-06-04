@@ -36,6 +36,11 @@ Never print, move, transform, commit, or document real tokens, keys, cloud
 credentials, signing material, 1Password data, `.env` values, or auth files.
 Use placeholders, `.env.example`, or secret-manager refs.
 
+## Git
+
+- Never add a `Co-Authored-By: Claude` trailer (or any Claude/AI co-author
+  attribution) to commit messages.
+
 ## Verification
 
 - zsh changes: render the template, run `zsh -n` on the result.
