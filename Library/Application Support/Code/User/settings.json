@@ -215,6 +215,46 @@
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
+    // Language-server heap/GC tuning. JDKs come from devbox+direnv per project,
+    // so no java.home / runtimes are hardcoded here on purpose.
+    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
+    "java.import.gradle.wrapper.enabled": true,
+
+    // Pull down library sources/decompiled output so go-to-definition lands on
+    // real code instead of stubs.
+    "java.maven.downloadSources": true,
+    "java.eclipse.downloadSources": true,
+    "java.references.includeDecompiledSources": true,
+
+    // Faster authoring: fill best-guess args, richer signature help, and
+    // static-import favorites for the common test/assertion libraries.
+    "java.completion.guessMethodArguments": "auto",
+    "java.signatureHelp.description.enabled": true,
+    "java.completion.favoriteStaticMembers": [
+        "org.junit.jupiter.api.Assertions.*",
+        "org.junit.jupiter.api.Assumptions.*",
+        "org.assertj.core.api.Assertions.*",
+        "org.mockito.Mockito.*",
+        "org.mockito.ArgumentMatchers.*",
+        "org.hamcrest.MatcherAssert.assertThat",
+        "org.hamcrest.Matchers.*"
+    ],
+
+    // Code-generation defaults for generated equals/hashCode/getters.
+    "java.codeGeneration.hashCodeEquals.useJava7Objects": true,
+    "java.codeGeneration.useBlocks": true,
+    "java.codeGeneration.generateComments": false,
+
+    // Safe, unambiguous cleanups applied on save.
+    "java.cleanup.actionsOnSave": [
+        "addOverride",
+        "instanceofPatternMatch",
+        "switchExpression"
+    ],
+
+    // SonarLint: lint quality/bugs without phoning home.
+    "sonarlint.disableTelemetry": true,
+
     "spring-boot.ls.problem.application-properties.enabled": true,
     "spring-boot.ls.problem.application-yaml.enabled": true,
 
@@ -247,8 +287,16 @@
         }
     },
 
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java",
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
+    },
+
     "[kotlin]": {
-        "editor.defaultFormatter": "jetbrains.kotlin"
+        "editor.defaultFormatter": "jetbrains.kotlin",
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
     },
 
     "[typescript]": {
