@@ -31,6 +31,22 @@
     editor = nvim
     pager = delta
     # Global ignore lives at ~/.config/git/ignore (XDG)
+    # Built-in filesystem monitor + untracked cache — much faster `git status`
+    # on large repos (no daemon to install; macOS-supported since git 2.37).
+    fsmonitor = true
+    untrackedCache = true
+
+[commit]
+    # Show the full diff in the commit-message editor — review while you write.
+    verbose = true
+
+[column]
+    # Multi-column output for `git branch`, `git status`, `git tag`, etc.
+    ui = auto
+
+[tag]
+    # Sort tags by semantic version rather than lexically (v1.10 after v1.9).
+    sort = version:refname
 
 [interactive]
     diffFilter = delta --color-only
@@ -52,6 +68,8 @@
 [diff]
     colorMoved = default
     algorithm = histogram
+    # i/ w/ c/ prefixes (index/worktree/commit) instead of a/ b/ — unambiguous.
+    mnemonicPrefix = true
 
 [merge]
     conflictstyle = zdiff3
@@ -71,6 +89,7 @@
 
 [rerere]
     enabled = true
+    autoupdate = true
 
 [fetch]
     prune = true

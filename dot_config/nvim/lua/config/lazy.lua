@@ -38,14 +38,18 @@ require("lazy").setup({
     -- LazyVim core + its default plugin spec
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
 
-    -- Backend-dev language extras. Uncomment whichever you want — each one
-    -- pulls in LSP, treesitter, formatters, and linters for that language.
-    -- { import = "lazyvim.plugins.extras.lang.java" },
+    -- Backend-dev language extras. Each one pulls in LSP, treesitter,
+    -- formatters, and linters for that language. Enabled to match the primary
+    -- stack (Java/Kotlin + TS, with the config formats you touch daily).
+    -- First `nvim` launch after enabling installs the LSP servers via Mason.
+    { import = "lazyvim.plugins.extras.lang.java" },
+    { import = "lazyvim.plugins.extras.lang.kotlin" },
+    { import = "lazyvim.plugins.extras.lang.typescript" },
+    { import = "lazyvim.plugins.extras.lang.json" },
+    { import = "lazyvim.plugins.extras.lang.yaml" },
+    { import = "lazyvim.plugins.extras.lang.docker" },
+    -- Uncomment the rest as you need them:
     -- { import = "lazyvim.plugins.extras.lang.python" },
-    -- { import = "lazyvim.plugins.extras.lang.typescript" },
-    -- { import = "lazyvim.plugins.extras.lang.json" },
-    -- { import = "lazyvim.plugins.extras.lang.yaml" },
-    -- { import = "lazyvim.plugins.extras.lang.docker" },
     -- { import = "lazyvim.plugins.extras.lang.terraform" },
     -- { import = "lazyvim.plugins.extras.lang.markdown" },
 
