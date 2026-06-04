@@ -52,7 +52,8 @@ secrets.*
 .env.*
 !.env.example
 !.env.sample
-.envrc.local
+mise.local.toml
+.mise.local.toml
 
 # Cloud auth state
 .aws/credentials
