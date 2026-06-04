@@ -18,9 +18,10 @@
      on top of the core Brewfile. */ -}}
 {{- $profile    := promptChoice "profile" (list "personal" "work") "personal" -}}
 
-{{/* Workstation feature toggles. Project toolchains (Kubernetes, Terraform,
-     database clients/servers, language runtimes) belong in each project's
-     devbox.json, not in global Homebrew modules. */ -}}
+{{/* Workstation feature toggles. Language runtimes belong in mise (global
+     defaults in ~/.config/mise/config.toml, per-project pins in each project's
+     mise.toml); project CLIs (Kubernetes, Terraform, DB clients) stay in
+     Homebrew or run via Docker — not in global Homebrew runtime modules. */ -}}
 {{- $useOnePassword := promptBool "useOnePassword" true -}}
 {{- $featMacApps    := promptBool "features.macApps" true -}}
 

@@ -6,37 +6,73 @@
 [![Catppuccin Frappe](https://img.shields.io/badge/Catppuccin-Frapp%C3%A9-f2d5cf?labelColor=303446)](https://github.com/catppuccin/catppuccin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Homebrew apps, Devbox project environments, and macOS defaults wired up. The installer defaults to a short fresh-Mac path, with cleanup, feature toggles, and git signing setup available when the required software is actually installed.
+Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Homebrew apps, mise-managed language runtimes, and macOS defaults wired up. The installer defaults to a short fresh-Mac path, with cleanup, feature toggles, and git signing setup available when the required software is actually installed.
 
 ![Terminal preview](docs/terminal-preview.svg)
 
 ## Start here
 
-Fresh Mac or existing machine:
+Pick the scenario that matches your machine. Everything below runs as your normal macOS user — **never with `sudo`**. Homebrew and the macOS steps ask for your password themselves when they need privileged changes. Every step is idempotent and safe to re-run.
+
+### 1. Brand-new Mac
+
+One command bootstraps Xcode Command Line Tools, Homebrew, this repo, all packages, and macOS defaults:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-Run that as your normal macOS user, not with `sudo`. Homebrew and the macOS setup steps request your sudo password themselves when they need privileged changes.
+Fresh installs ask only for profile, git name, and git email up front. The wizard explains each prompt inline, uses normal text input instead of special key handling, and falls back to plain ASCII when the terminal cannot render box-drawing characters. The heavy parts show progress: Xcode CLT/Homebrew bootstrap gets a heartbeat, then packages split into per-tap/formula/cask progress.
 
-Fresh installs ask only for profile, git name, and git email up front. Git signing is finished later by `bootstrap-auth.sh`, after 1Password is installed and signed in. The wizard explains each prompt inline, uses normal text input instead of special key handling, and falls back to plain ASCII when the terminal cannot render box-drawing characters.
-
-The heavy parts have visible progress: Xcode CLT/Homebrew bootstrap gets a heartbeat, then Homebrew packages split into individual taps/formulae/casks with per-item progress. Reruns skip packages that already landed.
-
-Already bootstrapped and only changing profile, identity, or feature toggles:
-
-```sh
-bash ~/Developer/personal/dotfiles/install.sh --configure-only
-```
-
-After the wizard finishes:
+When the wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                      # skip if disabled
-bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh
-exec zsh                                               # reload managed shell
-sudo shutdown -r now                                   # finish macOS defaults
+bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh   # finishes git signing
+exec zsh                                               # reload the managed shell
+chezdoctor                                             # verify everything is healthy
+sudo shutdown -r now                                   # reboot to finish macOS defaults
+```
+
+### 2. Existing Mac with an older setup
+
+Use the **same installer** — it snapshots any pre-existing legacy dotfiles into a timestamped backup before taking over (skip with `SKIP_BACKUP=1`), then converges the machine to the current config:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
+```
+
+If the machine **already tracks these dotfiles**, just pull and apply instead:
+
+```sh
+chezup
+```
+
+Either path automatically runs the **deprecation cleanup** so you don't carry forward tools the repo no longer manages. It:
+
+- uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`, `temurin@25`, `direnv`) — language runtimes now come from **mise**;
+- removes the old out-of-band `devbox` binary and the leftover `~/.config/direnv` config; and
+- asks **y/N before deleting the old `/nix` store** from the previous devbox stack (it needs sudo and can't be undone — answer `n` to keep it, remove it later with `/nix/nix-installer uninstall`).
+
+On a fresh machine that never had the old stack, the cleanup is a silent no-op. Afterward, reload the shell so mise activation takes effect and sanity-check:
+
+```sh
+exec zsh
+chezdoctor      # warns about any leftover devbox/Nix/direnv it couldn't remove
+```
+
+> **Coming from the devbox/direnv setup?** Runtimes (Java/Node) are now managed by mise: global defaults live in `~/.config/mise/config.toml`, and each project pins its own versions + env vars in a committed `mise.toml` (its `[env]` block replaces `.envrc`). See [What you get](docs/what-you-get.md) and [examples/mise/](examples/mise/).
+
+### 3. Already set up — staying current
+
+```sh
+chezup       # pull latest repo changes, preview, then apply
+```
+
+Only changing profile, identity, or feature toggles (no full bootstrap):
+
+```sh
+bash ~/Developer/personal/dotfiles/install.sh --configure-only
 ```
 
 <details>
@@ -68,7 +104,7 @@ bash install.sh --reset-brew   # uninstall everything first, then reinstall
 | `chezup` | Pull latest repo changes, then run `chez`. |
 | `chezreinit` | Pull, re-render chezmoi config, then apply. Use after wizard/data-model changes. |
 | `chezdiff` | Preview dotfile drift, brew drift, and actionable script re-runs. |
-| `chezdoctor` | Read-only health check for repo, chezmoi, brew, auth, signing, Devbox, and shell layout. |
+| `chezdoctor` | Read-only health check for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
 Common profile and feature changes:
 
@@ -85,10 +121,10 @@ dotfiles features disable macApps
 | Area | Baseline |
 |---|---|
 | Terminal | Ghostty, Zellij, Starship, Catppuccin Frappe, JetBrainsMono Nerd Font. |
-| Shell | zsh with XDG layout, fzf, zoxide, direnv, Carapace completions, syntax highlighting, and modern CLI aliases. |
+| Shell | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, and modern CLI aliases. |
 | Local AI | Part of the default `macApps` module: Ollama (run as a brew service) plus the Codex, ChatGPT, Claude, and Claude Code apps. Pull models manually with `ollama pull`. |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
-| Project tools | Devbox + direnv for per-project JDK/Kotlin/Postgres/Node/Terraform/Kubernetes tools. |
+| Project tools | mise for per-project language runtimes (Java/Node/Python); CLIs and database servers via Homebrew or Docker. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |
 | Workstation apps | Homebrew-managed core apps, optional mac app extras, and profile-specific personal/work layers. |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
@@ -112,7 +148,7 @@ See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 Other useful references:
 
 - [Mapping](docs/mapping.md) maps every managed source file to its target in `$HOME`.
-- [examples/](examples/) contains Devbox, direnv, and pre-commit starter files.
+- [examples/](examples/) contains mise and pre-commit starter files.
 
 ## License
 

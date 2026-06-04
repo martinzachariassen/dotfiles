@@ -20,8 +20,9 @@ Icon?
 *~
 .netrwhist
 
-# Direnv
-.envrc.local
+# mise — machine-local runtime/env overrides (never committed)
+mise.local.toml
+.mise.local.toml
 
 # Common secret files
 .env

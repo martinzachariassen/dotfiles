@@ -32,7 +32,7 @@ git add . && git commit -m "..."
 
 ### Toggling a feature on or off later
 
-Features are workstation-level booleans in `~/.config/chezmoi/chezmoi.toml`. Project tools are not toggled here; add them to that project's `devbox.json` instead. Use the `dotfiles` command for day-to-day workstation changes:
+Features are workstation-level booleans in `~/.config/chezmoi/chezmoi.toml`. Project tools are not toggled here; pin them in that project's `mise.toml` instead. Use the `dotfiles` command for day-to-day workstation changes:
 
 ```sh
 dotfiles features list
@@ -69,55 +69,55 @@ git add Brewfile && git commit -m "Add httpx" && git push
 chezmoi apply -v                                            # triggers brew-bundle re-run via hash change
 ```
 
-**Project toolchain** — add it to that project's Devbox config instead:
+**Project language runtime** — pin it in that project's `mise.toml` instead:
 
 ```sh
 cd /path/to/project
-devbox add terraform tflint terraform-docs
-devbox add kubectl kubectx k9s stern kubernetes-helm
-devbox add postgresql_16 redis pgcli
+mise use java@temurin-21 gradle@latest node@lts
 ```
 
-For a starting point, copy one of [`examples/devbox/`](../examples/devbox/) into the project as `devbox.json`.
+CLIs (kubectl, terraform) and database servers (Postgres, Redis) are not mise's
+job — install those from the Brewfile, or run datastores via Docker /
+Testcontainers. For a starting point, copy one of [`examples/mise/`](../examples/mise/)
+into the project as `mise.toml`.
 
-### Starting a project with Devbox + direnv
+### Starting a project with mise
 
-Use this for any project with repo-local tooling: Java, Kotlin, Node, Terraform,
-Kubernetes, database clients, or anything else where the version should travel
-with the repo instead of your global machine. Devbox defines the toolchain;
-direnv activates it automatically when you enter the directory and unloads it
-when you leave.
+Use this for any project with a repo-local language runtime: Java, Kotlin, Node,
+Python, or anything else where the version should travel with the repo instead
+of your global machine. `mise.toml` pins the runtimes and carries project env
+vars; `mise activate` (wired into `.zshrc`) switches to them automatically when
+you enter the directory and restores the global set when you leave.
 
 ```sh
 cd /path/to/project
-devbox init
-devbox add jdk21 maven              # replace with the tools this project needs
-devbox generate direnv
+mise use java@temurin-21 gradle@latest node@lts   # replace with what the project needs
 ```
 
-Commit the generated files:
+`mise use` writes (or updates) `mise.toml` in the current directory. Commit it:
 
 ```sh
-git add devbox.json devbox.lock .envrc
-git commit -m "chore(devbox): add project toolchain"
+git add mise.toml
+git commit -m "chore(mise): pin project toolchain"
 ```
 
-`devbox generate direnv` writes an `.envrc` equivalent to:
+Project environment variables go in the file's `[env]` section instead of a
+separate dotfile:
 
-```sh
-eval "$(devbox generate direnv --print-envrc)"
+```toml
+[env]
+SPRING_PROFILES_ACTIVE = "local"
+DATABASE_URL = "postgres://localhost:5432/app"
 ```
 
-That line asks devbox to emit the current environment for this project. Keeping
-it generated instead of hand-writing `PATH`/`JAVA_HOME` avoids baking Nix store
-paths or machine-local details into the repo.
+mise installs each runtime to a stable, version-named path (e.g.
+`~/.local/share/mise/installs/java/temurin-21/Contents/Home`), so onboarding is
+`git clone && cd` — mise installs any missing pinned versions on first entry,
+with nothing machine-local baked into the repo.
 
-For projects under `~/Developer`, this dotfiles setup auto-trusts `.envrc`
-files. Elsewhere, run `direnv allow` once after reviewing the file.
-
-You do not need this for projects that have no local toolchain or environment
-variables. When a repo does use devbox, pair it with direnv by default; otherwise
-every terminal and editor session needs a manual `devbox shell`.
+You do not need this for projects with no local runtime or environment
+variables; the global defaults from `~/.config/mise/config.toml` apply
+everywhere else.
 
 **With a config file you want to manage** — install, configure, then adopt:
 
@@ -157,7 +157,7 @@ chez                         # smart `chezmoi apply` — diff preview + auto-for
 chezup                       # `git pull --ff-only` in the source repo, then chez — most common upgrade workflow
 chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + chez. Use after a data-model change upstream
 chezdiff                     # chezmoi diff + brew bundle drift + actionable script re-runs
-chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + devbox global update
+chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + mise upgrade
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
 chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)
 
@@ -234,7 +234,7 @@ its own configuration.
 - **Claude config** — `CLAUDE_CONFIG_DIR` points at `~/.config/claude`, and both `CLAUDE.shared.md` and the profile-rendered `CLAUDE.md` are present.
 - **Git signing** — `op-ssh-sign` exists, signing key configured, smoke test of `git -S commit` actually succeeds.
 - **Brew packages** — every workstation/profile Brewfile satisfied; reports brew packages installed locally but not tracked in any Brewfile.
-- **devbox + direnv + Nix** — devbox CLI installed, `/nix` store mounted, `nix-daemon` running, direnv hook wired into the shell, global direnv config present, no leftover `mise` on PATH.
+- **mise** — `mise` installed via Homebrew, activation wired into the shell, global `~/.config/mise/config.toml` present, and the global runtimes (Temurin JDK 21 + 25, Node LTS) installed to their stable paths.
 - **Cloud auth** — informational status of `gh`, `az`, `gcloud`, `op` when present.
 - **Fonts** — JetBrainsMono Nerd Font installed.
 - **Privacy permissions** — printed checklist (these can't be checked programmatically).

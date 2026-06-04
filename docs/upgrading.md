@@ -13,7 +13,7 @@ Defined in your `.zshrc`. It does:
 1. `git pull --ff-only` in `~/Developer/personal/dotfiles`
 2. `chez` — chezmoi status + a single-keypress confirm + `chezmoi apply --force`
 
-That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, modified scripts, and VS Code settings/extensions. Project-level Devbox changes are applied when you enter that project or run `devbox install` there.
+That handles everything chezmoi knows how to handle: new dotfiles, edited templates, added/removed workstation packages in any Brewfile, modified scripts, and VS Code settings/extensions. Project-level runtime changes are applied when you `cd` into that project (mise installs any missing pinned versions) or run `mise install` there.
 
 `chezup` is also a no-op when nothing changed — safe to run as often as you like (e.g., wire it into a launchd timer for a daily auto-sync if you want).
 
@@ -61,7 +61,7 @@ Disabling a feature toggle stops that Brewfile from being re-applied, but does *
 brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.mac-apps
 ```
 
-`chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is useful when you've manually `brew install`ed something and want to decide whether to promote it into a workstation Brewfile, move it into a project Devbox, or remove it.
+`chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is useful when you've manually `brew install`ed something and want to decide whether to promote it into a workstation Brewfile, pin it in a project's `mise.toml`, or remove it.
 
 ### Why the Brewfiles aren't version-pinned
 
@@ -78,11 +78,11 @@ This is deliberate, not an oversight:
   arbitrary older version of a formula. Committing a lockfile would be a dead
   file. (The `Brewfile.lock.json` entry in `.chezmoiignore` is just a guard in
   case one is ever generated locally — nothing writes it.)
-- **Per-project reproducibility lives in devbox, not Homebrew.** When a project
-  needs a pinned toolchain (a specific JDK, Node, Terraform, Postgres…), that
-  belongs in the project's `devbox.json` + `devbox.lock`, which *do* pin exact
-  versions and travel with the repo. Homebrew is for workstation-wide tools
-  where "latest" is the right answer.
+- **Per-project reproducibility lives in mise, not Homebrew.** When a project
+  needs a pinned language runtime (a specific JDK, Node, Python…), that belongs
+  in the project's committed `mise.toml`, which *does* pin exact versions and
+  travels with the repo. Homebrew is for workstation-wide tools where "latest"
+  is the right answer.
 
 If you ever need a specific older version of a workstation tool, install it
 ad-hoc (`brew install foo@1.2`) and treat it as untracked — `chezaudit` will
@@ -92,6 +92,6 @@ remind you it isn't in a Brewfile.
 
 ```sh
 chezreinit         # pull + init + apply — handles data-model drift in one shot
-chezbump           # brew update/upgrade + devbox global update
+chezbump           # brew update/upgrade + mise upgrade
 chezdoctor         # full health check — surfaces anything that broke while you were away
 ```

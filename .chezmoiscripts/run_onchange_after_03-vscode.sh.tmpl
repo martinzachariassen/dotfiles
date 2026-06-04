@@ -16,6 +16,8 @@ SOURCE="{{ .chezmoi.sourceDir }}"
 EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
 DEPRECATED_EXTENSIONS=(
     "continue.continue"
+    "jetpack-io.devbox"
+    "mkhl.direnv"
 )
 
 if ! command -v code >/dev/null 2>&1; then

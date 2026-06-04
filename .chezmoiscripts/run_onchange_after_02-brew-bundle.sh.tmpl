@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs `brew bundle` whenever any existing Brewfile module, the profile, the
-# workstation feature toggles, or this script itself change. Project toolchains
-# belong in per-project devbox.json files, not in global Homebrew modules.
+# workstation feature toggles, or this script itself change. Per-project
+# language runtimes belong in each project's mise.toml, not in global Homebrew
+# modules.
 #
 # Brewfile (core)        hash: {{ include "Brewfile" | sha256sum }}
 # brewfiles/Brewfile.mac-apps      hash: {{ include "brewfiles/Brewfile.mac-apps" | sha256sum }}
