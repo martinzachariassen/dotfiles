@@ -65,29 +65,127 @@ if [ "$RESET_BREW_REQUESTED" = "1" ] && [ "$MIRROR_BREW_REQUESTED" = "1" ]; then
     exit 1
 fi
 
-if [ -t 1 ]; then
-    BOLD=$'\033[1m'; DIM=$'\033[2m'
-    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'; RED=$'\033[31m'
-    CYAN=$'\033[36m'; RESET=$'\033[0m'
+# ─── Terminal capabilities ──────────────────────────────────────────────────
+# Detected once, up front. Everything downstream degrades from these flags so
+# the wizard looks good in Ghostty and still works over SSH, `curl | bash`,
+# non-UTF-8 locales, NO_COLOR, and macOS's stock bash 3.2.
+have_tty() { ( exec </dev/tty >/dev/tty ) 2>/dev/null; }
+
+# Color at all? stdout is a terminal, NO_COLOR unset, TERM not "dumb".
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+    UI_COLOR=1
 else
-    BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
+    UI_COLOR=0
 fi
 
+# Color depth: truecolor > 256 > 16 > none.
+UI_DEPTH=16
+case "${COLORTERM:-}" in
+    *truecolor*|*24bit*) UI_DEPTH=true ;;
+esac
+if [ "$UI_DEPTH" = 16 ]; then
+    case "${TERM:-}" in
+        *256color*|*-direct*) UI_DEPTH=256 ;;
+    esac
+fi
+[ "$UI_COLOR" = 0 ] && UI_DEPTH=none
+
+# Unicode glyphs only when the locale is UTF-8.
 case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-    *UTF-8*|*utf8*|*UTF8*)
-        BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
-        BOX_TOP="╭────────────────────────────────────────────────────────────╮"
-        BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
-        ;;
-    *)
-        BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
-        BOX_TOP="+------------------------------------------------------------+"
-        BOX_BOTTOM="+------------------------------------------------------------+"
-        ;;
+    *UTF-8*|*utf8*|*UTF8*) UI_UNICODE=1 ;;
+    *) UI_UNICODE=0 ;;
 esac
 
+# Layout width, clamped to a comfortable range.
+UI_COLS="$( { tput cols; } 2>/dev/null </dev/tty || true )"
+[ -z "$UI_COLS" ] && UI_COLS="${COLUMNS:-}"
+case "$UI_COLS" in ''|*[!0-9]*) UI_COLS=60 ;; esac
+[ "$UI_COLS" -lt 48 ] && UI_COLS=48
+[ "$UI_COLS" -gt 80 ] && UI_COLS=80
+
+# Arrow-key menus need an interactive tty + stty. YES mode skips all prompts.
+if [ "${ASSUME_YES:-0}" != "1" ] && command -v stty >/dev/null 2>&1 && have_tty; then
+    UI_RAW=1
+else
+    UI_RAW=0
+fi
+UI_STTY_SAVED=""
+
+# fg NAME — emit the SGR escape for a semantic color at the detected depth.
+# Palette is Catppuccin Frappé (matches Ghostty + Starship), with 256/16
+# fallbacks. Returns nothing when color is off.
+fg() {
+    [ "$UI_COLOR" = 0 ] && return 0
+    case "$UI_DEPTH" in
+        true)
+            case "$1" in
+                accent)  printf '\033[38;2;202;158;230m' ;;  # mauve
+                accent2) printf '\033[38;2;140;170;238m' ;;  # blue
+                ok)      printf '\033[38;2;166;209;137m' ;;  # green
+                warn)    printf '\033[38;2;229;200;144m' ;;  # yellow
+                err)     printf '\033[38;2;231;130;132m' ;;  # red
+                info)    printf '\033[38;2;153;209;219m' ;;  # sky
+                muted)   printf '\033[38;2;115;121;148m' ;;  # overlay0
+                rail)    printf '\033[38;2;98;104;128m'  ;;  # surface2
+            esac ;;
+        256)
+            case "$1" in
+                accent)  printf '\033[38;5;183m' ;;
+                accent2) printf '\033[38;5;111m' ;;
+                ok)      printf '\033[38;5;150m' ;;
+                warn)    printf '\033[38;5;180m' ;;
+                err)     printf '\033[38;5;210m' ;;
+                info)    printf '\033[38;5;152m' ;;
+                muted)   printf '\033[38;5;102m' ;;
+                rail)    printf '\033[38;5;60m'  ;;
+            esac ;;
+        *)
+            case "$1" in
+                accent)  printf '\033[35m' ;;
+                accent2) printf '\033[34m' ;;
+                ok)      printf '\033[32m' ;;
+                warn)    printf '\033[33m' ;;
+                err)     printf '\033[31m' ;;
+                info)    printf '\033[36m' ;;
+                muted)   printf '\033[90m' ;;
+                rail)    printf '\033[36m' ;;
+            esac ;;
+    esac
+}
+
+# Back-compat aliases: existing helpers reference these names directly, so they
+# pick up the themed palette without touching every call site.
+if [ "$UI_COLOR" = 1 ]; then
+    BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+    GREEN="$(fg ok)"; YELLOW="$(fg warn)"; BLUE="$(fg accent2)"; RED="$(fg err)"
+    CYAN="$(fg rail)"; ACCENT="$(fg accent)"; INFOC="$(fg info)"; MUTED="$(fg muted)"
+else
+    BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; BLUE=""; RED=""
+    CYAN=""; ACCENT=""; INFOC=""; MUTED=""
+fi
+
+# Glyph set with ASCII fallback.
+if [ "$UI_UNICODE" = 1 ]; then
+    BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
+    G_POINTER="❯"; G_OFF="○"; G_FULL="▰"; G_EMPTY="▱"
+    BOX_TL="╭"; BOX_TR="╮"; BOX_BL="╰"; BOX_BR="╯"; BOX_H="─"; BOX_V="│"
+    SPIN_FRAMES="⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏"
+else
+    BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
+    G_POINTER=">"; G_OFF="o"; G_FULL="#"; G_EMPTY="-"
+    BOX_TL="+"; BOX_TR="+"; BOX_BL="+"; BOX_BR="+"; BOX_H="-"; BOX_V="|"
+    SPIN_FRAMES="| / - \\"
+fi
+
+# repeat CHAR COUNT — echo CHAR repeated COUNT times (multibyte-safe).
+repeat() {
+    local ch="$1" n="$2" out="" i=0
+    while [ "$i" -lt "$n" ]; do out="$out$ch"; i=$((i + 1)); done
+    printf '%s' "$out"
+}
+
 line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
-node_prefix() { printf "%s%s%s" "$CYAN" "$NODE" "$RESET"; }
+node_prefix() { printf "%s%s%s" "$ACCENT" "$NODE" "$RESET"; }
 
 say()   { printf "%s  %s\n" "$(line_prefix)" "$1"; }
 ok()    { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
@@ -119,10 +217,40 @@ bool_label() {
     esac
 }
 
+# A thin horizontal divider aligned under the rail.
+rule() {
+    printf "%s  %s%s%s\n" "$(line_prefix)" "$MUTED" "$(repeat "$BOX_H" $((UI_COLS - 6)))" "$RESET"
+}
+
+# progress_bar N M — render "▰▰▰▱▱" for N out of M.
+progress_bar() {
+    local n="$1" m="$2" segs=12 filled i out=""
+    [ "$m" -le 0 ] && m=1
+    filled=$(( n * segs / m ))
+    for ((i=0; i<segs; i++)); do
+        if [ "$i" -lt "$filled" ]; then out="$out$G_FULL"; else out="$out$G_EMPTY"; fi
+    done
+    printf '%s' "$out"
+}
+
 phase_open() {
-    local title="$1"
+    local title="$1" n m rest human pct
     printf "%s\n" "$(line_prefix)"
-    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET"
+    case "$title" in
+        [0-9]*/[0-9]*)
+            n="${title%%/*}"
+            rest="${title#*/}"; m="${rest%% *}"
+            human="${title#*- }"
+            pct=$(( n * 100 / m ))
+            printf "%s  %sStep %s/%s%s   %s%s%s %s%d%%%s\n" \
+                "$(node_prefix)" "$BOLD" "$n" "$m" "$RESET" \
+                "$ACCENT" "$(progress_bar "$n" "$m")" "$RESET" "$DIM" "$pct" "$RESET"
+            printf "%s  %s%s%s\n" "$(line_prefix)" "$BOLD" "$human" "$RESET"
+            ;;
+        *)
+            printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET"
+            ;;
+    esac
     printf "%s\n" "$(line_prefix)"
 }
 
@@ -165,36 +293,71 @@ start_long_step() {
     [ "$DRY_RUN" = "1" ] && return 0
     local label="$1" parent_pid=$$ start_ts
     start_ts="$(date +%s)"
-    (
-        local since_msg=0
-        while kill -0 "$parent_pid" 2>/dev/null; do
-            sleep 2
-            since_msg=$((since_msg + 2))
-            if [ "$since_msg" -ge 30 ]; then
-                local now elapsed mins secs
-                now="$(date +%s)"
-                elapsed=$((now - start_ts))
-                mins=$((elapsed / 60))
-                secs=$((elapsed % 60))
-                printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "$(line_prefix)" "$DIM" "$label" "$mins" "$secs" "$RESET"
-                since_msg=0
-            fi
-        done
-    ) &
-    LONG_STEP_PID=$!
+    if [ "$UI_COLOR" = 1 ] && [ -t 1 ]; then
+        # Animated single-line spinner, redrawn in place.
+        (
+            local frames i=0 fcount frame now elapsed mins secs
+            # shellcheck disable=SC2206
+            frames=($SPIN_FRAMES); fcount=${#frames[@]}
+            while kill -0 "$parent_pid" 2>/dev/null; do
+                now="$(date +%s)"; elapsed=$((now - start_ts))
+                mins=$((elapsed / 60)); secs=$((elapsed % 60))
+                frame="${frames[$((i % fcount))]}"
+                printf '\r\033[2K%s  %s%s%s %s%s… %dm%02ds%s' \
+                    "$(line_prefix)" "$ACCENT" "$frame" "$RESET" "$DIM" "$label" "$mins" "$secs" "$RESET"
+                i=$((i + 1))
+                sleep 0.1
+            done
+        ) &
+        LONG_STEP_PID=$!
+    else
+        # No color / not a TTY (CI, pipes, logs): periodic heartbeat lines.
+        (
+            local since_msg=0 now elapsed mins secs
+            while kill -0 "$parent_pid" 2>/dev/null; do
+                sleep 2
+                since_msg=$((since_msg + 2))
+                if [ "$since_msg" -ge 30 ]; then
+                    now="$(date +%s)"
+                    elapsed=$((now - start_ts))
+                    mins=$((elapsed / 60))
+                    secs=$((elapsed % 60))
+                    printf "%s    %s... still working on %s - %dm%02ds elapsed%s\n" "$(line_prefix)" "$DIM" "$label" "$mins" "$secs" "$RESET"
+                    since_msg=0
+                fi
+            done
+        ) &
+        LONG_STEP_PID=$!
+    fi
 }
 
 stop_long_step() {
-    [ -n "$LONG_STEP_PID" ] && kill "$LONG_STEP_PID" 2>/dev/null
+    if [ -n "$LONG_STEP_PID" ]; then
+        kill "$LONG_STEP_PID" 2>/dev/null
+        wait "$LONG_STEP_PID" 2>/dev/null
+        if [ "$UI_COLOR" = 1 ] && [ -t 1 ]; then
+            printf '\r\033[2K'   # wipe the spinner line so the result replaces it
+        fi
+    fi
     LONG_STEP_PID=""
+}
+
+restore_terminal() {
+    [ -n "${UI_STTY_SAVED:-}" ] && stty "$UI_STTY_SAVED" </dev/tty 2>/dev/null
+    UI_STTY_SAVED=""
+    [ "$UI_COLOR" = 1 ] && printf '\033[?25h' 2>/dev/null   # ensure cursor visible
 }
 
 cleanup_background_jobs() {
     stop_long_step
     stop_sudo_keepalive
+    restore_terminal
 }
 
+on_signal() { cleanup_background_jobs; exit 130; }
+
 trap cleanup_background_jobs EXIT
+trap on_signal INT TERM
 
 timed_run() {
     local label="$1"
@@ -264,10 +427,6 @@ cache_sudo_for_homebrew() {
     ok "sudo cached for Homebrew"
 }
 
-have_tty() {
-    ( exec </dev/tty >/dev/tty ) 2>/dev/null
-}
-
 adopt_homebrew_path() {
     command -v brew >/dev/null 2>&1 && return 0
 
@@ -299,17 +458,123 @@ prompt_text() {
     printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
     [ -n "$hint" ] && printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$hint" "$RESET" > /dev/tty
     if [ -n "$default" ]; then
-        prompt_read answer "Current: ${BOLD}$default${RESET}. Press Enter to keep it, or type a new value: "
+        prompt_read answer "${G_POINTER} keep ${ACCENT}${default}${RESET}, or type a new value: "
         [ -z "$answer" ] && answer="$default"
     else
-        prompt_read answer "Type a value, or press Enter to skip: "
+        prompt_read answer "${G_POINTER} type a value, or press Enter to skip: "
     fi
     printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${answer:-<blank>}" "$RESET"
     printf -v "$__out" '%s' "$answer"
 }
 
+# ui_select_raw OUTVAR DEFAULT "val|label"...
+# Interactive ↑/↓ menu (raw mode). Draws the option rows to /dev/tty, returns
+# the chosen value via OUTVAR. Caller prints the title and the confirmed line.
+ui_select_raw() {
+    local __out="$1" default="$2"; shift 2
+    local opts=("$@") n=$# i sel=0 key rest val saved
+
+    for ((i=0; i<n; i++)); do
+        [ "${opts[$i]%%|*}" = "$default" ] && sel=$i
+    done
+
+    _ui_draw() {
+        local j v l
+        for ((j=0; j<n; j++)); do
+            v="${opts[$j]%%|*}"; l="${opts[$j]#*|}"
+            if [ "$j" -eq "$sel" ]; then
+                printf '\r\033[2K%s    %s%s %s%s%s\n' "$(line_prefix)" "$ACCENT" "$G_POINTER" "$BOLD" "$l" "$RESET" > /dev/tty
+            else
+                printf '\r\033[2K%s    %s%s %s%s\n' "$(line_prefix)" "$DIM" "$G_OFF" "$l" "$RESET" > /dev/tty
+            fi
+        done
+    }
+
+    saved="$(stty -g </dev/tty 2>/dev/null)"
+    UI_STTY_SAVED="$saved"
+    stty -echo -icanon min 1 time 0 </dev/tty 2>/dev/null
+    [ "$UI_COLOR" = 1 ] && printf '\033[?25l' > /dev/tty   # hide cursor
+
+    _ui_draw
+    while :; do
+        IFS= read -rsn1 key </dev/tty || break
+        case "$key" in
+            $'\033')
+                read -rsn2 -t 1 rest </dev/tty
+                case "$rest" in
+                    '[A') sel=$(( (sel - 1 + n) % n )) ;;
+                    '[B') sel=$(( (sel + 1) % n )) ;;
+                esac ;;
+            k|K) sel=$(( (sel - 1 + n) % n )) ;;
+            j|J) sel=$(( (sel + 1) % n )) ;;
+            ''|$'\n'|$'\r') break ;;
+            [1-9])
+                if [ "$key" -ge 1 ] && [ "$key" -le "$n" ]; then sel=$((key - 1)); break; fi ;;
+        esac
+        printf '\033[%dA' "$n" > /dev/tty   # back to top of the list
+        _ui_draw
+    done
+
+    [ "$UI_COLOR" = 1 ] && printf '\033[?25h' > /dev/tty   # show cursor
+    stty "$saved" </dev/tty 2>/dev/null
+    UI_STTY_SAVED=""
+
+    val="${opts[$sel]%%|*}"
+    printf -v "$__out" '%s' "$val"
+}
+
+# _choice_numbered OUTVAR DEFAULT "val|label"...
+# Fallback selector: numbered list + line input. No title / confirm line.
+_choice_numbered() {
+    local __out="$1" default="$2"; shift 2
+    local opts=("$@") n=$# i answer value label
+    for ((i=0; i<n; i++)); do
+        value="${opts[$i]%%|*}"
+        label="${opts[$i]#*|}"
+        if [ "$value" = "$default" ]; then
+            printf "%s    %s%d%s %s %s(current)%s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" "$DIM" "$RESET" > /dev/tty
+        else
+            printf "%s    %s%d%s %s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" > /dev/tty
+        fi
+    done
+    while :; do
+        prompt_read answer "${G_POINTER} choose 1-$n, or Enter for ${BOLD}$default${RESET}: "
+        [ -z "$answer" ] && { printf -v "$__out" '%s' "$default"; return; }
+        case "$answer" in
+            ''|*[!0-9]*) warn "enter a number from 1 to $n" ;;
+            *)
+                if [ "$answer" -ge 1 ] && [ "$answer" -le "$n" ]; then
+                    printf -v "$__out" '%s' "${opts[$((answer - 1))]%%|*}"
+                    return
+                fi
+                warn "enter a number from 1 to $n" ;;
+        esac
+    done
+}
+
+prompt_choice() {
+    local __out="$1" title="$2" default="$3"; shift 3
+
+    if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
+        printf -v "$__out" '%s' "$default"
+        printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
+            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
+        return
+    fi
+
+    printf "%s  %s%s%s" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
+    if [ "$UI_RAW" = "1" ]; then
+        printf "  %s%s↑/↓ Enter%s\n" "$DIM" "${ARROW_MARK} " "$RESET" > /dev/tty
+        ui_select_raw "$__out" "$default" "$@"
+    else
+        printf "\n" > /dev/tty
+        _choice_numbered "$__out" "$default" "$@"
+    fi
+    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+}
+
 prompt_confirm() {
-    local __out="$1" title="$2" default_yes="${3:-1}" answer default_label result
+    local __out="$1" title="$2" default_yes="${3:-1}" answer default_label result def cv
     [ "$default_yes" = "1" ] && default_label="Y/n" || default_label="y/N"
 
     if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
@@ -320,94 +585,35 @@ prompt_confirm() {
         return
     fi
 
-    while :; do
-        if [ "$default_yes" = "1" ]; then
-            prompt_read answer "${BOLD}${title}${RESET} [$default_label] Press Enter for yes, or type n: "
-        else
-            prompt_read answer "${BOLD}${title}${RESET} [$default_label] Press Enter for no, or type y: "
-        fi
-        case "${answer:-default}" in
-            default)
-                [ "$default_yes" = "1" ] && result=true || result=false
-                break ;;
-            y|Y|yes|YES) result=true; break ;;
-            n|N|no|NO) result=false; break ;;
-            *) warn "answer y or n" ;;
-        esac
-    done
+    if [ "$UI_RAW" = "1" ]; then
+        [ "$default_yes" = "1" ] && def=yes || def=no
+        printf "%s  %s%s%s  %s%s↑/↓ Enter%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" "$DIM" "${ARROW_MARK} " "$RESET" > /dev/tty
+        ui_select_raw cv "$def" "yes|Yes" "no|No"
+        [ "$cv" = "yes" ] && result=true || result=false
+    else
+        while :; do
+            if [ "$default_yes" = "1" ]; then
+                prompt_read answer "${BOLD}${title}${RESET} [$default_label] Enter for yes, or type n: "
+            else
+                prompt_read answer "${BOLD}${title}${RESET} [$default_label] Enter for no, or type y: "
+            fi
+            case "${answer:-default}" in
+                default) [ "$default_yes" = "1" ] && result=true || result=false; break ;;
+                y|Y|yes|YES) result=true; break ;;
+                n|N|no|NO) result=false; break ;;
+                *) warn "answer y or n" ;;
+            esac
+        done
+    fi
     printf -v "$__out" '%s' "$result"
     printf "%s  %s%s:%s %s%s%s\n" \
         "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
 }
 
-prompt_choice() {
-    local __out="$1" title="$2" default="$3"
-    shift 3
-    local opts=("$@") n=$# i answer value label
-
-    if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
-        printf -v "$__out" '%s' "$default"
-        printf "%s  %s%s:%s %s%s%s %s(default)%s\n" \
-            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$default" "$RESET" "$DIM" "$RESET"
-        return
-    fi
-
-    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
-    for ((i=0; i<n; i++)); do
-        value="${opts[$i]%%|*}"
-        label="${opts[$i]#*|}"
-        if [ "$value" = "$default" ]; then
-            printf "%s    %d. %s %s%s(current)%s\n" "$(line_prefix)" $((i + 1)) "$label" "$DIM" "$RESET" "$DIM" > /dev/tty
-        else
-            printf "%s    %d. %s\n" "$(line_prefix)" $((i + 1)) "$label" > /dev/tty
-        fi
-    done
-
-    while :; do
-        prompt_read answer "Choose 1-$n, or press Enter for ${BOLD}$default${RESET}: "
-        [ -z "$answer" ] && { printf -v "$__out" '%s' "$default"; break; }
-        case "$answer" in
-            ''|*[!0-9]*) warn "enter a number from 1 to $n" ;;
-            *)
-                if [ "$answer" -ge 1 ] && [ "$answer" -le "$n" ]; then
-                    value="${opts[$((answer - 1))]%%|*}"
-                    printf -v "$__out" '%s' "$value"
-                    break
-                fi
-                warn "enter a number from 1 to $n"
-                ;;
-        esac
-    done
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
-}
-
 prompt_continue_or_customize() {
-    local __out="$1" title="$2" answer
-
-    if ! have_tty || [ "$ASSUME_YES" = "1" ]; then
-        printf -v "$__out" '%s' "recommended"
-        printf "%s  %s%s:%s %srecommended%s %s(default)%s\n" \
-            "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$RESET" "$DIM" "$RESET"
-        return
-    fi
-
-    printf "%s  %s%s%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" > /dev/tty
-    printf "%s    1. Continue with recommended setup\n" "$(line_prefix)" > /dev/tty
-    printf "%s    2. Customize packages, signing, cleanup, and migration\n" "$(line_prefix)" > /dev/tty
-
-    while :; do
-        prompt_read answer "Press Enter for recommended setup, or type 2 to customize: "
-        case "${answer:-1}" in
-            1)
-                printf -v "$__out" '%s' "recommended"
-                break ;;
-            2)
-                printf -v "$__out" '%s' "custom"
-                break ;;
-            *) warn "enter 1 or 2" ;;
-        esac
-    done
-    printf "%s  %s%s:%s %s%s%s\n" "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "${!__out}" "$RESET"
+    prompt_choice "$1" "$2" "recommended" \
+        "recommended|Continue with recommended setup" \
+        "custom|Customize packages, signing, cleanup, and migration"
 }
 
 prompt_phrase() {
@@ -507,27 +713,44 @@ load_existing_answers() {
 }
 
 banner() {
+    local inner=$((UI_COLS - 2)) depth_label sep chips=""
+    case "$UI_DEPTH" in
+        true) depth_label="truecolor" ;;
+        256)  depth_label="256-color" ;;
+        16)   depth_label="16-color" ;;
+        *)    depth_label="plain" ;;
+    esac
+    [ "$UI_UNICODE" = 1 ] && sep="·" || sep="-"
+
+    # _brow PLAIN COLORED — one framed row; PLAIN drives the right-edge padding.
+    _brow() {
+        local plain="$1" colored="$2" pad
+        pad=$(( inner - 1 - ${#plain} ))
+        [ "$pad" -lt 0 ] && pad=0
+        printf '%s%s%s %s%s%s%s%s\n' \
+            "$ACCENT" "$BOX_V" "$RESET" "$colored" "$(repeat ' ' "$pad")" "$ACCENT" "$BOX_V" "$RESET"
+    }
+
     printf "\n"
-    printf "%s\n" "${CYAN}${BOX_TOP}${RESET}"
-    printf "%s  %sDotfiles Setup%s                                             %s\n" "$(line_prefix)" "$BOLD" "$RESET" "$(line_prefix)"
-    printf "%s  Fresh macOS workstation bootstrap.                          %s\n" "$(line_prefix)" "$(line_prefix)"
-    printf "%s\n" "${CYAN}${BOX_BOTTOM}${RESET}"
-    if [ "$DRY_RUN" = "1" ]; then
-        printf "%s  %sDry run:%s no changes will be made.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
-    fi
-    if [ "$ASSUME_YES" = "1" ]; then
-        printf "%s  %sYes mode:%s recommended defaults accepted. Homebrew cleanup stays off unless flagged.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
-    fi
-    if [ "$CONFIGURE_ONLY" = "1" ]; then
-        printf "%s  %sConfigure only:%s update profile, identity, features, then apply.\n" "$(line_prefix)" "$YELLOW$BOLD" "$RESET"
-    fi
-    printf "%s  The default path only asks for inputs available on a fresh Mac.\n" "$(line_prefix)"
-    printf "%s  Git signing is finished later, after 1Password is installed and signed in.\n" "$(line_prefix)"
-    printf "%s  Advanced cleanup and feature toggles stay available when you need them.\n" "$(line_prefix)"
+    printf '%s%s%s%s%s\n' "$ACCENT" "$BOX_TL" "$(repeat "$BOX_H" "$inner")" "$BOX_TR" "$RESET"
+    _brow "${NODE} DOTFILES" "${ACCENT}${BOLD}${NODE} DOTFILES${RESET}"
+    _brow "macOS workstation setup" "${BOLD}macOS workstation setup${RESET}"
+    _brow "catppuccin frappe ${sep} ${depth_label}" "${DIM}catppuccin frappe ${sep} ${depth_label}${RESET}"
+    printf '%s%s%s%s%s\n' "$ACCENT" "$BOX_BL" "$(repeat "$BOX_H" "$inner")" "$BOX_BR" "$RESET"
+
+    [ "$DRY_RUN" = "1" ]       && chips="$chips ${YELLOW}${BOLD}[DRY-RUN]${RESET}"
+    [ "$ASSUME_YES" = "1" ]    && chips="$chips ${YELLOW}${BOLD}[YES]${RESET}"
+    [ "$CONFIGURE_ONLY" = "1" ] && chips="$chips ${YELLOW}${BOLD}[CONFIGURE-ONLY]${RESET}"
+    [ -n "$chips" ] && printf "%s %s\n" "$(line_prefix)" "$chips"
+
+    hr
+    say "The default path only asks for inputs available on a fresh Mac."
+    say "Git signing is finished later, after 1Password is installed and signed in."
+    say "Advanced cleanup and feature toggles stay available when you need them."
     if have_tty && [ "$ASSUME_YES" != "1" ]; then
         local _
-        printf "%s\n" "$(line_prefix)"
-        prompt_read _ "Press Enter to begin the setup check "
+        hr
+        prompt_read _ "${G_POINTER} Press Enter to begin the setup check "
     fi
 }
 
@@ -682,6 +905,7 @@ confirm_phase() {
     phase_open "3/5 - Review plan"
 
     say "${BOLD}This is what will be applied.${RESET}"
+    rule
     setting "Setup style" "${CHOICE_SETUP_MODE:-recommended}"
     setting "Profile" "$CHOICE_PROFILE"
     setting "Name" "${CHOICE_NAME:-<blank>}"
@@ -1112,6 +1336,7 @@ self_test() {
 next_steps() {
     phase_open "Done"
     say "${BOLD}Your workstation baseline is installed.${RESET}"
+    rule
     setting "Profile" "$CHOICE_PROFILE"
     setting "Mac apps" "$(bool_label "$CHOICE_FEAT_macApps")"
     setting "Local AI" "$(bool_label "$CHOICE_FEAT_ai")"
