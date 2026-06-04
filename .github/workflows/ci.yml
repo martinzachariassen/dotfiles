@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly macOS render canary (Mondays 06:17 UTC). Catches macOS-only
+    # template/path breakage before a real fresh-Mac install hits it. The
+    # Linux jobs below run on every push/PR; the macOS render job is gated to
+    # this schedule and manual dispatch (see its `if:`).
+    - cron: "17 6 * * 1"
 
 permissions:
   contents: read
@@ -31,11 +38,11 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck zsh
 
       - name: Lint plain shell scripts for errors
-        run: shellcheck --severity=error --shell=bash install.sh scripts/*.sh
+        run: shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
 
       - name: Check shell parser syntax
         run: |
-          bash -n install.sh scripts/*.sh
+          bash -n install.sh scripts/*.sh scripts/lib/*.sh
           zsh -n dot_zshenv dot_config/zsh/dot_zprofile
 
   # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
@@ -80,6 +87,22 @@ jobs:
           AI: ${{ matrix.ai }}
         run: bash scripts/render-check.sh "$PWD"
 
+  # ─── Job 2b: shell unit tests (bats) ───────────────────────────────────────
+  # Runs the bats-core suite in tests/ — covers the semver helper used by the
+  # doctor's chezmoi-version gate and the real mkcd shell function extracted
+  # from the zsh config template. Fast; runs on every push/PR.
+  tests:
+    name: shell unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install bats + zsh
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
+
+      - name: Run bats suite
+        run: bats tests/
+
   # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────
   # Resolve every referenced formula/cask. This catches dead names and broken
   # taps without installing anything, and should fail CI when the repo asks for
@@ -109,3 +132,33 @@ jobs:
 
       - name: Check every Brewfile module
         run: bash scripts/brew-check-modules.sh "$PWD"
+
+  # ─── Job 5: macOS render canary (weekly / manual) ──────────────────────────
+  # The Linux `chezmoi` job renders templates with the darwin-guarded scripts
+  # short-circuiting to `exit 0`, so it never exercises the real macOS script
+  # bodies (brew-bundle, vscode, macos-defaults, the sha256 `include`s). This
+  # job runs the same render on a macOS runner where those guards fall through,
+  # catching macOS-only template/path breakage before a fresh-Mac install does.
+  # Gated to the weekly schedule + manual dispatch to keep PRs fast and cheap.
+  render-macos:
+    name: chezmoi render (macOS canary)
+    runs-on: macos-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [personal, work]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install chezmoi
+        run: |
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Render every template via dry-run apply (macOS bodies)
+        env:
+          PROFILE: ${{ matrix.profile }}
+          MAC_APPS: "true"
+          AI: "true"
+        run: bash scripts/render-check.sh "$PWD"
