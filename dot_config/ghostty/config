@@ -37,6 +37,13 @@ macos-non-native-fullscreen = true
 cursor-style = bar
 cursor-style-blink = true
 
+# ─── Mouse / clipboard ────────────────────────────────────────────────────────
+# Hide the pointer while typing; it reappears on mouse move.
+mouse-hide-while-typing = true
+# Selecting text copies straight to the system clipboard — matches Zellij's
+# copy_on_select so the behavior is consistent inside and outside a session.
+copy-on-select = clipboard
+
 # ─── Shell integration ────────────────────────────────────────────────────────
 # Ghostty injects its zsh integration automatically; nothing extra in .zshrc
 # beyond what we already have. Enables proper title-setting, jump-between-prompts, etc.

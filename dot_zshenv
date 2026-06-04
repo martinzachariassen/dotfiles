@@ -28,6 +28,13 @@ export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
 # scripts and editor/IDE-spawned subshells — sees it.
 export CLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/claude"
 
+# ─── Editor ───────────────────────────────────────────────────────────────────
+# git has its own core.editor, but everything else (kubectl edit, crontab -e,
+# gh, fzf binds, `git rebase -i` when core.editor is unset, etc.) falls back to
+# $VISUAL/$EDITOR — otherwise vi/nano. Set both so the whole system agrees.
+export EDITOR=nvim
+export VISUAL=nvim
+
 # ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
 export SHELL_SESSIONS_DISABLE=1
 
@@ -53,6 +60,10 @@ export SHELL_SESSIONS_DISABLE=1
 # Three ways to escape any pager: q · Ctrl-C · (short content auto-exits).
 # The -P prompt is double-quoted so less treats spaces inside as one argument.
 export LESS='-FRK -P"Press q or Ctrl-C to quit · / search · h for help"'
+
+# Keep less's search history out of $HOME (~/.lesshst). Redirect to XDG state;
+# use "-" instead if you'd rather not persist search history at all.
+export LESSHISTFILE="$XDG_STATE_HOME/less/history"
 
 # ─── PATH ─────────────────────────────────────────────────────────────────────
 export PATH="$HOME/.local/bin:$PATH"

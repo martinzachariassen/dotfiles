@@ -11,6 +11,7 @@ setopt AUTO_CD                  # `dirname` alone = `cd dirname`
 setopt AUTO_PUSHD               # `cd` pushes onto the dir stack
 setopt PUSHD_IGNORE_DUPS        # no duplicates in dir stack
 setopt CORRECT                  # offer command corrections on typos
+setopt EXTENDED_GLOB            # enable ^, ~, (#...) glob operators
 
 # ─── Tooling ──────────────────────────────────────────────────────────────────
 # mise: language runtime manager + per-project env. `mise activate` puts the
@@ -34,6 +35,9 @@ setopt EXTENDED_HISTORY        # save timestamp + duration
 setopt HIST_EXPIRE_DUPS_FIRST  # drop dupes first when trimming
 setopt HIST_IGNORE_DUPS        # don't store consecutive dupes
 setopt HIST_IGNORE_SPACE       # don't store lines starting with space (private)
+setopt HIST_REDUCE_BLANKS      # trim superfluous whitespace before storing
+setopt HIST_SAVE_NO_DUPS       # don't write a dupe to the history file
+setopt HIST_FIND_NO_DUPS       # skip earlier dupes when searching history
 setopt HIST_VERIFY             # show !! expansions before running
 setopt SHARE_HISTORY           # share across sessions
 
@@ -63,6 +67,20 @@ autoload -Uz compinit
 compinit -C -d "$ZSH_COMPDUMP"
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'  # case-insensitive
+
+# ─── Key bindings ─────────────────────────────────────────────────────────────
+# Make ↑/↓ do prefix-aware history search: type `git ` then ↑ cycles only the
+# history lines that start with what's already on the line, leaving the cursor
+# at end-of-line. Complements zsh-autosuggestions (type-ahead) — different gesture.
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+# Bind both the terminfo codes (application cursor mode, what zle sees in most
+# terminals) and the literal ^[[ sequences, so it works regardless of mode.
+[ -n "${terminfo[kcuu1]}" ] && bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
+[ -n "${terminfo[kcud1]}" ] && bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
+bindkey '^[[A' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search
 
 # ─── fzf — fuzzy finder shell integration (Ctrl-R, Ctrl-T, **<Tab>) ───────────
 # Use `fd` as the underlying file walker — much faster than the default `find`,

@@ -11,6 +11,7 @@ format = """
 $directory\
 $git_branch$git_status\
 $java$kotlin$nodejs$python\
+$terraform$docker_context\
 $kubernetes$azure$gcloud\
 $cmd_duration\
 $line_break\
@@ -74,6 +75,20 @@ format = "via [$symbol($version )]($style)"
 symbol  = " "
 style   = "yellow"
 format  = 'via [${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
+
+# ── Tooling context ───────────────────────────────────────────────────────────
+# Both modules are self-scoping: terraform only shows when a .tf file / .terraform
+# dir is present, docker_context only when a Dockerfile/compose file exists AND
+# the active context isn't the default — so neither clutters unrelated dirs.
+[terraform]
+symbol = "󱁢 "
+style  = "mauve"
+format = "via [$symbol$workspace]($style) "
+
+[docker_context]
+symbol = " "
+style  = "blue"
+format = "via [$symbol$context]($style) "
 
 # ── Cloud / cluster context ───────────────────────────────────────────────────
 [kubernetes]
