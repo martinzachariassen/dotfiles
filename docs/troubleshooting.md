@@ -152,3 +152,22 @@ If Xcode CLT is missing, the script opens Apple's installer and polls for up to 
 **`chezmoi apply -v` hangs at `tightening permissions on /opt/homebrew/share/zsh*`** — should finish in <1s now (scoped to just the zsh dirs). If it hangs longer, you're probably running an old version of the script — Ctrl-C, `git pull` (or just re-run `chezmoi apply` from the source dir), and re-apply.
 
 **Old `chezmoi apply` runs prompted about `.zsh_history`** — this used to fight with an active shell because `remove_dot_zsh_history` markers tried to delete a file the shell kept recreating. Those markers are gone. If you still have the legacy files (`~/.zsh_history` or `~/.config/zsh/.zsh_history`), delete them once: `rm -f ~/.zsh_history ~/.config/zsh/.zsh_history`.
+
+**Rotating the 1Password SSH signing key** — git commit signing uses an SSH key stored in 1Password, surfaced through the 1Password SSH agent. The public key is baked into your chezmoi config in two places: `signingKey` in `~/.config/chezmoi/chezmoi.toml` (which renders `~/.config/git/config`) and the entry in `~/.config/git/allowed_signers`. When you rotate the key (new key in 1Password, or moving to a new vault), update both so signing keeps working and old commits still verify:
+
+1. **Create / locate the new key** in 1Password (an SSH key item). Make sure the 1Password app's SSH agent is enabled: *Settings → Developer → Use the SSH agent*.
+2. **Copy the new public key.** In 1Password, open the key item → copy the public key (`ssh-ed25519 AAAA… `). Or with the CLI: `op read "op://Private/<key-item>/public key"`.
+3. **Update the signing key in your chezmoi data** — don't hand-edit the rendered git config, update the source of truth:
+   ```sh
+   dotfiles signing set        # prompts for the new public key, re-renders git config + allowed_signers
+   ```
+   (Equivalently: `bash ~/Developer/personal/dotfiles/install.sh --configure-only` and re-enter the key, or `chezmoi init` after editing `signingKey`.)
+4. **Keep the old key in `allowed_signers` if you want old commits to keep verifying.** Verification matches the key that *signed* each commit, so removing the old public key makes commits signed with it show as unverified. `allowed_signers` can list more than one line — add the new key without deleting the old one unless you specifically want to invalidate old signatures.
+5. **Update the key everywhere it's registered** for verification: GitHub/GitLab (*Settings → SSH and GPG keys → new "Signing key"*), and any server that checks `allowed_signers`.
+6. **Verify it works:**
+   ```sh
+   chezdoctor        # the "Git signing" section runs a real `git -S` smoke test
+   git -c commit.gpgsign=true commit --allow-empty -m "signing test" && git log --show-signature -1
+   ```
+
+Never commit the **private** key or paste it into the repo — only the public key (which is what `signingKey`/`allowed_signers` hold) ever lands in chezmoi source. See the [Secrets](../AGENTS.md) rule.

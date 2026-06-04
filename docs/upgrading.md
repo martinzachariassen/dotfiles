@@ -49,7 +49,7 @@ Knowing what triggers what makes the upgrade story less mysterious:
 | A `.tmpl` template | chezmoi re-renders it against your current `[data]` block |
 | `Brewfile` or `brewfiles/Brewfile.*` | `run_onchange_after_02-brew-bundle.sh` re-fires (hash comment caught it) |
 | `.chezmoi.toml.tmpl` itself | **nothing automatic** — you must run `chezmoi init` (or `chezreinit`) to re-render `~/.config/chezmoi/chezmoi.toml`. This is the only common case where `chezup` alone is insufficient |
-| `scripts/macos-defaults.sh` | nothing — it's `run_once_after`. Manually run `macos-defaults` (the alias) to re-apply |
+| `scripts/macos-defaults.sh` | `run_onchange_after_04-macos-defaults.sh` re-fires (it embeds a sha256 `include` of this script), re-applying your defaults. A routine apply that *doesn't* touch this script is a no-op, so you don't get a sudo prompt every time. To re-apply without editing the script, run the `macos-defaults` alias |
 
 If you forget which path you're on, `chezdiff` shows you everything actionable at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and `run_*` scripts that would re-fire for reasons other than the normal every-apply hooks. It's the "what would chezup actually do" preview.
 
@@ -62,6 +62,31 @@ brew bundle cleanup --force --file=~/Developer/personal/dotfiles/brewfiles/Brewf
 ```
 
 `chezaudit` (alias) shows you packages currently installed that aren't tracked in any Brewfile, which is useful when you've manually `brew install`ed something and want to decide whether to promote it into a workstation Brewfile, move it into a project Devbox, or remove it.
+
+### Why the Brewfiles aren't version-pinned
+
+Every formula and cask in `Brewfile` and `brewfiles/Brewfile.*` is **unpinned** —
+`brew bundle` always installs whatever is current in Homebrew at apply time.
+This is deliberate, not an oversight:
+
+- **The Brewfiles describe a fresh-Mac baseline, not a frozen snapshot.** The
+  goal is "a new machine ends up with the current versions of these tools,"
+  which is exactly what unpinned gives you.
+- **Homebrew no longer supports a Brewfile lockfile.** The old
+  `Brewfile.lock.json` mechanism was removed from `brew bundle`; there is no
+  `--no-lock` flag and no supported way to make `brew bundle` reinstall an
+  arbitrary older version of a formula. Committing a lockfile would be a dead
+  file. (The `Brewfile.lock.json` entry in `.chezmoiignore` is just a guard in
+  case one is ever generated locally — nothing writes it.)
+- **Per-project reproducibility lives in devbox, not Homebrew.** When a project
+  needs a pinned toolchain (a specific JDK, Node, Terraform, Postgres…), that
+  belongs in the project's `devbox.json` + `devbox.lock`, which *do* pin exact
+  versions and travel with the repo. Homebrew is for workstation-wide tools
+  where "latest" is the right answer.
+
+If you ever need a specific older version of a workstation tool, install it
+ad-hoc (`brew install foo@1.2`) and treat it as untracked — `chezaudit` will
+remind you it isn't in a Brewfile.
 
 ### What to do after a long absence (machine sitting idle for weeks)
 

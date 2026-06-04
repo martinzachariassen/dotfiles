@@ -186,6 +186,46 @@ zj                           # zellij attach -c default — named session, detac
 macos-defaults               # re-apply system settings (sudo prompt; idempotent)
 ```
 
+### Pinning Neovim plugins
+
+The Neovim setup is a LazyVim bootstrap (`dot_config/nvim/lua/config/lazy.lua`).
+By default plugins track their latest commit (`defaults.version = false`), so a
+fresh machine installs whatever is current — convenient, but not reproducible.
+
+To pin an exact, machine-portable plugin set, commit lazy.nvim's lockfile into
+chezmoi (it is **not** tracked out of the box):
+
+```sh
+nvim                                   # let plugins install on first launch
+# inside nvim:
+:Lazy sync                             # resolves + writes ~/.config/nvim/lazy-lock.json
+# back in the shell:
+chezmoi add ~/.config/nvim/lazy-lock.json
+chezmoi cd && git add . && git commit -m "chore(nvim): pin plugin lockfile" && git push
+```
+
+After that, a fresh install (or `:Lazy restore`) reproduces the pinned revisions.
+Bump deliberately with `:Lazy update`, then re-run `chezmoi add ~/.config/nvim/lazy-lock.json`
+and commit. If you'd rather stay on rolling-latest, just don't track the
+lockfile — the current default.
+
+### JetBrains IDE settings
+
+IntelliJ IDEA ships in the `mac-apps` Brewfile tier, but its **settings are not
+managed by this repo** — JetBrains config is large, version-specific, and noisy
+to diff, so chezmoi-tracking it tends to create churn for little benefit. Use
+JetBrains' own sync instead:
+
+- **Settings Sync** (*Settings → Settings Sync → Enable*) — backs keymaps,
+  editor settings, plugins, and themes to your JetBrains account and syncs them
+  across machines. Easiest option; recommended for most setups.
+- **Settings Repository** (*File → Manage IDE Settings → Settings Repository*) —
+  points the IDE at a private git repo you control, if you prefer git over the
+  JetBrains account. Keep that repo separate from this dotfiles repo.
+
+Either way, the only thing this repo owns is *installing* the IDE; the IDE owns
+its own configuration.
+
 ### Diagnosing problems: doctor.sh
 
 `bash ~/Developer/personal/dotfiles/scripts/doctor.sh` (or `chezdoctor`) is the single command for "is this machine in the state it should be?". It's read-only and idempotent. It reports pass / warn / fail across:
