@@ -8,30 +8,31 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 
 Run that command as your normal macOS user, not with `sudo`. `sudo curl ... | bash` only makes the download privileged, not the installer. `curl ... | sudo bash` runs the whole setup as root, which breaks Homebrew and writes dotfiles into the wrong home directory. The installer and Homebrew will ask for your sudo password at the specific steps that need it.
 
-You'll meet a guided terminal wizard with numbered menus and normal text fields. It deliberately avoids raw-mode arrow-key prompts so it works in plain Terminal, Ghostty, remote shells, and pasted `curl | bash` sessions. If the terminal cannot render box-drawing characters, the wizard falls back to plain ASCII while keeping the same layout.
+You'll meet a guided terminal wizard themed to match the rest of the setup (Catppuccin Frappé), with a framed banner, per-step progress bars, an animated spinner for long steps, and **arrow-key menus** (↑/↓ + Enter, or press the number). It adapts to the terminal it runs in: truecolor → 256-color → 16-color → no-color, Unicode glyphs → ASCII, and arrow-key menus → numbered entry. Anything without an interactive terminal — `curl | bash` pipes, CI, `YES=1` — automatically falls back to numbered/auto-accepted prompts and log-friendly heartbeats instead of the spinner. It works the same in Ghostty, Terminal.app, iTerm, SSH, and stock macOS bash 3.2.
 
 The default path is aimed at a fresh macOS install: it asks only for profile, git name, and git email. It does not ask for a 1Password signing public key before 1Password exists on the machine. Git signing is finished by `bootstrap-auth.sh` after 1Password is installed and signed in. Package cleanup, feature toggles, and manual signing-key entry live behind the customize option.
 
 Once you confirm, the install runs unattended except for system prompts such as Xcode CLT or sudo. Total time is usually ~15 min, almost all of it Apple tooling and Homebrew downloading. On a fresh Mac, the first install stage prints its own sub-plan and heartbeat around Xcode CLT, Homebrew, chezmoi, and the repo clone. The later Homebrew package stage is split into individual taps/formulae/casks with per-item timing and a 30-second heartbeat during quiet downloads, so a rerun can resume through Homebrew's normal "already installed" checks instead of repeating the whole package set.
 
 ```text
-╭────────────────────────────────────────────────────────────╮
-│  Dotfiles Setup                                             │
-│  Fresh macOS workstation bootstrap.                          │
-╰────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────╮
+│ ◆ DOTFILES                                               │
+│ macOS workstation setup                                  │
+│ catppuccin frappe · truecolor                            │
+╰──────────────────────────────────────────────────────────╯
 │  The default path only asks for inputs available on a fresh Mac.
 │  Git signing is finished later, after 1Password is installed and signed in.
 │  Advanced cleanup and feature toggles stay available when you need them.
 │
-◆  2/5 - Choose setup
+◆  Step 2/5   ▰▰▰▰▱▱▱▱▱▱▱▱ 40%
+│  Choose setup
 │
 │  Essentials first. Press Enter keeps the detected value.
 │      Fresh installs only need profile, git name, and git email here.
 │
-◆  Profile
-│    1. personal - personal extras only (current)
-│    2. work - work extras only
-│  Choose 1-2, or press Enter for personal:
+◆  Profile  → ↑/↓ Enter
+│    ❯ ● personal — personal extras only
+│      ○ work     — work extras only
 │
 │  Recommended setup
 │    1Password          yes
@@ -39,10 +40,12 @@ Once you confirm, the install runs unattended except for system prompts such as 
 │    Mac apps           yes
 │    Local AI           no
 │    Homebrew cleanup   keep local packages
-◆  Setup style
-│    1. Continue with recommended setup
-│    2. Customize packages, signing, cleanup, and migration
+◆  Setup style  → ↑/↓ Enter
+│    ❯ ● Continue with recommended setup
+│      ○ Customize packages, signing, cleanup, and migration
 ```
+
+When the terminal has no interactive keyboard (pipes, CI), the same screens render in plain ASCII with numbered entry instead — e.g. `1. personal …` / `Choose 1-2`.
 
 The wizard is idempotent. Re-run it any time — it detects existing state, shows current values as defaults, lets you change profile/identity/features, and skips steps that are already done.
 
