@@ -6,7 +6,6 @@ set -euo pipefail
 SOURCE_DIR="${1:-$(pwd)}"
 PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
-AI="${AI:-false}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 case "$PROFILE" in
