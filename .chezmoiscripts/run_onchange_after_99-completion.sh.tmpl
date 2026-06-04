@@ -21,7 +21,6 @@ USE_OP="{{ dig "useOnePassword" true . }}"
 
 # Build current workstation extras as a bullet-separated string for compact display.
 EXTRAS=""
-{{ if dig "features" "ai" false . }}EXTRAS="${EXTRAS}ai · "{{ end }}
 {{ if dig "features" "macApps" true . }}EXTRAS="${EXTRAS}macApps · "{{ end }}
 EXTRAS="${EXTRAS% · }"
 [ -z "$EXTRAS" ] && EXTRAS="(none enabled)"

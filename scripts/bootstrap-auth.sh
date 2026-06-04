@@ -25,26 +25,20 @@ set -uo pipefail
 SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
-if [ -t 1 ]; then
-    BOLD=$'\033[1m'; DIM=$'\033[2m'
-    GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'; RED=$'\033[31m'; CYAN=$'\033[36m'
-    RESET=$'\033[0m'
+# Shared UI helpers (colors + Unicode/ASCII glyphs), resolved next to this
+# script so they load regardless of the current directory.
+_UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck source=lib/ui.sh
+if [ -r "$_UI_DIR/lib/ui.sh" ]; then
+    . "$_UI_DIR/lib/ui.sh"
+    ui_init_colors
+    ui_init_glyphs
 else
     BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
+    BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
+    BOX_TOP="+------------------------------------------------------------+"
+    BOX_BOTTOM="+------------------------------------------------------------+"
 fi
-
-case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-    *UTF-8*|*utf8*|*UTF8*)
-        BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
-        BOX_TOP="╭────────────────────────────────────────────────────────────╮"
-        BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
-        ;;
-    *)
-        BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
-        BOX_TOP="+------------------------------------------------------------+"
-        BOX_BOTTOM="+------------------------------------------------------------+"
-        ;;
-esac
 
 line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
 node_prefix() { printf "%s%s%s" "$CYAN" "$NODE" "$RESET"; }

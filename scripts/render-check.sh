@@ -19,11 +19,6 @@ case "$MAC_APPS" in
     *) echo "MAC_APPS must be true or false" >&2; exit 2 ;;
 esac
 
-case "$AI" in
-    true|false) ;;
-    *) echo "AI must be true or false" >&2; exit 2 ;;
-esac
-
 case "$USE_ONE_PASSWORD" in
     true|false) ;;
     *) echo "USE_ONE_PASSWORD must be true or false" >&2; exit 2 ;;
@@ -45,10 +40,9 @@ sourceDir = "$SOURCE_DIR"
 
     [data.features]
         macApps   = $MAC_APPS
-        ai        = $AI
 EOF
 
-echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS ai=$AI useOnePassword=$USE_ONE_PASSWORD"
+echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
 render_output="$tmpdir/chezmoi-render.out"
 if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
         --config="$tmpdir/.config/chezmoi/chezmoi.toml" \

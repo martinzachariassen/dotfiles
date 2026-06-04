@@ -4,9 +4,8 @@
 
 set -euo pipefail
 
-SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 CHEZMOI_CONFIG="${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}"
-FEATURE_KEYS=(macApps ai)
+FEATURE_KEYS=(macApps)
 APPLY=1
 
 usage() {
@@ -15,15 +14,14 @@ Usage:
   dotfiles profile show
   dotfiles profile set personal|work [--no-apply]
   dotfiles features list
-  dotfiles features enable macApps|ai [--no-apply]
-  dotfiles features disable macApps|ai [--no-apply]
-  dotfiles features set macApps|ai true|false [--no-apply]
+  dotfiles features enable macApps [--no-apply]
+  dotfiles features disable macApps [--no-apply]
+  dotfiles features set macApps true|false [--no-apply]
   dotfiles signing show
   dotfiles signing set [<ssh-public-key>] [--no-apply]
 
 Environment:
   CHEZMOI_CONFIG   path to chezmoi.toml (default: ~/.config/chezmoi/chezmoi.toml)
-  DOTFILES_DIR     source repo fallback when chezmoi is not initialized
 EOF
 }
 
@@ -50,7 +48,6 @@ valid_feature() {
 feature_default() {
     case "$1" in
         macApps) printf 'true' ;;
-        ai) printf 'false' ;;
         *) printf 'false' ;;
     esac
 }

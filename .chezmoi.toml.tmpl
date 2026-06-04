@@ -23,7 +23,6 @@
      devbox.json, not in global Homebrew modules. */ -}}
 {{- $useOnePassword := promptBool "useOnePassword" true -}}
 {{- $featMacApps    := promptBool "features.macApps" true -}}
-{{- $featAi         := promptBool "features.ai" false -}}
 
 # Tell chezmoi the source repo lives under ~/Developer/personal/dotfiles
 # (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
@@ -42,7 +41,6 @@ sourceDir = "{{ .chezmoi.homeDir }}/Developer/personal/dotfiles"
 
     [data.features]
         macApps   = {{ $featMacApps }}
-        ai        = {{ $featAi }}
 
 # delta is unconditionally in the core Brewfile, so we can wire chezmoi's
 # diff pager to it without `lookPath` gating. The path resolves on first

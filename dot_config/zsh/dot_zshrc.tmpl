@@ -285,7 +285,7 @@ chezbump() {
     echo
     echo "── brew bundle cleanup (preview) ──────────────────────────────"
     echo "  Packages installed locally but not in any Brewfile:"
-    brew bundle cleanup --file="$src/Brewfile" --file="$src/brewfiles/Brewfile.ai" \
+    brew bundle cleanup --file="$src/Brewfile" \
                         --file="$src/brewfiles/Brewfile.mac-apps" \
                         --file="$src/brewfiles/Brewfile.personal" \
                         --file="$src/brewfiles/Brewfile.work" 2>/dev/null \
@@ -321,7 +321,7 @@ chezaudit() {
         echo "── Untracked (installed locally, not in any Brewfile) ────────"
         echo "$untracked"
         echo
-        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.ai / brewfiles/Brewfile.mac-apps /"
+        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.mac-apps /"
         echo "brewfiles/Brewfile.personal / brewfiles/Brewfile.work),"
         echo "or \`brew uninstall <name>\` if you don't actually use it."
     fi
