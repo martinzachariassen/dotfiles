@@ -1,29 +1,37 @@
-# Brewfile.mac-apps — Mac-only quality-of-life GUI apps + container introspection.
+# Brewfile.mac-apps — Mac-only quality-of-life GUI apps + AI tooling.
 #
 # Installed when `features.macApps = true` in chezmoi data.
 #
 # Pure preference stack — none of these are required by the shell config or
 # scripts. Skip the toggle if you prefer to install your own picks. Each line
-# is also fine to comment out individually.
+# is also fine to comment out individually. Entries are sorted alphabetically
+# within each section.
 
+# ─── Productivity & system ────────────────────────────────────────────────────
+cask "google-drive"             # file sync
+cask "jordanbaird-ice@beta"     # menu bar manager
+cask "notion"                   # notes / docs
+cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
+
+# ─── Browser ──────────────────────────────────────────────────────────────────
 cask "google-chrome"            # the only browser most web tooling assumes
-cask "google-drive"
-cask "notion"
+
+# ─── Media ────────────────────────────────────────────────────────────────────
+cask "obs"                      # screen recording / streaming
 cask "spotify"
-cask "obs"
 cask "vlc"
-cask "bruno"
-cask "pearcleaner"
-cask "jordanbaird-ice@beta"
-cask "intellij-idea"
+
+# ─── Development ──────────────────────────────────────────────────────────────
+cask "bruno"                    # offline API client (Postman alternative)
+cask "intellij-idea"            # JetBrains IDE
 
 # ─── AI tooling + apps ────────────────────────────────────────────────────────
 # Ollama runs models locally. It's installed here but pulls no models — start it
 # with `scripts/setup-ollama.sh`, then `ollama pull <model>` for the ones you want.
 brew "ollama"                   # local model runner/server
-cask "codex"                    # OpenAI Codex CLI
 cask "chatgpt"                  # OpenAI ChatGPT desktop app
 cask "claude"                   # Anthropic Claude desktop app
 cask "claude-code"              # Anthropic Claude Code CLI
+cask "codex"                    # OpenAI Codex CLI

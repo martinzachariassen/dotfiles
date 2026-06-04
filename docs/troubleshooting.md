@@ -116,7 +116,7 @@ Plus an upfront plan that tells you what's coming, how many modules will run, an
   Profile: personal
   Modules: 3
     1. core (always)
-    2. mac apps (Rectangle/Raycast/Stats/Chrome/dive)
+    2. mac apps (Raycast/Stats/Chrome/AI apps)
     3. personal profile extras
   Items: 59 taps/formulae/casks split into individual installs.
   First install usually takes 5-15 minutes. Downloads dominate.
