@@ -63,6 +63,18 @@ repos:
   #     - id: terraform_validate
   #     - id: terraform_tflint
 
+  # ─── Dockerfiles (uncomment if the project ships images) ───────────────────
+  # - repo: https://github.com/hadolint/hadolint
+  #   rev: v2.13.1-beta
+  #   hooks:
+  #     - id: hadolint-docker                   # runs hadolint in a container
+
+  # ─── GitHub Actions workflows (uncomment if the repo has .github/workflows) ─
+  # - repo: https://github.com/rhysd/actionlint
+  #   rev: v1.7.7
+  #   hooks:
+  #     - id: actionlint                        # validates workflow syntax + shell in run:
+
   # ─── Secrets — block accidental token commits ──────────────────────────────
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.21.2

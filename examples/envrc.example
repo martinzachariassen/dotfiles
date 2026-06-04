@@ -12,11 +12,21 @@
 
 # ─── Runtime toolchain via devbox ────────────────────────────────────────────
 # Ask devbox to emit the direnv integration for this project. It reads
-# devbox.json in this directory and exports the project's Nix-built JDK /
-# Kotlin / Postgres / Node / etc. into the shell, scoped to this dir only and
-# reverted on `cd` out. Two projects on different JDK majors coexist without
-# PATH gymnastics.
+# devbox.json in this directory and exports the project's Nix-built tools
+# (Postgres / Node / gradle / etc.) into the shell, scoped to this dir only and
+# reverted on `cd` out.
 eval "$(devbox generate direnv --print-envrc)"
+
+# ─── Java version (Homebrew Temurin, stable paths) ───────────────────────────
+# JDKs are installed globally via Homebrew (Brewfile: temurin@21, temurin@25) so
+# the editor and CLI share one stable path — VS Code's Java server stops losing
+# its classpath the way it does with devbox's churning /nix/store paths. Drop
+# "jdk*" from devbox.json so it doesn't re-export a Nix JDK over the line below.
+#
+# Gradle's `toolchain {}` already auto-selects the JDK to *compile* with, so this
+# is mostly for Maven (whose compiler runs on JAVA_HOME) or plain `java`/kotlinc.
+# Set it after the devbox eval above so it wins. Pick the major you want:
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"   # or -v 25  (list: java_home -V)
 
 # ─── Project-local environment variables ─────────────────────────────────────
 # These exist while you're in this directory, gone when you leave.
