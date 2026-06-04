@@ -13,7 +13,7 @@ and edit. The comments inside each file explain the choices.
 # devbox + direnv: per-project runtimes + env vars
 cd /path/to/project
 devbox init                                       # creates devbox.json
-devbox add jdk21 kotlin postgresql_16 gradle      # pin your toolchain
+devbox add gradle postgresql_16                   # pin per-project tools (NOT the JDK — see below)
 devbox generate direnv                            # creates .envrc
 # direnv allow                                     # only if the dir isn't under ~/Developer (the whitelisted root)
 
@@ -30,7 +30,31 @@ cp ~/Developer/personal/dotfiles/examples/pre-commit-config.yaml.example /path/t
 cd /path/to/project
 pre-commit install             # writes .git/hooks/pre-commit; runs on every git commit
 pre-commit run --all-files     # one-off: run all hooks against every tracked file
+
+# maven toolchains (optional): pin a JDK per Maven build, independent of JAVA_HOME
+cp ~/Developer/personal/dotfiles/examples/maven/toolchains.xml.example ~/.m2/toolchains.xml
 ```
+
+### Java / Kotlin JDKs
+
+JDKs are the one runtime that does **not** come from devbox here — they're
+installed globally via Homebrew Temurin (`Brewfile`: `temurin@21`, `temurin@25`).
+The reason is VS Code: the Java language server caches the JDK's absolute path,
+and devbox's content-hashed `/nix/store` paths move on every update/GC, which
+forces constant "reload Java projects". A stable Homebrew path fixes that.
+
+You still pin the Java *version* per project — just in the build tool, which is
+where teammates and CI read it from anyway:
+
+- **Gradle** — `java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }`
+  (or `kotlin { jvmToolchain(21) }`). Gradle auto-discovers the Temurin JDKs; no
+  paths, no `JAVA_HOME`. VS Code follows automatically.
+- **Maven** — `<maven.compiler.release>21</maven.compiler.release>`. Maven compiles
+  on whatever JDK runs it, so also set `JAVA_HOME` (one line in `.envrc`, see
+  `envrc.example`) or use `examples/maven/toolchains.xml.example`.
+
+Add another major (e.g. 17) by adding `cask "temurin@17"` to the `Brewfile` and a
+matching entry to `java.configuration.runtimes` in the VS Code settings.
 
 All three tools are already wired into your shell — `direnv` and `pre-commit`
 land via the Brewfile (`direnv` also has its hook in `.zshrc` and the `~/Developer`
@@ -49,6 +73,9 @@ the code. A teammate cloning the repo gets the exact same JDK/Postgres/Node,
 Terraform/OpenTofu, or Kubernetes tool versions on first `cd` in (after
 `devbox install` once). This dotfiles repo deliberately doesn't carry runtime
 or project CLI pins in Homebrew — those belong to each project, not to your
-personal machine config. Account-level CLIs such as `az` and `gcloud` are the
-exception: they stay global so authentication and project/subscription context
-are available before entering a project shell.
+personal machine config. The exceptions are deliberate: account-level CLIs such
+as `az` and `gcloud` stay global so authentication and project/subscription
+context are available before entering a project shell, and the **JDK** stays
+global (Homebrew Temurin) so VS Code's Java server has a stable path to anchor to
+(see "Java / Kotlin JDKs" above). The project's Java *version* is still pinned in
+its own repo — via the Gradle/Maven toolchain, not Homebrew.

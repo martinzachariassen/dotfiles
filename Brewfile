@@ -69,6 +69,15 @@ cask "1password"               # GUI app — SSH agent + git signing live here
 cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
 cask "docker-desktop"          # if you'd rather use colima/podman, swap this line
 
+# ─── JDKs (stable paths for VS Code's Java server) ────────────────────────────
+# devbox/Nix JDK paths are content-hashed and churn on update/GC, which makes
+# VS Code's Java language server keep losing its classpath. These Homebrew
+# Temurin JDKs give the editor a stable anchor; project build versions are still
+# pinned per project via Gradle toolchains. Paths:
+#   /Library/Java/JavaVirtualMachines/temurin-{21,25}.jdk/Contents/Home
+cask "temurin@21"              # JDK 21 (LTS) — editor + Gradle daemon default
+cask "temurin@25"              # JDK 25 (LTS) — registered runtime for newer projects
+
 # ─── Fonts ────────────────────────────────────────────────────────────────────
 cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty reference this
 cask "font-fira-code-nerd-font"        # secondary; nice ligatures

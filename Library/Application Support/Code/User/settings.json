@@ -210,13 +210,33 @@
     // BACKEND / INFRA
     // =========================================================
 
-    "java.configuration.updateBuildConfiguration": "interactive",
+    // Auto-sync the classpath when build files change (no manual prompt).
+    "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
-    // Language-server heap/GC tuning. JDKs come from devbox+direnv per project,
-    // so no java.home / runtimes are hardcoded here on purpose.
+    // Pin the editor's JDKs to stable Homebrew Temurin paths instead of devbox's
+    // volatile /nix/store paths. The Nix paths are content-hashed and move on
+    // every devbox update / GC, which made JDT.LS lose its classpath and force
+    // constant "reload Java projects". Project build versions are still pinned
+    // per project via Gradle toolchains; devbox keeps managing the rest of each
+    // project's env (DB, gradle, node, …). Installed via Brewfile temurin@{21,25}.
+    "java.jdt.ls.java.home": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+    "java.import.gradle.java.home": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-21",
+            "path": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+            "default": true
+        },
+        {
+            "name": "JavaSE-25",
+            "path": "/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home"
+        }
+    ],
+
+    // Language-server heap/GC tuning.
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
     "java.import.gradle.wrapper.enabled": true,
 
