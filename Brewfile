@@ -51,6 +51,8 @@ brew "httpie"                  # curl, but human
 brew "mkcert"                  # locally-trusted dev certificates
 brew "grpcurl"                 # curl, but for gRPC
 brew "shfmt"                   # shell-script formatter (backs the shell-format VS Code ext)
+brew "shellcheck"              # shell-script linter (editor ext + pre-commit + CI)
+brew "hadolint"                # Dockerfile linter (backs the hadolint VS Code ext)
 
 # ─── Editor (terminal) ────────────────────────────────────────────────────────
 brew "neovim"                  # init.lua in dot_config/nvim ships LazyVim presets
