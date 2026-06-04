@@ -1,10 +1,10 @@
 # Brewfile.personal — extras for the `personal` profile.
 #
 # Installed on top of the core Brewfile when your profile is "personal".
-# Skipped when your profile is "work".
+# Skipped when your profile is "work". Entries are sorted alphabetically.
 #
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.personal
 
-# ─── Add your other personal-only apps below ──────────────────────────────────
+# ─── Personal apps ────────────────────────────────────────────────────────────
 cask "discord"
 cask "steam"
