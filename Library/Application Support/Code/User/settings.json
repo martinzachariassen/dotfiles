@@ -39,9 +39,20 @@
 
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
+    "editor.formatOnSaveMode": "file",
     "editor.codeActionsOnSave": {
         "source.organizeImports": "explicit"
     },
+
+    // One default formatter so save-formatting is deterministic and never shows
+    // a "select a formatter" prompt. LSP-owned languages (Java, Kotlin, YAML,
+    // XML, Terraform, …) override this in LANGUAGE-SPECIFIC below.
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+    // Prettier fallbacks used only when a repo has no .prettierrc — see
+    // examples/.prettierrc.example to pin these per project for the whole team.
+    "prettier.printWidth": 100,
+    "prettier.proseWrap": "preserve",
 
     "editor.inlineSuggest.enabled": true,
     "editor.rulers": [100, 120],
@@ -285,6 +296,23 @@
     "yaml.completion": true,
     "yaml.hover": true,
     "yaml.schemaStore.enable": true,
+    "yaml.format.printWidth": 120,
+    "yaml.format.singleQuote": false,
+    "yaml.format.bracketSpacing": true,
+    "yaml.format.proseWrap": "preserve",
+
+    // XML (LemMinX / redhat.vscode-xml) — keep pom.xml & Spring XML tidy and
+    // schema-validated without reflowing hand-laid-out attributes.
+    "xml.format.enabled": true,
+    "xml.format.maxLineWidth": 120,
+    "xml.format.splitAttributes": "preserve",
+    "xml.format.preserveAttributeLineBreaks": true,
+    "xml.format.joinContentLines": false,
+    "xml.validation.enabled": true,
+
+    // shfmt flags for the shell-format extension (4-space indent, indent switch
+    // cases) — mirrors the repo .editorconfig.
+    "shellformat.flag": "-i 4 -ci",
 
     "cSpell.language": "en-US,nb",
 
@@ -296,8 +324,40 @@
         "editor.defaultFormatter": "vscode.json-language-features"
     },
 
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+
     "[yaml]": {
         "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+
+    "[xml]": {
+        "editor.defaultFormatter": "redhat.vscode-xml"
+    },
+
+    "[markdown]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    "[toml]": {
+        "editor.defaultFormatter": "tamasfe.even-better-toml"
+    },
+
+    "[dockerfile]": {
+        "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+    },
+
+    "[shellscript]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+
+    "[terraform]": {
+        "editor.defaultFormatter": "hashicorp.terraform"
+    },
+
+    "[terraform-vars]": {
+        "editor.defaultFormatter": "hashicorp.terraform"
     },
 
     "[spring-boot-properties-yaml]": {

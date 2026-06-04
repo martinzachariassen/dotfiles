@@ -33,7 +33,25 @@ pre-commit run --all-files     # one-off: run all hooks against every tracked fi
 
 # maven toolchains (optional): pin a JDK per Maven build, independent of JAVA_HOME
 cp ~/Developer/personal/dotfiles/examples/maven/toolchains.xml.example ~/.m2/toolchains.xml
+
+# formatting: identical results across editors/teammates
+cp ~/Developer/personal/dotfiles/examples/.editorconfig.example /path/to/project/.editorconfig
+cp ~/Developer/personal/dotfiles/examples/.prettierrc.example   /path/to/project/.prettierrc
 ```
+
+### Consistent formatting
+
+VS Code is set to format on save with a pinned formatter per language, so the
+*editor* is deterministic. To make results identical for everyone — other
+editors, CI, teammates — commit these two files to the project root:
+
+- **`.editorconfig`** — the cross-editor baseline (indent, charset, EOL,
+  final newline). Honored by VS Code, IntelliJ, Vim, and formatters like
+  Prettier and `shfmt`. Start from `examples/.editorconfig.example`.
+- **`.prettierrc`** — pins Prettier options (print width, quotes, trailing
+  commas, prose wrap) for JS/TS/JSON/YAML/Markdown. Start from
+  `examples/.prettierrc.example`. When present it overrides the editor's
+  Prettier fallbacks, so everyone gets the same output.
 
 ### Java / Kotlin JDKs
 
