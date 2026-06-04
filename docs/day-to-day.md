@@ -157,6 +157,7 @@ chez                         # smart `chezmoi apply` — diff preview + auto-for
 chezup                       # `git pull --ff-only` in the source repo, then chez — most common upgrade workflow
 chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + chez. Use after a data-model change upstream
 chezdiff                     # chezmoi diff + brew bundle drift + actionable script re-runs
+chezfix                      # install missing brew/mise packages directly — repairs drift chezup can't see (hash-tracked run_onchange scripts don't re-fire when a package vanishes but its Brewfile is unchanged)
 chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + mise upgrade
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
 chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)

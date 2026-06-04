@@ -119,10 +119,13 @@ if [ -d /nix ]; then
 
     # Reopen stdin from the controlling TTY — chezmoi runs scripts with stdin
     # disconnected. If there's no TTY (piped/CI apply), the read fails and we
-    # default to skipping, which is the safe choice.
-    exec </dev/tty 2>/dev/null || true
+    # default to skipping, which is the safe choice. Note: don't redirect the
+    # shell's stderr here — `read -p` writes its prompt to stderr, so swallowing
+    # it globally hides the question and makes the script look hung.
+    exec </dev/tty || true
     resp=""
-    read -r -p "Uninstall the Nix store now? [y/N] " resp </dev/tty 2>/dev/null || resp=""
+    printf "  Uninstall the Nix store now? [y/N] "
+    read -r resp </dev/tty 2>/dev/null || resp=""
     case "$resp" in
         [yY]|[yY][eE][sS])
             if [ -x /nix/nix-installer ]; then

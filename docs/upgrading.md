@@ -53,6 +53,12 @@ Knowing what triggers what makes the upgrade story less mysterious:
 
 If you forget which path you're on, `chezdiff` shows you everything actionable at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and `run_*` scripts that would re-fire for reasons other than the normal every-apply hooks. It's the "what would chezup actually do" preview.
 
+### When `chezdiff` reports missing packages but `chezup` won't install them
+
+The `run_onchange_*` scripts re-fire on **input-hash** changes, not on system state. So if a formula or cask gets uninstalled (or a previous apply bailed half-way) while its `Brewfile` stays unchanged, chezmoi still has the hash recorded as "ran" — `chezup`/`chez` do nothing, yet `chezdiff`'s `brew bundle check` (which inspects *real* state) correctly flags the drift. The two disagree because they measure different things.
+
+Run **`chezfix`** to close that gap: it checks each applicable Brewfile module for this profile and runs `brew bundle install` for any that are unsatisfied, then `mise install` for the global runtimes — installing directly, with no hash games and no `scriptState` reset. (The nuclear alternative is `chezmoi state delete-bucket --bucket=scriptState && chez`, which forces *every* `run_onchange`/`run_once` script to re-fire.)
+
 ### Cleaning up packages from features you've turned off
 
 Disabling a feature toggle stops that Brewfile from being re-applied, but does **not** uninstall the packages it pulled in — intentional, so you don't lose tools you might still use. To actually remove the current mac-apps feature packages:

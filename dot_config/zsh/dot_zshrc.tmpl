@@ -234,20 +234,30 @@ chezup() {
 # and scripts that would re-fire for reasons other than the normal every-apply
 # hooks.
 chezdiff() {
-    local src f pending_scripts
+    local src f pending_scripts brew_drift out
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     echo "── chezmoi diff (managed file changes) ───────────────────────"
     chezmoi diff --exclude scripts
     echo
     echo "── brew bundle (missing packages) ────────────────────────────"
     # Check every Brewfile module that exists in source. The wildcard catches
-    # core + workstation extras + profile extras.
+    # core + workstation extras + profile extras. `brew bundle check` exits
+    # non-zero when a module has missing packages — that's our drift signal.
+    brew_drift=0
     for f in "$src"/Brewfile "$src"/brewfiles/Brewfile.*; do
         [ -f "$f" ] || continue
         case "$f" in *.lock.json) continue ;; esac
-        brew bundle check --verbose --file="$f" 2>&1 \
-            | grep -E '^(Brewfile|→|✗)' || echo "  $(basename "$f") satisfied"
+        if out=$(brew bundle check --verbose --file="$f" 2>&1); then
+            echo "  $(basename "$f") satisfied"
+        else
+            printf '%s\n' "$out" | grep -E '^(Brewfile|→|✗)'
+            brew_drift=1
+        fi
     done
+    # `chezup`/`chez` only re-run the brew/mise scripts when a Brewfile *hash*
+    # changes (run_onchange) — they're blind to packages that vanished while
+    # the Brewfile stayed put. `chezfix` checks real state and installs.
+    [ "$brew_drift" -eq 1 ] && echo "  → run \`chezfix\` to install the missing packages"
     echo
     echo "── chezmoi scripts with actionable changes ───────────────────"
     pending_scripts="$(
@@ -258,6 +268,56 @@ chezdiff() {
         printf '%s\n' "$pending_scripts"
     else
         echo "  none (00-sudo-cache runs every apply by design)"
+    fi
+}
+
+# Self-heal package drift that `chezup`/`chez` can't see. Those commands only
+# re-fire the brew-bundle (02) and mise-install (02b) scripts when a Brewfile
+# or the global mise config *hash* changes — chezmoi tracks input hashes, not
+# installed state. So if a formula/cask gets uninstalled (or a previous apply
+# bailed half-way) while the source files stay put, `chezup` does nothing and
+# `chezdiff` shows the drift with no way to act on it. `chezfix` is that action:
+# it checks real state and runs `brew bundle install` + `mise install` directly,
+# no hash games and no scriptState reset. The module set mirrors what the
+# brew-bundle script installs for this profile + macApps flag.
+chezfix() {
+    local src f did
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    did=0
+    local -a modules
+    modules=("$src/Brewfile")
+{{ if dig "features" "macApps" true . -}}
+    modules+=("$src/brewfiles/Brewfile.mac-apps")
+{{ end -}}
+{{ if eq .profile "personal" -}}
+    modules+=("$src/brewfiles/Brewfile.personal")
+{{ end -}}
+{{ if eq .profile "work" -}}
+    modules+=("$src/brewfiles/Brewfile.work")
+{{ end -}}
+    echo "── brew bundle install (missing packages) ────────────────────"
+    for f in "${modules[@]}"; do
+        [ -f "$f" ] || continue
+        if brew bundle check --file="$f" >/dev/null 2>&1; then
+            echo "  ✓ $(basename "$f") already satisfied"
+        else
+            echo "→ installing from $(basename "$f")…"
+            brew bundle install --file="$f" && did=1
+        fi
+    done
+    if command -v mise >/dev/null 2>&1; then
+        echo
+        echo "── mise install (global runtimes) ────────────────────────────"
+        # Run from $HOME so only the global config.toml is in scope — matches
+        # the 02b-mise-install script's "global toolchain" intent and avoids
+        # pulling in a project mise.toml if you happen to call this from a repo.
+        ( cd "$HOME" && mise install ) && did=1
+    fi
+    echo
+    if [ "$did" -eq 1 ]; then
+        echo "✓ chezfix: drift repaired."
+    else
+        echo "✓ chezfix: nothing to do — everything already installed."
     fi
 }
 
