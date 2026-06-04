@@ -2,8 +2,8 @@
 #
 # This is the smallest set that makes the dotfiles' shell experience work as
 # documented: a Catppuccin-themed Ghostty + Starship + Zellij + zsh stack with
-# the modern CLI replacements wired into aliases, devbox + direnv for per-project
-# runtimes, chezmoi for managing this repo, and 1Password for SSH + git signing.
+# the modern CLI replacements wired into aliases, mise for language runtimes,
+# chezmoi for managing this repo, and 1Password for SSH + git signing.
 #
 # Optional add-ons live in brewfiles/Brewfile.<feature> files and are layered on
 # top of this one based on your answers to the install wizard. See:
@@ -20,7 +20,6 @@
 brew "chezmoi"                 # this very repo's manager
 brew "coreutils"               # GNU date/tar/sort/etc. as gdate, gtar, …
 brew "curl"
-brew "direnv"                  # per-directory env vars + auto-activates devbox via .envrc
 brew "gh"                      # GitHub CLI
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
@@ -31,11 +30,6 @@ brew "tldr"                    # `tldr <cmd>` — concise example-driven help
 brew "tree"
 brew "wget"
 brew "yq"                      # YAML
-# devbox: NOT a brew formula. Installed via Jetify's official curl-installer
-# in .chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl, which runs
-# before this Brewfile is touched. Devbox itself manages per-project runtimes
-# (Java/Kotlin/Postgres/…) via Nix; on first `devbox shell` it bootstraps Nix
-# in multi-user mode if absent.
 
 # ─── Modern CLI replacements (the shell config aliases these by default) ──────
 brew "bat"                     # cat
@@ -56,7 +50,12 @@ brew "shfmt"                   # shell-script formatter (backs the shell-format 
 brew "zoxide"                  # smarter cd based on directory frecency
 
 # ─── Runtimes ─────────────────────────────────────────────────────────────────
-brew "node"                    # global Node.js/npm (per-project versions still via devbox)
+# mise owns language runtimes (java, node, python, …). Global defaults live in
+# ~/.config/mise/config.toml (managed: dot_config/mise/config.toml); per-project
+# versions + env vars live in each project's own mise.toml. mise installs to
+# stable paths (~/.local/share/mise/installs/<tool>/<version>), so VS Code's
+# Java server gets a non-churning JDK path — see settings.json.tmpl.
+brew "mise"                    # polyglot runtime manager (replaces node + temurin casks)
 
 # ─── Editor (terminal) ────────────────────────────────────────────────────────
 brew "neovim"                  # init.lua in dot_config/nvim ships LazyVim presets
@@ -76,14 +75,9 @@ cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
 cask "kotlin-lsp"              # JetBrains Kotlin LSP CLI for non-VS Code clients
 cask "visual-studio-code"      # VS Code app; settings/extensions managed by chezmoi
 
-# ─── JDKs (stable paths for VS Code's Java server) ────────────────────────────
-# devbox/Nix JDK paths are content-hashed and churn on update/GC, which makes
-# VS Code's Java language server keep losing its classpath. These Homebrew
-# Temurin JDKs give the editor a stable anchor; project build versions are still
-# pinned per project via Gradle toolchains. Paths:
-#   /Library/Java/JavaVirtualMachines/temurin-{21,25}.jdk/Contents/Home
-cask "temurin@21"              # JDK 21 (LTS) — editor + Gradle daemon default
-cask "temurin@25"              # JDK 25 (LTS) — registered runtime for newer projects
+# JDKs are managed by mise (java = ["temurin-21", "temurin-25"] in the global
+# config), not Homebrew. mise install paths are stable, so VS Code's Java server
+# anchors to them directly — see dot_config/mise/config.toml + settings.json.tmpl.
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
 cask "font-fira-code-nerd-font"        # secondary; nice ligatures

@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# run_onchange_after_02c-cleanup-deprecated — remove tools this repo has dropped.
+#
+# Purpose:
+#   When the dotfiles stop managing something (a Homebrew package, an
+#   out-of-band binary, a config dir), `chezmoi apply` and `brew bundle` only
+#   ADD and update — they never remove. So old tools linger on machines that
+#   were set up under the previous config. This script is the one place that
+#   cleans up *intentionally dropped* tooling, driven by the explicit manifest
+#   below. To deprecate something in the future, add it to the right list here.
+#
+# Why this is safe:
+#   - It only ever touches items NAMED in the manifest — never a blanket sweep.
+#     (For an aggressive "remove anything not in the Brewfiles" pass, use the
+#     `chezbump` preview + `brew bundle cleanup --force` by hand instead.)
+#   - Every step is guarded by an "is it actually here?" check, so on a fresh
+#     machine that never had the old stack this is a no-op.
+#   - The irreversible, sudo-level bit (the Nix store) is never removed without
+#     an explicit y/N confirmation.
+#
+# Lifecycle:
+#   `run_onchange_*` re-fires only when this script's rendered content changes —
+#   so it runs once after a fresh install and once after `chezup` pulls an edit
+#   to the manifest, then stays quiet on routine applies. Idempotent guards make
+#   any re-fire a cheap no-op.
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ Cleanup: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+# ─── Deprecation manifest ─────────────────────────────────────────────────────
+# Homebrew packages this repo used to install but no longer does. mise now owns
+# language runtimes (node, the Temurin JDKs), and direnv is replaced by mise's
+# per-project `[env]`. mise installs its own copies under ~/.local/share/mise,
+# so removing the Homebrew ones is safe.
+DEPRECATED_FORMULAE=(
+    "direnv"        # replaced by mise's per-project [env]
+    "node"          # runtimes now come from mise
+)
+DEPRECATED_CASKS=(
+    "temurin@21"    # JDKs now come from mise (java = [...])
+    "temurin@25"
+)
+# Out-of-band paths (binaries / config dirs) left by the old devbox + direnv
+# stack. Removed without prompting — all cheap and reversible.
+DEPRECATED_PATHS=(
+    "{{ .chezmoi.homeDir }}/.config/direnv"        # direnv global config
+    "{{ .chezmoi.homeDir }}/.local/share/devbox"   # devbox global packages
+    "{{ .chezmoi.homeDir }}/.cache/devbox"         # devbox cache
+    "{{ .chezmoi.homeDir }}/.config/devbox"        # devbox config (if any)
+)
+
+echo "◆ Cleanup: removing deprecated tools"
+
+removed_any=false
+
+# ─── 1. Deprecated Homebrew formulae + casks ──────────────────────────────────
+if command -v brew >/dev/null 2>&1; then
+    installed_formulae="$(brew list --formula -1 2>/dev/null || true)"
+    for f in ${DEPRECATED_FORMULAE[@]+"${DEPRECATED_FORMULAE[@]}"}; do
+        if printf '%s\n' "$installed_formulae" | grep -qx "$f"; then
+            echo "→ uninstalling deprecated formula: $f"
+            if brew uninstall "$f" >/dev/null 2>&1; then
+                removed_any=true
+            else
+                # Most likely still a dependency of another installed formula.
+                echo "  ! kept $f — still required by another package (\`brew uses --installed $f\`)"
+            fi
+        fi
+    done
+
+    installed_casks="$(brew list --cask -1 2>/dev/null || true)"
+    for c in ${DEPRECATED_CASKS[@]+"${DEPRECATED_CASKS[@]}"}; do
+        if printf '%s\n' "$installed_casks" | grep -qx "$c"; then
+            echo "→ uninstalling deprecated cask: $c"
+            if brew uninstall --cask "$c" >/dev/null 2>&1; then
+                removed_any=true
+            else
+                echo "  ! could not remove cask $c (remove manually: brew uninstall --cask $c)"
+            fi
+        fi
+    done
+fi
+
+# ─── 2. devbox binary ─────────────────────────────────────────────────────────
+# Installed by the old Jetify curl-installer into /usr/local/bin (often
+# root-owned), so fall back to sudo. The sudo credential is already cached by
+# run_before_00-sudo-cache, so this won't prompt in the normal apply flow.
+if command -v devbox >/dev/null 2>&1; then
+    devbox_path="$(command -v devbox)"
+    echo "→ removing devbox binary: $devbox_path"
+    if rm -f "$devbox_path" 2>/dev/null || sudo rm -f "$devbox_path" 2>/dev/null; then
+        removed_any=true
+    else
+        echo "  ! could not remove $devbox_path — remove it manually"
+    fi
+fi
+
+# ─── 3. Deprecated config/data paths ──────────────────────────────────────────
+for p in ${DEPRECATED_PATHS[@]+"${DEPRECATED_PATHS[@]}"}; do
+    if [ -e "$p" ]; then
+        echo "→ removing $p"
+        rm -rf "$p" && removed_any=true
+    fi
+done
+
+# ─── 4. Nix store (irreversible — confirm first) ──────────────────────────────
+# The /nix store backed devbox's per-project packages. It needs sudo to remove
+# and can't be undone, so we ask before nuking it rather than doing it silently.
+if [ -d /nix ]; then
+    nix_size="$(du -sh /nix 2>/dev/null | cut -f1 || echo '?')"
+    echo
+    echo "── Nix store cleanup ─────────────────────────────────────────"
+    echo "  Devbox is gone, but its Nix store is still at /nix ($nix_size)."
+    echo "  Removing it is irreversible and requires sudo."
+
+    # Reopen stdin from the controlling TTY — chezmoi runs scripts with stdin
+    # disconnected. If there's no TTY (piped/CI apply), the read fails and we
+    # default to skipping, which is the safe choice.
+    exec </dev/tty 2>/dev/null || true
+    resp=""
+    read -r -p "Uninstall the Nix store now? [y/N] " resp </dev/tty 2>/dev/null || resp=""
+    case "$resp" in
+        [yY]|[yY][eE][sS])
+            if [ -x /nix/nix-installer ]; then
+                echo "→ running the Determinate Nix uninstaller"
+                if /nix/nix-installer uninstall --no-confirm; then
+                    echo "✓ Nix store removed"
+                    removed_any=true
+                else
+                    echo "  ! uninstall failed — retry manually: /nix/nix-installer uninstall"
+                fi
+            else
+                echo "  ! /nix/nix-installer not found (this may be an upstream multi-user Nix)."
+                echo "    Uninstall per https://nix.dev/manual/nix/latest/installation/uninstall"
+            fi
+            ;;
+        *)
+            echo "  Skipped. Remove later with: /nix/nix-installer uninstall"
+            ;;
+    esac
+fi
+
+if [ "$removed_any" = true ]; then
+    echo "✓ Deprecated tools cleaned up"
+else
+    echo "✓ Nothing to clean up"
+fi

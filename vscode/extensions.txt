@@ -16,8 +16,7 @@ github.copilot-chat
 github.vscode-github-actions
 hashicorp.terraform
 humao.rest-client
-jetpack-io.devbox
-mkhl.direnv
+hverlin.mise-vscode
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql

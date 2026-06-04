@@ -3,15 +3,18 @@
   Maven toolchains — Option B for picking a JDK independent of JAVA_HOME.
 
   Most projects don't need this: Gradle auto-selects the JDK via toolchain {},
-  and for Maven a one-line JAVA_HOME in .envrc (see examples/envrc.example) is
-  simpler. Use this only when you want a Maven build to compile with a specific
-  JDK regardless of which JDK launched `mvn`.
+  and for Maven the JAVA_HOME that `mise activate` exports (from the project's
+  mise.toml) is usually enough. Use this only when you want a Maven build to
+  compile with a specific JDK regardless of which JDK launched `mvn`.
 
   Setup:
     cp examples/maven/toolchains.xml.example ~/.m2/toolchains.xml
-  Then keep the <jdkHome> paths in sync with the Temurin casks in your Brewfile.
-  This file is intentionally NOT chezmoi-managed — it hardcodes versioned JDK
-  paths that move on Temurin updates, so copy + bump it by hand.
+  The <jdkHome> paths below point at mise's stable install dirs
+  (~/.local/share/mise/installs/java/temurin-<major>/...). Those dirs are a
+  fixed name per major version, so unlike the old Homebrew-cask paths they do
+  NOT move on a JDK patch update — no bumping needed. This file is intentionally
+  NOT chezmoi-managed. Maven interpolates ${user.home}; if your Maven is too old
+  to do so, replace it with your absolute home path.
 
   A project opts in via the maven-toolchains-plugin in its pom.xml:
 
@@ -39,7 +42,7 @@
       <vendor>temurin</vendor>
     </provides>
     <configuration>
-      <jdkHome>/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home</jdkHome>
+      <jdkHome>${user.home}/.local/share/mise/installs/java/temurin-21/Contents/Home</jdkHome>
     </configuration>
   </toolchain>
   <toolchain>
@@ -49,7 +52,7 @@
       <vendor>temurin</vendor>
     </provides>
     <configuration>
-      <jdkHome>/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home</jdkHome>
+      <jdkHome>${user.home}/.local/share/mise/installs/java/temurin-25/Contents/Home</jdkHome>
     </configuration>
   </toolchain>
 </toolchains>

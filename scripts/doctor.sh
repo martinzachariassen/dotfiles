@@ -284,55 +284,47 @@ else
     fail "brew not on PATH"
 fi
 
-# ─── 7. devbox + direnv (per-project runtimes) ────────────────────────────────
-section "devbox + direnv"
-if command -v devbox >/dev/null 2>&1; then
-    pass "devbox installed: $(devbox version 2>/dev/null | head -1)"
-else
-    fail "devbox missing — runtimes (Java, Kotlin, Postgres, …) won't activate per project"
-fi
-# Nix is bootstrapped eagerly by run_onchange_before_01b-install-devbox; verify
-# it actually landed. Without /nix, `devbox shell` will halt on a "press enter
-# to continue" prompt the first time it runs — that's the paper-cut the eager
-# install is meant to prevent.
-if [ -d /nix ]; then
-    pass "Nix store present at /nix"
-    # The LaunchDaemon label depends on which Nix flavour you have:
-    #   - Upstream Nix multi-user:  org.nixos.nix-daemon
-    #   - Determinate Nix Installer: systems.determinate.nix-daemon
-    # We use Determinate via the devbox-bootstrap script, but accept either so
-    # this check doesn't flap if/when labels change again or if someone reinstalls
-    # with the upstream installer. `sudo launchctl list` lists system daemons.
-    if sudo -n launchctl list 2>/dev/null | grep -qE '(org\.nixos|systems\.determinate)\.nix-daemon'; then
-        pass "nix-daemon LaunchDaemon running"
-    elif launchctl list 2>/dev/null | grep -qE '(org\.nixos|systems\.determinate)\.nix-daemon'; then
-        pass "nix-daemon LaunchDaemon running"
+# ─── 7. mise (language runtimes) ──────────────────────────────────────────────
+section "mise (runtimes)"
+if command -v mise >/dev/null 2>&1; then
+    pass "mise installed: $(mise version 2>/dev/null | head -1)"
+    # Confirm activation is wired into the shell config — without it mise
+    # doesn't set PATH/JAVA_HOME or auto-switch per project.
+    if grep -q 'mise activate zsh' "$HOME/.config/zsh/.zshrc" 2>/dev/null; then
+        pass "mise activation present in ~/.config/zsh/.zshrc"
     else
-        warn "/nix exists but nix-daemon label not found — run \`sudo launchctl list | grep -i nix\` to see what's there. If empty, kickstart with \`sudo launchctl kickstart -k system/systems.determinate.nix-daemon\` (or org.nixos.nix-daemon for upstream Nix)."
+        fail "mise activation missing from ~/.config/zsh/.zshrc — run: chezmoi apply"
+    fi
+    if [ -f "$HOME/.config/mise/config.toml" ]; then
+        pass "~/.config/mise/config.toml present"
+    else
+        warn "~/.config/mise/config.toml missing — no global java/node defaults; run: chezmoi apply"
+    fi
+    # Verify the global runtimes actually resolved to an installed path. A
+    # missing install means the eager `mise install` (run_onchange_after_02b)
+    # hasn't run yet — first shell would have no java/node.
+    if mise where java >/dev/null 2>&1; then
+        pass "java resolves: $(mise where java 2>/dev/null)"
+    else
+        warn "java not installed via mise — run: mise install"
+    fi
+    if mise where node >/dev/null 2>&1; then
+        pass "node resolves: $(mise where node 2>/dev/null)"
+    else
+        warn "node not installed via mise — run: mise install"
     fi
 else
-    fail "Nix store missing at /nix — devbox will prompt for install on first use. Re-run \`chez\` to bootstrap."
+    fail "mise missing — language runtimes (java, node, …) won't activate. Run: chez"
+fi
+# Legacy guards: catch leftovers from the old devbox + direnv + Nix stack.
+if command -v devbox >/dev/null 2>&1; then
+    warn "legacy \`devbox\` still on PATH — uninstall: rm -f /usr/local/bin/devbox (runtimes now come from mise)"
+fi
+if [ -d /nix ]; then
+    warn "legacy Nix store still at /nix — devbox is gone; uninstall with \`/nix/nix-installer uninstall\` if you want the space back"
 fi
 if command -v direnv >/dev/null 2>&1; then
-    pass "direnv installed: $(direnv version 2>/dev/null)"
-    # Confirm the hook is actually wired into the shell config — without it
-    # devbox activation via .envrc is a no-op.
-    if grep -q 'direnv hook zsh' "$HOME/.config/zsh/.zshrc" 2>/dev/null; then
-        pass "direnv hook present in ~/.config/zsh/.zshrc"
-    else
-        fail "direnv hook missing from ~/.config/zsh/.zshrc — run: chezmoi apply"
-    fi
-    if [ -f "$HOME/.config/direnv/direnv.toml" ]; then
-        pass "~/.config/direnv/direnv.toml present"
-    else
-        warn "~/.config/direnv/direnv.toml missing — projects under whitelisted dirs will need per-project \`direnv allow\`"
-    fi
-else
-    fail "direnv missing — .envrc activation won't fire on cd"
-fi
-# Legacy guard: catch a stale mise install that the user hasn't uninstalled yet.
-if command -v mise >/dev/null 2>&1; then
-    warn "legacy \`mise\` still on PATH — run: brew uninstall mise && rm -rf ~/.local/share/mise ~/.config/mise"
+    warn "legacy \`direnv\` still on PATH — no longer used; remove with: brew uninstall direnv && rm -rf ~/.config/direnv"
 fi
 
 # ─── 8. Auth state (FYI) ──────────────────────────────────────────────────────

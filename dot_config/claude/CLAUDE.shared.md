@@ -40,8 +40,10 @@ Kotlin with Spring Boot; Node/TypeScript when the situation calls for it.
 
 ## Environment
 
-- Per-project runtimes via **devbox + direnv**. Never suggest
-  mise/asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN or installing runtimes via brew.
+- Language runtimes via **mise** — global defaults (java, node) in
+  `~/.config/mise/config.toml`, per-project versions + env vars in each
+  project's own `mise.toml` (its `[env]` section, not direnv). Never suggest
+  asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN or installing runtimes via brew.
 - Terminal: Ghostty + Zellij (not tmux). Shell: plain zsh
   (no oh-my-zsh/prezto/zinit).
 

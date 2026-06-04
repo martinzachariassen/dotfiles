@@ -1,8 +1,8 @@
 # examples/
 
 Drop-in starter files you can copy into a project to make use of the global
-workstation tools (`devbox`, `direnv`, `pre-commit`). Not chezmoi-managed —
-these are references, not config that gets applied to `$HOME`.
+workstation tools (`mise`, `pre-commit`). Not chezmoi-managed — these are
+references, not config that gets applied to `$HOME`.
 
 ## How to use
 
@@ -10,20 +10,14 @@ Copy the file you want into a project root, rename it (drop the `.example`),
 and edit. The comments inside each file explain the choices.
 
 ```sh
-# devbox + direnv: per-project runtimes + env vars
+# mise: per-project runtimes + env vars
 cd /path/to/project
-devbox init                                       # creates devbox.json
-devbox add gradle postgresql_16                   # pin per-project tools (NOT the JDK — see below)
-devbox generate direnv                            # creates .envrc
-# direnv allow                                     # only if the dir isn't under ~/Developer (the whitelisted root)
+mise use java@temurin-21 gradle@latest node@lts   # creates/updates mise.toml
+mise install                                       # download the pinned versions
 
-# or start from one of the opinionated templates
-cp ~/Developer/personal/dotfiles/examples/devbox/backend-devbox.json /path/to/project/devbox.json
-cp ~/Developer/personal/dotfiles/examples/devbox/kubernetes-devbox.json /path/to/project/devbox.json
-cp ~/Developer/personal/dotfiles/examples/devbox/terraform-devbox.json /path/to/project/devbox.json
-cp ~/Developer/personal/dotfiles/examples/devbox/opentofu-devbox.json /path/to/project/devbox.json
-cd /path/to/project
-devbox generate direnv
+# or start from the opinionated template
+cp ~/Developer/personal/dotfiles/examples/mise/backend.mise.toml /path/to/project/mise.toml
+cd /path/to/project && mise install
 
 # pre-commit: git hooks for lint/format/sanity-checks
 cp ~/Developer/personal/dotfiles/examples/pre-commit-config.yaml.example /path/to/project/.pre-commit-config.yaml
@@ -55,45 +49,41 @@ editors, CI, teammates — commit these two files to the project root:
 
 ### Java / Kotlin JDKs
 
-JDKs are the one runtime that does **not** come from devbox here — they're
-installed globally via Homebrew Temurin (`Brewfile`: `temurin@21`, `temurin@25`).
-The reason is VS Code: the Java language server caches the JDK's absolute path,
-and devbox's content-hashed `/nix/store` paths move on every update/GC, which
-forces constant "reload Java projects". A stable Homebrew path fixes that.
+JDKs come from mise (`java = ["temurin-21", "temurin-25"]` in the global
+`~/.config/mise/config.toml`), and a project pins its own version in its
+`mise.toml`. mise installs to stable, version-named paths
+(`~/.local/share/mise/installs/java/temurin-21/Contents/Home`) that don't move
+on update, so VS Code's Java language server has a durable path to anchor to —
+that's exactly what the `java.configuration.runtimes` entries in the managed
+VS Code settings point at.
 
-You still pin the Java *version* per project — just in the build tool, which is
-where teammates and CI read it from anyway:
+You still pin the Java *version* per project in the build tool, which is where
+teammates and CI read it from anyway:
 
 - **Gradle** — `java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }`
-  (or `kotlin { jvmToolchain(21) }`). Gradle auto-discovers the Temurin JDKs; no
-  paths, no `JAVA_HOME`. VS Code follows automatically.
-- **Maven** — `<maven.compiler.release>21</maven.compiler.release>`. Maven compiles
-  on whatever JDK runs it, so also set `JAVA_HOME` (one line in `.envrc`, see
-  `envrc.example`) or use `examples/maven/toolchains.xml.example`.
+  (or `kotlin { jvmToolchain(21) }`). Gradle auto-discovers the mise JDKs; no
+  paths needed. VS Code follows automatically.
+- **Maven** — `<maven.compiler.release>21</maven.compiler.release>`. Maven
+  compiles on whatever JDK runs it; `mise activate` sets `JAVA_HOME` to the
+  project's pinned JDK, or use `examples/maven/toolchains.xml.example`.
 
-Add another major (e.g. 17) by adding `cask "temurin@17"` to the `Brewfile` and a
-matching entry to `java.configuration.runtimes` in the VS Code settings.
+Add another major (e.g. 17) by adding it to the `java = [...]` list in the
+global mise config and a matching entry to `java.configuration.runtimes` in the
+VS Code settings.
 
-All three tools are already wired into your shell — `direnv` and `pre-commit`
-land via the Brewfile (`direnv` also has its hook in `.zshrc` and the `~/Developer`
-whitelist in `~/.config/direnv/direnv.toml`), and `devbox` is installed via
-Jetify's official curl-installer by `.chezmoiscripts/run_onchange_before_01b-install-devbox.sh.tmpl`
-on first `chezmoi apply` (devbox isn't in homebrew). No further setup.
+Both tools are already wired into your shell — `pre-commit` lands via the
+Brewfile, and `mise` lands via the Brewfile with its activation hook in
+`.zshrc` and global defaults in `~/.config/mise/config.toml`. No further setup.
 
-`examples/envrc.example` is still useful when you want a documented `.envrc`
-with extra project environment variables, `PATH_add ./bin`, or `.envrc.local`
-support. For the common case, prefer `devbox generate direnv`.
+### Why per-project runtimes (mise) instead of just global versions?
 
-### Why per-project runtimes (devbox) instead of a global manager?
-
-`devbox.json` lives in the project's own repo, gets committed, and travels with
-the code. A teammate cloning the repo gets the exact same JDK/Postgres/Node,
-Terraform/OpenTofu, or Kubernetes tool versions on first `cd` in (after
-`devbox install` once). This dotfiles repo deliberately doesn't carry runtime
-or project CLI pins in Homebrew — those belong to each project, not to your
-personal machine config. The exceptions are deliberate: account-level CLIs such
-as `az` and `gcloud` stay global so authentication and project/subscription
-context are available before entering a project shell, and the **JDK** stays
-global (Homebrew Temurin) so VS Code's Java server has a stable path to anchor to
-(see "Java / Kotlin JDKs" above). The project's Java *version* is still pinned in
-its own repo — via the Gradle/Maven toolchain, not Homebrew.
+A project's `mise.toml` lives in its own repo, gets committed, and travels with
+the code. A teammate cloning the repo gets the exact same JDK/Node/Python
+versions on first `cd` in (after `mise install` once). This dotfiles repo
+deliberately doesn't carry project runtime pins — those belong to each project,
+not to your personal machine config; the global mise config only provides
+sensible *defaults* for a bare shell. The exceptions are deliberate:
+account-level CLIs such as `az` and `gcloud` stay global (Homebrew) so auth and
+project/subscription context are available before entering a project, and
+database servers + project CLIs (kubectl, terraform) stay in Homebrew or run via
+Docker — mise manages language runtimes, not everything.

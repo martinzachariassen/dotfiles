@@ -4,21 +4,21 @@ If `chezmoi apply` ever prompts you about a file in `$HOME` having changed, the 
 
 A few specific issues worth knowing about:
 
-**VS Code says `java.jdt.ls.java.home` points to a missing folder for a devbox Java project** — don't set `java.jdt.ls.java.home` globally to `${env:JAVA_HOME}` or `${workspaceFolder}/.devbox/...`. GUI-launched VS Code often does not inherit `JAVA_HOME`, and Red Hat's Java extension does not expand `${workspaceFolder}` for that setting. The global dotfiles intentionally leave it unset so the extension can use its bundled JRE to launch the language server.
+**VS Code says `java.jdt.ls.java.home` points to a missing folder for a mise Java project** — the managed VS Code settings point `java.jdt.ls.java.home` and the `java.configuration.runtimes` paths at mise's stable install locations (e.g. `~/.local/share/mise/installs/java/temurin-21/Contents/Home`), templated to your home directory. Because mise installs to version-named paths that don't churn on update, those paths stay valid — the old breakage came from Nix's content-hashed store paths changing under the language server.
 
-For devbox-backed Java projects, commit a `.envrc` next to `devbox.json`:
+If the language server still can't find the JDK, the global runtimes probably aren't installed yet. Install them:
 
 ```sh
-eval "$(devbox generate direnv --print-envrc)"
+mise install        # downloads the runtimes pinned in ~/.config/mise/config.toml
 ```
 
-The VS Code direnv extension then exports the project's JDK/Maven/Gradle environment for the workspace. The Jetify Devbox extension is also installed; for projects where an extension starts before direnv has updated the window environment, run `Devbox: Reopen in Devbox shell environment` from the command palette.
+The [mise VS Code extension](https://marketplace.visualstudio.com/items?itemName=hverlin.mise-vscode) (`hverlin.mise-vscode`) surfaces the active tools and picks up each project's `mise.toml`, so a workspace inherits its pinned JDK/Maven/Gradle when you open the folder.
 
-Only use a workspace-local `.vscode/settings.json` as a fallback when Red Hat Java still cannot find a JDK. That setting needs an **absolute** path to that project's devbox profile:
+Only use a workspace-local `.vscode/settings.json` as a fallback when Red Hat Java still cannot find a JDK. That setting needs an **absolute** path to a mise JDK install:
 
 ```json
 {
-  "java.jdt.ls.java.home": "/absolute/path/to/project/.devbox/nix/profile/default"
+  "java.jdt.ls.java.home": "/Users/you/.local/share/mise/installs/java/temurin-21/Contents/Home"
 }
 ```
 

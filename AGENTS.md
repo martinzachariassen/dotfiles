@@ -1,6 +1,6 @@
 # Dotfiles repo instructions
 
-chezmoi-managed macOS dotfiles. Stack: plain zsh, devbox + direnv, Brewfile,
+chezmoi-managed macOS dotfiles. Stack: plain zsh, mise, Brewfile,
 Ghostty + Zellij, Starship, Claude Code, Codex. Prefer small, reviewable
 edits that preserve existing patterns.
 
@@ -20,8 +20,10 @@ edits that preserve existing patterns.
   brew-bundle script based on `chezmoi.toml` `profile` and the `macApps`
   feature flag. `Brewfile.mac-apps` holds GUI apps + AI tooling (Ollama, the
   Claude/Codex/ChatGPT apps).
-- Per-project runtimes and CLIs live in that project's `devbox.json`.
-- No runtime managers (mise, asdf, nvm, jenv, pyenv, rbenv, Volta, SDKMAN).
+- Language runtimes (java, node, python) come from `mise` — global defaults in
+  `dot_config/mise/config.toml`, per-project versions + env in each project's
+  own `mise.toml`. Don't put runtimes in Homebrew.
+- No other runtime managers (asdf, nvm, jenv, pyenv, rbenv, Volta, SDKMAN).
 
 ## Shell and terminal
 
@@ -29,7 +31,7 @@ edits that preserve existing patterns.
 - Guard integrations with `command -v` / file checks so a fresh machine boots
   before every package is installed. Source `zsh-syntax-highlighting` last.
 - Preferred tools: Ghostty, Zellij, Starship, fzf, zoxide, Carapace, eza, bat,
-  fd, ripgrep, direnv, devbox.
+  fd, ripgrep, mise.
 
 ## Secrets
 

@@ -65,7 +65,7 @@
 
       <rect x="92" y="246" width="776" height="154" rx="8" fill="url(#stage)" stroke="#626880"/>
       <text x="126" y="286" class="green">✓</text>
-      <text x="162" y="286" class="text">Xcode CLT, Homebrew, chezmoi, Devbox</text>
+      <text x="162" y="286" class="text">Xcode CLT, Homebrew, chezmoi, mise</text>
       <text x="126" y="326" class="green">✓</text>
       <text x="162" y="326" class="text">Brewfiles install packages with per-item progress</text>
       <text x="126" y="362" class="green">✓</text>
@@ -96,7 +96,7 @@
       <text x="126" y="286" class="green">✓</text>
       <text x="162" y="286" class="text">Ghostty, Zellij, Starship, zsh, modern CLI tools</text>
       <text x="126" y="326" class="green">✓</text>
-      <text x="162" y="326" class="text">Devbox + direnv keep project toolchains pinned</text>
+      <text x="162" y="326" class="text">mise keeps project language runtimes pinned</text>
       <text x="126" y="362" class="green">✓</text>
       <text x="162" y="362" class="text">Personal stays lean; work profile adds cloud tooling</text>
     </g>

@@ -1274,13 +1274,10 @@ self_test() {
     say "${DIM}core${RESET}"
     _v "git" git --version
     _v "chezmoi" chezmoi --version
-    _v "devbox" devbox version
-    _vf "Nix store /nix" "[ -d /nix ]"
-    _vf "nix-daemon running" "launchctl list 2>/dev/null | grep -Eq '(org\\.nixos|systems\\.determinate)\\.nix-daemon'"
+    _v "mise" mise --version
     _v "starship" starship --version
     _v "zellij" zellij --version
     _v "lazygit" lazygit --version
-    _v "direnv" direnv version
     _v "delta" delta --version
     _v "fzf" fzf --version
     if [ "${CHOICE_FEAT_macApps:-true}" = "true" ]; then

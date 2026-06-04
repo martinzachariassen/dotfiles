@@ -135,7 +135,12 @@
     // PROJECT ENVIRONMENT
     // =========================================================
 
-    "direnv.restart.automatic": true,
+    // mise provides per-project runtimes + env. The extension reflects the
+    // active mise tools into the integrated terminal and is mise-toml aware.
+    // Auto-configuration of OTHER extensions is left OFF: this settings file is
+    // chezmoi-managed, so the Java SDK paths below are the single source of
+    // truth — we don't want the extension writing into it and causing drift.
+    "mise.configureExtensionsAutomatically": false,
 
     // =========================================================
     // VIM
@@ -227,23 +232,25 @@
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
-    // Pin the editor's JDKs to stable Homebrew Temurin paths instead of devbox's
-    // volatile /nix/store paths. The Nix paths are content-hashed and move on
-    // every devbox update / GC, which made JDT.LS lose its classpath and force
-    // constant "reload Java projects". Project build versions are still pinned
-    // per project via Gradle toolchains; devbox keeps managing the rest of each
-    // project's env (DB, gradle, node, …). Installed via Brewfile temurin@{21,25}.
-    "java.jdt.ls.java.home": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
-    "java.import.gradle.java.home": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+    // Pin the editor's JDKs to mise's stable install paths. Unlike devbox/Nix
+    // (content-hashed paths that churned on every update/GC and made JDT.LS
+    // lose its classpath), mise installs to a fixed, version-named directory
+    // that doesn't move — so these paths are durable anchors. The JDKs come
+    // from the global mise config (java = ["temurin-21", "temurin-25"] in
+    // dot_config/mise/config.toml); project build versions are still pinned per
+    // project via Gradle toolchains. This file is a chezmoi template so the
+    // home dir resolves per machine.
+    "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
+    "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
     "java.configuration.runtimes": [
         {
             "name": "JavaSE-21",
-            "path": "/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home",
+            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
             "default": true
         },
         {
             "name": "JavaSE-25",
-            "path": "/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home"
+            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home"
         }
     ],
 

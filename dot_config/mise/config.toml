@@ -1,0 +1,17 @@
+# mise — global config
+# Loaded by mise on every shell that runs `mise activate zsh` (wired in
+# ~/.config/zsh/.zshrc). Source: ~/Developer/personal/dotfiles/dot_config/mise/config.toml
+# (managed via chezmoi). Edit via `chezmoi edit ~/.config/mise/config.toml`.
+#
+# These are the GLOBAL default runtimes — the versions you get in any directory
+# that doesn't pin its own. Per-project versions + env vars go in that project's
+# own mise.toml and override these on `cd`. See examples/mise/backend.mise.toml.
+
+[tools]
+# Two JDKs installed; the first is the active/default one. Listing both means
+# both stable install paths exist for VS Code's java.configuration.runtimes
+# (settings.json.tmpl), mirroring the old temurin@21 + temurin@25 casks.
+#   ~/.local/share/mise/installs/java/temurin-21/Contents/Home
+#   ~/.local/share/mise/installs/java/temurin-25/Contents/Home
+java = ["temurin-21", "temurin-25"]
+node = "lts"

@@ -13,14 +13,13 @@ setopt PUSHD_IGNORE_DUPS        # no duplicates in dir stack
 setopt CORRECT                  # offer command corrections on typos
 
 # ─── Tooling ──────────────────────────────────────────────────────────────────
-# direnv: per-directory env vars + the activation hook for devbox. Drop a
-# `.envrc` into any project (typically `eval "$(devbox generate direnv --print-envrc)"`)
-# and it loads automatically when you `cd` in. Per-project runtimes (JDK,
-# Kotlin, Postgres, Node, …) come from each project's own `devbox.json`, not
-# from this repo.
-# Whitelist of trusted dirs lives in ~/.config/direnv/direnv.toml so projects
-# under those roots don't need a per-project `direnv allow`.
-command -v direnv >/dev/null && eval "$(direnv hook zsh)"
+# mise: language runtime manager + per-project env. `mise activate` puts the
+# active tools on PATH, sets JAVA_HOME, and auto-switches when you `cd` into a
+# project that pins its own versions. Global defaults (java, node) live in
+# ~/.config/mise/config.toml; per-project runtimes + env vars come from each
+# project's own `mise.toml` (its `[env]` section replaces what direnv used to
+# do). No `.envrc`, no per-project `allow` step.
+command -v mise >/dev/null && eval "$(mise activate zsh)"
 
 # ─── History ──────────────────────────────────────────────────────────────────
 # IMPORTANT: macOS's /etc/zshrc runs AFTER ~/.zshenv but BEFORE this file and
@@ -107,7 +106,7 @@ command -v fd  >/dev/null && alias find='fd'
 
 # ─── Tool shortcuts ───────────────────────────────────────────────────────────
 # Single/double-letter aliases for tools I run constantly. Some commands are
-# expected to come from a project's devbox environment rather than global brew.
+# expected to come from a project's mise environment rather than global brew.
 alias n='nvim'                  # editor
 alias lg='lazygit'              # git TUI — the daily-driver for staging/blame/branch ops
 alias d='docker'
@@ -273,8 +272,8 @@ chezreinit() {
     chezmoi init && chez "$@"
 }
 
-# Routine dependency bump: update brew + devbox globals.
-# Per-project runtimes live in each project's own devbox.json and travel with
+# Routine dependency bump: update brew + mise global runtimes.
+# Per-project runtimes live in each project's own mise.toml and travel with
 # the project's repo — not bumped here.
 # Doesn't auto-commit — you review the diff and commit yourself.
 chezbump() {
@@ -291,10 +290,10 @@ chezbump() {
                         --file="$src/brewfiles/Brewfile.work" 2>/dev/null \
         || brew bundle cleanup --file="$src/Brewfile"
     echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
-    if command -v devbox >/dev/null 2>&1; then
+    if command -v mise >/dev/null 2>&1; then
         echo
-        echo "── devbox global update ──────────────────────────────────────"
-        devbox global update || true
+        echo "── mise upgrade (global runtimes) ─────────────────────────────"
+        mise upgrade || true
     fi
     echo
     echo "Now: cd $src && git diff   to review, then commit."

@@ -82,22 +82,24 @@ alternatives, default to these unless a specific project uses something else.
 
 **Runtimes & version management**
 
-- **`devbox`** (Jetify, Nix-backed) for per-project runtimes:
-  Java/Kotlin/Postgres/Node/etc. Each project carries its own `devbox.json`
-  (committed) and `.envrc` with `eval "$(devbox generate direnv --print-envrc)"`;
-  on `cd`, direnv activates the pinned toolchain for that project only.
+- **`mise`** for language runtimes: java, node, python, etc. Global defaults
+  (java, node) live in `~/.config/mise/config.toml`; each project pins its own
+  versions + env vars in a committed `mise.toml`. On `cd`, `mise activate`
+  switches to that project's toolchain and sets `JAVA_HOME` automatically — its
+  `[env]` block carries project env vars, so no separate per-project env tool is
+  needed.
 - For a new Spring Boot service the scaffold is:
   ```sh
-  devbox init
-  devbox add jdk21 kotlin gradle postgresql_16 flyway
+  mise use java@temurin-21 gradle@latest node@lts
   ```
-  Commit both `devbox.json` and `devbox.lock`.
-- Common nixpkgs for my stack: `jdk21` / `temurin-bin-21`, `kotlin`, `gradle`,
-  `maven`, `postgresql_16`, `redis`, `flyway`.
-- **`direnv`** for project env vars + auto-activating devbox.
-- **No global runtime manager** (no mise, asdf, nvm, jenv, pyenv, sdkman, ...).
-  If I genuinely need a fallback JDK or Node outside any project, use
-  `devbox global add jdk21 kotlin nodejs@lts`, but default to per-project.
+  Commit the resulting `mise.toml`. Project env vars go in its `[env]` section.
+- Common mise tools for my stack: `java@temurin-21` / `java@temurin-25`,
+  `gradle`, `maven`, `node`, `python`. Database servers (Postgres, Redis) and
+  CLIs (kubectl, terraform) stay in Homebrew or run via Docker — mise manages
+  language runtimes, not everything.
+- **No other runtime manager** (no asdf, nvm, jenv, pyenv, sdkman, ...) and
+  never install runtimes via brew. Need a one-off version? `mise use -g
+  java@temurin-21`, but default to per-project pins.
 
 **Shell & terminal**
 
@@ -121,8 +123,8 @@ alternatives, default to these unless a specific project uses something else.
 **Databases**
 
 - `pgcli` (Postgres) and `redis-cli` available globally via Brewfile.
-- Prefer per-project pinned servers via `devbox add postgresql_16 redis`
-  instead of global brew services.
+- Prefer per-project datastores via Docker / Testcontainers instead of global
+  brew services.
 
 **HTTP / RPC**
 
@@ -130,7 +132,7 @@ alternatives, default to these unless a specific project uses something else.
 
 **Kubernetes**
 
-- Project tools: `kubectl`, `k9s`, `stern`, `helm` via per-project Devbox.
+- Project tools: `kubectl`, `k9s`, `stern`, `helm` via Homebrew.
 - Work-profile helpers: `kubectx`/`kubens`, AKS `kubelogin`, and GCP `gcloud`.
 - GKE auth: `gke-gcloud-auth-plugin`.
 
@@ -264,18 +266,18 @@ chore(deps): bump spring-boot to 3.4
 
 ## Tooling conventions (positive defaults)
 
-- **Always assume `devbox` + `direnv`** for per-project runtimes (JDK, Kotlin,
-  Node, Postgres, Redis, etc.). Do not suggest `mise`, `nvm`, `jenv`, `pyenv`,
-  `rbenv`, `asdf`, `volta`, `sdkman`, or installing language runtimes via
-  `brew` directly.
-- **For new projects, propose a committed `devbox.json` + `.envrc`** with
-  `eval "$(devbox generate direnv --print-envrc)"`. The toolchain travels with
-  the project repo, so onboarding is `git clone && cd` and direnv handles the
-  rest.
-- **For Node, prefer `pnpm`** (add it via `devbox add nodejs pnpm` per project).
+- **Always assume `mise`** for per-project language runtimes (JDK, Kotlin,
+  Node, Python, etc.). Do not suggest `nvm`, `jenv`, `pyenv`, `rbenv`, `asdf`,
+  `volta`, `sdkman`, or installing language runtimes via `brew` directly.
+- **For new projects, propose a committed `mise.toml`** that pins the runtime
+  versions and carries project env vars in its `[env]` section. The toolchain
+  travels with the project repo, so onboarding is `git clone && cd` and `mise
+  activate` switches to it automatically.
+- **For Node, prefer `pnpm`** (pin it per project with `mise use node@lts pnpm@latest`).
 - **For installing dev CLIs globally** (things I want available outside any
   project, such as `kubectl` or `terraform`), add them to my Brewfile rather
   than language-specific installers (`npm install -g`, `pip install --user`).
+  Database servers and project CLIs stay in Homebrew or run via Docker, not mise.
 - **For zsh customization**, add things to my managed `.zshrc` rather than
   introducing a framework (oh-my-zsh, prezto, zinit). My setup is plain zsh +
   brew `zsh-completions` + `zsh-syntax-highlighting`.
@@ -286,7 +288,7 @@ chore(deps): bump spring-boot to 3.4
 
 - **Do not apologize** when correcting yourself. Just state the correction.
 - **Do not surface "this might not work in older versions" caveats** for tools I
-  have installed. Trust my devbox/Brewfile versions; if compatibility genuinely
+  have installed. Trust my mise/Brewfile versions; if compatibility genuinely
   matters for a snippet, say so once and move on.
 - **Default cloud examples to Azure or GCP.** AWS is fine when I explicitly ask
   or when the topic is cloud-agnostic and AWS is the most-recognizable baseline;
