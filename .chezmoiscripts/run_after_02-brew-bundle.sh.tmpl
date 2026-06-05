@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# run_after_02-brew-bundle — converge Homebrew to the active Brewfile modules.
+#
+# Runs on EVERY apply (run_after, not run_onchange) so the machine's real
+# installed state is reconciled with what the Brewfile declares — not just when
+# the Brewfile text changes. A fast presence short-circuit keeps a clean machine
+# quick; only genuinely-missing items trigger the per-item install. This is
+# the convergence guarantee described in docs/lifecycle.md, and it's why there's
+# no longer a separate `chezfix`.
+#
+# The actual install engine lives in scripts/lib/brew-bundle.sh (sourced below)
+# so it's shellcheck-able and unit-tested. This script only selects the modules
+# for the active profile/features, prints the plan, and drives the engine. Per-
+# project language runtimes belong in each project's mise.toml, not here.
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ Homebrew packages: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+# Re-attach stdin to the controlling terminal so casks that invoke sudo
+# (docker-desktop, 1password) can read the password. See run_before_00-sudo-cache
+# for the upfront pre-auth; this is the belt-and-braces complement.
+if [ -e /dev/tty ] && [ -r /dev/tty ]; then
+    exec </dev/tty
+else
+    echo "! no terminal available; casks needing sudo may skip or ask later"
+fi
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+SOURCE="{{ .chezmoi.sourceDir }}"
+
+# shellcheck source=../scripts/lib/brew-bundle.sh
+. "$SOURCE/scripts/lib/brew-bundle.sh"
+
+bb_init
+
+# ─── Build the run plan from the active profile + feature toggles ─────────────
+PLAN_LABELS=()
+PLAN_FILES=()
+add_step() { PLAN_LABELS+=("$1"); PLAN_FILES+=("$SOURCE/$2"); }
+
+add_step "core (always)"                  "Brewfile"
+{{ if dig "features" "macApps" true . -}}
+add_step "mac apps (Raycast/Stats/Chrome/AI apps)"  "brewfiles/Brewfile.mac-apps"
+{{ end -}}
+case "{{ .profile }}" in
+    personal) add_step "personal profile extras"  "brewfiles/Brewfile.personal" ;;
+esac
+case "{{ .profile }}" in
+    work)     add_step "work profile extras"      "brewfiles/Brewfile.work" ;;
+esac
+
+TOTAL=${#PLAN_LABELS[@]}
+TOTAL_ITEMS=0
+for i in $(seq 0 $((TOTAL - 1))); do
+    TOTAL_ITEMS=$((TOTAL_ITEMS + $(count_bundle_lines "${PLAN_FILES[$i]}")))
+done
+
+echo "◆ Apply 3/5: Homebrew packages"
+echo "  Profile: {{ .profile }}"
+
+# ─── Fast path: skip the whole install when nothing is missing ────────────────
+if bb_modules_satisfied "${PLAN_FILES[@]}"; then
+    echo "  ✓ packages already match the Brewfile ($TOTAL_ITEMS item(s)) — nothing to install."
+    chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
+    exit 0
+fi
+
+echo "  Modules: $TOTAL"
+for i in $(seq 0 $((TOTAL - 1))); do
+    printf "    %d. %s\n" $((i + 1)) "${PLAN_LABELS[$i]}"
+done
+echo "  Items: $TOTAL_ITEMS taps/formulae/casks split into individual installs."
+echo "  First install usually takes 5-15 minutes. Downloads dominate."
+echo "  Quiet stretches print a heartbeat every 30 seconds."
+
+# Print disabled modules so users know nothing's being silently dropped.
+{{ if not (dig "features" "macApps" true .) -}}
+echo "  mac-apps module disabled"
+{{ end -}}
+
+# ─── Execute the plan (continue-on-error; failures summarised at the end) ─────
+OVERALL_START="$(date +%s)"
+CURRENT_ITEM=1
+for i in $(seq 0 $((TOTAL - 1))); do
+    bundle_one "${PLAN_LABELS[$i]}" "${PLAN_FILES[$i]}" $((i + 1)) "$TOTAL" "$CURRENT_ITEM" "$TOTAL_ITEMS"
+    CURRENT_ITEM=$((CURRENT_ITEM + $(count_bundle_lines "${PLAN_FILES[$i]}")))
+done
+OVERALL_END="$(date +%s)"
+OVERALL_ELAPSED=$((OVERALL_END - OVERALL_START))
+OVERALL_MIN=$((OVERALL_ELAPSED / 60))
+OVERALL_SEC=$((OVERALL_ELAPSED % 60))
+
+# brew installs sometimes leave group/other-write bits on share dirs that end
+# up on zsh's $fpath, which makes `compinit` prompt at every shell startup:
+#   "zsh compinit: insecure directories, run compaudit for list."
+# Strip those bits proactively.
+chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
+
+# ─── Summary ──────────────────────────────────────────────────────────────────
+# Continue-on-error means a single bad cask never aborts the apply. We surface
+# the failures loudly and exit 0 so the rest of the apply (vscode, macOS
+# defaults) still runs; the next `chezup` retries the failed items (they're
+# idempotent) and `chezdoctor` flags any residual brew drift.
+if [ ${#BB_FAILURES[@]} -gt 0 ]; then
+    printf "! Homebrew: %d item(s) failed after %dm%02ds — the rest installed:\n" "${#BB_FAILURES[@]}" "$OVERALL_MIN" "$OVERALL_SEC"
+    for fail in "${BB_FAILURES[@]}"; do
+        printf "    ✗ %s\n" "$fail"
+    done
+    echo "  Re-run \`chezup\` to retry them (already-installed items are skipped)."
+    exit 0
+fi
+
+printf "✓ Homebrew packages up to date — %d module(s), total %dm%02ds\n" "$TOTAL" "$OVERALL_MIN" "$OVERALL_SEC"

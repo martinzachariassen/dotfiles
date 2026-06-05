@@ -97,15 +97,29 @@ bash install.sh --reset-brew   # uninstall everything first, then reinstall
 
 ## Daily commands
 
+The whole everyday surface is **two verbs plus a health check**. Both verbs end
+in the same `chezmoi apply`, which now reconciles *real installed state* on every
+run — so "make this Mac match the repo" always installs what the Brewfile
+declares (no separate fix step). See [Lifecycle](docs/lifecycle.md).
+
+| Command | Use |
+|---|---|
+| `chezup` | **Converge this Mac to the repo:** pull the latest changes, apply, and install any missing packages. The everyday command. |
+| `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood). |
+| `chezdoctor` | Read-only health check for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
+
+<details>
+<summary>Advanced / occasional commands</summary>
+
 | Command | Use |
 |---|---|
 | `dotfiles` | Jump to the source repo. With arguments, manage profile/features. |
-| `chez` | Preview and apply dotfile changes with one confirmation. |
-| `chezup` | Pull latest repo changes, then run `chez`. |
-| `chezreinit` | Pull, re-render chezmoi config, then apply. Use after wizard/data-model changes. |
-| `chezdiff` | Preview dotfile drift, brew drift, and actionable script re-runs. |
-| `chezfix` | Install packages that `chezdiff` reports as missing when `chezup` can't see the drift. |
-| `chezdoctor` | Read-only health check for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
+| `chez` | Apply without pulling — the building block `chezup` calls. |
+| `chezreinit` | Pull, re-run `chezmoi init` to pick up new data-model keys, then apply. Use after wizard/data-model changes. |
+| `chezbump` | Routine dependency upgrade (`brew upgrade` + `mise upgrade`). |
+| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile. |
+
+</details>
 
 Common profile and feature changes:
 
@@ -136,6 +150,7 @@ See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 
 | Page | Use it for |
 |---|---|
+| [Lifecycle](docs/lifecycle.md) | The two-verb model (bootstrap vs converge), the convergence guarantee, and the command map. Start here. |
 | [Bootstrap](docs/bootstrap.md) | Wizard flow, profiles, features, secrets, signing, and macOS privacy permissions. |
 | [Day-to-day](docs/day-to-day.md) | Chezmoi mental model, adding tools, previewing changes, aliases, and `doctor.sh`. |
 | [Upgrading](docs/upgrading.md) | `chezup`, `chezreinit`, invalidation rules, and long-absence maintenance. |

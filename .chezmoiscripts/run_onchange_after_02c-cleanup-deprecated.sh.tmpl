@@ -41,8 +41,11 @@ DEPRECATED_FORMULAE=(
     "node"          # runtimes now come from mise
 )
 DEPRECATED_CASKS=(
-    "temurin@21"    # JDKs now come from mise (java = [...])
+    "temurin@21"        # JDKs now come from mise (java = [...])
     "temurin@25"
+    "microsoft-outlook" # superseded by the microsoft-office (M365) suite, which
+                        # bundles Outlook and conflicts_with the standalone cask.
+                        # Removing it here lets `brew bundle` install the suite.
 )
 # Out-of-band paths (binaries / config dirs) left by the old devbox + direnv
 # stack. Removed without prompting — all cheap and reversible.

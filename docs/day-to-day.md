@@ -152,15 +152,15 @@ g, gs, gd, gl                # git, status -sb, diff, log --graph
 ..,  ...                     # cd .. / cd ../..
 dotfiles                     # cd ~/Developer/personal/dotfiles
 
-# chezmoi
-chez                         # smart `chezmoi apply` — diff preview + auto-force, no mid-apply prompt collisions
-chezup                       # `git pull --ff-only` in the source repo, then chez — most common upgrade workflow
-chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + chez. Use after a data-model change upstream
-chezdiff                     # chezmoi diff + brew bundle drift + actionable script re-runs
-chezfix                      # install missing brew/mise packages directly — repairs drift chezup can't see (hash-tracked run_onchange scripts don't re-fire when a package vanishes but its Brewfile is unchanged)
+# chezmoi — everyday
+chezup                       # converge this Mac to the repo: `git pull --ff-only` then apply. Every apply now reconciles real installed state, so this also installs any missing brew/mise packages (no separate fix step). The most common command.
+chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)
+
+# chezmoi — advanced / occasional
+chez                         # smart `chezmoi apply` without pulling — diff preview + auto-force, no mid-apply prompt collisions. The building block chezup calls
+chezreinit                   # pull + `chezmoi init` (re-renders chezmoi.toml from the latest template, prompting only for new keys) + apply. Use after a data-model change upstream
 chezbump                     # routine bump: brew update/upgrade + brew bundle cleanup --dry-run + mise upgrade
 chezaudit                    # report brew packages installed locally but not tracked in any Brewfile
-chezdoctor                   # full health check (XDG layout, Claude personal config, op signing, brew sync, auth state)
 
 # Modern CLI replacements (only activate if the tool is installed)
 ls, ll, tree                 # eza variants

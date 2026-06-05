@@ -25,6 +25,30 @@ edits that preserve existing patterns.
   own `mise.toml`. Don't put runtimes in Homebrew.
 - No other runtime managers (asdf, nvm, jenv, pyenv, rbenv, Volta, SDKMAN).
 
+## Bootstrap & convergence model
+
+The setup experience is **two verbs sharing one engine** — see `docs/lifecycle.md`
+for the full contract. Preserve these invariants when touching `install.sh`, the
+`.chezmoiscripts/run_after_*` scripts, `scripts/lib/brew-bundle.sh`, or the
+`chez*` functions:
+
+- **Apply always converges real state, never input hashes.** The package scripts
+  (`run_after_02-brew-bundle`, `run_after_02b-mise-install`) run on *every* apply
+  and install based on what's actually present vs. what the Brewfile declares,
+  with a fast presence / `mise ls --missing` short-circuit (presence, not
+  freshness — upgrades stay `chezbump`'s job). Never turn these back into
+  `run_onchange_*` — that reintroduces the drift gap that `chezfix` used to paper
+  over.
+- **Two everyday verbs only:** `chezup` (converge existing) and `install.sh`
+  (bootstrap new), plus `chezdoctor` for health. New capability folds into those
+  or an advanced helper (`chez`, `chezreinit`, `chezbump`, `chezaudit`) — don't add
+  a fourth daily command.
+- **One engine, one look.** Package installs go through `scripts/lib/brew-bundle.sh`;
+  terminal color/glyphs through `scripts/lib/ui.sh`. Don't fork a second install
+  loop or color scheme.
+- **Continue-on-error + idempotent.** A single failing cask must not abort the
+  apply; re-running heals.
+
 ## Shell and terminal
 
 - Plain zsh — no oh-my-zsh, prezto, zinit, or other framework.
@@ -54,6 +78,10 @@ Use placeholders, `.env.example`, or secret-manager refs.
 - zsh changes: render the template, run `zsh -n` on the result.
 - Brewfile changes: `brew bundle check --file=<path>` when practical (newly
   added formulae reporting as missing pre-install is expected).
+- Convergence/engine changes (`scripts/lib/brew-bundle.sh`, `run_after_02*`):
+  `shellcheck` the lib, render the templates with `chezmoi execute-template` and
+  `shellcheck` the output, and run `bats tests/` (covers the extracted helpers).
+  See `docs/lifecycle.md`.
 - `install.sh` / prompt changes: `bash -n install.sh` + `shellcheck`, then
   `python3 tests/drive-wizard.py clean` and `… stray`. See `docs/wizard.md`.
 - Docs-only: skip.

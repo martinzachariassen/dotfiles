@@ -18,7 +18,12 @@ brew "kubernetes-cli"           # kubectl
 cask "gcloud-cli"               # global Google Cloud account/project CLI
 
 # ─── Work apps ────────────────────────────────────────────────────────────────
+# microsoft-office is the full Microsoft 365 suite for Mac (Word, Excel,
+# PowerPoint, Outlook, OneNote, OneDrive) — one installer pkg. Do NOT also list
+# the standalone microsoft-outlook / -word / -excel / -powerpoint / -onenote /
+# onedrive casks: the suite `conflicts_with` every one of them, so `brew bundle`
+# fails outright. Teams ships separately (it's not in the M365 suite installer),
+# so it correctly stays its own cask.
 cask "microsoft-office"
-cask "microsoft-outlook"
 cask "microsoft-teams"
 cask "slack"
