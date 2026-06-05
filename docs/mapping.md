@@ -30,6 +30,7 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/nvim/init.lua` | `~/.config/nvim/init.lua` | Neovim entrypoint. One-liner: `require("config.lazy")`. |
 | `dot_config/nvim/lua/config/lazy.lua` | `~/.config/nvim/lua/config/lazy.lua` | LazyVim bootstrap. Auto-clones lazy.nvim on first launch. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/etc.) ship commented-out for opt-in. |
 | `dot_config/nvim/lua/plugins/colorscheme.lua` | `~/.config/nvim/lua/plugins/colorscheme.lua` | Catppuccin Frappé colorscheme override for LazyVim. |
+| `dot_config/nvim/lazy-lock.json` | `~/.config/nvim/lazy-lock.json` | lazy.nvim lockfile — pins exact plugin commits so installs are reproducible. Bump with `:Lazy update` then `chezmoi add`. See [day-to-day](day-to-day.md) → "Pinning Neovim plugins". |
 | `private_dot_ssh/config` | `~/.ssh/config` | Mode 0600 enforced via `private_` prefix. SSH hardcodes `~/.ssh/`. |
 
 ## Files chezmoi REMOVES from `$HOME` (the `remove_` markers)

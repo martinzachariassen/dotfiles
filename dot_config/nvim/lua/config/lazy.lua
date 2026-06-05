@@ -1,18 +1,22 @@
 -- LazyVim bootstrap — pinned to stable, auto-clones lazy.nvim on first run.
 -- Edit via: chezmoi edit ~/.config/nvim/lua/config/lazy.lua
 --
--- Plugin version pinning: `defaults.version = false` below means each plugin
--- tracks its latest commit, so a fresh machine gets "whatever is current today"
--- — not a reproducible set. To pin exact plugin revisions across machines,
--- commit lazy.nvim's lockfile into chezmoi (it is NOT tracked by default):
+-- Plugin version pinning: `defaults.version = false` below means plugins track
+-- their latest commit, BUT the resolved set is pinned via lazy.nvim's lockfile,
+-- which IS tracked in chezmoi (dot_config/nvim/lazy-lock.json → ~/.config/nvim/
+-- lazy-lock.json). So a fresh machine gets the exact same commits, not "whatever
+-- is current today".
 --
---     nvim                         # let plugins install on first launch
---     :Lazy sync                   # resolve + write ~/.config/nvim/lazy-lock.json
---     chezmoi add ~/.config/nvim/lazy-lock.json
---     chezmoi cd && git add . && git commit -m "chore(nvim): pin plugin lockfile"
+-- Reproduce on a new machine:   after first launch installs plugins, run
+--     :Lazy restore             # check out the commits recorded in lazy-lock.json
 --
--- After that, `:Lazy restore` (or a fresh install) reproduces the pinned set,
--- and you bump versions deliberately with `:Lazy update` + re-`chezmoi add`.
+-- Bump versions deliberately:
+--     :Lazy update              # update + rewrite ~/.config/nvim/lazy-lock.json
+--     # test, then capture the new lock back into the repo:
+--     chezmoi add ~/.config/nvim/lazy-lock.json && chezmoi cd && git commit -am …
+--
+-- Tradeoff: `:Lazy update`/`:Lazy sync` rewrite the live lockfile, so it shows
+-- as chezmoi drift until you re-add (intended — you bump on purpose).
 -- See docs/day-to-day.md → "Pinning Neovim plugins".
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
