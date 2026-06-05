@@ -72,6 +72,7 @@ Not synced to `$HOME` — these are tools you run from the repo itself.
 | `scripts/macos-defaults.sh` | Idempotent system defaults. | On first apply and again whenever this script changes (chezmoi `run_onchange_after_*` keyed on its sha256); re-run by hand via the `macos-defaults` alias after macOS updates reset things. |
 | `scripts/lib/semver.sh` | Sourced helper: `semver_extract` / `semver_lt`. Used by `doctor.sh` for the chezmoi version-minimum check. Unit-tested by `tests/semver.bats`. | Never run directly. |
 | `tests/*.bats` | bats-core unit tests for shared shell helpers and zsh functions. Run in CI; run locally with `bats tests/`. | When changing shell helpers. |
+| `tests/drive-wizard.py` | pty smoke test that drives `install.sh` end-to-end under `DRY_RUN` (always answers "No", so nothing is applied), guarding the wizard's TTY handling against hangs and regressions. See [wizard](wizard.md). | When changing `install.sh` or the `prompt_*` / TTY code. |
 
 ## chezmoi infrastructure (not files in `$HOME`, but used by chezmoi itself)
 

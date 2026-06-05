@@ -141,6 +141,7 @@ See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 | [Upgrading](docs/upgrading.md) | `chezup`, `chezreinit`, invalidation rules, and long-absence maintenance. |
 | [Troubleshooting](docs/troubleshooting.md) | Known failure modes and recovery commands. |
 | [Architecture](docs/architecture.md) | Chezmoi file classes, remove markers, ignored files, and apply scripts. |
+| [Wizard internals](docs/wizard.md) | How `install.sh`'s prompts and TTY handling work, the invariants, and how to validate changes without breaking it. |
 | [AI tools](docs/ai-tools.md) | How Claude Code, Codex, and Copilot read this repo — user-level config, the `AGENTS.md` bridge, and local LLM setup. |
 | [Forking](docs/forking.md) | What to change when basing your own setup on this repo. |
 | [Uninstall / reset](docs/uninstall-reset.md) | Homebrew mirror/reset and manual rollback notes. |

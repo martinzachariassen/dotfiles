@@ -33,6 +33,16 @@ edits that preserve existing patterns.
 - Preferred tools: Ghostty, Zellij, Starship, fzf, zoxide, Carapace, eza, bat,
   fd, ripgrep, mise.
 
+## install.sh wizard
+
+- `install.sh` is the fragile pre-bootstrap script (runs before chezmoi/brew/mise
+  exist). Before changing it or any `prompt_*` / TTY code, read `docs/wizard.md`.
+- Reuse the `prompt_*` helpers; never hand-roll TTY input handling around bash
+  `read -n` (it ignores your `stty` and hangs). Empty input must re-ask, never
+  hard-abort. Every prompt needs a non-tty / `YES=1` default.
+- Validate before committing: `bash -n install.sh`, `shellcheck`, then the pty
+  drive `python3 tests/drive-wizard.py clean` and `… stray` (must not hang).
+
 ## Secrets
 
 Never print, move, transform, commit, or document real tokens, keys, cloud
@@ -44,4 +54,6 @@ Use placeholders, `.env.example`, or secret-manager refs.
 - zsh changes: render the template, run `zsh -n` on the result.
 - Brewfile changes: `brew bundle check --file=<path>` when practical (newly
   added formulae reporting as missing pre-install is expected).
+- `install.sh` / prompt changes: `bash -n install.sh` + `shellcheck`, then
+  `python3 tests/drive-wizard.py clean` and `… stray`. See `docs/wizard.md`.
 - Docs-only: skip.
