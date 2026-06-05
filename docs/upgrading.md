@@ -47,17 +47,26 @@ Knowing what triggers what makes the upgrade story less mysterious:
 |---|---|
 | Any file under `dot_*` or `private_dot_*` | chezmoi writes it to `$HOME` |
 | A `.tmpl` template | chezmoi re-renders it against your current `[data]` block |
-| `Brewfile` or `brewfiles/Brewfile.*` | `run_onchange_after_02-brew-bundle.sh` re-fires (hash comment caught it) |
+| `Brewfile` or `brewfiles/Brewfile.*` (or a package that went missing) | `run_after_02-brew-bundle.sh` runs **every apply** and reconciles real installed state, so missing packages are (re)installed regardless of whether the Brewfile text changed |
 | `.chezmoi.toml.tmpl` itself | **nothing automatic** — you must run `chezmoi init` (or `chezreinit`) to re-render `~/.config/chezmoi/chezmoi.toml`. This is the only common case where `chezup` alone is insufficient |
 | `scripts/macos-defaults.sh` | `run_onchange_after_04-macos-defaults.sh` re-fires (it embeds a sha256 `include` of this script), re-applying your defaults. A routine apply that *doesn't* touch this script is a no-op, so you don't get a sudo prompt every time. To re-apply without editing the script, run the `macos-defaults` alias |
 
-If you forget which path you're on, `chezdiff` shows you everything actionable at once: chezmoi's dotfile diff, brew-bundle drift across every tracked Brewfile, and `run_*` scripts that would re-fire for reasons other than the normal every-apply hooks. It's the "what would chezup actually do" preview.
+### Packages are reconciled by real state, not by hashes
 
-### When `chezdiff` reports missing packages but `chezup` won't install them
+The brew and mise apply steps (`run_after_02-brew-bundle`,
+`run_after_02b-mise-install`) run on **every** apply and install based on what's
+actually present on the machine versus what the active Brewfile modules declare —
+not on whether the Brewfile *text* changed. So if a formula or cask gets
+uninstalled, or a previous apply bailed half-way, plain `chezup` reinstalls it.
+A fast presence check (each declared package installed?) plus `mise ls --missing`
+keeps a clean machine quick — it just prints "already matches". It reconciles
+*presence*, not freshness: upgrading already-installed packages stays `chezbump`'s
+job, so a routine apply never surprise-upgrades anything. This is the convergence
+guarantee in [lifecycle](lifecycle.md), and it's why there's no longer a separate
+`chezfix`/`chezdiff` pair — there's nothing for them to close the gap on.
 
-The `run_onchange_*` scripts re-fire on **input-hash** changes, not on system state. So if a formula or cask gets uninstalled (or a previous apply bailed half-way) while its `Brewfile` stays unchanged, chezmoi still has the hash recorded as "ran" — `chezup`/`chez` do nothing, yet `chezdiff`'s `brew bundle check` (which inspects *real* state) correctly flags the drift. The two disagree because they measure different things.
-
-Run **`chezfix`** to close that gap: it checks each applicable Brewfile module for this profile and runs `brew bundle install` for any that are unsatisfied, then `mise install` for the global runtimes — installing directly, with no hash games and no `scriptState` reset. (The nuclear alternative is `chezmoi state delete-bucket --bucket=scriptState && chez`, which forces *every* `run_onchange`/`run_once` script to re-fire.)
+To preview what an apply would change without applying, use `chezmoi diff`
+(managed files) and `brew bundle check --file=<module>` (packages).
 
 ### Cleaning up packages from features you've turned off
 

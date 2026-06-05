@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# run_after_02b-mise-install — materialize mise's global toolchain.
+#
+# Why this exists:
+#   `mise activate` (wired into ~/.config/zsh/.zshrc) puts tools on PATH and
+#   sets JAVA_HOME, but it does NOT install missing versions on its own. So
+#   the first shell on a fresh machine would have a global mise config that
+#   points at java/node versions that aren't downloaded yet. Running
+#   `mise install` here eagerly downloads the global toolchain so the first
+#   interactive shell just works — the mise equivalent of the old eager Nix
+#   bootstrap.
+#
+# Why `run_after` (every apply), not `run_onchange`:
+#   This converges real installed state, not the config's text. A runtime can go
+#   missing while ~/.config/mise/config.toml stays put (manual uninstall, a
+#   half-finished apply). Running every apply — gated by a fast `mise ls
+#   --missing` short-circuit so a clean machine is a no-op — guarantees the
+#   global toolchain matches the config. This mirrors run_after_02-brew-bundle's
+#   convergence guarantee (see docs/lifecycle.md).
+#   mise itself is installed by the brew-bundle step (02), and the target-state
+#   config (~/.config/mise/config.toml) is written before any run_after script,
+#   so both are in place by now.
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ mise: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+echo "◆ Apply 2b/5: mise runtimes"
+
+if ! command -v mise >/dev/null 2>&1; then
+    # brew-bundle (02) installs mise; if it's missing here the bundle step
+    # failed or hasn't run. Don't fail the whole apply — the next shell will
+    # have mise on PATH once brew bundle succeeds, and re-running `chezup` will
+    # re-run this script.
+    echo "! mise not on PATH yet — skipping global install."
+    echo "  Re-run \`chezup\` after brew bundle finishes to install runtimes."
+    exit 0
+fi
+
+# Fast path: nothing missing ⇒ a routine apply is a quiet no-op. `mise ls
+# --missing` lists configured-but-not-installed tools; empty output means the
+# global toolchain already matches the config.
+if [ -z "$(cd "$HOME" && mise ls --missing 2>/dev/null)" ]; then
+    echo "  ✓ global runtimes already installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
+    exit 0
+fi
+
+echo "→ Installing global runtimes from ~/.config/mise/config.toml"
+echo "  (java + node; downloads only what's missing, idempotent)"
+
+# `mise install` with no args installs every tool pinned in the resolved
+# config — here just the global config.toml. Already-installed versions are
+# skipped, so re-runs are cheap. Don't fail the apply on a transient network
+# error; the tools install lazily on first `mise install`/use otherwise.
+if (cd "$HOME" && mise install); then
+    echo "✓ mise runtimes installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
+else
+    echo "! mise install failed (network?). Re-run \`chezup\` or \`mise install\` to retry."
+    exit 0
+fi
