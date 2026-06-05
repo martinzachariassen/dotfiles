@@ -188,25 +188,29 @@ macos-defaults               # re-apply system settings (sudo prompt; idempotent
 ### Pinning Neovim plugins
 
 The Neovim setup is a LazyVim bootstrap (`dot_config/nvim/lua/config/lazy.lua`).
-By default plugins track their latest commit (`defaults.version = false`), so a
-fresh machine installs whatever is current — convenient, but not reproducible.
+Although `defaults.version = false` lets plugins track their latest commit, the
+resolved set is **pinned via lazy.nvim's lockfile, which IS tracked in chezmoi**
+(`dot_config/nvim/lazy-lock.json`). A fresh machine therefore gets the exact same
+commits, not whatever is current that day.
 
-To pin an exact, machine-portable plugin set, commit lazy.nvim's lockfile into
-chezmoi (it is **not** tracked out of the box):
+Reproduce on a new machine — after the first launch installs the plugins:
 
-```sh
-nvim                                   # let plugins install on first launch
-# inside nvim:
-:Lazy sync                             # resolves + writes ~/.config/nvim/lazy-lock.json
-# back in the shell:
-chezmoi add ~/.config/nvim/lazy-lock.json
-chezmoi cd && git add . && git commit -m "chore(nvim): pin plugin lockfile" && git push
+```vim
+:Lazy restore                          " check out the commits recorded in lazy-lock.json
 ```
 
-After that, a fresh install (or `:Lazy restore`) reproduces the pinned revisions.
-Bump deliberately with `:Lazy update`, then re-run `chezmoi add ~/.config/nvim/lazy-lock.json`
-and commit. If you'd rather stay on rolling-latest, just don't track the
-lockfile — the current default.
+Bump versions deliberately:
+
+```sh
+# inside nvim:
+:Lazy update                           # update + rewrite ~/.config/nvim/lazy-lock.json
+# confirm everything still loads, then back in the shell:
+chezmoi add ~/.config/nvim/lazy-lock.json
+chezmoi cd && git commit -am "chore(nvim): bump plugin lockfile" && git push
+```
+
+Tradeoff: `:Lazy update`/`:Lazy sync` rewrite the live lockfile, so it shows as
+chezmoi drift until you re-add it — which is the point: you bump on purpose.
 
 ### JetBrains IDE settings
 

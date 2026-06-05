@@ -1,0 +1,44 @@
+# Personal Codex global config
+
+This file is loaded automatically into every personal Codex session.
+Project-specific overrides go in `<project>/AGENTS.md` and layer on top of this
+one. Project instructions win when they are more specific.
+
+<!--
+  The shared base below (about-me, communication, working approach, code style,
+  environment, secrets, commits) is the SAME body Claude Code loads. Edit it once
+  in .chezmoitemplates/agents/shared.md — do not fork it here. Codex-only
+  operational detail follows the shared base.
+-->
+
+---
+
+{{ includeTemplate "agents/shared.md" . }}
+
+---
+
+## Working model (Codex-specific)
+
+- Prefer making the change, running the relevant checks, and reporting the result
+  over stopping at a proposal. (Higher autonomy than the shared base implies.)
+
+## What to suggest
+
+- Catch correctness issues before style nits: error handling, race conditions,
+  unbounded resource use, missing transaction boundaries, and missing tests for
+  changed behavior.
+
+## When working in this dotfiles repo
+
+The repo at `~/Developer/personal/dotfiles` uses chezmoi conventions:
+
+- Source files prefixed `dot_*` map to `~/.X`; `private_dot_*` adds mode 0600;
+  `remove_*` markers delete the corresponding `~/.X`. Files ending in `.tmpl`
+  are Go templates rendered with chezmoi data (name, email, signingKey, profile).
+- The Brewfile is tiered: `Brewfile` (core, always) plus
+  `brewfiles/Brewfile.{mac-apps,personal,work}`, layered by the brew-bundle
+  script from the `profile` value and the `macApps` flag.
+- Edit dotfiles via `chezmoi edit ~/.X` (editing the live `$HOME` file creates
+  drift). Apply with the `chez` zsh function.
+- `docs/mapping.md` is the authoritative source-to-target table — update it when
+  adding/removing managed files.

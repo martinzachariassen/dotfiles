@@ -32,7 +32,8 @@ top of the user-level config.
 
 | Want to change… | Edit | After |
 |---|---|---|
-| Style/conventions for all my AI sessions on this machine | `dot_config/claude/CLAUDE.shared.md` and/or `dot_codex/AGENTS.md` | `chez` |
+| Style/conventions for all my AI sessions on this machine (Claude **and** Codex) | `.chezmoitemplates/agents/shared.md` | `chez` |
+| Codex-only operational detail (tool inventory, autonomy) | `dot_codex/AGENTS.md.tmpl` | `chez` |
 | Behavior for one Claude profile (personal vs work) | `.chezmoitemplates/claude/<profile>.md` | `chez` |
 | Rules for agents working in *this dotfiles repo* | `AGENTS.md` | nothing — repo-local, no apply step |
 
@@ -64,10 +65,14 @@ the default `~/.claude`. No per-invocation wrapper.
 
 Two source files render that user-level config:
 
-- [`dot_config/claude/CLAUDE.shared.md`](../dot_config/claude/CLAUDE.shared.md)
+- [`dot_config/claude/CLAUDE.shared.md.tmpl`](../dot_config/claude/CLAUDE.shared.md.tmpl)
   — the **shared base**, loaded for every session regardless of profile.
   Communication style, tool environment Claude can assume, code-style
-  preferences, anti-patterns ("don't suggest tmux, I use Zellij").
+  preferences, anti-patterns ("don't suggest tmux, I use Zellij"). It's a thin
+  wrapper: the actual content lives in
+  [`.chezmoitemplates/agents/shared.md`](../.chezmoitemplates/agents/shared.md),
+  which is `includeTemplate`d here **and** into the Codex `AGENTS.md` so the two
+  tools share one body that can't drift.
 - [`dot_config/claude/CLAUDE.md.tmpl`](../dot_config/claude/CLAUDE.md.tmpl) —
   templated entry point. Uses
   `{{ includeTemplate (printf "claude/%s.md" .profile) . -}}` to pull the
@@ -78,18 +83,21 @@ Two source files render that user-level config:
   Code layers the shared base in at memory-load time — no concat step, no
   generated file to accidentally edit in place.
 
-Edit via `chezmoi edit ~/.config/claude/CLAUDE.shared.md`, or edit the profile
-body directly in `.chezmoitemplates/claude/<profile>.md`, then run `chez`.
+Edit the shared base in `.chezmoitemplates/agents/shared.md` (changes flow to
+both Claude and Codex), or edit the profile body directly in
+`.chezmoitemplates/claude/<profile>.md`, then run `chez`.
 Switching profiles (`dotfiles profile set personal|work`) just changes which
 body the template includes; the shared base is constant.
 
 ## Codex global instructions
 
-[`dot_codex/AGENTS.md`](../dot_codex/AGENTS.md) maps to `~/.codex/AGENTS.md`
-and is loaded into every personal Codex session before project-level
-instructions. It mirrors the same personal defaults as the Claude shared base.
-Project-specific Codex instructions go in `<project>/AGENTS.md` and layer on
-top.
+[`dot_codex/AGENTS.md.tmpl`](../dot_codex/AGENTS.md.tmpl) maps to
+`~/.codex/AGENTS.md` and is loaded into every personal Codex session before
+project-level instructions. It `includeTemplate`s the exact same shared base as
+the Claude config ([`.chezmoitemplates/agents/shared.md`](../.chezmoitemplates/agents/shared.md))
+— not a mirror, the same file — then appends Codex-only operational detail (tool
+inventory, autonomy stance, dotfiles-repo conventions). Project-specific Codex
+instructions go in `<project>/AGENTS.md` and layer on top.
 
 ## Local LLMs
 

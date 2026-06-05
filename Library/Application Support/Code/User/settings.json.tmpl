@@ -14,6 +14,13 @@
     "breadcrumbs.enabled": true,
     "workbench.settings.enableNaturalLanguageSearch": false,
     "workbench.enableExperiments": false,
+    "workbench.list.smoothScrolling": true,
+
+    // Cap open tabs per group so the editor never sprawls; least-recently-used
+    // non-dirty tabs auto-close once the limit is hit.
+    "workbench.editor.limit.enabled": true,
+    "workbench.editor.limit.value": 10,
+    "workbench.editor.limit.perEditorGroup": true,
 
     // =========================================================
     // FONT & EDITOR
@@ -36,6 +43,7 @@
 
     "editor.bracketPairColorization.enabled": true,
     "editor.stickyScroll.enabled": true,
+    "editor.stickyScroll.maxLineCount": 5,
 
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
@@ -55,6 +63,7 @@
     "prettier.proseWrap": "preserve",
 
     "editor.inlineSuggest.enabled": true,
+    "editor.acceptSuggestionOnEnter": "smart",
     "editor.rulers": [100, 120],
     "editor.cursorSurroundingLines": 4,
     "editor.linkedEditing": true,
@@ -89,6 +98,29 @@
         "**/build": true
     },
 
+    // Collapse derived/companion files under their parent in the Explorer so the
+    // tree shows intent, not noise (lockfiles under manifests, maps/.d.ts under
+    // sources, .class under .java, etc.). Toggle nests with the arrow.
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.expand": false,
+    "explorer.fileNesting.patterns": {
+        "*.ts": "${capture}.js, ${capture}.d.ts, ${capture}.js.map",
+        "*.tsx": "${capture}.js, ${capture}.css",
+        "*.js": "${capture}.js.map, ${capture}.min.js, ${capture}.d.ts",
+        "*.java": "${capture}.class",
+        "package.json": "package-lock.json, .npmrc, .nvmrc, .node-version, tsconfig*.json, .eslint*, .prettier*, eslint.config.*, prettier.config.*",
+        "tsconfig.json": "tsconfig.*.json",
+        "build.gradle": "gradle.properties, gradle-wrapper.properties, settings.gradle, gradlew, gradlew.bat",
+        "build.gradle.kts": "gradle.properties, gradle-wrapper.properties, settings.gradle.kts, gradlew, gradlew.bat",
+        "pom.xml": "mvnw, mvnw.cmd, .mvn",
+        "*.tf": "${capture}.tfvars, ${capture}.tfvars.json, .terraform.lock.hcl",
+        "Dockerfile": "Dockerfile.*, .dockerignore, docker-compose.*, compose.*",
+        "pyproject.toml": "poetry.lock, uv.lock, setup.py, setup.cfg, requirements*.txt, .python-version, ruff.toml, .ruff.toml",
+        ".gitignore": ".gitattributes, .gitmodules, .mailmap, .editorconfig",
+        "mise.toml": ".mise.toml, mise.*.toml, .tool-versions",
+        "readme.md": "license, license.*, contributing.*, changelog.*, code_of_conduct.*, security.*"
+    },
+
     // =========================================================
     // SEARCH
     // =========================================================
@@ -115,7 +147,13 @@
     "git.openRepositoryInParentFolders": "never",
     "git.pruneOnFetch": true,
     "git.rebaseWhenSync": true,
+    "git.mergeEditor": true,
     "gitlens.currentLine.enabled": false,
+
+    // SCM view as a tree, and diffs that respect whitespace + flag moved code.
+    "scm.defaultViewMode": "tree",
+    "diffEditor.ignoreTrimWhitespace": false,
+    "diffEditor.experimental.showMoves": true,
 
     "github.gitAuthentication": true,
     "githubPullRequests.pullBranch": "never",
@@ -345,6 +383,14 @@
 
     "[markdown]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+
+    // Commit messages: subject ≤50, body wrap at 72 — the conventional guides.
+    "[git-commit]": {
+        "editor.rulers": [50, 72]
+    },
+    "[scminput]": {
+        "editor.rulers": [50, 72]
     },
 
     "[toml]": {

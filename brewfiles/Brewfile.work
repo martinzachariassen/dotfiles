@@ -6,15 +6,19 @@
 #
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.work
 
-# ─── Cloud / Kubernetes ───────────────────────────────────────────────────────
-# tap stays first: the kubelogin formula below resolves from it.
+# ─── Cloud / Kubernetes / IaC ─────────────────────────────────────────────────
+# Taps stay first: the kubelogin + terraform formulae below resolve from them.
 tap "Azure/kubelogin"
-brew "azure-cli"                 # global Azure account/subscription CLI; project K8s tooling via Homebrew/Docker
+tap "hashicorp/tap"
+brew "azure-cli"                 # global Azure account/subscription CLI
 brew "Azure/kubelogin/kubelogin" # AKS Azure AD auth plugin for kubectl
-brew "kubectx"                   # provides kubectx and kubens for context/namespace switching
-cask "gcloud-cli"                # global Google Cloud account/project CLI; project K8s tooling via Homebrew/Docker
+brew "hashicorp/tap/terraform"  # IaC — HashiCorp's official tap (latest, BUSL build)
+brew "kubectx"                  # kubectx + kubens for context/namespace switching
+brew "kubernetes-cli"           # kubectl
+cask "gcloud-cli"               # global Google Cloud account/project CLI
 
 # ─── Work apps ────────────────────────────────────────────────────────────────
+cask "microsoft-office"
 cask "microsoft-outlook"
 cask "microsoft-teams"
 cask "slack"

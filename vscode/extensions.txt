@@ -14,6 +14,7 @@ foxundermoon.shell-format
 github.vscode-pull-request-github
 github.copilot-chat
 github.vscode-github-actions
+gruntfuggly.todo-tree
 hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
@@ -43,3 +44,4 @@ vscjava.vscode-spring-boot-dashboard
 vscjava.vscode-spring-initializr
 vscodevim.vim
 vmware.vscode-spring-boot
+wmaurer.change-case

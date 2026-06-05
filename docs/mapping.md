@@ -13,12 +13,15 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/git/allowed_signers.tmpl` | `~/.config/git/allowed_signers` | Templated allowed signers file so Git can verify local SSH commit signatures. |
 | `dot_config/git/ignore` | `~/.config/git/ignore` | Global gitignore. |
 | `dot_config/mise/config.toml` | `~/.config/mise/config.toml` | mise global config — default language runtimes (`java = ["temurin-21", "temurin-25"]`, `node = "lts"`). Per-project versions + env vars live in each project's own `mise.toml` and override these on `cd`. |
-| `dot_config/claude/CLAUDE.shared.md` | `~/.config/claude/CLAUDE.shared.md` | Shared Claude Code base — communication style, environment, code-style preferences, anti-patterns. `@import`ed by the rendered `CLAUDE.md`. Always applied. |
+| `dot_config/claude/CLAUDE.shared.md.tmpl` | `~/.config/claude/CLAUDE.shared.md` | Shared Claude Code base. Thin wrapper that `includeTemplate`s `.chezmoitemplates/agents/shared.md` (the single source of truth, shared verbatim with Codex). `@import`ed by the rendered `CLAUDE.md`. Always applied. |
 | `dot_config/claude/CLAUDE.md.tmpl` | `~/.config/claude/CLAUDE.md` | Active-profile Claude Code memory. Renders by including `.chezmoitemplates/claude/<profile>.md`; its first line is `@~/.config/claude/CLAUDE.shared.md`, so the shared base layers in at memory-load time. `CLAUDE_CONFIG_DIR=~/.config/claude` (set in `.zshenv`) tells Claude Code to read this. |
 | `.chezmoitemplates/claude/personal.md` | *(not copied to $HOME)* | Personal-profile body. Pulled into `CLAUDE.md` via `includeTemplate` when `profile = personal`. |
 | `.chezmoitemplates/claude/work.md` | *(not copied to $HOME)* | Work-profile body. Pulled into `CLAUDE.md` via `includeTemplate` when `profile = work`. |
-| `dot_codex/AGENTS.md` | `~/.codex/AGENTS.md` | Global Codex instructions auto-loaded into every personal Codex session — communication style, environment, code-style preferences, and commit conventions. Project-specific overrides go in `<project>/AGENTS.md`. |
+| `.chezmoitemplates/agents/shared.md` | *(not copied to $HOME)* | Single source of truth for personal AI defaults (about-me, communication, code style, environment, secrets, commits). `includeTemplate`d into both `CLAUDE.shared.md` and the Codex `AGENTS.md` so they can't drift. |
+| `dot_codex/AGENTS.md.tmpl` | `~/.codex/AGENTS.md` | Global Codex instructions auto-loaded into every personal Codex session. `includeTemplate`s the shared base (`.chezmoitemplates/agents/shared.md`), then appends Codex-only operational detail (tool inventory, autonomy, dotfiles-repo notes). Project-specific overrides go in `<project>/AGENTS.md`. |
 | `Library/Application Support/Code/User/settings.json.tmpl` | `~/Library/Application Support/Code/User/settings.json` | VS Code user settings. Templated so the Java runtime paths resolve to this machine's mise install dir (`{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/...`). This path is not XDG; VS Code on macOS hardcodes it under `~/Library/Application Support`. |
+| `Library/Application Support/Code/User/keybindings.json` | `~/Library/Application Support/Code/User/keybindings.json` | VS Code custom keybindings. Editor-chrome chords (pane/group management, terminal split) that complement the vim leader maps held in `settings.json`. |
+| `Library/Application Support/Code/User/snippets/*.json` | `~/Library/Application Support/Code/User/snippets/*.json` | VS Code user snippets (per-language). |
 | `dot_docker/config.json` | `~/.docker/config.json` | Docker CLI config. Stays at `~/.docker/` because Docker Desktop hardcodes the path. |
 | `dot_docker/daemon.json` | `~/.docker/daemon.json` | Docker daemon config. |
 | `dot_config/ghostty/config` | `~/.config/ghostty/config` | Ghostty terminal config. Catppuccin Frappé theme is built into Ghostty, no theme file needed. |
@@ -27,6 +30,7 @@ Reference table showing exactly what each file in the repo does.
 | `dot_config/nvim/init.lua` | `~/.config/nvim/init.lua` | Neovim entrypoint. One-liner: `require("config.lazy")`. |
 | `dot_config/nvim/lua/config/lazy.lua` | `~/.config/nvim/lua/config/lazy.lua` | LazyVim bootstrap. Auto-clones lazy.nvim on first launch. Backend-dev language extras (Java/Python/TypeScript/JSON/YAML/Docker/etc.) ship commented-out for opt-in. |
 | `dot_config/nvim/lua/plugins/colorscheme.lua` | `~/.config/nvim/lua/plugins/colorscheme.lua` | Catppuccin Frappé colorscheme override for LazyVim. |
+| `dot_config/nvim/lazy-lock.json` | `~/.config/nvim/lazy-lock.json` | lazy.nvim lockfile — pins exact plugin commits so installs are reproducible. Bump with `:Lazy update` then `chezmoi add`. See [day-to-day](day-to-day.md) → "Pinning Neovim plugins". |
 | `private_dot_ssh/config` | `~/.ssh/config` | Mode 0600 enforced via `private_` prefix. SSH hardcodes `~/.ssh/`. |
 
 ## Files chezmoi REMOVES from `$HOME` (the `remove_` markers)

@@ -114,13 +114,19 @@ command -v starship >/dev/null && eval "$(starship init zsh)"
 command -v eza >/dev/null && {
     alias ls='eza --group-directories-first'
     alias ll='eza -lah --group-directories-first --git --time-style=long-iso'
+    # `tree` is eza's tree view (no separate `tree` binary installed). For the
+    # rare scripted case that needs classic tree output, use eza's flags or
+    # `\tree`-style alternatives explicitly.
     alias tree='eza --tree --level=3 --group-directories-first'
 }
 # Intentional: aliasing `cat` to bat. Use `command cat` (or `\cat`) if you need
 # the bare GNU/BSD cat behavior — e.g. when piping into something that doesn't
 # expect ANSI color codes or when behavior parity with scripts matters.
 command -v bat >/dev/null && alias cat='bat --paging=never --style=plain'
-command -v fd  >/dev/null && alias find='fd'
+# Intentionally NOT aliasing `find` to `fd`. Unlike cat/ls, fd is not a drop-in:
+# its flags and default semantics differ enough that muscle-memory invocations
+# (`find . -name x -exec …`) silently misbehave under fd. Use `fd` directly when
+# you want it; `find` keeps the standard behavior scripts and snippets expect.
 
 # ─── Tool shortcuts ───────────────────────────────────────────────────────────
 # Single/double-letter aliases for tools I run constantly. Some commands are
