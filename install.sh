@@ -472,7 +472,7 @@ prompt_text() {
 # the chosen value via OUTVAR. Caller prints the title and the confirmed line.
 ui_select_raw() {
     local __out="$1" default="$2"; shift 2
-    local opts=("$@") n=$# i sel=0 key rest val saved
+    local opts=("$@") n=$# i sel=0 key rest val saved _drain
 
     for ((i=0; i<n; i++)); do
         [ "${opts[$i]%%|*}" = "$default" ] && sel=$i
@@ -516,6 +516,13 @@ ui_select_raw() {
     done
 
     [ "$UI_COLOR" = 1 ] && printf '\033[?25h' > /dev/tty   # show cursor
+    # Drain anything the terminal left buffered (the Enter keypress, a trailing
+    # byte from a multi-byte arrow sequence, key autorepeat) so the NEXT plain
+    # `read` doesn't consume a stray newline and return empty. `min 0 time 0`
+    # makes reads non-blocking, so the loop exits the instant the buffer is
+    # empty — and works on macOS bash 3.2 (no fractional `read -t`).
+    stty min 0 time 0 </dev/tty 2>/dev/null
+    while IFS= read -rsn1 _drain </dev/tty 2>/dev/null; do :; done
     stty "$saved" </dev/tty 2>/dev/null
     UI_STTY_SAVED=""
 
@@ -624,8 +631,16 @@ prompt_phrase() {
     if ! have_tty; then
         return 1
     fi
-    prompt_read answer "Type ${BOLD}$phrase${RESET} to confirm: "
-    [ "$answer" = "$phrase" ]
+    # Loop so an empty line (e.g. a stray newline that slipped past the menu
+    # drain, or an accidental Enter) re-asks instead of aborting the whole run.
+    # The exact phrase proceeds; any other non-empty input is a deliberate
+    # decline; Ctrl-C still cancels.
+    while :; do
+        prompt_read answer "Type ${BOLD}$phrase${RESET} to confirm (Ctrl-C to cancel): "
+        [ "$answer" = "$phrase" ] && return 0
+        [ -n "$answer" ] && return 1
+        warn "Nothing entered — type the exact phrase, or press Ctrl-C to cancel."
+    done
 }
 
 json_string() {
