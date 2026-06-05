@@ -22,37 +22,11 @@ one. Project instructions win when they are more specific.
 - Prefer making the change, running the relevant checks, and reporting the result
   over stopping at a proposal. (Higher autonomy than the shared base implies.)
 
-## What I use
-
-This machine is set up via my chezmoi-managed dotfiles at
-`~/Developer/personal/dotfiles`. Assume the following available; default to them
-when suggesting alternatives unless a project uses something else.
-
-- **Runtimes:** `mise` (see Environment above). Common tools for my stack:
-  `java@temurin-21` / `java@temurin-25`, `gradle`, `maven`, `node`, `python`.
-  New Spring Boot scaffold: `mise use java@temurin-21 gradle@latest node@lts`,
-  then commit the `mise.toml`.
-- **Shell / terminal:** zsh with XDG layout (`ZDOTDIR=~/.config/zsh`), `fzf`
-  (`Ctrl-R`) backed by `fd`, plus `zsh-autosuggestions` / `-syntax-highlighting`
-  / `-completions`. Ghostty + Zellij + Starship. `k` is aliased to `kubectl`.
-- **Git & ops:** signed commits via 1Password `op-ssh-sign`; `delta` pager;
-  `lazygit`; `pre-commit`.
-- **Databases:** `pgcli`, `redis-cli` globally; prefer per-project datastores via
-  Docker / Testcontainers over global brew services.
-- **HTTP / RPC:** `httpie`, `grpcurl`, `mkcert` for local TLS.
-- **Kubernetes:** `kubectl`, `k9s`, `stern`, `helm`; work-profile `kubectx` /
-  `kubens`, AKS `kubelogin`, GCP `gcloud` + `gke-gcloud-auth-plugin`.
-- **Cloud CLIs (work profile):** `az` (Azure), `gcloud` (GCP).
-- **IaC:** Terraform (HashiCorp tap) + `tflint` + `terraform-docs`.
-- **Containers:** Docker Desktop, `dive` for image introspection.
-
 ## What to suggest
 
 - Catch correctness issues before style nits: error handling, race conditions,
   unbounded resource use, missing transaction boundaries, and missing tests for
   changed behavior.
-- For installing dev CLIs globally, add them to my Brewfile rather than
-  `npm install -g` / `pip install --user`.
 
 ## When working in this dotfiles repo
 

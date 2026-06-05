@@ -96,22 +96,26 @@ fundamentals.
 
 ## Environment
 
-- Language runtimes via **mise** — global defaults (java, node) in
-  `~/.config/mise/config.toml`; per-project versions + env vars in each project's
-  own committed `mise.toml` (its `[env]` section, not direnv). On `cd`,
-  `mise activate` switches toolchain and sets `JAVA_HOME`. For new projects,
-  propose a committed `mise.toml` that pins runtimes. For Node prefer `pnpm`.
-- Never suggest asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN, or installing runtimes
-  via brew. Install global dev CLIs (kubectl, terraform, …) via Homebrew, not
-  language installers; database servers and project CLIs stay in Homebrew or run
-  via Docker — mise manages language runtimes, not everything.
-- Terminal: Ghostty + Zellij (not tmux). Shell: plain zsh (no
-  oh-my-zsh/prezto/zinit) — extend the managed `.zshrc`, don't add a framework.
+This is the durable shape of the machine. Specific packages come and go — don't
+assume any one tool is installed; if a workflow needs something, say so and add
+it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
+
+- macOS (Apple Silicon) workstation managed by chezmoi, XDG layout
+  (`ZDOTDIR=~/.config/zsh`).
+- **Language runtimes come from mise** — global defaults in
+  `~/.config/mise/config.toml`, per-project versions + env in each project's
+  committed `mise.toml` (`[env]` section, not direnv). For new projects propose a
+  committed `mise.toml`; for Node prefer `pnpm`. Never suggest
+  asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN or installing runtimes via brew.
+- **Global CLIs and apps come from Homebrew**; databases and project services run
+  via Docker / Testcontainers — mise owns language runtimes, not everything.
+- Shell: plain zsh, no framework (oh-my-zsh/prezto/zinit) — extend the managed
+  `.zshrc`. Terminal: Ghostty + Zellij (not tmux). Prompt: Starship. Prefer
+  modern CLI replacements where they exist.
 - Editors: VS Code (GUI), Neovim + LazyVim (terminal), IntelliJ for non-trivial
-  Java/Kotlin work.
-- Prefer modern CLI tools: `eza`/`ls`, `rg`/`grep`, `fd`/`find`, `bat`/`cat`,
-  `dust`/`du`. Favor declarative/idempotent approaches; for state-mutating
-  shell, detect-then-act so re-runs are cheap.
+  Java/Kotlin. Commits signed through 1Password's `op-ssh-sign`.
+- Favor declarative/idempotent approaches; for state-mutating shell,
+  detect-then-act so re-runs are cheap.
 
 ## Secrets — hard rule
 
