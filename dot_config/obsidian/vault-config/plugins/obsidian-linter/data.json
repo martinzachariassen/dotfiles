@@ -1,0 +1,30 @@
+{
+  "lintOnSave": false,
+  "displayChanged": true,
+  "foldersToIgnore": [
+    "99 Meta/_templates",
+    "99 Meta/_attachments"
+  ],
+  "ruleConfigs": {
+    "trailing-spaces": {
+      "enabled": true,
+      "two-space-line-break": false
+    },
+    "consecutive-blank-lines": {
+      "enabled": true
+    },
+    "convert-spaces-to-tabs": {
+      "enabled": false
+    },
+    "heading-blank-lines": {
+      "enabled": true,
+      "empty-line-after-yaml": true
+    },
+    "yaml-timestamp": {
+      "enabled": false
+    },
+    "remove-empty-list-markers": {
+      "enabled": false
+    }
+  }
+}
