@@ -8,10 +8,27 @@
 # own mise.toml and override these on `cd`. See examples/mise/backend.mise.toml.
 
 [tools]
-# Two JDKs installed; the first is the active/default one. Listing both means
-# both stable install paths exist for VS Code's java.configuration.runtimes
-# (settings.json.tmpl), mirroring the old temurin@21 + temurin@25 casks.
+# Two JDKs installed; the first is the active/default one. JDK 25 is the LTS we
+# develop against; JDK 21 stays installed so older projects keep working without
+# a per-project mise.toml change. Both stable install paths exist for VS Code's
+# java.configuration.runtimes (settings.json.tmpl):
+#   ~/.local/share/mise/installs/java/temurin-25/Contents/Home   (default)
 #   ~/.local/share/mise/installs/java/temurin-21/Contents/Home
-#   ~/.local/share/mise/installs/java/temurin-25/Contents/Home
-java = ["temurin-21", "temurin-25"]
+java = ["temurin-25", "temurin-21"]
+
+# Node LTS — mise resolves "lts" to whatever the current LTS line is at install
+# time. Active LTS as of 2026 is Node 24 (Jod). Per-project pins still win.
 node = "lts"
+
+# Python — major-pinned so patch releases install cleanly on `mise install`
+# while a deliberate major bump stays a code change. 3.14 is the current
+# stable line (released Oct 2025); Ruff (vscode-python settings) targets it.
+python = "3.14"
+
+# Maven + Gradle — managed by mise so the wrapperless `mvn` / `gradle` in your
+# PATH stays current without Homebrew owning JVM build tools. Projects with a
+# committed mvnw / gradlew wrapper always use the wrapper version (and should);
+# these globals exist for ad-hoc scaffolding, plugin probes, and `mvn archetype:
+# generate`. "latest" lets mise track the newest stable on each `mise install`.
+maven = "latest"
+gradle = "latest"

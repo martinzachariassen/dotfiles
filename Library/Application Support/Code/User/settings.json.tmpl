@@ -274,21 +274,24 @@
     // (content-hashed paths that churned on every update/GC and made JDT.LS
     // lose its classpath), mise installs to a fixed, version-named directory
     // that doesn't move — so these paths are durable anchors. The JDKs come
-    // from the global mise config (java = ["temurin-21", "temurin-25"] in
+    // from the global mise config (java = ["temurin-25", "temurin-21"] in
     // dot_config/mise/config.toml); project build versions are still pinned per
-    // project via Gradle toolchains. This file is a chezmoi template so the
-    // home dir resolves per machine.
-    "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
-    "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
+    // project via Gradle/Maven toolchains. This file is a chezmoi template so
+    // the home dir resolves per machine.
+    //
+    // JDT.LS itself runs on Java 25 — picks up newer language-server features
+    // and matches the default project JDK so Lombok/javac plugins line up.
+    "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
+    "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.configuration.runtimes": [
         {
-            "name": "JavaSE-21",
-            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home",
+            "name": "JavaSE-25",
+            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
             "default": true
         },
         {
-            "name": "JavaSE-25",
-            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home"
+            "name": "JavaSE-21",
+            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home"
         }
     ],
 
@@ -328,11 +331,35 @@
         "switchExpression"
     ],
 
+    // Lombok handled by redhat.java's built-in support (since v1.9), not the
+    // deprecated vscjava.vscode-lombok extension. JDT.LS prefers the project's
+    // own Lombok jar from the classpath and falls back to the bundled one —
+    // so projects that pin a recent Lombok (1.18.40+ for JDK 25, 1.18.46+ for
+    // JDK 26) get accurate parsing of @-annotated sources automatically.
+    "java.jdt.ls.lombokSupport.enabled": true,
+
     // SonarLint: lint quality/bugs without phoning home.
     "sonarlint.disableTelemetry": true,
 
     "spring-boot.ls.problem.application-properties.enabled": true,
     "spring-boot.ls.problem.application-yaml.enabled": true,
+
+    // JetBrains Kotlin LSP — server-side configuration. The extension is Alpha
+    // and JVM-only (no Multiplatform, no Android). Settings live under the
+    // `intellij.*` namespace because the underlying server is IntelliJ's
+    // language-engine repackaged as an LSP.
+    //
+    //   intellij.dev.serverPort = -1  → use the server bundled in the
+    //     extension's VSIX (`unpack-server.mjs`). Any other port would expect
+    //     a locally-run dev server — only useful if you're hacking on the LSP.
+    //   intellij.buildTool = null      → auto-detect (gradle | maven). Leave
+    //     unset so per-project shape wins.
+    //   intellij.jdkForSymbolResolution → JDK whose stdlib symbols the server
+    //     resolves against. Anchored to the same mise temurin-25 path used by
+    //     JDT.LS above so Java + Kotlin agree on what `java.*` looks like.
+    "intellij.dev.serverPort": -1,
+    "intellij.jdkForSymbolResolution": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
+    "intellij.trace.server": "off",
 
     "terraform.languageServer.enable": true,
 
@@ -426,8 +453,13 @@
         "editor.detectIndentation": false
     },
 
+    // JetBrains Kotlin LSP (extension ID jetbrains.kotlin-server) — Alpha as of
+    // KotlinConf 2026. Ships the IntelliJ-backed language server bundled inside
+    // the extension (the kotlin-lsp Homebrew cask is for *non*-VS Code clients
+    // like nvim/Emacs). The formatter is the same publisher.extension ID, not
+    // "jetbrains.kotlin" — that was the older extension we deprecated.
     "[kotlin]": {
-        "editor.defaultFormatter": "jetbrains.kotlin",
+        "editor.defaultFormatter": "jetbrains.kotlin-server",
         "editor.tabSize": 4,
         "editor.detectIndentation": false
     },
