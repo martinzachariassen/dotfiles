@@ -19,6 +19,10 @@ DEPRECATED_EXTENSIONS=(
     "jetbrains.kotlin"
     "jetpack-io.devbox"
     "mkhl.direnv"
+    # Lombok support is now built into redhat.java (since v1.9), controlled by
+    # java.jdt.ls.lombokSupport.enabled (default true). The standalone extension
+    # ships an old bundled lombok.jar and is being deprecated upstream.
+    "vscjava.vscode-lombok"
 )
 
 if ! command -v code >/dev/null 2>&1; then

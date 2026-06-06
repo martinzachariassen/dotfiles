@@ -38,7 +38,6 @@ vscjava.vscode-java-debug
 vscjava.vscode-java-dependency
 vscjava.vscode-java-pack
 vscjava.vscode-java-test
-vscjava.vscode-lombok
 vscjava.vscode-maven
 vscjava.vscode-spring-boot-dashboard
 vscjava.vscode-spring-initializr
