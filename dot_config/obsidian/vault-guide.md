@@ -78,6 +78,26 @@ tags: [project]
 ---
 ```
 
+## Diagrams
+
+Two paths, pick by what the diagram is:
+
+- **Mermaid** — built into Obsidian's markdown renderer, no plugin
+  needed. Fence a block with ` ```mermaid ` and it renders in both
+  Live Preview and Reading view. Catppuccin styles it automatically.
+  Good for flowcharts, sequence diagrams, ER, gantt — anything you'd
+  rather express as code than draw.
+- **Excalidraw** — for hand-drawn sketches and freeform whiteboarding,
+  via the Excalidraw plugin.
+
+```mermaid
+flowchart LR
+    Inbox[00 Inbox] -->|weekly review| Projects[20 Projects]
+    Inbox --> Areas[30 Areas]
+    Inbox --> Resources[40 Resources]
+    Projects -->|done| Archive[50 Archive]
+```
+
 ## Where do I put this?
 
 A quick decision tree for a new note:

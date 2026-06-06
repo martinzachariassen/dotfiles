@@ -10,7 +10,6 @@
 # ─── Productivity & system ────────────────────────────────────────────────────
 cask "google-drive"             # file sync
 cask "jordanbaird-ice@beta"     # menu bar manager
-cask "notion"                   # notes / docs
 cask "obsidian"                 # personal knowledge / vault
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
