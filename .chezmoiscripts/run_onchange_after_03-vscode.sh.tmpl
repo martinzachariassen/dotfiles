@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Installs VS Code extensions from the repo manifest and refreshes the
-# JetBrains Kotlin VSIX from Kotlin/kotlin-lsp releases when this script or the
+# Installs VS Code extensions from the repo manifest when this script or the
 # extension manifest changes.
 #
 # Marketplace extension manifest hash: {{ include "vscode/extensions.txt" | sha256sum }}
@@ -16,6 +15,8 @@ SOURCE="{{ .chezmoi.sourceDir }}"
 EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
 DEPRECATED_EXTENSIONS=(
     "continue.continue"
+    "fwcd.kotlin"
+    "jetbrains.kotlin"
     "jetpack-io.devbox"
     "mkhl.direnv"
 )
@@ -63,85 +64,10 @@ uninstall_deprecated_extensions() {
     done
 }
 
-latest_kotlin_release_json() {
-    curl -fsSL \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/Kotlin/kotlin-lsp/releases/latest"
-}
-
-kotlin_vsix_url() {
-    local release_json="$1" arch_suffix
-    case "$(uname -m)" in
-        arm64) arch_suffix="mac-aarch64.vsix" ;;
-        x86_64) arch_suffix="mac-x64.vsix" ;;
-        *)
-            echo "! unsupported architecture for Kotlin VSIX: $(uname -m)" >&2
-            return 1
-            ;;
-    esac
-
-    printf '%s\n' "$release_json" \
-        | jq -r --arg suffix "$arch_suffix" '
-            .body
-            | scan("https://download-cdn\\.jetbrains\\.com/kotlin-lsp/[^)[:space:]]+")
-            | select(endswith($suffix))
-            | select(contains(".vsix"))
-        ' \
-        | head -1
-}
-
-install_kotlin_vsix() {
-    if ! command -v jq >/dev/null 2>&1; then
-        echo "! jq not found; Kotlin VSIX install skipped"
-        return 0
-    fi
-
-    local release_json latest_version installed_version url checksum_url tmpdir vsix expected actual
-    release_json="$(latest_kotlin_release_json)" || {
-        echo "! could not read latest Kotlin LSP release; Kotlin VSIX install skipped"
-        return 0
-    }
-
-    latest_version="$(printf '%s\n' "$release_json" | jq -r '.tag_name | sub("^kotlin-lsp/v"; "")')"
-    installed_version="$(code --list-extensions --show-versions 2>/dev/null \
-        | awk -F@ 'tolower($1) == "jetbrains.kotlin" { print $2; exit }' || true)"
-
-    if [ -n "$installed_version" ] && [ "$installed_version" = "$latest_version" ]; then
-        echo "✓ JetBrains Kotlin extension already current: $installed_version"
-        return 0
-    fi
-
-    url="$(kotlin_vsix_url "$release_json")"
-    if [ -z "$url" ] || [ "$url" = "null" ]; then
-        echo "! latest Kotlin LSP release did not include a macOS VSIX URL"
-        return 0
-    fi
-
-    checksum_url="$url.sha256"
-    tmpdir="$(mktemp -d)"
-    vsix="$tmpdir/kotlin-lsp.vsix"
-    trap 'rm -rf "$tmpdir"' RETURN
-
-    echo "→ downloading JetBrains Kotlin extension $latest_version"
-    curl -fsSL "$url" -o "$vsix"
-
-    expected="$(curl -fsSL "$checksum_url" | awk '{ print $1; exit }')"
-    actual="$(shasum -a 256 "$vsix" | awk '{ print $1; exit }')"
-    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
-        echo "✗ Kotlin VSIX checksum mismatch" >&2
-        return 1
-    fi
-
-    code --install-extension "$vsix" --force
-    echo "✓ JetBrains Kotlin extension installed: $latest_version"
-}
-
 echo "◆ Apply 4/5: VS Code extensions"
 echo "  Manifest: $EXTENSIONS_FILE"
 
 install_marketplace_extensions
 uninstall_deprecated_extensions
-install_kotlin_vsix
 
 echo "✓ VS Code extensions are managed"
