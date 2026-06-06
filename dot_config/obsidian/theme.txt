@@ -1,0 +1,5 @@
+# Theme to install into every vault: <theme-name>|<github owner/repo>
+# The theme-name becomes the folder name under .obsidian/themes/ and the
+# cssTheme value in .obsidian/appearance.json. Fetched from the default branch
+# (manifest.json + theme.css) since theme repos don't always publish releases.
+Catppuccin|catppuccin/obsidian

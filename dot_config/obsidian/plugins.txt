@@ -1,0 +1,28 @@
+# Community plugins to seed into every vault, one per line.
+# Format: <plugin-id>|<github owner/repo>
+# Lines starting with # and blank lines are ignored.
+#
+# The plugin-id MUST match the "id" field in the plugin's manifest.json — it
+# becomes the folder name under .obsidian/plugins/ and the key in
+# .obsidian/community-plugins.json. Verify with:
+#   curl -fsSL https://github.com/<repo>/releases/latest/download/manifest.json | jq .id
+# Templater pinned to 2.20.5 — 2.21+ bumps minAppVersion to 1.13.0, which is
+# Catalyst/early-access only. Unpin once Obsidian 1.13 ships as public stable.
+templater-obsidian|SilentVoid13/Templater|2.20.5
+periodic-notes|liamcain/obsidian-periodic-notes
+dataview|blacksmithgu/obsidian-dataview
+quickadd|chhoumann/quickadd
+obsidian-tasks-plugin|obsidian-tasks-group/obsidian-tasks
+obsidian-icon-folder|FlorianWoelki/obsidian-iconize
+tag-wrangler|pjeby/tag-wrangler
+table-editor-obsidian|tgrosinger/advanced-tables-obsidian
+obsidian-style-settings|mgmeyers/obsidian-style-settings
+# Calendar pinned to 1.5.10 — repo's latest is a 2.0 beta whose manifest id
+# is "calendar-beta", which would mismatch the community-store id "calendar".
+calendar|liamcain/obsidian-calendar-plugin|1.5.10
+nldates-obsidian|argenos/nldates-obsidian
+obsidian-excalidraw-plugin|zsviczian/obsidian-excalidraw-plugin
+homepage|mirnovov/obsidian-homepage
+obsidian-linter|platers/obsidian-linter
+omnisearch|scambier/obsidian-omnisearch
+obsidian-auto-link-title|zolrath/obsidian-auto-link-title

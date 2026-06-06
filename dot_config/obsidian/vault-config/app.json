@@ -1,0 +1,19 @@
+{
+  "attachmentFolderPath": "99 Meta/_attachments",
+  "useMarkdownLinks": false,
+  "newLinkFormat": "shortest",
+  "alwaysUpdateLinks": true,
+  "showInlineTitle": true,
+  "showLineNumber": false,
+  "readableLineLength": true,
+  "strictLineBreaks": false,
+  "promptDelete": false,
+  "trashOption": "system",
+  "showUnsupportedFiles": false,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "00 Inbox",
+  "defaultViewMode": "source",
+  "livePreview": true,
+  "spellcheck": true,
+  "showFrontmatter": true
+}

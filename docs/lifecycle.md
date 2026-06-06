@@ -111,6 +111,7 @@ packages is `chezbump`'s job, so a routine apply never surprise-upgrades anythin
 | Convergence engine (progress, short-circuit, continue-on-error) | `scripts/lib/brew-bundle.sh` |
 | Homebrew apply step (module selection + plan + drive) | `.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl` |
 | mise runtime apply step | `.chezmoiscripts/run_after_02b-mise-install.sh.tmpl` |
+| Obsidian vault apply step | `.chezmoiscripts/run_after_02d-obsidian-apply.sh.tmpl` (engine in `scripts/lib/obsidian-apply.sh`) |
 | Shared color/glyph helpers | `scripts/lib/ui.sh` |
 | Everyday verbs (`chezup`, `chezdoctor`) + advanced helpers | `dot_config/zsh/dot_zshrc.tmpl` |
 | Bootstrap wizard | `install.sh` (rules in `docs/wizard.md`) |

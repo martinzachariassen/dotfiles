@@ -1,0 +1,30 @@
+<%*
+const title = tp.file.title;
+const week = moment(title, "YYYY-[W]WW");
+const start = week.clone().startOf('isoWeek');
+const end = week.clone().endOf('isoWeek');
+%>---
+type: weekly
+week: <% title %>
+range: <% start.format("YYYY-MM-DD") %> → <% end.format("YYYY-MM-DD") %>
+tags: [weekly, review]
+---
+# Week <% title %>
+
+> <% start.format("MMM D") %> – <% end.format("MMM D, YYYY") %>
+
+## What got done
+
+```dataview
+LIST FROM "10 Daily"
+WHERE type = "daily" AND date >= date("<% start.format("YYYY-MM-DD") %>") AND date <= date("<% end.format("YYYY-MM-DD") %>")
+SORT date ASC
+```
+
+## Wins
+
+## Drag
+
+## Carrying forward
+
+## Next week's focus
