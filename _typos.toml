@@ -1,0 +1,14 @@
+# typos — config for the CI job in .github/workflows/ci.yml (job: `typos`).
+# Run locally: brew install typos-cli && typos
+#
+# Extend conservatively: every entry is a real word `typos` would otherwise
+# flag, OR a vendor file where the contents aren't under our control.
+
+[files]
+extend-exclude = [
+    # Neovim plugin lock — plugin names + commit hashes, machine-managed.
+    "dot_config/nvim/lazy-lock.json",
+    # Obsidian community plugin IDs / per-plugin data — vendor JSON.
+    "dot_config/obsidian/vault-config/community-plugins.json",
+    "dot_config/obsidian/vault-config/plugins/**/*.json",
+]
