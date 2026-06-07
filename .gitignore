@@ -22,6 +22,15 @@ Icon
 .nvimlog
 Session.vim
 
+# ─── AI coding tools (local-only state) ───────────────────────────────────────
+# Per-clone permission/session state for assistants. Belongs in $HOME, not in
+# the repo. The user's global ~/.config/git/ignore typically already covers
+# this; the repo-local entries make it self-protecting on forks and CI.
+.claude/
+.codex/
+.aider*
+.cursor/
+
 # ─── Build / temp ─────────────────────────────────────────────────────────────
 *.bak
 *.orig
