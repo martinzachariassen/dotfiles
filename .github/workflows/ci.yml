@@ -92,8 +92,10 @@ jobs:
 
   # ─── Job 2b: shell unit tests (bats) ───────────────────────────────────────
   # Runs the bats-core suite in tests/ — covers the semver helper used by the
-  # doctor's chezmoi-version gate and the real mkcd shell function extracted
-  # from the zsh config template. Fast; runs on every push/PR.
+  # doctor's chezmoi-version gate, the real mkcd shell function extracted from
+  # the zsh config template, the obsidian-apply vault discovery, and the
+  # static + dynamic checks on every .chezmoiscripts/*.sh.tmpl. Fast; runs on
+  # every push/PR.
   tests:
     name: shell unit tests
     runs-on: ubuntu-latest
@@ -101,7 +103,16 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Install bats + zsh
+        # python3 ships with ubuntu-latest; needed by obsidian-apply.bats.
         run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
+
+      - name: Install chezmoi
+        # Required by chezmoi-scripts.bats's dynamic check, which renders
+        # every .chezmoiscripts/*.sh.tmpl and runs it on Linux to confirm
+        # the darwin guard fires before any macOS-only command.
+        run: |
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run bats suite
         run: bats tests/

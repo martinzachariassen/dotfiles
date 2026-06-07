@@ -44,10 +44,12 @@ install_marketplace_extensions() {
     installed="$(installed_extensions)"
     while IFS= read -r line || [ -n "$line" ]; do
         ext="${line%%#*}"
-        ext="$(printf '%s' "$ext" | xargs)"
+        ext="$(printf '%s' "$ext" | xargs | tr '[:upper:]' '[:lower:]')"
         [ -n "$ext" ] || continue
 
-        if printf '%s\n' "$installed" | grep -qi "^${ext}$"; then
+        # -F = literal match (extension IDs contain "."), -x = whole line.
+        # `installed` is already lowercased; `ext` matches that.
+        if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "✓ extension already installed: $ext"
         else
             echo "→ installing extension: $ext"
@@ -60,8 +62,11 @@ uninstall_deprecated_extensions() {
     local installed ext
     installed="$(installed_extensions)"
 
+    # DEPRECATED_EXTENSIONS entries are kept lowercase by convention so they
+    # line up with `installed_extensions` (already lowercased). Match literally
+    # with -F so dots in IDs aren't treated as regex any-char.
     for ext in "${DEPRECATED_EXTENSIONS[@]}"; do
-        if printf '%s\n' "$installed" | grep -qi "^${ext}$"; then
+        if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "→ uninstalling deprecated extension: $ext"
             code --uninstall-extension "$ext"
         fi
