@@ -140,7 +140,7 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
 - Never print, commit, move, or transform secrets, tokens, keys, cloud
   credentials, signing material, or auth files.
 - Treat `~/.ssh`, `~/.config/{gh,gcloud,1Password}`, `~/.azure`, `~/.claude*`,
-  `~/.codex/auth.json`, and `.env` files as sensitive unless I say otherwise.
+  and `.env` files as sensitive unless I say otherwise.
 - Use `.env.example`, placeholders, or secret-manager references — never real
   values.
 

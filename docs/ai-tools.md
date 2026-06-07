@@ -1,8 +1,8 @@
 # AI tools
 
-This repo is wired for three AI coding tools: Claude Code, GitHub Copilot, and
-Codex. Each reads instructions in its own way; this page explains the layering
-and how to change anything.
+This repo is wired for two AI coding tools: Claude Code and GitHub Copilot.
+Each reads instructions in its own way; this page explains the layering and
+how to change anything.
 
 ## Layering at a glance
 
@@ -12,7 +12,6 @@ Two layers, in order:
    repo. Loaded once per session by each tool, before any project files.
    - Claude Code: `~/.config/claude/CLAUDE.md` (active profile body) +
      `@~/.config/claude/CLAUDE.shared.md` (recursive import at memory-load).
-   - Codex: `~/.codex/AGENTS.md`.
    - Copilot: no user-level file here — relies on the repo-local layer.
 2. **Repo-local (per-project)** — lives in this repo, ignored by chezmoi so it
    never lands in `$HOME`. Single source of truth: [`AGENTS.md`](../AGENTS.md).
@@ -22,7 +21,6 @@ Two layers, in order:
    - Copilot reads
      [`.github/copilot-instructions.md`](../.github/copilot-instructions.md),
      which points at `AGENTS.md`.
-   - Codex auto-loads `AGENTS.md` natively.
 
 Other projects work the same way — drop a `<project>/CLAUDE.md`,
 `<project>/AGENTS.md`, or `.github/copilot-instructions.md` and they layer on
@@ -32,8 +30,7 @@ top of the user-level config.
 
 | Want to change… | Edit | After |
 |---|---|---|
-| Style/conventions for all my AI sessions on this machine (Claude **and** Codex) | `.chezmoitemplates/agents/shared.md` | `chez` |
-| Codex-only operational detail (tool inventory, autonomy) | `dot_codex/AGENTS.md.tmpl` | `chez` |
+| Style/conventions for all my AI sessions on this machine | `.chezmoitemplates/agents/shared.md` | `chez` |
 | Behavior for one Claude profile (personal vs work) | `.chezmoitemplates/claude/<profile>.md` | `chez` |
 | Rules for agents working in *this dotfiles repo* | `AGENTS.md` | nothing — repo-local, no apply step |
 
@@ -71,8 +68,8 @@ Two source files render that user-level config:
   preferences, anti-patterns ("don't suggest tmux, I use Zellij"). It's a thin
   wrapper: the actual content lives in
   [`.chezmoitemplates/agents/shared.md`](../.chezmoitemplates/agents/shared.md),
-  which is `includeTemplate`d here **and** into the Codex `AGENTS.md` so the two
-  tools share one body that can't drift.
+  which is `includeTemplate`d here so the source-of-truth body stays in one
+  place.
 - [`dot_config/claude/CLAUDE.md.tmpl`](../dot_config/claude/CLAUDE.md.tmpl) —
   templated entry point. Uses
   `{{ includeTemplate (printf "claude/%s.md" .profile) . -}}` to pull the
@@ -83,21 +80,10 @@ Two source files render that user-level config:
   Code layers the shared base in at memory-load time — no concat step, no
   generated file to accidentally edit in place.
 
-Edit the shared base in `.chezmoitemplates/agents/shared.md` (changes flow to
-both Claude and Codex), or edit the profile body directly in
-`.chezmoitemplates/claude/<profile>.md`, then run `chez`.
-Switching profiles (`dotfiles profile set personal|work`) just changes which
-body the template includes; the shared base is constant.
-
-## Codex global instructions
-
-[`dot_codex/AGENTS.md.tmpl`](../dot_codex/AGENTS.md.tmpl) maps to
-`~/.codex/AGENTS.md` and is loaded into every personal Codex session before
-project-level instructions. It `includeTemplate`s the exact same shared base as
-the Claude config ([`.chezmoitemplates/agents/shared.md`](../.chezmoitemplates/agents/shared.md))
-— not a mirror, the same file — then appends Codex-only operational detail (tool
-inventory, autonomy stance, dotfiles-repo conventions). Project-specific Codex
-instructions go in `<project>/AGENTS.md` and layer on top.
+Edit the shared base in `.chezmoitemplates/agents/shared.md`, or edit the
+profile body directly in `.chezmoitemplates/claude/<profile>.md`, then run
+`chez`. Switching profiles (`dotfiles profile set personal|work`) just
+changes which body the template includes; the shared base is constant.
 
 ## Local LLMs
 
@@ -109,7 +95,7 @@ scripts/setup-ollama.sh          # starts Ollama as a brew service
 ```
 
 The `macApps` feature installs [`ollama`](https://docs.ollama.com/) for local
-model serving, plus the Codex, ChatGPT, Claude, and Claude Code apps (see
+model serving, plus the Claude and Claude Code apps (see
 [`brewfiles/Brewfile.mac-apps`](../brewfiles/Brewfile.mac-apps)).
 `scripts/setup-ollama.sh` runs Ollama as a background service via
 `brew services` — it is idempotent and pulls no models.

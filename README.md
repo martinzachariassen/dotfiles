@@ -137,7 +137,7 @@ dotfiles features disable macApps
 |---|---|
 | Terminal | Ghostty, Zellij, Starship, Catppuccin Frappe, JetBrainsMono Nerd Font. |
 | Shell | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, and modern CLI aliases. |
-| Local AI | Part of the default `macApps` module: Ollama (run as a brew service) plus the Codex, ChatGPT, Claude, and Claude Code apps. Pull models manually with `ollama pull`. |
+| Local AI | Part of the default `macApps` module: Ollama (run as a brew service) plus the Claude and Claude Code apps. Pull models manually with `ollama pull`. |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | Project tools | mise for per-project language runtimes (Java/Node/Python); CLIs and database servers via Homebrew or Docker. |
 | Editors | VS Code via Homebrew, Neovim with LazyVim for terminal work. |
@@ -157,7 +157,7 @@ See [What you get](docs/what-you-get.md) for the full table and prompt examples.
 | [Troubleshooting](docs/troubleshooting.md) | Known failure modes and recovery commands. |
 | [Architecture](docs/architecture.md) | Chezmoi file classes, remove markers, ignored files, and apply scripts. |
 | [Wizard internals](docs/wizard.md) | How `install.sh`'s prompts and TTY handling work, the invariants, and how to validate changes without breaking it. |
-| [AI tools](docs/ai-tools.md) | How Claude Code, Codex, and Copilot read this repo — user-level config, the `AGENTS.md` bridge, and local LLM setup. |
+| [AI tools](docs/ai-tools.md) | How Claude Code and Copilot read this repo — user-level config, the `AGENTS.md` bridge, and local LLM setup. |
 | [Forking](docs/forking.md) | What to change when basing your own setup on this repo. |
 | [Uninstall / reset](docs/uninstall-reset.md) | Homebrew mirror/reset and manual rollback notes. |
 | [Reference](docs/reference.md) | Links to the important repo files. |

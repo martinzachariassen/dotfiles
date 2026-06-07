@@ -46,6 +46,8 @@ DEPRECATED_CASKS=(
     "microsoft-outlook" # superseded by the microsoft-office (M365) suite, which
                         # bundles Outlook and conflicts_with the standalone cask.
                         # Removing it here lets `brew bundle` install the suite.
+    "codex"             # OpenAI Codex CLI — repo no longer manages OpenAI tooling
+    "chatgpt"           # OpenAI ChatGPT desktop app — same
 )
 # Out-of-band paths (binaries / config dirs) left by the old devbox + direnv
 # stack. Removed without prompting — all cheap and reversible.
@@ -110,7 +112,38 @@ for p in ${DEPRECATED_PATHS[@]+"${DEPRECATED_PATHS[@]}"}; do
     fi
 done
 
-# ─── 4. Nix store (irreversible — confirm first) ──────────────────────────────
+# ─── 4. ~/.codex (auth + history — confirm first) ────────────────────────────
+# OpenAI Codex CLI state. Holds `auth.json`, session sqlite databases, history,
+# and memories. Confirm before deleting (same pattern as the Nix store below) so
+# we never silently transform auth material.
+codex_dir="{{ .chezmoi.homeDir }}/.codex"
+if [ -d "$codex_dir" ]; then
+    codex_size="$(du -sh "$codex_dir" 2>/dev/null | cut -f1 || echo '?')"
+    echo
+    echo "── ~/.codex cleanup ──────────────────────────────────────────"
+    echo "  Codex CLI is gone, but its state dir is still at $codex_dir ($codex_size)."
+    echo "  It contains auth.json and session history. Removal is irreversible."
+
+    exec </dev/tty || true
+    resp=""
+    printf "  Delete %s now? [y/N] " "$codex_dir"
+    read -r resp </dev/tty 2>/dev/null || resp=""
+    case "$resp" in
+        [yY]|[yY][eE][sS])
+            if rm -rf "$codex_dir"; then
+                echo "✓ Removed $codex_dir"
+                removed_any=true
+            else
+                echo "  ! could not remove $codex_dir — delete it manually"
+            fi
+            ;;
+        *)
+            echo "  Skipped. Remove later with: rm -rf $codex_dir"
+            ;;
+    esac
+fi
+
+# ─── 5. Nix store (irreversible — confirm first) ──────────────────────────────
 # The /nix store backed devbox's per-project packages. It needs sudo to remove
 # and can't be undone, so we ask before nuking it rather than doing it silently.
 if [ -d /nix ]; then

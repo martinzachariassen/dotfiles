@@ -147,7 +147,7 @@ jobs:
       - uses: crate-ci/typos@master
 
   # ─── Job 2e: PR metadata (title + no AI attribution) ───────────────────────
-  # Hard rules from the shared Claude/Codex base: every commit/PR title uses
+  # Hard rules from the shared Claude base: every commit/PR title uses
   # Conventional Commits, and nothing — commits, PR body, code, docs — carries
   # AI attribution like `Co-authored-by: Claude` or "Generated with Claude
   # Code". This job enforces both on every PR.
@@ -199,7 +199,7 @@ jobs:
           #      (https://…)" with the parenthesised URL — the auto-generated
           #      banner always ships with it; prose almost never does.
           # ERE, case-insensitive (`grep -iE`).
-          pattern='Co-authored-by:[[:space:]]+(Claude|Codex|ChatGPT|Copilot|GPT-).*<[^>]*@[^>]*>|Generated[[:space:]]+with[[:space:]]+\[Claude[[:space:]]+Code\]\(https?:'
+          pattern='Co-authored-by:[[:space:]]+(Claude|Copilot).*<[^>]*@[^>]*>|Generated[[:space:]]+with[[:space:]]+\[Claude[[:space:]]+Code\]\(https?:'
           errors=0
 
           if printf '%s' "$PR_BODY" | grep -inE "$pattern"; then
