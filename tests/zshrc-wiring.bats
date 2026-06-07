@@ -87,9 +87,9 @@ setup() {
 @test "zshrc sources zsh-syntax-highlighting LAST" {
     # The syntax-highlighting plugin's README is explicit: it must be the
     # last sourced file, otherwise other plugins (autosuggestions, etc.)
-    # mis-render. The comment in the source file documents this; this test
-    # enforces it stays the LAST `source …syntax-highlighting…` line by
-    # confirming no other `source` line follows it.
+    # render incorrectly. The comment in the source file documents this;
+    # this test enforces it stays the LAST `source …syntax-highlighting…`
+    # line by confirming no other `source` line follows it.
     line=$(grep -n 'source.*zsh-syntax-highlighting' "$ZSHRC" | tail -1 | cut -d: -f1)
     [ -n "$line" ]
     tail -n "+$((line + 1))" "$ZSHRC" | grep -E '^[[:space:]]*source[[:space:]]' && return 1
