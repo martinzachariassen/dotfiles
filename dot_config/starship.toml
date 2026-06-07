@@ -110,7 +110,7 @@ disabled = false
 [gcloud]
 symbol   = "󱇶 "
 style    = "lavender"
-format   = '[(󱇶 $account)(@$domain)( \($project\)) ]($style)'
+format   = '[($symbol$account)(@$domain)( \($project\)) ]($style)'
 detect_env_vars = ["CLOUDSDK_CORE_ACCOUNT", "GOOGLE_CLOUD_PROJECT"]
 disabled = false
 

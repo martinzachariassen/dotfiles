@@ -1,8 +1,6 @@
 README.md
 AGENTS.md
 **/AGENTS.md
-CLAUDE.md
-docs/
 LICENSE
 install.sh
 scripts/
@@ -15,7 +13,6 @@ vscode/
 .github/
 .gitignore
 .DS_Store
-examples/
 tests/
 raycast/
 .storecode/

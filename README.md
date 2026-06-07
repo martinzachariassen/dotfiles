@@ -8,8 +8,6 @@
 
 Personal macOS setup, managed by [chezmoi](https://chezmoi.io). One command turns a fresh Mac into a backend workstation with terminal, shell, editors, Homebrew apps, mise-managed language runtimes, and macOS defaults wired up. The installer defaults to a short fresh-Mac path, with cleanup, feature toggles, and git signing setup available when the required software is actually installed.
 
-![Terminal preview](docs/terminal-preview.svg)
-
 ## Start here
 
 Pick the scenario that matches your machine. Everything below runs as your normal macOS user — **never with `sudo`**. Homebrew and the macOS steps ask for your password themselves when they need privileged changes. Every step is idempotent and safe to re-run.
@@ -61,7 +59,7 @@ exec zsh
 chezdoctor      # warns about any leftover devbox/Nix/direnv it couldn't remove
 ```
 
-> **Coming from the devbox/direnv setup?** Runtimes (Java/Node) are now managed by mise: global defaults live in `~/.config/mise/config.toml`, and each project pins its own versions + env vars in a committed `mise.toml` (its `[env]` block replaces `.envrc`). See [What you get](docs/what-you-get.md) and [examples/mise/](examples/mise/).
+> **Coming from the devbox/direnv setup?** Runtimes (Java/Node) are now managed by mise: global defaults live in `~/.config/mise/config.toml`, and each project pins its own versions + env vars in a committed `mise.toml` (its `[env]` block replaces `.envrc`).
 
 ### 3. Already set up — staying current
 
@@ -100,7 +98,7 @@ bash install.sh --reset-brew   # uninstall everything first, then reinstall
 The whole everyday surface is **two verbs plus a health check**. Both verbs end
 in the same `chezmoi apply`, which now reconciles *real installed state* on every
 run — so "make this Mac match the repo" always installs what the Brewfile
-declares (no separate fix step). See [Lifecycle](docs/lifecycle.md).
+declares (no separate fix step).
 
 | Command | Use |
 |---|---|
@@ -144,28 +142,9 @@ dotfiles features disable macApps
 | Workstation apps | Homebrew-managed core apps, optional mac app extras, and profile-specific personal/work layers. |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
 
-See [What you get](docs/what-you-get.md) for the full table and prompt examples.
-
 ## Documentation
 
-| Page | Use it for |
-|---|---|
-| [Lifecycle](docs/lifecycle.md) | The two-verb model (bootstrap vs converge), the convergence guarantee, and the command map. Start here. |
-| [Bootstrap](docs/bootstrap.md) | Wizard flow, profiles, features, secrets, signing, and macOS privacy permissions. |
-| [Day-to-day](docs/day-to-day.md) | Chezmoi mental model, adding tools, previewing changes, aliases, and `doctor.sh`. |
-| [Upgrading](docs/upgrading.md) | `chezup`, `chezreinit`, invalidation rules, and long-absence maintenance. |
-| [Troubleshooting](docs/troubleshooting.md) | Known failure modes and recovery commands. |
-| [Architecture](docs/architecture.md) | Chezmoi file classes, remove markers, ignored files, and apply scripts. |
-| [Wizard internals](docs/wizard.md) | How `install.sh`'s prompts and TTY handling work, the invariants, and how to validate changes without breaking it. |
-| [AI tools](docs/ai-tools.md) | How Claude Code and Copilot read this repo — user-level config, the `AGENTS.md` bridge, and local LLM setup. |
-| [Forking](docs/forking.md) | What to change when basing your own setup on this repo. |
-| [Uninstall / reset](docs/uninstall-reset.md) | Homebrew mirror/reset and manual rollback notes. |
-| [Reference](docs/reference.md) | Links to the important repo files. |
-
-Other useful references:
-
-- [Mapping](docs/mapping.md) maps every managed source file to its target in `$HOME`.
-- [examples/](examples/) contains mise and pre-commit starter files.
+Being rewritten — links coming back here when the new pages land.
 
 ## License
 

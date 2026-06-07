@@ -1,11 +1,15 @@
 # Community plugins to seed into every vault, one per line.
-# Format: <plugin-id>|<github owner/repo>
+# Format: <plugin-id>|<github owner/repo>[|<release-tag>]
 # Lines starting with # and blank lines are ignored.
 #
 # The plugin-id MUST match the "id" field in the plugin's manifest.json — it
 # becomes the folder name under .obsidian/plugins/ and the key in
 # .obsidian/community-plugins.json. Verify with:
 #   curl -fsSL https://github.com/<repo>/releases/latest/download/manifest.json | jq .id
+#
+# Without a tag we fetch /releases/latest/download. Pin a tag only when the
+# repo's latest release is unusable (beta, manifest-id mismatch, breaking
+# minAppVersion) — see the templater + calendar lines below.
 # Templater pinned to 2.20.5 — 2.21+ bumps minAppVersion to 1.13.0, which is
 # Catalyst/early-access only. Unpin once Obsidian 1.13 ships as public stable.
 templater-obsidian|SilentVoid13/Templater|2.20.5
