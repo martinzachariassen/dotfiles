@@ -20,7 +20,6 @@ humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
 ms-azuretools.vscode-containers
-ms-kubernetes-tools.vscode-helm
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
 ms-python.python
@@ -34,6 +33,7 @@ sonarsource.sonarlint-vscode
 streetsidesoftware.code-spell-checker
 streetsidesoftware.code-spell-checker-norwegian-bokmal
 tamasfe.even-better-toml
+tim-koehler.helm-intellisense
 timonwong.shellcheck
 usernamehw.errorlens
 vivaxy.vscode-conventional-commits
