@@ -17,5 +17,6 @@ extend-exclude = [
 # new entries here when CI surfaces a genuine word that typos misreads as a
 # typo — case-folding is automatic, so one lowercase entry covers AKS/Aks/aks.
 [default.extend-words]
-aks = "aks"            # Azure Kubernetes Service — referenced in Brewfile.work + bootstrap-auth.sh
+aks = "aks"            # Azure Kubernetes Service — Brewfile.work + bootstrap-auth.sh
 hashi = "hashi"        # HashiCorp tap prefix in Brewfile.work
+jod = "jod"            # Node.js 24 LTS codename — dot_config/mise/config.toml
