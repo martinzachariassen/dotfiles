@@ -246,20 +246,21 @@ chez() {
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
-# Converge THIS Mac to the repo — the everyday command. Pulls the latest repo,
-# then applies. Because the brew + mise apply scripts now reconcile real
-# installed state on EVERY apply (run_after, not hash-gated), this also
-# guarantees packages match the Brewfile — there's no separate "fix" step. The
-# fresh-machine equivalent is install.sh. See docs/lifecycle.md.
+# Converge THIS Mac to the repo — the everyday command. Wizard-styled pull +
+# preview + apply, sharing banner/phase/prompt vocabulary with install.sh
+# (see scripts/lib/ui.sh `ui_init_wizard` and docs/lifecycle.md, "Look & feel").
+# Because the brew + mise apply scripts reconcile real installed state on EVERY
+# apply (run_after, not hash-gated), this also guarantees packages match the
+# Brewfile — no separate "fix" step. The fresh-machine equivalent is install.sh.
+#
+# Environment passthrough:
+#   YES=1       skip the confirm gate
+#   DRY_RUN=1   print state-changing commands without running them
+# Extra args go straight to `chezmoi apply` (e.g. `chezup -v`).
 chezup() {
     local src
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
-    # Shared banner with the install wizard (glyphs/colors from scripts/lib/ui.sh,
-    # with ASCII + no-color fallbacks). Sourced in a subshell so nothing leaks
-    # into the interactive shell.
-    ( . "$src/scripts/lib/ui.sh" 2>/dev/null && ui_init_colors && ui_init_glyphs \
-        && printf '\n%s%s Converging this Mac to the dotfiles repo…%s\n' "${BOLD:-}" "${NODE:-#}" "${RESET:-}" )
-    (cd "$src" && git pull --ff-only) && chez "$@"
+    bash "$src/scripts/chezup.sh" "$@"
 }
 
 # Full-stack health check (runs scripts/doctor.sh from the source dir). The other
