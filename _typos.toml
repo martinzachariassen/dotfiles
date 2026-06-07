@@ -1,0 +1,22 @@
+# typos — config for the CI job in .github/workflows/ci.yml (job: `typos`).
+# Run locally: brew install typos-cli && typos
+#
+# Extend conservatively: every entry is a real word `typos` would otherwise
+# flag, OR a vendor file where the contents aren't under our control.
+
+[files]
+extend-exclude = [
+    # Neovim plugin lock — plugin names + commit hashes, machine-managed.
+    "dot_config/nvim/lazy-lock.json",
+    # Obsidian community plugin IDs / per-plugin data — vendor JSON.
+    "dot_config/obsidian/vault-config/community-plugins.json",
+    "dot_config/obsidian/vault-config/plugins/**/*.json",
+]
+
+# Real technical abbreviations that aren't in typos' default dictionary. Add
+# new entries here when CI surfaces a genuine word that typos misreads as a
+# typo — case-folding is automatic, so one lowercase entry covers AKS/Aks/aks.
+[default.extend-words]
+aks = "aks"            # Azure Kubernetes Service — Brewfile.work + bootstrap-auth.sh
+hashi = "hashi"        # HashiCorp tap prefix in Brewfile.work
+jod = "jod"            # Node.js 24 LTS codename — dot_config/mise/config.toml

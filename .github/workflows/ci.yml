@@ -117,6 +117,103 @@ jobs:
       - name: Run bats suite
         run: bats tests/
 
+  # ─── Job 2c: config files (JSON / JSONC / TOML) ────────────────────────────
+  # Validates that every JSON, JSONC (VS Code), and TOML file in the source
+  # tree parses cleanly. Catches stray commas, missing quotes, and other hand-
+  # edit damage before `chezmoi apply` writes them into $HOME. The chezmoi job
+  # above proves *templates* render; this one proves the *outputs* are
+  # parseable as the config language they claim to be.
+  #
+  # Ubuntu runners ship python3 with `json.tool` and `tomllib` (3.11+), so no
+  # extra installs are needed.
+  config-lint:
+    name: config files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate JSON / JSONC / TOML
+        run: bash scripts/lint-config.sh "$PWD"
+
+  # ─── Job 2d: typos ─────────────────────────────────────────────────────────
+  # Spell-checks docs, comments, and identifiers using the `typos` Rust crate's
+  # curated dictionary. Fast, low false-positive rate; per-repo overrides live
+  # in `_typos.toml` at the repo root if a real word ever gets flagged.
+  typos:
+    name: typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: crate-ci/typos@master
+
+  # ─── Job 2e: PR metadata (title + no AI attribution) ───────────────────────
+  # Hard rules from the shared Claude/Codex base: every commit/PR title uses
+  # Conventional Commits, and nothing — commits, PR body, code, docs — carries
+  # AI attribution like `Co-authored-by: Claude` or "Generated with Claude
+  # Code". This job enforces both on every PR.
+  pr-meta:
+    name: PR title + attribution
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Conventional Commits title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            refactor
+            test
+            chore
+            perf
+            build
+            ci
+            style
+          requireScope: false
+          subjectPattern: ^.{1,72}$
+          subjectPatternError: |
+            PR title subject must be 1-72 characters (Conventional Commits hard rule).
+
+      - name: No AI attribution in commits or PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Match the CANONICAL forms that real assistants/IDE plugins emit,
+          # not prose that merely mentions the rule. Both branches require
+          # syntax that prose doesn't accidentally produce:
+          #   1. Git trailer "Co-authored-by: <Name> <email@domain>" with the
+          #      <…@…> email part on the SAME line as the name.
+          #   2. Claude Code's body line "[🤖 ]Generated with [Claude Code]
+          #      (https://…)" with the parenthesised URL — the auto-generated
+          #      banner always ships with it; prose almost never does.
+          # ERE, case-insensitive (`grep -iE`).
+          pattern='Co-authored-by:[[:space:]]+(Claude|Codex|ChatGPT|Copilot|GPT-).*<[^>]*@[^>]*>|Generated[[:space:]]+with[[:space:]]+\[Claude[[:space:]]+Code\]\(https?:'
+          errors=0
+
+          if printf '%s' "$PR_BODY" | grep -inE "$pattern"; then
+              echo "::error::PR body contains AI attribution — strip it before merging."
+              errors=$((errors + 1))
+          fi
+
+          if git log --format='%B%n---%n' "$BASE_SHA..$HEAD_SHA" | grep -inE "$pattern"; then
+              echo "::error::Commit message(s) contain AI attribution — rewrite the offending commits."
+              errors=$((errors + 1))
+          fi
+
+          exit "$errors"
+
   # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────
   # Resolve every referenced formula/cask. This catches dead names and broken
   # taps without installing anything, and should fail CI when the repo asks for

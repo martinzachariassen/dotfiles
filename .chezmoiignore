@@ -19,3 +19,4 @@ examples/
 tests/
 raycast/
 .storecode/
+_typos.toml

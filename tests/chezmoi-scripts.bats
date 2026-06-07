@@ -99,7 +99,7 @@ sourceDir = "$REPO_ROOT"
 [data]
     name           = "CI"
     email          = "ci@example.com"
-    signingKey     = "ssh-ed25519 AAAAci-placeholder"
+    signingKey     = "ssh-ed25519 AAAAplaceholder"
     profile        = "personal"
     useOnePassword = true
 
