@@ -83,8 +83,26 @@ fundamentals.
 - Jakarta Bean Validation (`@Valid`, `@NotNull`, …) at boundaries.
 - SLF4J parameterized logging (via Lombok `@Slf4j` in Java), never
   concatenation: `log.debug("user {} requested {}", userId, resource)`.
-- Tests: JUnit 5 + AssertJ; MockMvc/WebTestClient for the HTTP layer;
-  Testcontainers for anything touching a real database or queue.
+- Error responses via `@RestControllerAdvice` returning `ProblemDetail` (RFC
+  7807). Throw unchecked exceptions for non-recoverable conditions and map them
+  in one place — don't catch-and-rethrow through the call stack.
+- Tests: JUnit 5 + AssertJ. Prefer the narrow slice annotations
+  (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`) over `@SpringBootTest`; reach
+  for a full context only when the test genuinely needs one. MockMvc /
+  WebTestClient for the HTTP layer; Testcontainers for anything touching a
+  real database or queue.
+
+### Logging & observability
+
+- Structured JSON logs in deployed services (Spring Boot 3.4+'s
+  `logging.structured.format`, or logstash-logback-encoder on older versions);
+  plain console output in dev.
+- Correlation IDs via SLF4J MDC at the request boundary; make sure they
+  propagate across async / reactive contexts.
+- Metrics via Micrometer (built-in Spring Boot bridge); OpenTelemetry for
+  traces, and for logs too when the project's collector supports it.
+- Never log secrets, full tokens, raw PII, or full request/response bodies on
+  hot paths — log identifiers and shapes, not contents.
 
 ### Build, database, API
 
@@ -126,7 +144,7 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
 - Use `.env.example`, placeholders, or secret-manager references — never real
   values.
 
-## Commits — hard rule
+## Commits & PRs — hard rule
 
 - Conventional Commits: `<type>(<scope>): <subject>` — imperative mood, ≤72
   chars. Types: feat, fix, docs, refactor, test, chore, perf, build, ci, style.
@@ -134,5 +152,8 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   line.
 - Breaking changes: append `!` to the type (`feat(api)!: drop /v1 endpoints`) and
   add a `BREAKING CHANGE:` footer.
-- **Commits are authored by me only. Never add `Co-authored-by`, "Generated
-  with…", or any AI attribution.**
+- PR descriptions follow the same shape — what changed, *why*, and any rollout
+  or follow-up notes. Keep them scannable.
+- **All of the above is authored by me only. Never add `Co-authored-by`,
+  "Generated with…", or any AI attribution to commits, PR descriptions, code
+  comments, or docs.**
