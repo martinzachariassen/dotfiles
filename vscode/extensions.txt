@@ -14,15 +14,18 @@ github.vscode-pull-request-github
 github.copilot-chat
 github.vscode-github-actions
 gruntfuggly.todo-tree
+hashicorp.hcl
 hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
 ms-azuretools.vscode-containers
+ms-kubernetes-tools.vscode-helm
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
 ms-python.python
 ms-vscode-remote.remote-containers
+oderwat.indent-rainbow
 pkief.material-icon-theme
 redhat.java
 redhat.vscode-xml
@@ -33,6 +36,7 @@ streetsidesoftware.code-spell-checker-norwegian-bokmal
 tamasfe.even-better-toml
 timonwong.shellcheck
 usernamehw.errorlens
+vivaxy.vscode-conventional-commits
 vscjava.vscode-gradle
 vscjava.vscode-java-debug
 vscjava.vscode-java-dependency
