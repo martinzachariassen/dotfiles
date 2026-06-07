@@ -190,9 +190,16 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Patterns that must never land in the repo's history or PR metadata.
-          # Extend conservatively — every entry is grep -iE (ERE, case-insensitive).
-          pattern='Co-authored-by:[[:space:]]+(Claude|Codex|ChatGPT|Copilot|GPT-)|Generated[[:space:]]+with[[:space:]]+\[Claude Code\]|Generated[[:space:]]+by[[:space:]]+Copilot|🤖[[:space:]]+Generated[[:space:]]+with'
+          # Match the CANONICAL forms that real assistants/IDE plugins emit,
+          # not prose that merely mentions the rule. Both branches require
+          # syntax that prose doesn't accidentally produce:
+          #   1. Git trailer "Co-authored-by: <Name> <email@domain>" with the
+          #      <…@…> email part on the SAME line as the name.
+          #   2. Claude Code's body line "[🤖 ]Generated with [Claude Code]
+          #      (https://…)" with the parenthesised URL — the auto-generated
+          #      banner always ships with it; prose almost never does.
+          # ERE, case-insensitive (`grep -iE`).
+          pattern='Co-authored-by:[[:space:]]+(Claude|Codex|ChatGPT|Copilot|GPT-).*<[^>]*@[^>]*>|Generated[[:space:]]+with[[:space:]]+\[Claude[[:space:]]+Code\]\(https?:'
           errors=0
 
           if printf '%s' "$PR_BODY" | grep -inE "$pattern"; then

@@ -103,11 +103,10 @@ run() {
     "$@" || errors=$((errors + 1))
 }
 
-# Walk git's view of the tree (`-c`ached + `-o`ther + `--exclude-standard`) so
-# gitignored locals like .claude/settings.local.json never get linted, while
-# still catching untracked new files in a working dir. Files are prefixed with
-# `./` to match the find-style paths the rest of the script (and VSCODE_DIR)
-# is written against.
+# Walk git's view of the tree (cached + untracked, honouring --exclude-standard)
+# so gitignored locals like .claude/settings.local.json never get linted, while
+# still catching new files in a working dir. Files are prefixed with `./` to
+# match the find-style paths the rest of the script (and VSCODE_DIR) uses.
 list_paths() {
     local pattern="$1"
     git ls-files -co --exclude-standard -- "$pattern" | sed 's|^|./|' | sort

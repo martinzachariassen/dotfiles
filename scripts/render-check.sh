@@ -33,7 +33,7 @@ sourceDir = "$SOURCE_DIR"
 [data]
     name           = "CI"
     email          = "ci@example.com"
-    signingKey     = "ssh-ed25519 AAAAci-placeholder"
+    signingKey     = "ssh-ed25519 AAAAplaceholder"
     profile        = "$PROFILE"
     useOnePassword = $USE_ONE_PASSWORD
 

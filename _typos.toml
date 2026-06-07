@@ -12,3 +12,10 @@ extend-exclude = [
     "dot_config/obsidian/vault-config/community-plugins.json",
     "dot_config/obsidian/vault-config/plugins/**/*.json",
 ]
+
+# Real technical abbreviations that aren't in typos' default dictionary. Add
+# new entries here when CI surfaces a genuine word that typos misreads as a
+# typo — case-folding is automatic, so one lowercase entry covers AKS/Aks/aks.
+[default.extend-words]
+aks = "aks"            # Azure Kubernetes Service — referenced in Brewfile.work + bootstrap-auth.sh
+hashi = "hashi"        # HashiCorp tap prefix in Brewfile.work
