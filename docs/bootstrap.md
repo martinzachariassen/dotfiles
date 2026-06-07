@@ -116,7 +116,7 @@ The setup screen asks two orthogonal questions: which **profile** you're on (whi
 
 | Feature | Brewfile | What's in it |
 |---|---|---|
-| `macApps` | `brewfiles/Brewfile.mac-apps` | Raycast, Stats, Chrome, and other GUI quality-of-life apps, plus AI tooling: Ollama (local model runner) and the Codex, ChatGPT, Claude, and Claude Code apps. `scripts/setup-ollama.sh` starts Ollama as a brew service; models are pulled manually via `ollama pull` because they are large. Skip on a server-y machine. |
+| `macApps` | `brewfiles/Brewfile.mac-apps` | Raycast, Stats, Chrome, and other GUI quality-of-life apps, plus AI tooling: Ollama (local model runner) and the Claude and Claude Code apps. `scripts/setup-ollama.sh` starts Ollama as a brew service; models are pulled manually via `ollama pull` because they are large. Skip on a server-y machine. |
 
 The core `Brewfile` always installs the workstation baseline: git, GitHub CLI, modern CLI, prompt, zsh tooling, Ghostty, VS Code, 1Password GUI + CLI, Docker Desktop, Nerd Fonts, Neovim, `mise`, and other shell primitives. Azure and Google Cloud account CLIs live in the work profile (`brewfiles/Brewfile.work`) and are installed when the selected profile is `work`. Project Kubernetes tools, Terraform/OpenTofu, and database clients/servers stay in Homebrew or run via Docker; per-project language runtimes belong in each project's `mise.toml`. Starter templates live under [`examples/mise/`](../examples/mise/).
 
