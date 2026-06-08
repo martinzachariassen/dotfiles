@@ -1,16 +1,26 @@
 <%*
 const title = await tp.system.prompt("Project name");
 const domain = await tp.system.suggester(["work", "personal"], ["work", "personal"], true, "Domain?");
+const priority = await tp.system.suggester(["high", "medium", "low"], ["high", "medium", "low"], true, "Priority?");
 await tp.file.rename(title);
 %>---
 type: project
+icon: LiFolderKanban
+iconColor: "#a6d189"
+aliases: []
+created: <% tp.date.now("YYYY-MM-DD HH:mm") %>
 status: active
 domain: <% domain %>
+priority: <% priority %>
 started: <% tp.date.now("YYYY-MM-DD") %>
 target:
+area:
 tags: [project]
+related: []
 ---
 # <% title %>
+
+> Status: active  ·  <% domain %>  ·  priority <% priority %>
 
 ## Goal
 

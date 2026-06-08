@@ -16,11 +16,21 @@ hotkeys, templates.
   rewrites them on use; we don't fight that).
 - `templates/` — canonical Templater templates. Seeded into the vault's
   `99 Meta/_templates/` on first install.
+- `folder-readmes/` — per-folder `_README.md` files. Each source is named
+  after its target folder verbatim (`20 Projects.md` → `20 Projects/_README.md`),
+  so seeding needs no lookup table and `mkdir -p` lays down the PARA folder
+  structure on a fresh vault.
 - `Home.md` — vault dashboard. Seeded into the vault root on first
   install; the Homepage plugin opens it on launch.
 - `vault-guide.md` — user-facing how-to (PARA layout, hotkeys, where
   things go). Seeded into the vault as `99 Meta/Vault Guide.md` and
   linked from `Home.md`.
+
+`vault-config/` also carries `types.json` (property type registry, so dates,
+numbers, and lists render with the right widget) and
+`plugins/obsidian-icon-folder/data.json` (per-folder Lucide icons + Catppuccin
+colors). Per-note icons are driven by `icon`/`iconColor` frontmatter that the
+templates set, not by the Iconize config.
 
 ## How convergence works
 
@@ -32,8 +42,9 @@ hotkeys, templates.
 3. Ensures the theme + every plugin in `plugins.txt` is on disk (presence
    check, not freshness — freshness is `chezbump`'s job, same pattern as
    brew-bundle and mise-install).
-4. Seeds missing config files and templates. Existing files are left alone so
-   the in-app UI remains the source of truth for runtime changes.
+4. Seeds missing config files, templates, folder READMEs, `Home.md`, and the
+   Vault Guide. Existing files are left alone so the in-app UI remains the
+   source of truth for runtime changes.
 
 To re-seed a file from canonical config, delete it from the vault and re-run
 `chezup`. To pull plugin/theme updates, delete the relevant folder under

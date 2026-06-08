@@ -1,13 +1,18 @@
 <%*
 const title = tp.file.title;
+const m = moment(title, "YYYY-MM-DD");
 %>---
 type: daily
+icon: LiCalendarDays
+iconColor: "#8caaee"
 date: <% title %>
+created: <% tp.date.now("YYYY-MM-DD HH:mm") %>
+week: "[[<% m.format('YYYY-[W]WW') %>]]"
 tags: [daily]
 ---
-# <% title %> · <% moment(title, "YYYY-MM-DD").format("dddd") %>
+# <% title %> · <% m.format("dddd") %>
 
-> [[<% moment(title, "YYYY-MM-DD").subtract(1, 'd').format("YYYY-MM-DD") %>|← yesterday]] · [[<% moment(title, "YYYY-MM-DD").add(1, 'd').format("YYYY-MM-DD") %>|tomorrow →]]
+> [[<% m.clone().subtract(1, 'd').format("YYYY-MM-DD") %>|← yesterday]] · [[<% m.clone().add(1, 'd').format("YYYY-MM-DD") %>|tomorrow →]] · [[<% m.format('YYYY-[W]WW') %>|week]]
 
 ## Focus
 -
@@ -17,7 +22,7 @@ tags: [daily]
 
 ```tasks
 not done
-due before <% moment(title, "YYYY-MM-DD").add(1, 'd').format("YYYY-MM-DD") %>
+due before <% m.clone().add(1, 'd').format("YYYY-MM-DD") %>
 sort by priority
 ```
 

@@ -213,6 +213,32 @@ obsidian_seed_templates() {
     fi
 }
 
+# obsidian_seed_readmes VAULT — seed each PARA folder's "_README.md" from
+# folder-readmes/. Source files are named after their target folder verbatim
+# (e.g. "20 Projects.md" → "20 Projects/_README.md"), so no lookup table is
+# needed. mkdir -p also lays down the top-level folder structure on a fresh
+# vault. Seed-only: an existing README is left untouched.
+obsidian_seed_readmes() {
+    local vault="$1" src name dst placed=0
+    local rdir="$OB_CONFIG_DIR/folder-readmes"
+    [ -d "$rdir" ] || return 0
+    for src in "$rdir/"*.md; do
+        [ -f "$src" ] || continue
+        name="$(basename "$src" .md)"   # e.g. "20 Projects"
+        dst="$vault/$name/_README.md"
+        if [ -e "$dst" ]; then
+            continue
+        fi
+        mkdir -p "$vault/$name"
+        cp "$src" "$dst"
+        printf "  ${GREEN}seed${RESET} %s/_README.md\n" "$name"
+        placed=$((placed + 1))
+    done
+    if [ "$placed" -eq 0 ]; then
+        printf "  %sreadmes: every folder README already in vault%s\n" "$DIM" "$RESET"
+    fi
+}
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 # obsidian_apply — the full convergence. Returns 0 even when individual fetches
@@ -242,6 +268,7 @@ obsidian_apply() {
     obsidian_install_plugins "$vault"
     obsidian_seed_config "$vault"
     obsidian_seed_templates "$vault"
+    obsidian_seed_readmes "$vault"
     obsidian_seed_home "$vault"
     obsidian_seed_vault_guide "$vault"
     return 0
