@@ -5,13 +5,18 @@ const start = week.clone().startOf('isoWeek');
 const end = week.clone().endOf('isoWeek');
 %>---
 type: weekly
+icon: LiCalendarRange
+iconColor: "#8caaee"
 week: <% title %>
+created: <% tp.date.now("YYYY-MM-DD HH:mm") %>
 range: <% start.format("YYYY-MM-DD") %> → <% end.format("YYYY-MM-DD") %>
+month: "[[<% start.format('YYYY-MM') %>]]"
+status: open
 tags: [weekly, review]
 ---
 # Week <% title %>
 
-> <% start.format("MMM D") %> – <% end.format("MMM D, YYYY") %>
+> <% start.format("MMM D") %> – <% end.format("MMM D, YYYY") %>  ·  [[<% start.format('YYYY-MM') %>|month]]
 
 ## What got done
 

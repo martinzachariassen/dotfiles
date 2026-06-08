@@ -1,7 +1,46 @@
 {
+  "installedVersion": "1.0.0-beta1",
+  "activeCalendarSet": "Default",
   "showGettingStartedBanner": false,
   "hasMigratedDailyNoteSettings": true,
   "hasMigratedWeeklyNoteSettings": true,
+  "calendarSets": [
+    {
+      "day": {
+        "format": "YYYY-MM-DD",
+        "folder": "10 Daily/YYYY",
+        "openAtStartup": false,
+        "templatePath": "99 Meta/_templates/daily"
+      },
+      "week": {
+        "format": "YYYY-[W]WW",
+        "folder": "10 Daily/YYYY",
+        "openAtStartup": false,
+        "templatePath": "99 Meta/_templates/weekly"
+      },
+      "month": {
+        "format": "YYYY-MM",
+        "folder": "10 Daily/YYYY",
+        "openAtStartup": false,
+        "templatePath": "99 Meta/_templates/monthly"
+      },
+      "quarter": {
+        "format": "YYYY-[Q]Q",
+        "folder": "",
+        "openAtStartup": false,
+        "templatePath": ""
+      },
+      "year": {
+        "format": "YYYY",
+        "folder": "",
+        "openAtStartup": false,
+        "templatePath": ""
+      },
+      "id": "Default",
+      "ctime": "2026-06-05T22:19:55+02:00"
+    }
+  ],
+  "enableTimelineComplication": true,
   "daily": {
     "available": true,
     "format": "YYYY-MM-DD",
@@ -15,10 +54,10 @@
     "folder": "10 Daily/YYYY"
   },
   "monthly": {
-    "available": false,
+    "available": true,
     "format": "YYYY-MM",
-    "template": "",
-    "folder": ""
+    "template": "99 Meta/_templates/monthly",
+    "folder": "10 Daily/YYYY"
   },
   "quarterly": {
     "available": false,
