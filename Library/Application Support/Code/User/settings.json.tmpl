@@ -134,6 +134,11 @@
 
     "search.followSymlinks": false,
 
+    // Todo-Tree's marketplace VSIX (gruntfuggly.todo-tree 0.0.226) ships without
+    // its bundled `vscode-ripgrep/bin/rg`, so the extension fails on activation
+    // with "Failed to find vscode-ripgrep". Point it at the Homebrew rg instead.
+    "todo-tree.ripgrep.ripgrep": "/opt/homebrew/bin/rg",
+
     // =========================================================
     // EXPLORER & GIT
     // =========================================================
