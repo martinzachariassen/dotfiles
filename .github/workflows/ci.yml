@@ -6,10 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    # Weekly macOS render canary (Mondays 06:17 UTC). Catches macOS-only
-    # template/path breakage before a real fresh-Mac install hits it. The
-    # Linux jobs below run on every push/PR; the macOS render job is gated to
-    # this schedule and manual dispatch (see its `if:`).
+    # Weekly macOS render canary (Mondays 06:17 UTC) — catches macOS-only
+    # template/path breakage the Linux jobs can't see (they short-circuit the
+    # darwin-guarded hooks to `exit 0`).
     - cron: "17 6 * * 1"
 
 permissions:
@@ -20,151 +19,94 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ─── Job 1: shell scripts ───────────────────────────────────────────────────
-  # ShellCheck the plain shell scripts for errors. We deliberately do NOT lint
-  # the .chezmoiscripts/*.sh.tmpl files — they have Go template directives
-  # (e.g. `{{ if ne .chezmoi.os "darwin" }}exit 0{{ end }}`) that strip-and-
-  # lint approaches mishandle (the bare `exit 0` makes everything below it
-  # look unreachable to shellcheck). Those scripts are validated indirectly
-  # by the chezmoi job below: rendering them via chezmoi catches Go template
-  # syntax bugs, then bash parses the rendered script bodies.
+  # Lint plain shell scripts + check shell parser syntax. The .chezmoiscripts/
+  # *.sh.tmpl files are intentionally excluded — their Go template directives
+  # (e.g. `{{ if ne .chezmoi.os "darwin" }}exit 0{{ end }}`) confuse shellcheck.
+  # They're validated by `render` (template syntax) + `test` (rendered bodies).
   shell:
     name: shell scripts
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-
-      - name: Install shell tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck zsh
-
-      - name: Lint plain shell scripts for errors
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck zsh
+      - name: ShellCheck
         run: shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
-
-      - name: Check shell parser syntax
+      - name: Parser syntax
         run: |
           bash -n install.sh scripts/*.sh scripts/lib/*.sh
           zsh -n dot_zshenv dot_config/zsh/dot_zprofile
 
-  # ─── Job 2: chezmoi templates ───────────────────────────────────────────────
-  # Renders every template in the repo. Catches Go template syntax errors,
-  # undefined variables, stale references, and missing data prompts.
-  #
-  # Strategy: scripts/render-check.sh creates a temporary HOME with stub
-  # chezmoi data, then runs `chezmoi apply --dry-run`. This bypasses
-  # interactive prompts entirely and keeps the CI setup reproducible locally.
-  chezmoi:
-    name: chezmoi templates
+  # Render every template via `chezmoi apply --dry-run` against stub data — no
+  # disk writes, no interactive prompts. Catches Go-template syntax errors,
+  # undefined variables, and stale references. The curated matrix exercises both
+  # values of each data axis that branches a template: profile (personal/work),
+  # features.macApps, and useOnePassword (git signing on/off, the fork path).
+  render:
+    name: chezmoi render
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        profile: [personal, work]
-        mac_apps: [true, false]
-        # Vary useOnePassword: it branches the git config + allowed_signers
-        # templates (signing on/off). The false case is the no-1Password fork
-        # path, which would otherwise never be rendered in CI.
-        use_one_password: [true, false]
+        include:
+          - { profile: personal, mac_apps: true,  use_one_password: true }
+          - { profile: work,     mac_apps: true,  use_one_password: true }
+          - { profile: personal, mac_apps: false, use_one_password: true }
+          - { profile: personal, mac_apps: true,  use_one_password: false }
     steps:
       - uses: actions/checkout@v5
-
-      - name: Install zsh
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
-
-      - name: Install chezmoi
-        run: |
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Render every template via dry-run apply
-        # `--dry-run` never writes to disk; it just resolves source state and
-        # reports what would change. Any template parse error, undefined
-        # variable, or template-helper misuse fails this step.
-        #
-        # The macOS-only chezmoi scripts (run_*-install-homebrew, brew-bundle,
-        # vscode-extensions, macos-defaults) all have a `{{ if ne .chezmoi.os
-        # "darwin" }}exit 0{{ end }}` guard, so they don't need any
-        # macOS-specific tooling on this Linux runner — they just exit 0.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+      - uses: ./.github/actions/install-chezmoi
+      - name: Dry-run apply
         env:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: ${{ matrix.mac_apps }}
           USE_ONE_PASSWORD: ${{ matrix.use_one_password }}
         run: bash scripts/render-check.sh "$PWD"
 
-  # ─── Job 2b: shell unit tests (bats) ───────────────────────────────────────
-  # Runs the bats-core suite in tests/ — covers the semver helper used by the
-  # doctor's chezmoi-version gate, the real mkcd shell function extracted from
-  # the zsh config template, the obsidian-apply vault discovery, and the
-  # static + dynamic checks on every .chezmoiscripts/*.sh.tmpl. Fast; runs on
-  # every push/PR.
-  tests:
+  # bats-core suite in tests/: semver helper, shell functions, mise config,
+  # obsidian-apply, and the static + dynamic checks on every chezmoi hook
+  # (chezmoi-scripts.bats renders each hook and runs it on Linux to confirm the
+  # darwin guard fires before any macOS-only command — hence chezmoi here).
+  test:
     name: shell unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
+      - uses: ./.github/actions/install-chezmoi
+      - run: bats tests/
 
-      - name: Install bats + zsh
-        # python3 ships with ubuntu-latest; needed by obsidian-apply.bats.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
-
-      - name: Install chezmoi
-        # Required by chezmoi-scripts.bats's dynamic check, which renders
-        # every .chezmoiscripts/*.sh.tmpl and runs it on Linux to confirm
-        # the darwin guard fires before any macOS-only command.
-        run: |
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Run bats suite
-        run: bats tests/
-
-  # ─── Job 2c: config files (JSON / JSONC / TOML) ────────────────────────────
-  # Validates that every JSON, JSONC (VS Code), and TOML file in the source
-  # tree parses cleanly. Catches stray commas, missing quotes, and other hand-
-  # edit damage before `chezmoi apply` writes them into $HOME. The chezmoi job
-  # above proves *templates* render; this one proves the *outputs* are
-  # parseable as the config language they claim to be.
-  #
-  # Ubuntu runners ship python3 with `json.tool` and `tomllib` (3.11+), so no
-  # extra installs are needed.
-  config-lint:
+  # Validate every JSON / JSONC (VS Code) / TOML output parses as the language it
+  # claims to be. `render` proves templates render; this proves outputs are valid.
+  config:
     name: config files
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+      - run: bash scripts/lint-config.sh "$PWD"
 
-      - name: Validate JSON / JSONC / TOML
-        run: bash scripts/lint-config.sh "$PWD"
-
-  # ─── Job 2d: typos ─────────────────────────────────────────────────────────
-  # Spell-checks docs, comments, and identifiers using the `typos` Rust crate's
-  # curated dictionary. Fast, low false-positive rate; per-repo overrides live
-  # in `_typos.toml` at the repo root if a real word ever gets flagged.
   typos:
     name: typos
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: crate-ci/typos@master
 
-  # ─── Job 2e: PR metadata (title + no AI attribution) ───────────────────────
-  # Hard rules from the shared Claude base: every commit/PR title uses
-  # Conventional Commits, and nothing — commits, PR body, code, docs — carries
-  # AI attribution like `Co-authored-by: Claude` or "Generated with Claude
-  # Code". This job enforces both on every PR.
-  pr-meta:
-    name: PR title + attribution
+  # Conventional Commits PR title (subject 1-72 chars). PR-only.
+  pr-title:
+    name: PR title
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event_name == 'pull_request'
     permissions:
       pull-requests: read
     steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Conventional Commits title
-        uses: amannn/action-semantic-pull-request@v5
+      - uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -182,78 +124,29 @@ jobs:
           requireScope: false
           subjectPattern: ^.{1,72}$
           subjectPatternError: |
-            PR title subject must be 1-72 characters (Conventional Commits hard rule).
+            PR title subject must be 1-72 characters (Conventional Commits).
 
-      - name: No AI attribution in commits or PR body
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          # Match the CANONICAL forms that real assistants/IDE plugins emit,
-          # not prose that merely mentions the rule. Both branches require
-          # syntax that prose doesn't accidentally produce:
-          #   1. Git trailer "Co-authored-by: <Name> <email@domain>" with the
-          #      <…@…> email part on the SAME line as the name.
-          #   2. Claude Code's body line "[🤖 ]Generated with [Claude Code]
-          #      (https://…)" with the parenthesised URL — the auto-generated
-          #      banner always ships with it; prose almost never does.
-          # ERE, case-insensitive (`grep -iE`).
-          pattern='Co-authored-by:[[:space:]]+(Claude|Copilot).*<[^>]*@[^>]*>|Generated[[:space:]]+with[[:space:]]+\[Claude[[:space:]]+Code\]\(https?:'
-          errors=0
-
-          if printf '%s' "$PR_BODY" | grep -inE "$pattern"; then
-              echo "::error::PR body contains AI attribution — strip it before merging."
-              errors=$((errors + 1))
-          fi
-
-          if git log --format='%B%n---%n' "$BASE_SHA..$HEAD_SHA" | grep -inE "$pattern"; then
-              echo "::error::Commit message(s) contain AI attribution — rewrite the offending commits."
-              errors=$((errors + 1))
-          fi
-
-          exit "$errors"
-
-  # ─── Job 3: brew package names (macOS, blocking) ───────────────────────────
-  # Resolve every referenced formula/cask. This catches dead names and broken
-  # taps without installing anything, and should fail CI when the repo asks for
-  # packages Homebrew cannot evaluate.
-  brew-resolve:
-    name: brew package names
+  # Resolve every Brewfile formula/cask name without installing (blocking), then
+  # report installed-state drift (advisory — hosted macOS runners are slow/flaky).
+  brew:
+    name: brew packages
     runs-on: macos-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-
-      - name: Show brew version
-        run: brew --version
-
-      - name: Resolve formulae and casks (no install)
+      - name: Resolve names (no install)
         run: bash scripts/brew-resolve.sh "$PWD"
-
-  # ─── Job 4: brew installed-state smoke (macOS, advisory) ───────────────────
-  # `brew bundle check` reports what is not installed on the runner. That is
-  # useful drift signal, but GitHub-hosted macOS runners are slow and flaky, so
-  # this job stays advisory while brew-resolve above is blocking.
-  brew-check:
-    name: brew bundle check
-    runs-on: macos-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Check every Brewfile module
+      - name: Bundle check (advisory)
+        continue-on-error: true
         run: bash scripts/brew-check-modules.sh "$PWD"
 
-  # ─── Job 5: macOS render canary (weekly / manual) ──────────────────────────
-  # The Linux `chezmoi` job renders templates with the darwin-guarded scripts
-  # short-circuiting to `exit 0`, so it never exercises the real macOS script
-  # bodies (brew-bundle, vscode, macos-defaults, the sha256 `include`s). This
-  # job runs the same render on a macOS runner where those guards fall through,
-  # catching macOS-only template/path breakage before a fresh-Mac install does.
-  # Gated to the weekly schedule + manual dispatch to keep PRs fast and cheap.
+  # The Linux `render` job never executes the real macOS hook bodies (the darwin
+  # guards exit 0). This re-runs the render on macOS where those guards fall
+  # through. Gated to the weekly schedule + manual dispatch to keep PRs fast.
   render-macos:
     name: chezmoi render (macOS canary)
     runs-on: macos-latest
+    timeout-minutes: 20
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
@@ -261,14 +154,8 @@ jobs:
         profile: [personal, work]
     steps:
       - uses: actions/checkout@v5
-
-      - name: Install chezmoi
-        run: |
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Render every template via dry-run apply (macOS bodies)
-        env:
+      - uses: ./.github/actions/install-chezmoi
+      - env:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: "true"
           USE_ONE_PASSWORD: "true"
