@@ -1,3 +1,9 @@
+# Global AI defaults
+
+My cross-project working agreement — loaded for every project on this machine.
+Project-level instructions and existing code patterns always win over anything
+here.
+
 ## About me
 
 Senior backend developer on macOS (Apple Silicon).
@@ -23,22 +29,40 @@ fundamentals.
 - Don't surface "this might not work in older versions" caveats for tools I have
   installed. Trust my mise/Brewfile versions; if compatibility genuinely matters
   for a snippet, say so once and move on.
+- A short *why* — the reasoning or tradeoff — is welcome when I'm working with
+  something unfamiliar, even though the default is to be concise.
 - Default cloud examples to Azure or GCP. AWS is fine when I ask, or when the
   topic is cloud-agnostic and AWS is the most recognizable baseline.
+
+## Operating posture
+
+Read the repo's workflow and match it — one posture, applied to context:
+
+- **Solo / personal repo:** high autonomy. Make the change, run the narrowest
+  useful check, report — don't stop at a proposal for routine work. Committing
+  straight to `main` is fine. Experimentation and small opportunistic cleanups
+  alongside a change are welcome.
+- **Team / PR-based repo:** branch and open a PR; never push to `main`, never
+  force-push, never rewrite shared history. Keep commits small and reviewable.
+  Match team conventions over personal preference. Scope the diff to exactly what
+  the task needs.
+- **Always, regardless of repo:** pause and ask before blast-radius changes —
+  schema/migrations, shared contracts, auth, concurrency, public APIs, infra,
+  CI/pipelines, or adding a dependency in a team repo. On solo repos, add a
+  dependency when it clearly helps and just mention it.
+- **Verification scales with blast radius:** narrowest useful check first
+  (targeted test/build/typecheck/lint); broaden to integration when touching
+  persistence, cross-module contracts, auth, or user-facing flows. State what you
+  did and didn't verify; if you can't verify, say so and name the risk.
 
 ## Working approach
 
 - Read the codebase first; existing project patterns beat general preference.
 - Prefer structured parsers and framework APIs over ad-hoc string manipulation
   when the tooling is already available.
-- Keep edits scoped to the request; no opportunistic refactors unless they're
-  needed to finish the task safely. Treat a dirty worktree as normal — never
-  revert changes you didn't make unless I ask.
+- Treat a dirty worktree as normal — never revert changes you didn't make unless
+  I ask.
 - Use `rg` / `rg --files` for searching whenever possible.
-- Verification: run the narrowest useful check first (targeted test, formatter,
-  typecheck, linter). Broaden when the change touches shared behavior,
-  persistence, auth, concurrency, or user-facing workflows. If you can't verify,
-  say so plainly and name the risk.
 
 ## Code style
 
@@ -119,7 +143,10 @@ assume any one tool is installed; if a workflow needs something, say so and add
 it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
 
 - macOS (Apple Silicon) workstation managed by chezmoi, XDG layout
-  (`ZDOTDIR=~/.config/zsh`).
+  (`ZDOTDIR=~/.config/zsh`). The dotfiles repo lives at
+  `~/Developer/personal/dotfiles`; edit chezmoi sources via `chezmoi edit ~/.X`
+  (editing the live file in `$HOME` creates drift) and apply with the `chez` zsh
+  function. Full conventions for that repo are in its `CLAUDE.md`.
 - **Language runtimes come from mise** — global defaults in
   `~/.config/mise/config.toml`, per-project versions + env in each project's
   committed `mise.toml` (`[env]` section, not direnv). For new projects propose a
@@ -127,6 +154,11 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN or installing runtimes via brew.
 - **Global CLIs and apps come from Homebrew**; databases and project services run
   via Docker / Testcontainers — mise owns language runtimes, not everything.
+- **Kubernetes:** `kubectx` / `kubens` for context + namespace switching; AKS
+  auth via `kubelogin`.
+- **Secrets in deployed environments** come from a secret manager (Azure Key
+  Vault / GCP Secret Manager) — never plain env files, never values in committed
+  config. Local dev may use `.env` + Spring profiles with placeholders.
 - Shell: plain zsh, no framework (oh-my-zsh/prezto/zinit) — extend the managed
   `.zshrc`. Terminal: Ghostty + Zellij (not tmux). Prompt: Starship. Prefer
   modern CLI replacements where they exist.
@@ -134,6 +166,8 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   Java/Kotlin. Commits signed through 1Password's `op-ssh-sign`.
 - Favor declarative/idempotent approaches; for state-mutating shell,
   detect-then-act so re-runs are cheap.
+- Durable notes and personal knowledge live in Obsidian — reach for the vault
+  over scratch files when capturing thinking that should outlast the session.
 
 ## Secrets — hard rule
 
@@ -144,7 +178,14 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
 - Use `.env.example`, placeholders, or secret-manager references — never real
   values.
 
-## Commits & PRs — hard rule
+## Confidentiality
+
+Keep proprietary or internal context (cluster names, namespaces, internal URLs,
+ticket contents, chat messages, private code) out of commits, PR descriptions,
+and prompts to external tools or pastebins. When in doubt, treat it as
+need-to-know and keep it in the repo it came from.
+
+## Commits & PRs
 
 - Conventional Commits: `<type>(<scope>): <subject>` — imperative mood, ≤72
   chars. Types: feat, fix, docs, refactor, test, chore, perf, build, ci, style.
@@ -154,6 +195,3 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   add a `BREAKING CHANGE:` footer.
 - PR descriptions follow the same shape — what changed, *why*, and any rollout
   or follow-up notes. Keep them scannable.
-- **All of the above is authored by me only. Never add `Co-authored-by`,
-  "Generated with…", or any AI attribution to commits, PR descriptions, code
-  comments, or docs.**
