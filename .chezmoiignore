@@ -1,6 +1,10 @@
 README.md
 AGENTS.md
 **/AGENTS.md
+# Anchored to the repo root so it only ignores ~/CLAUDE.md (this repo's project
+# memory). An unanchored "CLAUDE.md" would also match the managed global
+# ~/.config/claude/CLAUDE.md and stop chezmoi from deploying it.
+/CLAUDE.md
 LICENSE
 install.sh
 scripts/

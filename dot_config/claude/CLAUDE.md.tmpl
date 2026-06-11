@@ -1,7 +1,0 @@
-{{/* Active profile's Claude Code memory. The body is sourced from
-     .chezmoitemplates/claude/<profile>.md so that each profile keeps its own
-     editable file in source while only one renders into $HOME. The body
-     itself starts with @~/.config/claude/CLAUDE.shared.md, which Claude Code
-     expands at memory-load time — so the shared base is layered in without a
-     concat step. */ -}}
-{{ includeTemplate (printf "claude/%s.md" .profile) . -}}

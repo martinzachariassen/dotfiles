@@ -1,5 +1,6 @@
 # Marketplace extensions installed by .chezmoiscripts/run_onchange_after_03-vscode.sh.tmpl.
 catppuccin.catppuccin-vsc
+adpyke.codesnap
 anthropic.claude-code
 bierner.markdown-mermaid
 charliermarsh.ruff
