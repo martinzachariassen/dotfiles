@@ -10,6 +10,7 @@ editorconfig.editorconfig
 esbenp.prettier-vscode
 exiasr.hadolint
 foxundermoon.shell-format
+genuitecllc.codetogether
 github.vscode-pull-request-github
 github.copilot-chat
 github.vscode-github-actions
