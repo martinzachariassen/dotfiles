@@ -8,6 +8,7 @@ Brewfile
 Brewfile.lock.json
 brewfiles/
 vscode/
+assets/
 .editorconfig
 .gitattributes
 .github/
