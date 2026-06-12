@@ -26,15 +26,15 @@ Every operation is **idempotent and convergent**: `chezmoi apply` reconciles rea
 
 `install.sh` probes the machine, asks only for what a fresh Mac can answer (profile, name, email), shows you the plan, and applies it. Arrow-key menus when you have a real terminal; plain numbered prompts over `curl | bash` or SSH.
 
-![The install.sh wizard running in dry-run mode](assets/demo-wizard.gif)
+<img src="assets/demo-wizard.gif" alt="The install.sh wizard running in dry-run mode" width="560">
 
 ### Stay in sync — chezup
 
 `chezup` is the everyday command: **pull → review → apply**, in three clearly labelled phases, ending in the same `chezmoi apply` the wizard uses.
 
-![The chezup converge flow running in dry-run mode](assets/demo-chezup.gif)
+<img src="assets/demo-chezup.gif" alt="The chezup converge flow running in dry-run mode" width="560">
 
-<sub>Both clips are recorded in `DRY_RUN` mode (state-changing commands are printed, never executed). Regenerate them with [`vhs`](https://github.com/charmbracelet/vhs): `vhs assets/tapes/wizard.tape` and `vhs assets/tapes/chezup.tape`.</sub>
+<sub>Both clips are recorded against a throwaway sandbox in `DRY_RUN` mode (state-changing commands are printed, never executed) — no real terminal, prompt, paths, or config is shown. Regenerate with [`vhs`](https://github.com/charmbracelet/vhs): `vhs assets/tapes/wizard.tape` and `vhs assets/tapes/chezup.tape` (the chezup clip builds its sandbox via `assets/tapes/sandbox.sh`).</sub>
 
 ## Quick start
 
@@ -204,9 +204,9 @@ bats tests/
 # Drive the real wizard under a pseudo-terminal (DRY_RUN, always aborts safely)
 python3 tests/drive-wizard.py        # or: python3 tests/drive-wizard.py stray
 
-# Regenerate the README demo GIFs (needs: brew install vhs)
-vhs assets/tapes/wizard.tape
-vhs assets/tapes/chezup.tape
+# Regenerate the README demo GIFs (needs: brew install vhs gifsicle)
+vhs assets/tapes/wizard.tape && gifsicle -O3 --lossy=60 --colors 96 -b assets/demo-wizard.gif
+vhs assets/tapes/chezup.tape && gifsicle -O3 --lossy=60 --colors 96 -b assets/demo-chezup.gif
 ```
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/feature matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.
