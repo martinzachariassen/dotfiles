@@ -21,6 +21,7 @@ hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
+mhutchie.git-graph
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
