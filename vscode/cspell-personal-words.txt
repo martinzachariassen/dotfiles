@@ -1,0 +1,6 @@
+allopen
+fasterxml
+flywaydb
+springframework
+stdlib
+Xjsr

@@ -393,6 +393,25 @@
 
     "cSpell.language": "en-US,nb",
 
+    // Personal dictionary as a chezmoi-managed plain-text file. Words added
+    // via "Add Words to personal" in the spell-checker quick-fix get appended
+    // to ~/.config/cspell/personal.txt, which is a symlink into this dotfiles
+    // repo (vscode/cspell-personal-words.txt). So new words show up in
+    // `git status`, are committed alongside the rest of the config, and sync
+    // across machines on the next chezmoi apply — no settings.json edit, no
+    // `chezmoi re-add` step. addWords: true exposes this dictionary as a
+    // target in the lightbulb menu; scope: user keeps it available in every
+    // project.
+    "cSpell.customDictionaries": {
+        "personal": {
+            "name": "personal",
+            "description": "Personal dictionary tracked in dotfiles",
+            "path": "{{ .chezmoi.homeDir }}/.config/cspell/personal.txt",
+            "addWords": true,
+            "scope": "user"
+        }
+    },
+
     // =========================================================
     // LANGUAGE-SPECIFIC
     // =========================================================
