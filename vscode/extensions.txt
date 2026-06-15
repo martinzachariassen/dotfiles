@@ -2,7 +2,6 @@
 catppuccin.catppuccin-vsc
 adpyke.codesnap
 anthropic.claude-code
-bierner.markdown-mermaid
 charliermarsh.ruff
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
@@ -21,6 +20,7 @@ hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
+mermaidchart.vscode-mermaid-chart
 mhutchie.git-graph
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
