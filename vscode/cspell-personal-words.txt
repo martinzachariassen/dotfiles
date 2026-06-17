@@ -1,6 +1,8 @@
 allopen
 fasterxml
 flywaydb
+healthcheck
 springframework
 stdlib
+temurin
 Xjsr
