@@ -1,7 +1,12 @@
 allopen
+cloudsdktool
 fasterxml
 flywaydb
 healthcheck
+isready
+livenessstate
+pgdata
+readinessstate
 springframework
 stdlib
 temurin

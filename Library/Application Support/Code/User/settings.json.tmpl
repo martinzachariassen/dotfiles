@@ -154,6 +154,13 @@
     "git.rebaseWhenSync": true,
     "git.mergeEditor": true,
     "gitlens.currentLine.enabled": false,
+    // Disable VS Code's built-in inline blame decoration shown at the end of the
+    // current line (default-on; often mistaken for a GitLens annotation).
+    "git.blame.editorDecoration.enabled": false,
+    "git.blame.statusBarItem.enabled": false,
+    // Remove the "You, N hours ago | 1 author" CodeLens GitLens inserts above
+    // code blocks (and between lines in YAML/config files).
+    "gitlens.codeLens.enabled": false,
 
     // SCM view as a tree, and diffs that respect whitespace + flag moved code.
     "scm.defaultViewMode": "tree",
