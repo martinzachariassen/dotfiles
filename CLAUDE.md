@@ -89,10 +89,18 @@ Run from the repo root. CI mirrors all of these.
 bats tests/
 bats tests/semver.bats
 
-# Lint plain shell scripts (NOT the .tmpl hooks — Go directives break shellcheck):
+# Lint + format-check plain shell scripts (NOT the .tmpl hooks — Go directives
+# break shellcheck). shfmt enforces `-i 4 -ci`; run `shfmt -w -i 4 -ci <files>`
+# to auto-fix. bash -n / zsh -n parse only their FIRST arg, so loop per file:
 shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
-bash -n install.sh scripts/*.sh scripts/lib/*.sh
-zsh -n dot_zshenv dot_config/zsh/dot_zprofile
+shfmt -d -i 4 -ci install.sh scripts/*.sh scripts/lib/*.sh
+for f in install.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+for f in dot_zshenv dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
+
+# Local commit gates mirroring CI (shellcheck, shfmt, typos, commit message).
+# Activate once per clone; run across everything on demand:
+pre-commit install --install-hooks
+pre-commit run --all-files
 
 # Render every template via dry-run apply (catches Go-template/data errors).
 # Vary the env to exercise the matrix of profiles/features:

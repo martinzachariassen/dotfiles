@@ -27,6 +27,7 @@ brew "jq"                      # JSON
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
 brew "tldr"                    # `tldr <cmd>` — concise example-driven help
+brew "typos-cli"               # source-code spell checker (pre-commit hook; CI uses the action)
 brew "wget"
 brew "yq"                      # YAML
 

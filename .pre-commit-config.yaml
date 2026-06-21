@@ -1,0 +1,57 @@
+# Pre-commit hooks — mirror the CI gates in .github/workflows/ci.yml so a commit
+# (including the direct-to-main commits this repo expects) is checked before it
+# lands, not after. Hooks shell out to the Homebrew-installed tools rather than
+# pre-commit's managed virtualenvs, matching this repo's rule that tooling comes
+# from brew/mise, not ad-hoc downloads.
+#
+# Activate once per clone (the hooks live in this repo, so run from its root):
+#   pre-commit install --install-hooks
+# Check everything on demand:
+#   pre-commit run --all-files
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: local
+    hooks:
+      # ─── Shell scripts (mirrors the `shell scripts` CI job) ──────────────────
+      - id: shellcheck
+        name: shellcheck (severity=error)
+        entry: shellcheck --severity=error --shell=bash
+        language: system
+        files: '^(install\.sh|scripts/.*\.sh)$'
+
+      - id: shfmt
+        name: shfmt (lint, -i 4 -ci)
+        entry: shfmt -d -i 4 -ci
+        language: system
+        files: '^(install\.sh|scripts/.*\.sh)$'
+
+      # bash -n / zsh -n only parse their first argument, so loop one file at a
+      # time (pre-commit passes the matched files as "$@" after the `--`).
+      - id: bash-syntax
+        name: bash -n
+        entry: bash -c 'for f; do bash -n "$f"; done' --
+        language: system
+        files: '^(install\.sh|scripts/.*\.sh)$'
+
+      - id: zsh-syntax
+        name: zsh -n
+        entry: bash -c 'for f; do zsh -n "$f"; done' --
+        language: system
+        files: '^(dot_zshenv|dot_config/zsh/dot_zprofile)$'
+
+      # ─── Spelling (mirrors the `typos` CI job) ───────────────────────────────
+      - id: typos
+        name: typos
+        entry: typos
+        language: system
+        pass_filenames: false
+
+      # ─── Commit message — closes the gap CI's PR-title check leaves for the
+      #     direct-to-main commits this repo expects ─────────────────────────────
+      - id: conventional-commit
+        name: Conventional Commits subject
+        stages: [commit-msg]
+        entry: bash scripts/lib/check-commit-msg.sh
+        language: system
