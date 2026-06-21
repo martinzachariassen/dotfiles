@@ -59,7 +59,7 @@ def_write() {
     local want
     case "$type" in
         -bool)
-            case "$value" in true|YES|yes|1) want=1 ;; *) want=0 ;; esac
+            case "$value" in true | YES | yes | 1) want=1 ;; *) want=0 ;; esac
             ;;
         *) want="$value" ;;
     esac
@@ -72,25 +72,25 @@ def_write() {
 # ═══════════════════════════════════════════════════════════════════════════════
 # KEYBOARD & INPUT — fastest possible key repeat, disable annoying autocorrect
 # ═══════════════════════════════════════════════════════════════════════════════
-def_write NSGlobalDomain ApplePressAndHoldEnabled               -bool false   # disable accents-on-hold; lets you hold j/k in vim
-def_write NSGlobalDomain KeyRepeat                              -int 2        # min 2 (≈30ms)
-def_write NSGlobalDomain InitialKeyRepeat                       -int 15       # min 15 (≈225ms)
-def_write NSGlobalDomain NSAutomaticCapitalizationEnabled       -bool false
-def_write NSGlobalDomain NSAutomaticDashSubstitutionEnabled     -bool false
-def_write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled   -bool false
-def_write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled    -bool false
-def_write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled   -bool false
-def_write NSGlobalDomain AppleKeyboardUIMode                    -int 3        # full keyboard access (Tab through dialogs)
-def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode     -bool true    # expanded save panels
-def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2    -bool true
-def_write NSGlobalDomain PMPrintingExpandedStateForPrint        -bool true    # expanded print panels
-def_write NSGlobalDomain PMPrintingExpandedStateForPrint2       -bool true
+def_write NSGlobalDomain ApplePressAndHoldEnabled -bool false # disable accents-on-hold; lets you hold j/k in vim
+def_write NSGlobalDomain KeyRepeat -int 2                     # min 2 (≈30ms)
+def_write NSGlobalDomain InitialKeyRepeat -int 15             # min 15 (≈225ms)
+def_write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
+def_write NSGlobalDomain NSAutomaticDashSubstitutionEnabled -bool false
+def_write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled -bool false
+def_write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
+def_write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+def_write NSGlobalDomain AppleKeyboardUIMode -int 3                    # full keyboard access (Tab through dialogs)
+def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true # expanded save panels
+def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true
+def_write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true # expanded print panels
+def_write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TRACKPAD
 # ═══════════════════════════════════════════════════════════════════════════════
 def_write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
-defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1   # -currentHost can't go through the helper
+defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1 # -currentHost can't go through the helper
 def_write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 # Three-finger drag (uncomment to enable)
 # defaults write com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool true
@@ -98,22 +98,22 @@ def_write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 # ═══════════════════════════════════════════════════════════════════════════════
 # FINDER — show everything; default to list view; sane sidebar
 # ═══════════════════════════════════════════════════════════════════════════════
-def_write NSGlobalDomain AppleShowAllExtensions      -bool   true              # show all file extensions
-def_write com.apple.finder AppleShowAllFiles         -bool   true              # show hidden files (Cmd+Shift+. still toggles)
-def_write com.apple.finder ShowPathbar               -bool   true
-def_write com.apple.finder ShowStatusBar             -bool   true
-def_write com.apple.finder _FXShowPosixPathInTitle   -bool   true              # full POSIX path in window title
-def_write com.apple.finder FXPreferredViewStyle      -string "Nlsv"            # list view
-def_write com.apple.finder FXDefaultSearchScope      -string "SCcf"            # search current folder, not whole Mac
+def_write NSGlobalDomain AppleShowAllExtensions -bool true # show all file extensions
+def_write com.apple.finder AppleShowAllFiles -bool true    # show hidden files (Cmd+Shift+. still toggles)
+def_write com.apple.finder ShowPathbar -bool true
+def_write com.apple.finder ShowStatusBar -bool true
+def_write com.apple.finder _FXShowPosixPathInTitle -bool true  # full POSIX path in window title
+def_write com.apple.finder FXPreferredViewStyle -string "Nlsv" # list view
+def_write com.apple.finder FXDefaultSearchScope -string "SCcf" # search current folder, not whole Mac
 def_write com.apple.finder FXEnableExtensionChangeWarning -bool false
-def_write com.apple.finder WarnOnEmptyTrash          -bool   false
-def_write com.apple.finder NewWindowTarget           -string "PfHm"            # new window opens to ~
-def_write com.apple.finder NewWindowTargetPath       -string "file://${HOME}/"
-def_write com.apple.finder QuitMenuItem               -bool   true              # enable Cmd+Q / Finder → Quit Finder
+def_write com.apple.finder WarnOnEmptyTrash -bool false
+def_write com.apple.finder NewWindowTarget -string "PfHm" # new window opens to ~
+def_write com.apple.finder NewWindowTargetPath -string "file://${HOME}/"
+def_write com.apple.finder QuitMenuItem -bool true # enable Cmd+Q / Finder → Quit Finder
 
 # Stop creating .DS_Store on network and USB volumes
 def_write com.apple.desktopservices DSDontWriteNetworkStores -bool true
-def_write com.apple.desktopservices DSDontWriteUSBStores     -bool true
+def_write com.apple.desktopservices DSDontWriteUSBStores -bool true
 
 # Show ~/Library (Apple hides it by default)
 chflags nohidden "${HOME}/Library" 2>/dev/null || true
@@ -124,23 +124,23 @@ sudo chflags nohidden /Volumes 2>/dev/null || true
 # ═══════════════════════════════════════════════════════════════════════════════
 # DOCK — small, auto-hide, no recent apps, no animation lag
 # ═══════════════════════════════════════════════════════════════════════════════
-def_write com.apple.dock tilesize                -int    42
-def_write com.apple.dock autohide                -bool   true
-def_write com.apple.dock autohide-delay          -float  0                      # no delay before showing
-def_write com.apple.dock autohide-time-modifier  -float  0.4                    # faster show/hide animation
-def_write com.apple.dock show-recents            -bool   false                  # no recent apps section
-def_write com.apple.dock mineffect               -string "scale"                # minimize: scale (faster) instead of genie
-def_write com.apple.dock mru-spaces              -bool   false                  # don't reorder spaces by recent use
-def_write com.apple.dock expose-group-by-app     -bool   false                  # Mission Control: don't group windows by app
+def_write com.apple.dock tilesize -int 42
+def_write com.apple.dock autohide -bool true
+def_write com.apple.dock autohide-delay -float 0           # no delay before showing
+def_write com.apple.dock autohide-time-modifier -float 0.4 # faster show/hide animation
+def_write com.apple.dock show-recents -bool false          # no recent apps section
+def_write com.apple.dock mineffect -string "scale"         # minimize: scale (faster) instead of genie
+def_write com.apple.dock mru-spaces -bool false            # don't reorder spaces by recent use
+def_write com.apple.dock expose-group-by-app -bool false   # Mission Control: don't group windows by app
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SCREENSHOTS — save to ~/Pictures/Screenshots, no shadow, PNG
 # ═══════════════════════════════════════════════════════════════════════════════
 mkdir -p "${HOME}/Pictures/Screenshots"
-def_write com.apple.screencapture location       -string "${HOME}/Pictures/Screenshots"
-def_write com.apple.screencapture type           -string "png"
-def_write com.apple.screencapture disable-shadow -bool   true
-def_write com.apple.screencapture include-date   -bool   true
+def_write com.apple.screencapture location -string "${HOME}/Pictures/Screenshots"
+def_write com.apple.screencapture type -string "png"
+def_write com.apple.screencapture disable-shadow -bool true
+def_write com.apple.screencapture include-date -bool true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEXTEDIT — plain text default, UTF-8
@@ -196,8 +196,8 @@ if [ "$macos_major" -ge 14 ]; then
         if [ -r "$SUDO_LOCAL_TEMPLATE" ] && ! sudo test -f "$SUDO_LOCAL"; then
             sudo cp "$SUDO_LOCAL_TEMPLATE" "$SUDO_LOCAL"
         fi
-        printf '# Managed by dotfiles macos-defaults.sh\nauth       sufficient     pam_tid.so\n' \
-            | sudo tee -a "$SUDO_LOCAL" >/dev/null
+        printf '# Managed by dotfiles macos-defaults.sh\nauth       sufficient     pam_tid.so\n' |
+            sudo tee -a "$SUDO_LOCAL" >/dev/null
         echo "  ✓ Touch ID for sudo enabled"
     fi
 else
@@ -208,7 +208,8 @@ fi
 # Apply changes — restart affected apps only if their settings actually changed
 # ═══════════════════════════════════════════════════════════════════════════════
 restart_if_changed() {
-    local app="$1" ; shift
+    local app="$1"
+    shift
     # bash 3.2 (macOS default) has a known bug with `${arr[@]:-}` under set -u;
     # explicit length check sidesteps it.
     [[ ${#CHANGED_DOMAINS[@]} -eq 0 ]] && return
@@ -222,8 +223,8 @@ restart_if_changed() {
         done
     done
 }
-restart_if_changed Finder         com.apple.finder com.apple.desktopservices
-restart_if_changed Dock           com.apple.dock
+restart_if_changed Finder com.apple.finder com.apple.desktopservices
+restart_if_changed Dock com.apple.dock
 restart_if_changed SystemUIServer com.apple.screencapture com.apple.systemuiserver
 
 echo "✓ macOS defaults complete — ${#CHANGED_DOMAINS[@]} write(s) applied"

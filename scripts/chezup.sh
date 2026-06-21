@@ -25,7 +25,7 @@ set -uo pipefail
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 DRY_RUN="${DRY_RUN:-0}"
 ASSUME_YES="${YES:-0}"
-export ASSUME_YES   # ui.sh's prompt helpers read this
+export ASSUME_YES # ui.sh's prompt helpers read this
 
 # ─── Shared UI ───────────────────────────────────────────────────────────────
 _CHEZUP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -47,15 +47,18 @@ run() {
     "$@"
 }
 
-on_signal() { restore_terminal; exit 130; }
+on_signal() {
+    restore_terminal
+    exit 130
+}
 trap restore_terminal EXIT
 trap on_signal INT TERM
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 human_duration() {
     local secs="$1" mins
-    mins=$(( secs / 60 ))
-    secs=$(( secs % 60 ))
+    mins=$((secs / 60))
+    secs=$((secs % 60))
     printf '%dm%02ds' "$mins" "$secs"
 }
 
@@ -70,7 +73,7 @@ render_status_line() {
     # Pick the first non-space code from the two columns.
     case "$code" in
         ' '*) code="${code:1:1}" ;;
-        *)    code="${code:0:1}" ;;
+        *) code="${code:0:1}" ;;
     esac
     printf "%s    %s%s%s  %s\n" "$(line_prefix)" "$ACCENT" "$code" "$RESET" "$path"
 }
@@ -93,7 +96,7 @@ phase_update_repo() {
         run git -C "$SOURCE_DIR" pull --ff-only
         after="$before"
     else
-        ( cd "$SOURCE_DIR" && git pull --ff-only ) >/dev/null 2>&1 || rc=$?
+        (cd "$SOURCE_DIR" && git pull --ff-only) >/dev/null 2>&1 || rc=$?
         after="$(cd "$SOURCE_DIR" && git rev-parse HEAD 2>/dev/null || echo unknown)"
     fi
 
@@ -201,7 +204,7 @@ done_card() {
     profile="$(chezmoi execute-template '{{ .profile }}' 2>/dev/null || true)"
     [ -z "$profile" ] && profile="unknown"
 
-    [ "$DRY_RUN" = "1" ]    && mode_chips="${mode_chips}${mode_chips:+ }DRY-RUN"
+    [ "$DRY_RUN" = "1" ] && mode_chips="${mode_chips}${mode_chips:+ }DRY-RUN"
     [ "$ASSUME_YES" = "1" ] && mode_chips="${mode_chips}${mode_chips:+ }YES"
 
     printf "%s\n" "$(line_prefix)"
@@ -231,7 +234,7 @@ PENDING_RAW=""
 main() {
     ui_banner "DOTFILES" "converge this Mac" ""
     local chips=""
-    [ "$DRY_RUN" = "1" ]    && chips="$chips ${YELLOW}${BOLD}[DRY-RUN]${RESET}"
+    [ "$DRY_RUN" = "1" ] && chips="$chips ${YELLOW}${BOLD}[DRY-RUN]${RESET}"
     [ "$ASSUME_YES" = "1" ] && chips="$chips ${YELLOW}${BOLD}[YES]${RESET}"
     [ -n "$chips" ] && printf "%s %s\n" "$(line_prefix)" "$chips"
 

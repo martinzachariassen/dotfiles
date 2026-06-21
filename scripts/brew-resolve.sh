@@ -15,8 +15,8 @@ resolve() {
         flag="--cask"
     fi
 
-    brew info "$flag" "$name" >/dev/null 2>&1 \
-        || brew search "$flag" "$name" 2>/dev/null | grep -Fxq "$name"
+    brew info "$flag" "$name" >/dev/null 2>&1 ||
+        brew search "$flag" "$name" 2>/dev/null | grep -Fxq "$name"
 }
 
 for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
@@ -32,10 +32,13 @@ for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
         if [[ "$line" =~ ^[[:space:]]*(brew|cask)[[:space:]]+\"([^\"]+)\" ]]; then
             kind="${BASH_REMATCH[1]}"
             name="${BASH_REMATCH[2]}"
-            resolve "$kind" "$name" \
-                || { echo "  ✗ $kind not found: $name"; missing=1; }
+            resolve "$kind" "$name" ||
+                {
+                    echo "  ✗ $kind not found: $name"
+                    missing=1
+                }
         fi
-    done < "$f"
+    done <"$f"
 done
 
 exit "$missing"

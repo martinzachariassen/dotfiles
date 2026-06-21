@@ -27,14 +27,22 @@ __DOTFILES_UI_SH=1
 # them unconditionally under `set -u`.
 ui_init_colors() {
     if [ -t 1 ]; then
-        BOLD=$'\033[1m'; DIM=$'\033[2m'
-        GREEN=$'\033[32m'; YELLOW=$'\033[33m'; BLUE=$'\033[34m'
-        RED=$'\033[31m'; CYAN=$'\033[36m'
+        BOLD=$'\033[1m'
+        DIM=$'\033[2m'
+        GREEN=$'\033[32m'
+        YELLOW=$'\033[33m'
+        BLUE=$'\033[34m'
+        RED=$'\033[31m'
+        CYAN=$'\033[36m'
         RESET=$'\033[0m'
     else
-        BOLD=""; DIM=""
-        GREEN=""; YELLOW=""; BLUE=""
-        RED=""; CYAN=""
+        BOLD=""
+        DIM=""
+        GREEN=""
+        YELLOW=""
+        BLUE=""
+        RED=""
+        CYAN=""
         RESET=""
     fi
 }
@@ -45,13 +53,21 @@ ui_init_colors() {
 # bare C/POSIX locale.
 ui_init_glyphs() {
     case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-        *UTF-8*|*utf8*|*UTF8*)
-            BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
+        *UTF-8* | *utf8* | *UTF8*)
+            BAR="│"
+            NODE="◆"
+            OK_MARK="✓"
+            ARROW_MARK="→"
+            FAIL_MARK="✗"
             BOX_TOP="╭────────────────────────────────────────────────────────────╮"
             BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
             ;;
         *)
-            BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
+            BAR="|"
+            NODE="*"
+            OK_MARK="OK"
+            ARROW_MARK=">"
+            FAIL_MARK="X"
             BOX_TOP="+------------------------------------------------------------+"
             BOX_BOTTOM="+------------------------------------------------------------+"
             ;;
@@ -93,29 +109,29 @@ _ui_wizard_capabilities() {
 
     UI_DEPTH=16
     case "${COLORTERM:-}" in
-        *truecolor*|*24bit*) UI_DEPTH=true ;;
+        *truecolor* | *24bit*) UI_DEPTH=true ;;
     esac
     if [ "$UI_DEPTH" = 16 ]; then
         case "${TERM:-}" in
-            *256color*|*-direct*) UI_DEPTH=256 ;;
+            *256color* | *-direct*) UI_DEPTH=256 ;;
         esac
     fi
     [ "$UI_COLOR" = 0 ] && UI_DEPTH=none
 
     case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-        *UTF-8*|*utf8*|*UTF8*) UI_UNICODE=1 ;;
+        *UTF-8* | *utf8* | *UTF8*) UI_UNICODE=1 ;;
         *) UI_UNICODE=0 ;;
     esac
 
-    UI_COLS="$( { tput cols; } 2>/dev/null </dev/tty || true )"
+    UI_COLS="$({ tput cols; } 2>/dev/null </dev/tty || true)"
     [ -z "$UI_COLS" ] && UI_COLS="${COLUMNS:-}"
-    case "$UI_COLS" in ''|*[!0-9]*) UI_COLS=60 ;; esac
+    case "$UI_COLS" in '' | *[!0-9]*) UI_COLS=60 ;; esac
     [ "$UI_COLS" -lt 48 ] && UI_COLS=48
     [ "$UI_COLS" -gt 80 ] && UI_COLS=80
 
-    if [ "${ASSUME_YES:-0}" != "1" ] \
-            && command -v stty >/dev/null 2>&1 \
-            && ( exec </dev/tty >/dev/tty ) 2>/dev/null; then
+    if [ "${ASSUME_YES:-0}" != "1" ] &&
+        command -v stty >/dev/null 2>&1 &&
+        (exec </dev/tty >/dev/tty) 2>/dev/null; then
         UI_RAW=1
     else
         UI_RAW=0
@@ -129,37 +145,40 @@ fg() {
     case "${UI_DEPTH:-none}" in
         true)
             case "$1" in
-                accent)  printf '\033[38;2;202;158;230m' ;;
+                accent) printf '\033[38;2;202;158;230m' ;;
                 accent2) printf '\033[38;2;140;170;238m' ;;
-                ok)      printf '\033[38;2;166;209;137m' ;;
-                warn)    printf '\033[38;2;229;200;144m' ;;
-                err)     printf '\033[38;2;231;130;132m' ;;
-                info)    printf '\033[38;2;153;209;219m' ;;
-                muted)   printf '\033[38;2;115;121;148m' ;;
-                rail)    printf '\033[38;2;98;104;128m'  ;;
-            esac ;;
+                ok) printf '\033[38;2;166;209;137m' ;;
+                warn) printf '\033[38;2;229;200;144m' ;;
+                err) printf '\033[38;2;231;130;132m' ;;
+                info) printf '\033[38;2;153;209;219m' ;;
+                muted) printf '\033[38;2;115;121;148m' ;;
+                rail) printf '\033[38;2;98;104;128m' ;;
+            esac
+            ;;
         256)
             case "$1" in
-                accent)  printf '\033[38;5;183m' ;;
+                accent) printf '\033[38;5;183m' ;;
                 accent2) printf '\033[38;5;111m' ;;
-                ok)      printf '\033[38;5;150m' ;;
-                warn)    printf '\033[38;5;180m' ;;
-                err)     printf '\033[38;5;210m' ;;
-                info)    printf '\033[38;5;152m' ;;
-                muted)   printf '\033[38;5;102m' ;;
-                rail)    printf '\033[38;5;60m'  ;;
-            esac ;;
+                ok) printf '\033[38;5;150m' ;;
+                warn) printf '\033[38;5;180m' ;;
+                err) printf '\033[38;5;210m' ;;
+                info) printf '\033[38;5;152m' ;;
+                muted) printf '\033[38;5;102m' ;;
+                rail) printf '\033[38;5;60m' ;;
+            esac
+            ;;
         *)
             case "$1" in
-                accent)  printf '\033[35m' ;;
+                accent) printf '\033[35m' ;;
                 accent2) printf '\033[34m' ;;
-                ok)      printf '\033[32m' ;;
-                warn)    printf '\033[33m' ;;
-                err)     printf '\033[31m' ;;
-                info)    printf '\033[36m' ;;
-                muted)   printf '\033[90m' ;;
-                rail)    printf '\033[36m' ;;
-            esac ;;
+                ok) printf '\033[32m' ;;
+                warn) printf '\033[33m' ;;
+                err) printf '\033[31m' ;;
+                info) printf '\033[36m' ;;
+                muted) printf '\033[90m' ;;
+                rail) printf '\033[36m' ;;
+            esac
+            ;;
     esac
 }
 
@@ -168,12 +187,29 @@ fg() {
 # want a "warning yellow") keep working.
 _ui_wizard_palette() {
     if [ "$UI_COLOR" = 1 ]; then
-        BOLD=$'\033[1m'; DIM=$'\033[2m'; RESET=$'\033[0m'
-        GREEN="$(fg ok)"; YELLOW="$(fg warn)"; BLUE="$(fg accent2)"; RED="$(fg err)"
-        CYAN="$(fg rail)"; ACCENT="$(fg accent)"; INFOC="$(fg info)"; MUTED="$(fg muted)"
+        BOLD=$'\033[1m'
+        DIM=$'\033[2m'
+        RESET=$'\033[0m'
+        GREEN="$(fg ok)"
+        YELLOW="$(fg warn)"
+        BLUE="$(fg accent2)"
+        RED="$(fg err)"
+        CYAN="$(fg rail)"
+        ACCENT="$(fg accent)"
+        INFOC="$(fg info)"
+        MUTED="$(fg muted)"
     else
-        BOLD=""; DIM=""; RESET=""; GREEN=""; YELLOW=""; BLUE=""; RED=""
-        CYAN=""; ACCENT=""; INFOC=""; MUTED=""
+        BOLD=""
+        DIM=""
+        RESET=""
+        GREEN=""
+        YELLOW=""
+        BLUE=""
+        RED=""
+        CYAN=""
+        ACCENT=""
+        INFOC=""
+        MUTED=""
     fi
 }
 
@@ -182,14 +218,38 @@ _ui_wizard_palette() {
 # ui_init_glyphs with per-char primitives we compose at render time.
 _ui_wizard_glyphs() {
     if [ "$UI_UNICODE" = 1 ]; then
-        BAR="│"; NODE="◆"; OK_MARK="✓"; ARROW_MARK="→"; FAIL_MARK="✗"
-        G_POINTER="❯"; G_OFF="○"; G_FULL="▰"; G_EMPTY="▱"
-        BOX_TL="╭"; BOX_TR="╮"; BOX_BL="╰"; BOX_BR="╯"; BOX_H="─"; BOX_V="│"
+        BAR="│"
+        NODE="◆"
+        OK_MARK="✓"
+        ARROW_MARK="→"
+        FAIL_MARK="✗"
+        G_POINTER="❯"
+        G_OFF="○"
+        G_FULL="▰"
+        G_EMPTY="▱"
+        BOX_TL="╭"
+        BOX_TR="╮"
+        BOX_BL="╰"
+        BOX_BR="╯"
+        BOX_H="─"
+        BOX_V="│"
         SPIN_FRAMES="⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏"
     else
-        BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
-        G_POINTER=">"; G_OFF="o"; G_FULL="#"; G_EMPTY="-"
-        BOX_TL="+"; BOX_TR="+"; BOX_BL="+"; BOX_BR="+"; BOX_H="-"; BOX_V="|"
+        BAR="|"
+        NODE="*"
+        OK_MARK="OK"
+        ARROW_MARK=">"
+        FAIL_MARK="X"
+        G_POINTER=">"
+        G_OFF="o"
+        G_FULL="#"
+        G_EMPTY="-"
+        BOX_TL="+"
+        BOX_TR="+"
+        BOX_BL="+"
+        BOX_BR="+"
+        BOX_H="-"
+        BOX_V="|"
         SPIN_FRAMES="| / - \\"
     fi
 }
@@ -201,20 +261,23 @@ _ui_wizard_define_helpers() {
     # repeat CHAR COUNT — echo CHAR repeated COUNT times (multibyte-safe).
     repeat() {
         local ch="$1" n="$2" out="" i=0
-        while [ "$i" -lt "$n" ]; do out="$out$ch"; i=$((i + 1)); done
+        while [ "$i" -lt "$n" ]; do
+            out="$out$ch"
+            i=$((i + 1))
+        done
         printf '%s' "$out"
     }
 
     line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
     node_prefix() { printf "%s%s%s" "$ACCENT" "$NODE" "$RESET"; }
 
-    say()   { printf "%s  %s\n" "$(line_prefix)" "$1"; }
-    ok()    { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
-    info()  { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
-    warn()  { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
-    fail()  { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
-    dim()   { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
-    hr()    { printf "%s\n" "$(line_prefix)"; }
+    say() { printf "%s  %s\n" "$(line_prefix)" "$1"; }
+    ok() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+    info() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
+    warn() { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
+    fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
+    dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
+    hr() { printf "%s\n" "$(line_prefix)"; }
 
     setting() {
         local label="$1" value="$2"
@@ -223,7 +286,7 @@ _ui_wizard_define_helpers() {
 
     bool_label() {
         case "${1:-false}" in
-            true|1|yes) printf 'yes' ;;
+            true | 1 | yes) printf 'yes' ;;
             *) printf 'no' ;;
         esac
     }
@@ -236,8 +299,8 @@ _ui_wizard_define_helpers() {
     progress_bar() {
         local n="$1" m="$2" segs=12 filled i out=""
         [ "$m" -le 0 ] && m=1
-        filled=$(( n * segs / m ))
-        for ((i=0; i<segs; i++)); do
+        filled=$((n * segs / m))
+        for ((i = 0; i < segs; i++)); do
             if [ "$i" -lt "$filled" ]; then out="$out$G_FULL"; else out="$out$G_EMPTY"; fi
         done
         printf '%s' "$out"
@@ -249,9 +312,10 @@ _ui_wizard_define_helpers() {
         case "$title" in
             [0-9]*/[0-9]*)
                 n="${title%%/*}"
-                rest="${title#*/}"; m="${rest%% *}"
+                rest="${title#*/}"
+                m="${rest%% *}"
                 human="${title#*- }"
-                pct=$(( n * 100 / m ))
+                pct=$((n * 100 / m))
                 printf "%s  %sStep %s/%s%s   %s%s%s %s%d%%%s\n" \
                     "$(node_prefix)" "$BOLD" "$n" "$m" "$RESET" \
                     "$ACCENT" "$(progress_bar "$n" "$m")" "$RESET" "$DIM" "$pct" "$RESET"
@@ -277,16 +341,16 @@ _ui_wizard_define_helpers() {
         local inner=$((UI_COLS - 2)) depth_label sep
         case "$UI_DEPTH" in
             true) depth_label="truecolor" ;;
-            256)  depth_label="256-color" ;;
-            16)   depth_label="16-color" ;;
-            *)    depth_label="plain" ;;
+            256) depth_label="256-color" ;;
+            16) depth_label="16-color" ;;
+            *) depth_label="plain" ;;
         esac
         [ "$UI_UNICODE" = 1 ] && sep="·" || sep="-"
         [ -z "$tagline" ] && tagline="catppuccin frappe $sep $depth_label"
 
         _brow() {
             local plain="$1" colored="$2" pad
-            pad=$(( inner - 1 - ${#plain} ))
+            pad=$((inner - 1 - ${#plain}))
             [ "$pad" -lt 0 ] && pad=0
             printf '%s%s%s %s%s%s%s%s\n' \
                 "$ACCENT" "$BOX_V" "$RESET" "$colored" "$(repeat ' ' "$pad")" "$ACCENT" "$BOX_V" "$RESET"
@@ -305,12 +369,12 @@ _ui_wizard_define_helpers() {
     # (`curl | bash`-style invocations) and redirected stdout. They degrade to
     # the supplied default when no tty is available or ASSUME_YES=1.
 
-    have_tty() { ( exec </dev/tty >/dev/tty ) 2>/dev/null; }
+    have_tty() { (exec </dev/tty >/dev/tty) 2>/dev/null; }
 
     prompt_read() {
         local __out="$1" prompt="$2" response
-        printf "%s  %s" "$(line_prefix)" "$prompt" > /dev/tty
-        IFS= read -r response < /dev/tty || response=""
+        printf "%s  %s" "$(line_prefix)" "$prompt" >/dev/tty
+        IFS= read -r response </dev/tty || response=""
         printf -v "$__out" '%s' "$response"
     }
 
@@ -325,21 +389,23 @@ _ui_wizard_define_helpers() {
     # ESC-rest read uses `-t 1` which honours fractional values in zsh but
     # not bash 3.2; that's fine here because chezup.sh runs under bash.
     ui_select_raw() {
-        local __out="$1" default="$2"; shift 2
+        local __out="$1" default="$2"
+        shift 2
         local opts=("$@") n=$# i sel=0 key rest val saved
 
-        for ((i=0; i<n; i++)); do
+        for ((i = 0; i < n; i++)); do
             [ "${opts[$i]%%|*}" = "$default" ] && sel=$i
         done
 
         _ui_draw() {
             local j v l
-            for ((j=0; j<n; j++)); do
-                v="${opts[$j]%%|*}"; l="${opts[$j]#*|}"
+            for ((j = 0; j < n; j++)); do
+                v="${opts[$j]%%|*}"
+                l="${opts[$j]#*|}"
                 if [ "$j" -eq "$sel" ]; then
-                    printf '\r\033[2K%s    %s%s %s%s%s\n' "$(line_prefix)" "$ACCENT" "$G_POINTER" "$BOLD" "$l" "$RESET" > /dev/tty
+                    printf '\r\033[2K%s    %s%s %s%s%s\n' "$(line_prefix)" "$ACCENT" "$G_POINTER" "$BOLD" "$l" "$RESET" >/dev/tty
                 else
-                    printf '\r\033[2K%s    %s%s %s%s\n' "$(line_prefix)" "$DIM" "$G_OFF" "$l" "$RESET" > /dev/tty
+                    printf '\r\033[2K%s    %s%s %s%s\n' "$(line_prefix)" "$DIM" "$G_OFF" "$l" "$RESET" >/dev/tty
                 fi
             done
         }
@@ -347,7 +413,7 @@ _ui_wizard_define_helpers() {
         saved="$(stty -g </dev/tty 2>/dev/null)"
         UI_STTY_SAVED="$saved"
         stty -echo -icanon min 1 time 0 </dev/tty 2>/dev/null
-        [ "$UI_COLOR" = 1 ] && printf '\033[?25l' > /dev/tty
+        [ "$UI_COLOR" = 1 ] && printf '\033[?25l' >/dev/tty
 
         _ui_draw
         while :; do
@@ -356,20 +422,25 @@ _ui_wizard_define_helpers() {
                 $'\033')
                     read -rsn2 -t 1 rest </dev/tty
                     case "$rest" in
-                        '[A') sel=$(( (sel - 1 + n) % n )) ;;
-                        '[B') sel=$(( (sel + 1) % n )) ;;
-                    esac ;;
-                k|K) sel=$(( (sel - 1 + n) % n )) ;;
-                j|J) sel=$(( (sel + 1) % n )) ;;
-                ''|$'\n'|$'\r') break ;;
+                        '[A') sel=$(((sel - 1 + n) % n)) ;;
+                        '[B') sel=$(((sel + 1) % n)) ;;
+                    esac
+                    ;;
+                k | K) sel=$(((sel - 1 + n) % n)) ;;
+                j | J) sel=$(((sel + 1) % n)) ;;
+                '' | $'\n' | $'\r') break ;;
                 [1-9])
-                    if [ "$key" -ge 1 ] && [ "$key" -le "$n" ]; then sel=$((key - 1)); break; fi ;;
+                    if [ "$key" -ge 1 ] && [ "$key" -le "$n" ]; then
+                        sel=$((key - 1))
+                        break
+                    fi
+                    ;;
             esac
-            printf '\033[%dA' "$n" > /dev/tty
+            printf '\033[%dA' "$n" >/dev/tty
             _ui_draw
         done
 
-        [ "$UI_COLOR" = 1 ] && printf '\033[?25h' > /dev/tty
+        [ "$UI_COLOR" = 1 ] && printf '\033[?25h' >/dev/tty
         stty "$saved" </dev/tty 2>/dev/null
         UI_STTY_SAVED=""
 
@@ -378,28 +449,33 @@ _ui_wizard_define_helpers() {
     }
 
     _choice_numbered() {
-        local __out="$1" default="$2"; shift 2
+        local __out="$1" default="$2"
+        shift 2
         local opts=("$@") n=$# i answer value label
-        for ((i=0; i<n; i++)); do
+        for ((i = 0; i < n; i++)); do
             value="${opts[$i]%%|*}"
             label="${opts[$i]#*|}"
             if [ "$value" = "$default" ]; then
-                printf "%s    %s%d%s %s %s(current)%s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" "$DIM" "$RESET" > /dev/tty
+                printf "%s    %s%d%s %s %s(current)%s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" "$DIM" "$RESET" >/dev/tty
             else
-                printf "%s    %s%d%s %s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" > /dev/tty
+                printf "%s    %s%d%s %s\n" "$(line_prefix)" "$ACCENT" $((i + 1)) "$RESET" "$label" >/dev/tty
             fi
         done
         while :; do
             prompt_read answer "${G_POINTER} choose 1-$n, or Enter for ${BOLD}$default${RESET}: "
-            [ -z "$answer" ] && { printf -v "$__out" '%s' "$default"; return; }
+            [ -z "$answer" ] && {
+                printf -v "$__out" '%s' "$default"
+                return
+            }
             case "$answer" in
-                ''|*[!0-9]*) warn "enter a number from 1 to $n" ;;
+                '' | *[!0-9]*) warn "enter a number from 1 to $n" ;;
                 *)
                     if [ "$answer" -ge 1 ] && [ "$answer" -le "$n" ]; then
                         printf -v "$__out" '%s' "${opts[$((answer - 1))]%%|*}"
                         return
                     fi
-                    warn "enter a number from 1 to $n" ;;
+                    warn "enter a number from 1 to $n"
+                    ;;
             esac
         done
     }
@@ -418,7 +494,7 @@ _ui_wizard_define_helpers() {
 
         if [ "$UI_RAW" = "1" ]; then
             [ "$default_yes" = "1" ] && def=yes || def=no
-            printf "%s  %s%s%s  %s%s↑/↓ Enter%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" "$DIM" "${ARROW_MARK} " "$RESET" > /dev/tty
+            printf "%s  %s%s%s  %s%s↑/↓ Enter%s\n" "$(node_prefix)" "$BOLD" "$title" "$RESET" "$DIM" "${ARROW_MARK} " "$RESET" >/dev/tty
             ui_select_raw cv "$def" "yes|Yes" "no|No"
             [ "$cv" = "yes" ] && result=true || result=false
         else
@@ -429,9 +505,18 @@ _ui_wizard_define_helpers() {
                     prompt_read answer "${BOLD}${title}${RESET} [$default_label] Enter for no, or type y: "
                 fi
                 case "${answer:-default}" in
-                    default) [ "$default_yes" = "1" ] && result=true || result=false; break ;;
-                    y|Y|yes|YES) result=true; break ;;
-                    n|N|no|NO) result=false; break ;;
+                    default)
+                        [ "$default_yes" = "1" ] && result=true || result=false
+                        break
+                        ;;
+                    y | Y | yes | YES)
+                        result=true
+                        break
+                        ;;
+                    n | N | no | NO)
+                        result=false
+                        break
+                        ;;
                     *) warn "answer y or n" ;;
                 esac
             done

@@ -32,7 +32,7 @@ die() {
 
 valid_profile() {
     case "$1" in
-        personal|work) return 0 ;;
+        personal | work) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -61,7 +61,7 @@ toml_quote() {
 
 valid_signing_key() {
     case "$1" in
-        ssh-ed25519\ *|ssh-rsa\ *|ecdsa-sha2-nistp256\ *|ecdsa-sha2-nistp384\ *|ecdsa-sha2-nistp521\ *) return 0 ;;
+        ssh-ed25519\ * | ssh-rsa\ * | ecdsa-sha2-nistp256\ * | ecdsa-sha2-nistp384\ * | ecdsa-sha2-nistp521\ *) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -81,7 +81,10 @@ parse_common_flags() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --no-apply) APPLY=0 ;;
-            -h|--help) usage; exit 0 ;;
+            -h | --help)
+                usage
+                exit 0
+                ;;
             *) die "unknown option: $1" ;;
         esac
         shift
@@ -99,10 +102,10 @@ show_profile() {
     if command -v jq >/dev/null 2>&1; then
         chezmoi data --format=json 2>/dev/null | jq -r '.profile // empty'
     else
-        chezmoi data --format=json 2>/dev/null \
-            | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-            | sed '/^$/d' \
-            | tail -1
+        chezmoi data --format=json 2>/dev/null |
+            sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+            sed '/^$/d' |
+            tail -1
     fi
 }
 
@@ -167,7 +170,7 @@ set_toml_value() {
                 emit_key()
             }
         }
-    ' "$CHEZMOI_CONFIG" > "$tmp"
+    ' "$CHEZMOI_CONFIG" >"$tmp"
     mv "$tmp" "$CHEZMOI_CONFIG"
 }
 
@@ -206,7 +209,10 @@ cmd_profile() {
             echo "dotfiles: profile set to $profile"
             apply_if_requested
             ;;
-        *) usage; exit 1 ;;
+        *)
+            usage
+            exit 1
+            ;;
     esac
 }
 
@@ -217,14 +223,14 @@ cmd_features() {
             parse_common_flags "${@:2}"
             show_features
             ;;
-        enable|disable)
+        enable | disable)
             shift
             local value="true" key
             [ "$action" = "disable" ] && value="false"
             local keys=()
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --no-apply|-h|--help) break ;;
+                    --no-apply | -h | --help) break ;;
                     *) keys+=("$1") ;;
                 esac
                 shift
@@ -243,14 +249,17 @@ cmd_features() {
             local key="${2:-}" value="${3:-}"
             [ -n "$key" ] || die "missing feature"
             valid_feature "$key" || die "unknown feature: $key"
-            case "$value" in true|false) ;; *) die "feature value must be true or false" ;; esac
+            case "$value" in true | false) ;; *) die "feature value must be true or false" ;; esac
             parse_common_flags "${@:4}"
             ensure_config
             set_toml_value "data.features" "$key" "$value"
             echo "dotfiles: feature $key=$value"
             apply_if_requested
             ;;
-        *) usage; exit 1 ;;
+        *)
+            usage
+            exit 1
+            ;;
     esac
 }
 
@@ -263,10 +272,10 @@ cmd_signing() {
             if command -v jq >/dev/null 2>&1; then
                 chezmoi data --format=json 2>/dev/null | jq -r '.signingKey // empty'
             else
-                chezmoi data --format=json 2>/dev/null \
-                    | sed -n 's/.*"signingKey"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-                    | sed '/^$/d' \
-                    | tail -1
+                chezmoi data --format=json 2>/dev/null |
+                    sed -n 's/.*"signingKey"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+                    sed '/^$/d' |
+                    tail -1
             fi
             ;;
         set)
@@ -275,9 +284,12 @@ cmd_signing() {
             while [ $# -gt 0 ]; do
                 case "$1" in
                     --no-apply) APPLY=0 ;;
-                    -h|--help) usage; exit 0 ;;
-                    -* ) die "unknown option: $1" ;;
-                    * )
+                    -h | --help)
+                        usage
+                        exit 0
+                        ;;
+                    -*) die "unknown option: $1" ;;
+                    *)
                         [ -z "$signing_key" ] || die "only one signing key can be provided"
                         signing_key="$1"
                         ;;
@@ -295,18 +307,33 @@ cmd_signing() {
             echo "dotfiles: git signing key configured"
             apply_git_if_requested
             ;;
-        *) usage; exit 1 ;;
+        *)
+            usage
+            exit 1
+            ;;
     esac
 }
 
 main() {
     local cmd="${1:-}"
     case "$cmd" in
-        profile) shift; cmd_profile "$@" ;;
-        features) shift; cmd_features "$@" ;;
-        signing) shift; cmd_signing "$@" ;;
-        -h|--help|"") usage ;;
-        *) usage; exit 1 ;;
+        profile)
+            shift
+            cmd_profile "$@"
+            ;;
+        features)
+            shift
+            cmd_features "$@"
+            ;;
+        signing)
+            shift
+            cmd_signing "$@"
+            ;;
+        -h | --help | "") usage ;;
+        *)
+            usage
+            exit 1
+            ;;
     esac
 }
 

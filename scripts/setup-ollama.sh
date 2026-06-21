@@ -27,11 +27,14 @@ if [ -r "$_UI_DIR/lib/ui.sh" ]; then
     . "$_UI_DIR/lib/ui.sh"
     ui_init_colors
 else
-    GREEN=""; YELLOW=""; BLUE=""; RESET=""
+    GREEN=""
+    YELLOW=""
+    BLUE=""
+    RESET=""
 fi
 
 info() { echo "  ${BLUE}→${RESET} $1"; }
-ok()   { echo "  ${GREEN}✓${RESET} $1"; }
+ok() { echo "  ${GREEN}✓${RESET} $1"; }
 warn() { echo "  ${YELLOW}!${RESET} $1"; }
 
 if ! command -v ollama >/dev/null 2>&1; then

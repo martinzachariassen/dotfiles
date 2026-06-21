@@ -34,8 +34,19 @@ if [ -r "$_UI_DIR/lib/ui.sh" ]; then
     ui_init_colors
     ui_init_glyphs
 else
-    BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; CYAN=""; RESET=""
-    BAR="|"; NODE="*"; OK_MARK="OK"; ARROW_MARK=">"; FAIL_MARK="X"
+    BOLD=""
+    DIM=""
+    GREEN=""
+    YELLOW=""
+    BLUE=""
+    RED=""
+    CYAN=""
+    RESET=""
+    BAR="|"
+    NODE="*"
+    OK_MARK="OK"
+    ARROW_MARK=">"
+    FAIL_MARK="X"
     BOX_TOP="+------------------------------------------------------------+"
     BOX_BOTTOM="+------------------------------------------------------------+"
 fi
@@ -55,13 +66,13 @@ step() {
     printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$2" "$RESET"
     echo
 }
-ok()   { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+ok() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
 info() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
 warn() { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
 fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
-say()  { printf "%s  %s\n" "$(line_prefix)" "$1"; }
-dim()  { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
-hr()   { printf "%s\n" "$(line_prefix)"; }
+say() { printf "%s  %s\n" "$(line_prefix)" "$1"; }
+dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
+hr() { printf "%s\n" "$(line_prefix)"; }
 
 pause_for_enter() {
     local prompt="$1"
@@ -177,7 +188,7 @@ if [ "${SKIP_GCLOUD:-0}" != "1" ]; then
     if [ "${SKIP_GKE:-0}" != "1" ] && command -v gcloud >/dev/null 2>&1; then
         step "GKE auth plugin" "Required for kubectl 1.26+ to talk to GKE clusters."
         if gcloud components list --filter='id=gke-gcloud-auth-plugin' \
-                --format='value(state.name)' 2>/dev/null | grep -q Installed; then
+            --format='value(state.name)' 2>/dev/null | grep -q Installed; then
             ok "gke-gcloud-auth-plugin already installed"
         else
             info "installing gke-gcloud-auth-plugin"
@@ -259,9 +270,9 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
         tmpdir=$(mktemp -d)
         if (
             cd "$tmpdir" &&
-            git init -q -b main &&
-            git -c user.email=bootstrap@local -c user.name=Bootstrap commit \
-                --allow-empty --quiet -S -m bootstrap-test 2>&1
+                git init -q -b main &&
+                git -c user.email=bootstrap@local -c user.name=Bootstrap commit \
+                    --allow-empty --quiet -S -m bootstrap-test 2>&1
         ) >/dev/null 2>&1; then
             ok "git -S commit succeeded - signing wired correctly"
         else

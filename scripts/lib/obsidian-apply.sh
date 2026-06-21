@@ -68,7 +68,7 @@ obsidian_install_theme() {
     [ -f "$OB_CONFIG_DIR/theme.txt" ] || return 0
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line#"${line%%[![:space:]]*}"}"
-        case "$line" in ''|'#'*) continue ;; esac
+        case "$line" in '' | '#'*) continue ;; esac
         name="${line%%|*}"
         repo="${line##*|}"
         themedir="$vault/.obsidian/themes/$name"
@@ -89,7 +89,7 @@ obsidian_install_theme() {
         else
             printf "  ${GREEN}${OK_MARK}${RESET} theme %s installed\n" "$name"
         fi
-    done < "$OB_CONFIG_DIR/theme.txt"
+    done <"$OB_CONFIG_DIR/theme.txt"
 }
 
 # ─── Plugins ──────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ obsidian_install_plugins() {
     [ -f "$OB_CONFIG_DIR/plugins.txt" ] || return 0
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line#"${line%%[![:space:]]*}"}"
-        case "$line" in ''|'#'*) continue ;; esac
+        case "$line" in '' | '#'*) continue ;; esac
         # Split on |. Bash 3.2: no read -ra into associative; use cut.
         id="$(printf '%s' "$line" | cut -d'|' -f1)"
         repo="$(printf '%s' "$line" | cut -d'|' -f2)"
@@ -127,16 +127,16 @@ obsidian_install_plugins() {
         mkdir -p "$dir"
         rc=0
         curl -fsSL --retry 2 -o "$dir/manifest.json" "$base/manifest.json" || rc=$?
-        curl -fsSL --retry 2 -o "$dir/main.js"        "$base/main.js"        || rc=$?
+        curl -fsSL --retry 2 -o "$dir/main.js" "$base/main.js" || rc=$?
         # styles.css is optional — don't fail if 404.
-        curl -fsSL --retry 2 -o "$dir/styles.css"     "$base/styles.css"     2>/dev/null || rm -f "$dir/styles.css"
+        curl -fsSL --retry 2 -o "$dir/styles.css" "$base/styles.css" 2>/dev/null || rm -f "$dir/styles.css"
         if [ "$rc" -ne 0 ]; then
             printf "  ${RED}${FAIL_MARK}${RESET} plugin %s: download failed (rc=%d)\n" "$id" "$rc"
             OB_FAILURES+=("plugin: $id (rc=$rc)")
         else
             printf "  ${GREEN}${OK_MARK}${RESET} plugin %s installed\n" "$id"
         fi
-    done < "$OB_CONFIG_DIR/plugins.txt"
+    done <"$OB_CONFIG_DIR/plugins.txt"
 }
 
 # ─── Config + templates (seed-only) ───────────────────────────────────────────
@@ -224,7 +224,7 @@ obsidian_seed_readmes() {
     [ -d "$rdir" ] || return 0
     for src in "$rdir/"*.md; do
         [ -f "$src" ] || continue
-        name="$(basename "$src" .md)"   # e.g. "20 Projects"
+        name="$(basename "$src" .md)" # e.g. "20 Projects"
         dst="$vault/$name/_README.md"
         if [ -e "$dst" ]; then
             continue

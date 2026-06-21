@@ -9,25 +9,34 @@ MAC_APPS="${MAC_APPS:-true}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 case "$PROFILE" in
-    personal|work) ;;
-    *) echo "PROFILE must be one of: personal, work" >&2; exit 2 ;;
+    personal | work) ;;
+    *)
+        echo "PROFILE must be one of: personal, work" >&2
+        exit 2
+        ;;
 esac
 
 case "$MAC_APPS" in
-    true|false) ;;
-    *) echo "MAC_APPS must be true or false" >&2; exit 2 ;;
+    true | false) ;;
+    *)
+        echo "MAC_APPS must be true or false" >&2
+        exit 2
+        ;;
 esac
 
 case "$USE_ONE_PASSWORD" in
-    true|false) ;;
-    *) echo "USE_ONE_PASSWORD must be true or false" >&2; exit 2 ;;
+    true | false) ;;
+    *)
+        echo "USE_ONE_PASSWORD must be true or false" >&2
+        exit 2
+        ;;
 esac
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 mkdir -p "$tmpdir/.config/chezmoi"
-cat > "$tmpdir/.config/chezmoi/chezmoi.toml" <<EOF
+cat >"$tmpdir/.config/chezmoi/chezmoi.toml" <<EOF
 sourceDir = "$SOURCE_DIR"
 
 [data]
@@ -44,11 +53,11 @@ EOF
 echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
 render_output="$tmpdir/chezmoi-render.out"
 if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
-        --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
-        --destination="$tmpdir" \
-        --source="$SOURCE_DIR" \
-        --no-pager \
-        --color=false >"$render_output" 2>&1; then
+    --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
+    --destination="$tmpdir" \
+    --source="$SOURCE_DIR" \
+    --no-pager \
+    --color=false >"$render_output" 2>&1; then
     cat "$render_output"
     exit 1
 fi

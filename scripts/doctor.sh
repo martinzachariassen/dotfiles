@@ -35,7 +35,13 @@ if [ -r "$_DOCTOR_DIR/lib/ui.sh" ]; then
     . "$_DOCTOR_DIR/lib/ui.sh"
     ui_init_colors
 else
-    BOLD=""; DIM=""; GREEN=""; YELLOW=""; BLUE=""; RED=""; RESET=""
+    BOLD=""
+    DIM=""
+    GREEN=""
+    YELLOW=""
+    BLUE=""
+    RED=""
+    RESET=""
 fi
 
 PASS=0
@@ -43,11 +49,26 @@ ACTION=0
 INFOCOUNT=0
 FAIL=0
 
-pass() { echo "  ${GREEN}✓${RESET}  $1"; PASS=$((PASS + 1)); }
-warn() { echo "  ${YELLOW}!${RESET}  $1"; ACTION=$((ACTION + 1)); }
-note() { echo "  ${BLUE}•${RESET}  $1"; INFOCOUNT=$((INFOCOUNT + 1)); }
-fail() { echo "  ${RED}✗${RESET}  $1"; FAIL=$((FAIL + 1)); }
-section() { echo; echo "${BOLD}${BLUE}── $1 ──${RESET}"; }
+pass() {
+    echo "  ${GREEN}✓${RESET}  $1"
+    PASS=$((PASS + 1))
+}
+warn() {
+    echo "  ${YELLOW}!${RESET}  $1"
+    ACTION=$((ACTION + 1))
+}
+note() {
+    echo "  ${BLUE}•${RESET}  $1"
+    INFOCOUNT=$((INFOCOUNT + 1))
+}
+fail() {
+    echo "  ${RED}✗${RESET}  $1"
+    FAIL=$((FAIL + 1))
+}
+section() {
+    echo
+    echo "${BOLD}${BLUE}── $1 ──${RESET}"
+}
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
@@ -194,9 +215,9 @@ if [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then
     tmpdir=$(mktemp -d)
     if (
         cd "$tmpdir" &&
-        git init -q -b main &&
-        git -c user.email=doctor@local -c user.name=Doctor commit \
-            --allow-empty --quiet -S -m doctor 2>&1
+            git init -q -b main &&
+            git -c user.email=doctor@local -c user.name=Doctor commit \
+                --allow-empty --quiet -S -m doctor 2>&1
     ) >/dev/null 2>&1; then
         pass "git signing works (commit -S succeeded)"
     else
@@ -262,11 +283,11 @@ if command -v brew >/dev/null 2>&1; then
     esac
     # Drift the OTHER way: ad-hoc installs not tracked anywhere.
     leaves_tmp=$(mktemp)
-    brew leaves > "$leaves_tmp" 2>/dev/null || true
-    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.* 2>/dev/null \
-        | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
-        | awk -F/ '{print $NF}' \
-        | sort -u)
+    brew leaves >"$leaves_tmp" 2>/dev/null || true
+    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.* 2>/dev/null |
+        sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
+        awk -F/ '{print $NF}' |
+        sort -u)
     untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked") 2>/dev/null || true)
     rm -f "$leaves_tmp"
     if [ -n "$untracked" ]; then
@@ -325,11 +346,13 @@ fi
 # ─── 8. Auth state (FYI) ──────────────────────────────────────────────────────
 section "Cloud auth (informational)"
 if command -v gh >/dev/null 2>&1; then
-    if gh auth status >/dev/null 2>&1; then pass "gh authenticated"
+    if gh auth status >/dev/null 2>&1; then
+        pass "gh authenticated"
     else note "gh not authenticated — run when needed: gh auth login"; fi
 fi
 if command -v az >/dev/null 2>&1; then
-    if az account show >/dev/null 2>&1; then pass "az authenticated"
+    if az account show >/dev/null 2>&1; then
+        pass "az authenticated"
     else note "az not authenticated — run when needed: az login"; fi
     if command -v kubelogin >/dev/null 2>&1 && kubelogin --version 2>/dev/null | grep -qi 'git hash:'; then
         pass "Azure kubelogin installed"
@@ -382,8 +405,8 @@ section "Fonts"
 jetbrains_nerd_font_installed() {
     local f
     for f in "$HOME/Library/Fonts"/JetBrainsMono*Nerd* \
-             /Library/Fonts/JetBrainsMono*Nerd* \
-             /opt/homebrew/Caskroom/font-jetbrains-mono-nerd-font/*; do
+        /Library/Fonts/JetBrainsMono*Nerd* \
+        /opt/homebrew/Caskroom/font-jetbrains-mono-nerd-font/*; do
         [ -e "$f" ] && return 0
     done
     return 1

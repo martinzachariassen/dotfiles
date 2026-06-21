@@ -91,7 +91,7 @@ bb_stop_heartbeat() {
 # is_bundle_line LINE — true if LINE is an actionable brew bundle directive.
 is_bundle_line() {
     case "$1" in
-        tap\ *|brew\ *|cask\ *|mas\ *) return 0 ;;
+        tap\ * | brew\ * | cask\ * | mas\ *) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -108,11 +108,14 @@ entry_name() {
 # count_bundle_lines FILE — number of actionable directives in FILE (0 if absent).
 count_bundle_lines() {
     local file="$1" count=0 line
-    [ -f "$file" ] || { printf '0'; return; }
+    [ -f "$file" ] || {
+        printf '0'
+        return
+    }
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line#"${line%%[![:space:]]*}"}"
         is_bundle_line "$line" && count=$((count + 1))
-    done < "$file"
+    done <"$file"
     printf '%s' "$count"
 }
 
@@ -130,7 +133,7 @@ write_unit_brewfile() {
             printf '%s\n' "$tap_line"
         done
         printf '%s\n' "$entry"
-    } > "$target"
+    } >"$target"
 }
 
 # bb_modules_satisfied FILE... — fast short-circuit. Return 0 when every entry
@@ -174,9 +177,9 @@ bb_modules_satisfied() {
                 cask)
                     printf '%s\n' "$installed_casks" | grep -qxF "$name" || return 1
                     ;;
-                *) : ;;  # mas/unknown: not used by these Brewfiles
+                *) : ;; # mas/unknown: not used by these Brewfiles
             esac
-        done < "$f"
+        done <"$f"
     done
     return 0
 }
@@ -199,7 +202,10 @@ bundle_one() {
     local module_items module_start module_end module_elapsed module_mins module_secs
     module_items="$(count_bundle_lines "$file")"
     printf "→ Module %d/%d: %s (%s, %s item(s))\n" "$module_step" "$module_total" "$label" "$(basename "$file")" "$module_items"
-    [ "$module_items" -gt 0 ] || { echo "✓ Module $module_step/$module_total: $label has no active entries"; return 0; }
+    [ "$module_items" -gt 0 ] || {
+        echo "✓ Module $module_step/$module_total: $label has no active entries"
+        return 0
+    }
 
     local active_taps=()
     local line display item_step item_file start_ts end_ts elapsed mins secs rc
@@ -244,7 +250,7 @@ bundle_one() {
             tap\ *) active_taps+=("$line") ;;
         esac
         item_step=$((item_step + 1))
-    done < "$file"
+    done <"$file"
 
     module_end="$(date +%s)"
     module_elapsed=$((module_end - module_start))

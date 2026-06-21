@@ -15,12 +15,15 @@ semver_extract() {
 # components count as 0, so "2.50" and "2.50.0" are equal. Leading zeros in a
 # component are treated as base-10 (not octal).
 semver_lt() {
-    _a="$1"; _b="$2"
+    _a="$1"
+    _b="$2"
     while [ -n "$_a$_b" ]; do
-        _ah="${_a%%.*}"; _bh="${_b%%.*}"
+        _ah="${_a%%.*}"
+        _bh="${_b%%.*}"
         case "$_a" in *.*) _a="${_a#*.}" ;; *) _a="" ;; esac
         case "$_b" in *.*) _b="${_b#*.}" ;; *) _b="" ;; esac
-        _ah=$(( 10#${_ah:-0} )); _bh=$(( 10#${_bh:-0} ))
+        _ah=$((10#${_ah:-0}))
+        _bh=$((10#${_bh:-0}))
         [ "$_ah" -lt "$_bh" ] && return 0
         [ "$_ah" -gt "$_bh" ] && return 1
     done
