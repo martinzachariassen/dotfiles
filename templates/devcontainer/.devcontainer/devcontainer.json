@@ -27,9 +27,9 @@
     "customizations": {
         "vscode": {
             "settings": {
-                // Override the two host-only paths that don't exist in a Linux
-                // container; everything else in user settings is either path-free
-                // (works as-is) or harmless dead config (the Java/mise keys).
+                // Override the host-only paths from user settings that don't
+                // exist in a Linux container. Everything else is path-free and
+                // works as-is.
                 "todo-tree.ripgrep.ripgrep": "/usr/bin/rg",
                 "cSpell.customDictionaries": {
                     "personal": {
@@ -38,7 +38,18 @@
                         "addWords": true,
                         "scope": "user"
                     }
-                }
+                },
+
+                // Clear the host JDK paths (user settings pins them to the Mac's
+                // mise installs, which don't exist here) so the Java/Kotlin
+                // language servers fall back to the container's JAVA_HOME. Inert
+                // on projects without Java; for a Java/Kotlin project, give the
+                // image a JDK (base image or feature) and these let the servers
+                // find it. Empty string = "not configured" to redhat.java.
+                "java.jdt.ls.java.home": "",
+                "java.import.gradle.java.home": "",
+                "java.configuration.runtimes": [],
+                "intellij.jdkForSymbolResolution": ""
             }
         }
     }

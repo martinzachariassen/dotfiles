@@ -241,6 +241,16 @@ excluded from the defaults for the same reason).
 Drop it into a project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
 and **Reopen in Container**.
 
+**Language runtimes belong to the image, not the editor.** The whole point of a
+dev container is that the `image`/`Dockerfile`/features install Java, Python,
+Node, etc. — so the language extensions attach to whatever the container
+provides, and there's no mise inside. For a **Java/Kotlin** project, swap the
+base `image` for a JDK image (or add a JDK feature); the base already clears the
+host JDK paths from user settings, so the Java/Kotlin language servers pick up
+the container's `JAVA_HOME` instead of the dead macOS mise paths. Same shape for
+Python (interpreter in the image) or Terraform (add the `terraform` binary if
+that project runs `plan`/`apply`).
+
 ## Repository layout
 
 ```
