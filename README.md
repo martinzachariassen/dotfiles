@@ -225,32 +225,27 @@ It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), a
 
 ## Dev containers
 
-Goal: a container feels like the Mac for the editor tools used every day, with
-**no per-project files** for the common case. Two machine-level VS Code settings
-do it automatically for *every* container:
-
-- `dev.containers.defaultExtensions` installs the core extension set. Each one
-  either bundles its own engine (`shellcheck`, `ruff`, `prettier`, `eslint`, the
-  parsers) or shells out to a binary installed below — so none of them error.
-- `dotfiles.repository` + `dotfiles.installCommand` clone this repo into every
-  container and run [`scripts/devcontainer-install.sh`](scripts/devcontainer-install.sh),
-  which installs the few binaries the extensions need but don't ship (`ripgrep`,
-  `shfmt`, `hadolint`) and symlinks `rg` to the path Todo-Tree expects.
-  `installCommand` is set explicitly so the macOS `install.sh` wizard never runs
-  inside a container.
-
-A container extension **can't** reach back to the Mac's binaries — it's a
-separate Linux machine, and a Homebrew arm64 binary wouldn't `exec` there even if
-mounted — so the binaries are installed *in* the container, just automatically.
-
 [`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
-for the handful of things that genuinely **can't** be global: the two-way
-spell-check dictionary (a bind mount — mounts are per-project only), the JDK path
-overrides (only matter for a Java/Kotlin project), and the runtime-dependent
-extensions (Java/Kotlin/Python/Docker/k8s), commented out and ready to uncomment
-once the image provides that runtime. Drop it into a project with
-`cp -R …/dotfiles/templates/devcontainer/.devcontainer .` and **Dev Containers:
-Rebuild Container**.
+that replicates the Mac editing environment inside a container. Copy it into a
+personal project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
+and **Dev Containers: Rebuild Container**.
+
+It is **opt-in, not global** — nothing in the VS Code user settings injects
+extensions or dotfiles into containers automatically. Team projects start from
+their own `devcontainer.json` without any personal configuration bleeding in.
+
+What the template provides:
+
+- The full personal extension set, active by default. Runtime-dependent
+  extensions (Java/Kotlin/Spring, Python, Docker/k8s, SonarQube) are commented
+  out; uncomment the ones that match what the image provides.
+- `setup.sh` (run via `postCreateCommand`) installs the CLI binaries the
+  extensions need but don't ship: `ripgrep` (Todo-Tree), `shfmt`, `hadolint`.
+  A container can't reach back to the Mac's Homebrew binaries, so they go in-image.
+- The two-way cSpell personal dictionary, bind-mounted from the host so "Add to
+  dictionary" writes the dotfiles-tracked file.
+- JDK path overrides that clear the Mac mise paths so `JAVA_HOME` in the
+  container wins for the Java/Kotlin language servers.
 
 **Language runtimes belong to the image, not the editor.** The whole point of a
 dev container is that the `image`/`Dockerfile`/features install Java, Python,

@@ -1,39 +1,75 @@
-// Per-project dev-container extras — copy this `.devcontainer/` folder into a
-// project that needs them.
+// Personal devcontainer template — copy this .devcontainer/ folder into a
+// project to get a full local-environment replica inside the container.
 //
-// The core set of extensions and their binaries already arrive in EVERY
-// container automatically, via `dev.containers.defaultExtensions` +
-// `dotfiles.*` in the VS Code user settings (managed in this repo). So this
-// file only carries the things that genuinely CAN'T be global:
+// This is an opt-in personal setup, not a team baseline. For a shared team
+// devcontainer, start fresh and include only what the team agrees on.
 //
-//   - the two-way spell-check dictionary, which needs a bind mount (mounts are
-//     per-project only — there's no global mount setting);
-//   - the JDK path overrides, which only matter for a Java/Kotlin project;
-//   - the runtime-dependent extensions, which would error in containers that
-//     don't provide that runtime.
+// What this provides:
+//   - The full extension set from the host Mac, minus host-only and cosmetic
+//     ones (themes, Remote Containers, CodeTogether, Claude Code, Norwegian
+//     spell-check pack). Runtime-dependent extensions are commented out below
+//     — uncomment per project type after confirming the runtime is in the image.
+//   - setup.sh (postCreateCommand) installs the CLI binaries those extensions
+//     shell out to: ripgrep (Todo-Tree), shfmt, hadolint. Run it once on
+//     container create; safe to re-run (idempotent).
+//   - The two-way cSpell personal dictionary, bind-mounted from the host so
+//     "Add to dictionary" writes through to the dotfiles-tracked file.
+//   - JDK path overrides that clear the Mac mise paths so the container's own
+//     JAVA_HOME wins for the Java/Kotlin language servers.
 //
-// Adjust `image` to whatever the project actually needs (a JDK, Python, etc.) —
-// the language runtime is the image's job, never mise's.
+// Adjust `image` to match what the project needs (JDK, Python, Node, etc.) —
+// the language runtime is the image's job, never mise's inside a container.
 {
-    "name": "base",
+    "name": "personal",
     "image": "mcr.microsoft.com/devcontainers/base:debian",
     "features": {
         "ghcr.io/devcontainers/features/common-utils:2": {}
     },
-    // Mount the host's cSpell personal dictionary into the container at a fixed
-    // path. "Add to dictionary" then writes the SAME physical file (a symlink
-    // into the dotfiles repo on the host), so new words sync both ways and show
-    // up in `git status` exactly like on the Mac.
+    // Run once on container create. Installs the CLI binaries the extensions
+    // need but don't bundle (ripgrep, shfmt, hadolint).
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    // Bind-mount the host's cSpell personal dictionary so "Add to dictionary"
+    // writes the same repo-tracked file as on the Mac.
     "mounts": [
         "source=${localEnv:HOME}/.config/cspell/personal.txt,target=/cspell/personal.txt,type=bind"
     ],
     "customizations": {
         "vscode": {
-            // The core extensions come globally via defaultExtensions. List
-            // here ONLY the runtime-dependent ones, and only after the image
-            // actually provides that runtime, or the language server will error.
             "extensions": [
-                // ── Uncomment per project type ──
+                // ── Editor / general productivity ──
+                "editorconfig.editorconfig",
+                "usernamehw.errorlens",
+                "oderwat.indent-rainbow",
+                "streetsidesoftware.code-spell-checker",
+                "gruntfuggly.todo-tree",
+                "wmaurer.change-case",
+                "vscodevim.vim",
+                "humao.rest-client",
+                "bierner.markdown-mermaid",
+                "davidanson.vscode-markdownlint",
+                // ── Git / GitHub ──
+                "eamodio.gitlens",
+                "mhutchie.git-graph",
+                "github.vscode-pull-request-github",
+                "github.vscode-github-actions",
+                "vivaxy.vscode-conventional-commits",
+                // ── Formatters / linters ──
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "timonwong.shellcheck",
+                "foxundermoon.shell-format",
+                "exiasr.hadolint",
+                "charliermarsh.ruff",
+                // ── Config formats ──
+                "redhat.vscode-yaml",
+                "redhat.vscode-xml",
+                "tamasfe.even-better-toml",
+                "hashicorp.hcl",
+                "hashicorp.terraform",
+                "tim-koehler.helm-intellisense",
+                // ── Database ──
+                "ms-ossdata.vscode-pgsql",
+                // ── Runtime-dependent — uncomment per project type ──
                 // Java / Kotlin / Spring (needs a JDK in the image):
                 // "redhat.java",
                 // "vscjava.vscode-java-pack",
@@ -53,11 +89,13 @@
                 // "sonarsource.sonarlint-vscode",
                 // Docker / Kubernetes (need a docker socket / kubectl + kubeconfig):
                 // "ms-azuretools.vscode-containers",
-                // "ms-kubernetes-tools.vscode-kubernetes-tools"
+                // "ms-kubernetes-tools.vscode-kubernetes-tools",
+                // mise (only useful if mise is installed in the image):
+                // "hverlin.mise-vscode"
             ],
             "settings": {
                 // Point cSpell at the mounted dictionary. The host user setting
-                // pins it to a Mac path that doesn't exist here, so override it.
+                // pins it to a Mac path that doesn't exist inside the container.
                 "cSpell.customDictionaries": {
                     "personal": {
                         "name": "personal",
@@ -66,13 +104,9 @@
                         "scope": "user"
                     }
                 },
-
-                // Clear the host JDK paths (the user settings pin them to the
-                // Mac's mise installs, which don't exist here) so the Java/Kotlin
-                // language servers fall back to the container's JAVA_HOME. Inert
-                // on projects without Java; for a Java/Kotlin project, give the
-                // image a JDK (base image or feature) and these let the servers
-                // find it. Empty string = "not configured" to redhat.java.
+                // Clear the host JDK paths (pinned to the Mac's mise installs)
+                // so the Java/Kotlin language servers fall back to JAVA_HOME.
+                // Inert on non-Java projects.
                 "java.jdt.ls.java.home": "",
                 "java.import.gradle.java.home": "",
                 "java.configuration.runtimes": [],
