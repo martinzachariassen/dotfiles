@@ -552,15 +552,30 @@
 
     "update.mode": "manual",
 
-
     // =========================================================
     // DEV CONTAINERS
     // =========================================================
-
-    // Extensions installed inside every dev container automatically.
-    // Excludes: themes/icons (cosmetic), remote-containers (host-side),
-    // codetogether/codesnap (host-only tools), claude-code (auth-bound),
-    // and the Norwegian spell-check pack (not generically useful in containers).
+    //
+    // Make any container feel like the Mac without per-project files. Two
+    // machine-level settings apply to *every* container automatically:
+    //
+    //   defaultExtensions  installs this core set into every container. Each one
+    //                      either bundles its own engine (shellcheck, ruff,
+    //                      prettier, eslint, the parsers) or shells out to a
+    //                      binary that devcontainer-install.sh adds below, so
+    //                      they all work in any Linux container.
+    //   dotfiles.*         clones this repo into every container and runs
+    //                      scripts/devcontainer-install.sh, which installs the
+    //                      CLI binaries the extensions need but don't ship
+    //                      (ripgrep, shfmt, hadolint). installCommand is set
+    //                      explicitly so the macOS install.sh wizard is never
+    //                      what runs inside a container.
+    //
+    // Runtime-dependent extensions (Java, Python, Docker/k8s, and SonarQube —
+    // which needs Node >= 20.12) are deliberately NOT here — they'd error in any
+    // container without that runtime. Add those,
+    // plus the synced spell-check dictionary mount and the JDK path overrides,
+    // per project via templates/devcontainer/ in this repo.
     "dev.containers.defaultExtensions": [
         // Editor / general productivity
         "editorconfig.editorconfig",
@@ -586,36 +601,19 @@
         "foxundermoon.shell-format",
         "exiasr.hadolint",
         "charliermarsh.ruff",
-        "sonarsource.sonarlint-vscode",
-        // Java / Kotlin / Spring
-        "redhat.java",
-        "vscjava.vscode-java-pack",
-        "vscjava.vscode-java-debug",
-        "vscjava.vscode-java-dependency",
-        "vscjava.vscode-java-test",
-        "vscjava.vscode-maven",
-        "vscjava.vscode-gradle",
-        "vscjava.vscode-spring-boot-dashboard",
-        "vscjava.vscode-spring-initializr",
-        "vmware.vscode-spring-boot",
-        "jetbrains.kotlin-server",
-        // Python
-        "ms-python.python",
         // Config formats
         "redhat.vscode-yaml",
         "redhat.vscode-xml",
         "tamasfe.even-better-toml",
         "hashicorp.hcl",
         "hashicorp.terraform",
-        // Containers / infra
-        "ms-azuretools.vscode-containers",
-        "ms-kubernetes-tools.vscode-kubernetes-tools",
         "tim-koehler.helm-intellisense",
         // Database
-        "ms-ossdata.vscode-pgsql",
-        // Runtime tooling
-        "hverlin.mise-vscode"
+        "ms-ossdata.vscode-pgsql"
     ],
+    "dotfiles.repository": "martinzachariassen/dotfiles",
+    "dotfiles.targetPath": "~/dotfiles",
+    "dotfiles.installCommand": "bash scripts/devcontainer-install.sh",
 
     // =========================================================
     // SECURITY

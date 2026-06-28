@@ -223,6 +223,45 @@ It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), a
 
 **`install.sh` is the wizard** — a self-contained bootstrap script (it has to run via `curl | bash` before the repo exists on disk). It walks five phases — *check this Mac → choose setup → review plan → execute → self-test* — then prints next steps. `chezup` deliberately mirrors its banner, phases, and prompts so the two feel like one tool.
 
+## Dev containers
+
+Goal: a container feels like the Mac for the editor tools used every day, with
+**no per-project files** for the common case. Two machine-level VS Code settings
+do it automatically for *every* container:
+
+- `dev.containers.defaultExtensions` installs the core extension set. Each one
+  either bundles its own engine (`shellcheck`, `ruff`, `prettier`, `eslint`, the
+  parsers) or shells out to a binary installed below — so none of them error.
+- `dotfiles.repository` + `dotfiles.installCommand` clone this repo into every
+  container and run [`scripts/devcontainer-install.sh`](scripts/devcontainer-install.sh),
+  which installs the few binaries the extensions need but don't ship (`ripgrep`,
+  `shfmt`, `hadolint`) and symlinks `rg` to the path Todo-Tree expects.
+  `installCommand` is set explicitly so the macOS `install.sh` wizard never runs
+  inside a container.
+
+A container extension **can't** reach back to the Mac's binaries — it's a
+separate Linux machine, and a Homebrew arm64 binary wouldn't `exec` there even if
+mounted — so the binaries are installed *in* the container, just automatically.
+
+[`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
+for the handful of things that genuinely **can't** be global: the two-way
+spell-check dictionary (a bind mount — mounts are per-project only), the JDK path
+overrides (only matter for a Java/Kotlin project), and the runtime-dependent
+extensions (Java/Kotlin/Python/Docker/k8s), commented out and ready to uncomment
+once the image provides that runtime. Drop it into a project with
+`cp -R …/dotfiles/templates/devcontainer/.devcontainer .` and **Dev Containers:
+Rebuild Container**.
+
+**Language runtimes belong to the image, not the editor.** The whole point of a
+dev container is that the `image`/`Dockerfile`/features install Java, Python,
+Node, etc. — so the language extensions attach to whatever the container
+provides, and there's no mise inside. For a **Java/Kotlin** project, swap the
+base `image` for a JDK image (or add a JDK feature); the base already clears the
+host JDK paths from user settings, so the Java/Kotlin language servers pick up
+the container's `JAVA_HOME` instead of the dead macOS mise paths. Same shape for
+Python (interpreter in the image) or Terraform (add the `terraform` binary if
+that project runs `plan`/`apply`).
+
 ## Repository layout
 
 ```
@@ -233,6 +272,7 @@ brewfiles/              # profile + feature layers (mac-apps, personal, work)
 .chezmoiscripts/        # ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
 dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
 scripts/                # chezup.sh, doctor.sh, dotfiles-config.sh, bootstrap-auth.sh, lib/ui.sh…
+templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
 tests/                  # bats suites + drive-wizard.py (drives install.sh under a pty)
 ```
 

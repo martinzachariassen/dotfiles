@@ -1,0 +1,83 @@
+// Per-project dev-container extras — copy this `.devcontainer/` folder into a
+// project that needs them.
+//
+// The core set of extensions and their binaries already arrive in EVERY
+// container automatically, via `dev.containers.defaultExtensions` +
+// `dotfiles.*` in the VS Code user settings (managed in this repo). So this
+// file only carries the things that genuinely CAN'T be global:
+//
+//   - the two-way spell-check dictionary, which needs a bind mount (mounts are
+//     per-project only — there's no global mount setting);
+//   - the JDK path overrides, which only matter for a Java/Kotlin project;
+//   - the runtime-dependent extensions, which would error in containers that
+//     don't provide that runtime.
+//
+// Adjust `image` to whatever the project actually needs (a JDK, Python, etc.) —
+// the language runtime is the image's job, never mise's.
+{
+    "name": "base",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+    },
+    // Mount the host's cSpell personal dictionary into the container at a fixed
+    // path. "Add to dictionary" then writes the SAME physical file (a symlink
+    // into the dotfiles repo on the host), so new words sync both ways and show
+    // up in `git status` exactly like on the Mac.
+    "mounts": [
+        "source=${localEnv:HOME}/.config/cspell/personal.txt,target=/cspell/personal.txt,type=bind"
+    ],
+    "customizations": {
+        "vscode": {
+            // The core extensions come globally via defaultExtensions. List
+            // here ONLY the runtime-dependent ones, and only after the image
+            // actually provides that runtime, or the language server will error.
+            "extensions": [
+                // ── Uncomment per project type ──
+                // Java / Kotlin / Spring (needs a JDK in the image):
+                // "redhat.java",
+                // "vscjava.vscode-java-pack",
+                // "vscjava.vscode-java-debug",
+                // "vscjava.vscode-java-dependency",
+                // "vscjava.vscode-java-test",
+                // "vscjava.vscode-maven",
+                // "vscjava.vscode-gradle",
+                // "vscjava.vscode-spring-boot-dashboard",
+                // "vscjava.vscode-spring-initializr",
+                // "vmware.vscode-spring-boot",
+                // "jetbrains.kotlin-server",
+                // Python (needs a Python interpreter in the image):
+                // "ms-python.python",
+                // SonarQube (needs Node >= 20.12 in the image, or set
+                // "sonarlint.pathToNodeExecutable"):
+                // "sonarsource.sonarlint-vscode",
+                // Docker / Kubernetes (need a docker socket / kubectl + kubeconfig):
+                // "ms-azuretools.vscode-containers",
+                // "ms-kubernetes-tools.vscode-kubernetes-tools"
+            ],
+            "settings": {
+                // Point cSpell at the mounted dictionary. The host user setting
+                // pins it to a Mac path that doesn't exist here, so override it.
+                "cSpell.customDictionaries": {
+                    "personal": {
+                        "name": "personal",
+                        "path": "/cspell/personal.txt",
+                        "addWords": true,
+                        "scope": "user"
+                    }
+                },
+
+                // Clear the host JDK paths (the user settings pin them to the
+                // Mac's mise installs, which don't exist here) so the Java/Kotlin
+                // language servers fall back to the container's JAVA_HOME. Inert
+                // on projects without Java; for a Java/Kotlin project, give the
+                // image a JDK (base image or feature) and these let the servers
+                // find it. Empty string = "not configured" to redhat.java.
+                "java.jdt.ls.java.home": "",
+                "java.import.gradle.java.home": "",
+                "java.configuration.runtimes": [],
+                "intellij.jdkForSymbolResolution": ""
+            }
+        }
+    }
+}

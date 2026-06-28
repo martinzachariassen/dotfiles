@@ -18,6 +18,7 @@ vscode/
 .gitignore
 .DS_Store
 tests/
+templates/
 raycast/
 .storecode/
 _typos.toml
