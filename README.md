@@ -1,3 +1,5 @@
+<div align="center">
+
 # dotfiles
 
 [![CI](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
@@ -9,32 +11,90 @@
 [![Last commit](https://img.shields.io/github/last-commit/martinzachariassen/dotfiles?logo=github)](https://github.com/martinzachariassen/dotfiles/commits/main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Personal macOS setup, managed by [chezmoi](https://chezmoi.io). **One command turns a fresh Mac into a backend workstation** — terminal, shell, editors, Homebrew apps, [mise](https://mise.jdx.dev)-managed language runtimes, and macOS defaults, all wired up.
+**One command turns a fresh Mac into a backend workstation.**
 
-The whole thing is built around **two everyday verbs** that look and feel like the same product:
+Personal macOS setup managed by [chezmoi](https://chezmoi.io) — terminal, shell, editors,
+Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults, all wired up.
 
-- [`install.sh`](install.sh) — the **wizard** that bootstraps a fresh (or legacy) Mac from scratch.
-- [`chezup`](scripts/chezup.sh) — the daily verb that **converges** this Mac to the repo.
+<!-- Hero screenshot slot: drop a terminal shot at assets/hero.png and uncomment.
+<img src="assets/hero.png" alt="Ghostty + Zellij + Starship on Catppuccin Frappé" width="800">
+-->
 
-Every operation is **idempotent and convergent**: `chezmoi apply` reconciles real installed state on every run, so "make this Mac match the repo" always works — no separate fix step.
+</div>
 
-> Targets **macOS on Apple Silicon**. Everything runs as your normal user — **never with `sudo`**. Homebrew and the macOS steps ask for your password themselves when they need it.
+---
 
-## Demos
+## Contents
 
-### Bootstrap a new Mac — the wizard
+- [Highlights](#highlights)
+- [What you get](#what-you-get)
+- [Quick start](#quick-start)
+  - [Brand-new Mac](#brand-new-mac)
+  - [Existing Mac with an older setup](#existing-mac-with-an-older-setup)
+  - [Already set up — staying current](#already-set-up--staying-current)
+- [Daily commands](#daily-commands)
+- [How it works](#how-it-works)
+- [Repository layout](#repository-layout)
+- [Development](#development)
+- [License](#license)
 
-`install.sh` probes the machine, asks only for what a fresh Mac can answer (profile, name, email), shows you the plan, and applies it. Arrow-key menus when you have a real terminal; plain numbered prompts over `curl | bash` or SSH.
+---
 
-![The install.sh wizard running in dry-run mode](assets/demo-wizard.gif)
+## Highlights
 
-### Stay in sync — chezup
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>🧙 One-command bootstrap</h3>
+      A single <a href="install.sh"><code>curl | bash</code></a> takes a fresh (or legacy)
+      Mac from zero to a fully configured workstation — Xcode CLT, Homebrew, this repo,
+      every package, and macOS defaults.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🔁 Idempotent &amp; convergent</h3>
+      <code>chezmoi apply</code> reconciles <em>real installed state</em> on every run.
+      "Make this Mac match the repo" always works — re-run anytime, no separate fix step.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🙅 No <code>sudo</code> lifestyle</h3>
+      Everything runs as your normal user. Homebrew and the macOS steps ask for your
+      password themselves, only when they actually need it.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>🎯 Two everyday verbs</h3>
+      <a href="install.sh"><code>install.sh</code></a> bootstraps; <a href="scripts/chezup.sh"><code>chezup</code></a>
+      converges. Same banner, phases, and prompts — one engine, one look.
+    </td>
+    <td width="33%" valign="top">
+      <h3>🧩 Layered packages</h3>
+      A core <a href="Brewfile">Brewfile</a> plus composable
+      <a href="brewfiles/">profile + feature layers</a> (mac-apps, personal, work),
+      chosen by the install wizard.
+    </td>
+    <td width="33%" valign="top">
+      <h3>✅ CI-guarded</h3>
+      Every push lints shell, renders the full template matrix, runs
+      <a href="tests/">bats suites</a>, and enforces Conventional Commits.
+    </td>
+  </tr>
+</table>
 
-`chezup` is the everyday command: **pull → review → apply**, in three clearly labelled phases, ending in the same `chezmoi apply` the wizard uses.
+> Targets **macOS on Apple Silicon**. Everything runs as your normal user — **never with `sudo`**.
 
-![The chezup converge flow running in dry-run mode](assets/demo-chezup.gif)
+## What you get
 
-<sub>Both clips are recorded in `DRY_RUN` mode (state-changing commands are printed, never executed). Regenerate them with [`vhs`](https://github.com/charmbracelet/vhs): `vhs assets/tapes/wizard.tape` and `vhs assets/tapes/chezup.tape`.</sub>
+| Area | Baseline |
+|---|---|
+| 🖥 **Terminal** | Ghostty, Zellij, Starship, Catppuccin Frappé, JetBrainsMono Nerd Font. |
+| 🐚 **Shell** | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases. |
+| ✏️ **Editors** | VS Code via Homebrew (extensions in [`vscode/extensions.txt`](vscode/extensions.txt)), Neovim with LazyVim. |
+| 🔀 **Git** | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
+| 📦 **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
+| 🤖 **Local AI** | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
+| 🧰 **Workstation apps** | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers. |
+| 🍎 **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
 
 ## Quick start
 
@@ -66,7 +126,7 @@ Use the **same installer** — it snapshots any pre-existing legacy dotfiles int
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-It also runs the **deprecation cleanup** so you don't carry forward tools the repo no longer manages — see the details below. Afterwards, reload and sanity-check:
+It also runs the **deprecation cleanup** so you don't carry forward tools the repo no longer manages. Afterwards, reload and sanity-check:
 
 ```sh
 exec zsh
@@ -128,6 +188,16 @@ The whole everyday surface is **two verbs plus a health check**. Both verbs end 
 | `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood). |
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
+Common profile and feature changes:
+
+```sh
+dotfiles profile set personal
+dotfiles profile set work
+dotfiles features list
+dotfiles features enable macApps
+dotfiles features disable macApps
+```
+
 <details>
 <summary>Advanced / occasional commands</summary>
 
@@ -141,19 +211,9 @@ The whole everyday surface is **two verbs plus a health check**. Both verbs end 
 
 </details>
 
-Common profile and feature changes:
+## How it works
 
-```sh
-dotfiles profile set personal
-dotfiles profile set work
-dotfiles features list
-dotfiles features enable macApps
-dotfiles features disable macApps
-```
-
-### How the commands work
-
-**`chezup` runs in three phases** (see the demo above):
+**`chezup` runs in three phases:**
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many commits arrived.
 2. **Review pending changes** — `chezmoi status` lists the drift between the repo and `$HOME` (`A` add, `M` modify, `D` remove). If nothing drifted, it stops here.
@@ -161,20 +221,7 @@ dotfiles features disable macApps
 
 It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
 
-**`install.sh` is the wizard** — a self-contained bootstrap script (it has to run via `curl | bash` before the repo exists on disk). It walks five phases: *check this Mac → choose setup → review plan → execute → self-test*, then prints next steps. The everyday `chezup` deliberately mirrors its banner, phases, and prompts so the two feel like one tool ("one engine, one look").
-
-## What you get
-
-| Area | Baseline |
-|---|---|
-| **Terminal** | Ghostty, Zellij, Starship, Catppuccin Frappé, JetBrainsMono Nerd Font. |
-| **Shell** | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases. |
-| **Editors** | VS Code via Homebrew (extensions in [`vscode/extensions.txt`](vscode/extensions.txt)), Neovim with LazyVim. |
-| **Git** | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
-| **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
-| **Local AI** | Part of the default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
-| **Workstation apps** | Homebrew-managed core apps, optional Mac app extras, and profile-specific personal/work layers. |
-| **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
+**`install.sh` is the wizard** — a self-contained bootstrap script (it has to run via `curl | bash` before the repo exists on disk). It walks five phases — *check this Mac → choose setup → review plan → execute → self-test* — then prints next steps. `chezup` deliberately mirrors its banner, phases, and prompts so the two feel like one tool.
 
 ## Repository layout
 
@@ -187,7 +234,6 @@ brewfiles/              # profile + feature layers (mac-apps, personal, work)
 dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
 scripts/                # chezup.sh, doctor.sh, dotfiles-config.sh, bootstrap-auth.sh, lib/ui.sh…
 tests/                  # bats suites + drive-wizard.py (drives install.sh under a pty)
-assets/                 # README demo GIFs + their vhs tapes
 ```
 
 The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`dot_config/zsh/dot_zshrc.tmpl`](dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
@@ -203,10 +249,6 @@ bats tests/
 
 # Drive the real wizard under a pseudo-terminal (DRY_RUN, always aborts safely)
 python3 tests/drive-wizard.py        # or: python3 tests/drive-wizard.py stray
-
-# Regenerate the README demo GIFs (needs: brew install vhs)
-vhs assets/tapes/wizard.tape
-vhs assets/tapes/chezup.tape
 ```
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/feature matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.
@@ -214,4 +256,3 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, ren
 ## License
 
 MIT. See [LICENSE](LICENSE).
-</content>
