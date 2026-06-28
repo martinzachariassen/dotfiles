@@ -571,8 +571,9 @@
     //                      explicitly so the macOS install.sh wizard is never
     //                      what runs inside a container.
     //
-    // Runtime-dependent extensions (Java, Python, Docker/k8s) are deliberately
-    // NOT here — they'd error in any container without that runtime. Add those,
+    // Runtime-dependent extensions (Java, Python, Docker/k8s, and SonarQube —
+    // which needs Node >= 20.12) are deliberately NOT here — they'd error in any
+    // container without that runtime. Add those,
     // plus the synced spell-check dictionary mount and the JDK path overrides,
     // per project via templates/devcontainer/ in this repo.
     "dev.containers.defaultExtensions": [
@@ -600,7 +601,6 @@
         "foxundermoon.shell-format",
         "exiasr.hadolint",
         "charliermarsh.ruff",
-        "sonarsource.sonarlint-vscode",
         // Config formats
         "redhat.vscode-yaml",
         "redhat.vscode-xml",

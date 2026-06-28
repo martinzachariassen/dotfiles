@@ -48,6 +48,9 @@
                 // "jetbrains.kotlin-server",
                 // Python (needs a Python interpreter in the image):
                 // "ms-python.python",
+                // SonarQube (needs Node >= 20.12 in the image, or set
+                // "sonarlint.pathToNodeExecutable"):
+                // "sonarsource.sonarlint-vscode",
                 // Docker / Kubernetes (need a docker socket / kubectl + kubeconfig):
                 // "ms-azuretools.vscode-containers",
                 // "ms-kubernetes-tools.vscode-kubernetes-tools"
