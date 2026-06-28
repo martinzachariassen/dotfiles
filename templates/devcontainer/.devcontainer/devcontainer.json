@@ -6,8 +6,11 @@
 // formatters/parsers. Language runtimes are deliberately NOT managed here —
 // the container image (or its features) owns those, not mise.
 //
-// Extensions come from your user-level `dev.containers.defaultExtensions`, so
-// they are not relisted below.
+// This is the ONLY place extensions get installed into a container — there is
+// deliberately no global `dev.containers.defaultExtensions`, which would force
+// the whole set into every container (and error wherever the backing binaries
+// are missing). Extensions, their binaries (setup.sh), and the path overrides
+// all travel together here, opt-in per project.
 {
     "name": "base",
     "image": "mcr.microsoft.com/devcontainers/base:debian",
@@ -26,6 +29,65 @@
     ],
     "customizations": {
         "vscode": {
+            // Core set — works in any container (binaries come from setup.sh or
+            // are bundled by the extension). The runtime-dependent ones are
+            // commented out: uncomment per project type, and make sure the image
+            // actually provides that runtime, or the language server will error.
+            "extensions": [
+                // Editor / general productivity
+                "editorconfig.editorconfig",
+                "usernamehw.errorlens",
+                "oderwat.indent-rainbow",
+                "streetsidesoftware.code-spell-checker",
+                "gruntfuggly.todo-tree",
+                "wmaurer.change-case",
+                "vscodevim.vim",
+                "humao.rest-client",
+                "bierner.markdown-mermaid",
+                "davidanson.vscode-markdownlint",
+                // Git / GitHub
+                "eamodio.gitlens",
+                "mhutchie.git-graph",
+                "github.vscode-pull-request-github",
+                "github.vscode-github-actions",
+                "vivaxy.vscode-conventional-commits",
+                // Formatters / linters
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "timonwong.shellcheck",
+                "foxundermoon.shell-format",
+                "exiasr.hadolint",
+                "charliermarsh.ruff",
+                "sonarsource.sonarlint-vscode",
+                // Config formats
+                "redhat.vscode-yaml",
+                "redhat.vscode-xml",
+                "tamasfe.even-better-toml",
+                "hashicorp.hcl",
+                "hashicorp.terraform",
+                "tim-koehler.helm-intellisense",
+                // Database
+                "ms-ossdata.vscode-pgsql"
+
+                // ── Uncomment per project type (the image must provide the runtime) ──
+                // Java / Kotlin / Spring (needs a JDK in the image):
+                // "redhat.java",
+                // "vscjava.vscode-java-pack",
+                // "vscjava.vscode-java-debug",
+                // "vscjava.vscode-java-dependency",
+                // "vscjava.vscode-java-test",
+                // "vscjava.vscode-maven",
+                // "vscjava.vscode-gradle",
+                // "vscjava.vscode-spring-boot-dashboard",
+                // "vscjava.vscode-spring-initializr",
+                // "vmware.vscode-spring-boot",
+                // "jetbrains.kotlin-server",
+                // Python (needs a Python interpreter in the image):
+                // "ms-python.python",
+                // Docker / Kubernetes (need a docker socket / kubectl + kubeconfig):
+                // "ms-azuretools.vscode-containers",
+                // "ms-kubernetes-tools.vscode-kubernetes-tools"
+            ],
             "settings": {
                 // Override the host-only paths from user settings that don't
                 // exist in a Linux container. Everything else is path-free and

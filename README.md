@@ -225,21 +225,25 @@ It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), a
 
 ## Dev containers
 
-`dev.containers.defaultExtensions` (in the VS Code settings) installs the
-personal extension set into every dev container automatically. Extensions alone
-can't replicate the host, though — most of the daily tools also depend on a CLI
-binary or a host path that doesn't exist in a fresh Linux container.
+Dev containers are **opt-in per project**, not configured globally. The VS Code
+setting `dev.containers.defaultExtensions` is deliberately *not* used — it would
+force the whole extension set into every container (including projects with their
+own `.devcontainer`), and the binary-backed ones (`hadolint`, `todo-tree`,
+`shellcheck`, `shfmt`) then error wherever those binaries aren't installed.
 
-[`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
-that closes those gaps for the tools used most: it installs `ripgrep` (Todo-Tree),
-`shfmt`, and `hadolint`, and bind-mounts the cSpell personal dictionary so
-"Add to dictionary" writes the same repo-tracked file as on the Mac. Runtimes
-are intentionally **not** managed here — a dev container owns its toolchain via
-the image/features, so there's no mise inside it (and `hverlin.mise-vscode` is
-excluded from the defaults for the same reason).
+Instead, [`templates/devcontainer/`](templates/devcontainer) is a copy-me
+`.devcontainer/` that bundles the three things that must travel together:
+the **extensions** (`customizations.vscode.extensions`), the **binaries** they
+need (`setup.sh` installs `ripgrep`, `shfmt`, `hadolint`; the rest bundle their
+own engine), and the **path overrides** — including a bind-mount of the cSpell
+personal dictionary so "Add to dictionary" writes the same repo-tracked file as
+on the Mac. The core list is error-free in any container; the runtime-dependent
+extensions (Java/Kotlin/Python/Docker/k8s) are commented out, ready to uncomment
+per project type.
 
 Drop it into a project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
-and **Reopen in Container**.
+and **Dev Containers: Rebuild Container** (a plain *Reopen* reuses the old
+container and skips `setup.sh`).
 
 **Language runtimes belong to the image, not the editor.** The whole point of a
 dev container is that the `image`/`Dockerfile`/features install Java, Python,
