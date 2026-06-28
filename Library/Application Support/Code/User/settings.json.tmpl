@@ -552,14 +552,68 @@
 
     "update.mode": "manual",
 
-    // Note: dev containers are intentionally NOT configured here. `dev.containers
-    // .defaultExtensions` is a blunt global that force-installs the whole set
-    // into *every* container — including projects with their own .devcontainer —
-    // and the binary-backed ones (hadolint, todo-tree, shellcheck, shfmt) then
-    // error wherever those binaries aren't installed. Instead, the extensions +
-    // their binaries + path overrides travel together as an opt-in scaffold a
-    // project copies in when it wants them — see templates/devcontainer/ in the
-    // dotfiles repo.
+    // =========================================================
+    // DEV CONTAINERS
+    // =========================================================
+    //
+    // Make any container feel like the Mac without per-project files. Two
+    // machine-level settings apply to *every* container automatically:
+    //
+    //   defaultExtensions  installs this core set into every container. Each one
+    //                      either bundles its own engine (shellcheck, ruff,
+    //                      prettier, eslint, the parsers) or shells out to a
+    //                      binary that devcontainer-install.sh adds below, so
+    //                      they all work in any Linux container.
+    //   dotfiles.*         clones this repo into every container and runs
+    //                      scripts/devcontainer-install.sh, which installs the
+    //                      CLI binaries the extensions need but don't ship
+    //                      (ripgrep, shfmt, hadolint). installCommand is set
+    //                      explicitly so the macOS install.sh wizard is never
+    //                      what runs inside a container.
+    //
+    // Runtime-dependent extensions (Java, Python, Docker/k8s) are deliberately
+    // NOT here — they'd error in any container without that runtime. Add those,
+    // plus the synced spell-check dictionary mount and the JDK path overrides,
+    // per project via templates/devcontainer/ in this repo.
+    "dev.containers.defaultExtensions": [
+        // Editor / general productivity
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "oderwat.indent-rainbow",
+        "streetsidesoftware.code-spell-checker",
+        "gruntfuggly.todo-tree",
+        "wmaurer.change-case",
+        "vscodevim.vim",
+        "humao.rest-client",
+        "bierner.markdown-mermaid",
+        "davidanson.vscode-markdownlint",
+        // Git / GitHub
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+        "vivaxy.vscode-conventional-commits",
+        // Formatters / linters
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "exiasr.hadolint",
+        "charliermarsh.ruff",
+        "sonarsource.sonarlint-vscode",
+        // Config formats
+        "redhat.vscode-yaml",
+        "redhat.vscode-xml",
+        "tamasfe.even-better-toml",
+        "hashicorp.hcl",
+        "hashicorp.terraform",
+        "tim-koehler.helm-intellisense",
+        // Database
+        "ms-ossdata.vscode-pgsql"
+    ],
+    "dotfiles.repository": "martinzachariassen/dotfiles",
+    "dotfiles.targetPath": "~/dotfiles",
+    "dotfiles.installCommand": "bash scripts/devcontainer-install.sh",
 
     // =========================================================
     // SECURITY
