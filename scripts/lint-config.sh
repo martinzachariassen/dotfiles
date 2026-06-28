@@ -7,7 +7,7 @@
 #   *.toml          — strict TOML, via Python tomllib (3.11+).
 #   *.json          — strict JSON, via `python3 -m json.tool`.
 #   VS Code configs — JSONC (line + block comments, trailing commas allowed);
-#                     validated by a small strip-then-load pass.
+#   + devcontainer.json validated by a small strip-then-load pass.
 #
 # Templates (*.json.tmpl, *.toml.tmpl) are NOT validated here — the chezmoi
 # render-check job already proves them parseable as templates, and the rendered
@@ -26,6 +26,15 @@ cd "$SOURCE_DIR"
 VSCODE_DIR='./Library/Application Support/Code/User'
 
 errors=0
+
+# JSONC, not strict JSON: the VS Code user dir, plus any devcontainer.json
+# (the dev-container spec allows comments + trailing commas).
+is_jsonc() {
+    case "$1" in
+        "${VSCODE_DIR}/"* | */devcontainer.json) return 0 ;;
+        *) return 1 ;;
+    esac
+}
 
 validate_strict_json() {
     local f="$1"
@@ -114,14 +123,14 @@ list_paths() {
 
 # ─── Strict JSON (everywhere except the VS Code JSONC dir) ────────────────────
 while IFS= read -r f; do
-    case "$f" in "${VSCODE_DIR}/"*) continue ;; esac
+    is_jsonc "$f" && continue
     echo "JSON   $f"
     run validate_strict_json "$f"
 done < <(list_paths '*.json')
 
-# ─── JSONC (VS Code config dir) ───────────────────────────────────────────────
+# ─── JSONC (VS Code config dir + devcontainer.json) ───────────────────────────
 while IFS= read -r f; do
-    case "$f" in "${VSCODE_DIR}/"*) ;; *) continue ;; esac
+    is_jsonc "$f" || continue
     echo "JSONC  $f"
     run validate_jsonc "$f"
 done < <(list_paths '*.json')

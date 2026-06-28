@@ -223,6 +223,24 @@ It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), a
 
 **`install.sh` is the wizard** — a self-contained bootstrap script (it has to run via `curl | bash` before the repo exists on disk). It walks five phases — *check this Mac → choose setup → review plan → execute → self-test* — then prints next steps. `chezup` deliberately mirrors its banner, phases, and prompts so the two feel like one tool.
 
+## Dev containers
+
+`dev.containers.defaultExtensions` (in the VS Code settings) installs the
+personal extension set into every dev container automatically. Extensions alone
+can't replicate the host, though — most of the daily tools also depend on a CLI
+binary or a host path that doesn't exist in a fresh Linux container.
+
+[`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
+that closes those gaps for the tools used most: it installs `ripgrep` (Todo-Tree),
+`shfmt`, and `hadolint`, and bind-mounts the cSpell personal dictionary so
+"Add to dictionary" writes the same repo-tracked file as on the Mac. Runtimes
+are intentionally **not** managed here — a dev container owns its toolchain via
+the image/features, so there's no mise inside it (and `hverlin.mise-vscode` is
+excluded from the defaults for the same reason).
+
+Drop it into a project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
+and **Reopen in Container**.
+
 ## Repository layout
 
 ```
@@ -233,6 +251,7 @@ brewfiles/              # profile + feature layers (mac-apps, personal, work)
 .chezmoiscripts/        # ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
 dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
 scripts/                # chezup.sh, doctor.sh, dotfiles-config.sh, bootstrap-auth.sh, lib/ui.sh…
+templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
 tests/                  # bats suites + drive-wizard.py (drives install.sh under a pty)
 ```
 

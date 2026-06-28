@@ -1,0 +1,45 @@
+// Reusable dev-container base — copy this `.devcontainer/` folder into a project.
+//
+// Goal is NOT host parity. It makes the handful of editor tools you rely on
+// every day work the same inside a container as on the Mac: the synced spell-
+// check dictionary, Todo-Tree, the shell/Docker linters, and the bundled
+// formatters/parsers. Language runtimes are deliberately NOT managed here —
+// the container image (or its features) owns those, not mise.
+//
+// Extensions come from your user-level `dev.containers.defaultExtensions`, so
+// they are not relisted below.
+{
+    "name": "base",
+    "image": "mcr.microsoft.com/devcontainers/base:debian",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {}
+    },
+    // Installs the few binaries the extensions need but don't bundle
+    // (ripgrep, shfmt, hadolint). See setup.sh for the why of each.
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    // Mount the host's cSpell personal dictionary into the container at a fixed
+    // path. "Add to dictionary" then writes the SAME physical file (a symlink
+    // into the dotfiles repo on the host), so new words sync both ways and show
+    // up in `git status` exactly like on the Mac.
+    "mounts": [
+        "source=${localEnv:HOME}/.config/cspell/personal.txt,target=/cspell/personal.txt,type=bind"
+    ],
+    "customizations": {
+        "vscode": {
+            "settings": {
+                // Override the two host-only paths that don't exist in a Linux
+                // container; everything else in user settings is either path-free
+                // (works as-is) or harmless dead config (the Java/mise keys).
+                "todo-tree.ripgrep.ripgrep": "/usr/bin/rg",
+                "cSpell.customDictionaries": {
+                    "personal": {
+                        "name": "personal",
+                        "path": "/cspell/personal.txt",
+                        "addWords": true,
+                        "scope": "user"
+                    }
+                }
+            }
+        }
+    }
+}

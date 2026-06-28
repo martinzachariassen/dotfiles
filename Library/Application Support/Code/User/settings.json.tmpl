@@ -612,9 +612,10 @@
         "ms-kubernetes-tools.vscode-kubernetes-tools",
         "tim-koehler.helm-intellisense",
         // Database
-        "ms-ossdata.vscode-pgsql",
-        // Runtime tooling
-        "hverlin.mise-vscode"
+        "ms-ossdata.vscode-pgsql"
+        // Note: hverlin.mise-vscode is intentionally excluded — dev containers
+        // own their runtimes via the image/features, so there is no mise inside
+        // them for the extension to reflect (it would just error on activation).
     ],
 
     // =========================================================
