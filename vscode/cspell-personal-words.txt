@@ -2,6 +2,7 @@ allopen
 cloudsdktool
 fasterxml
 flywaydb
+fwcd
 healthcheck
 isready
 livenessstate
@@ -10,4 +11,5 @@ readinessstate
 springframework
 stdlib
 temurin
+vscjava
 Xjsr

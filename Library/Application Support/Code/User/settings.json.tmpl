@@ -554,6 +554,70 @@
 
 
     // =========================================================
+    // DEV CONTAINERS
+    // =========================================================
+
+    // Extensions installed inside every dev container automatically.
+    // Excludes: themes/icons (cosmetic), remote-containers (host-side),
+    // codetogether/codesnap (host-only tools), claude-code (auth-bound),
+    // and the Norwegian spell-check pack (not generically useful in containers).
+    "dev.containers.defaultExtensions": [
+        // Editor / general productivity
+        "editorconfig.editorconfig",
+        "usernamehw.errorlens",
+        "oderwat.indent-rainbow",
+        "streetsidesoftware.code-spell-checker",
+        "gruntfuggly.todo-tree",
+        "wmaurer.change-case",
+        "vscodevim.vim",
+        "humao.rest-client",
+        "bierner.markdown-mermaid",
+        "davidanson.vscode-markdownlint",
+        // Git / GitHub
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+        "vivaxy.vscode-conventional-commits",
+        // Formatters / linters
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "exiasr.hadolint",
+        "charliermarsh.ruff",
+        "sonarsource.sonarlint-vscode",
+        // Java / Kotlin / Spring
+        "redhat.java",
+        "vscjava.vscode-java-pack",
+        "vscjava.vscode-java-debug",
+        "vscjava.vscode-java-dependency",
+        "vscjava.vscode-java-test",
+        "vscjava.vscode-maven",
+        "vscjava.vscode-gradle",
+        "vscjava.vscode-spring-boot-dashboard",
+        "vscjava.vscode-spring-initializr",
+        "vmware.vscode-spring-boot",
+        "jetbrains.kotlin-server",
+        // Python
+        "ms-python.python",
+        // Config formats
+        "redhat.vscode-yaml",
+        "redhat.vscode-xml",
+        "tamasfe.even-better-toml",
+        "hashicorp.hcl",
+        "hashicorp.terraform",
+        // Containers / infra
+        "ms-azuretools.vscode-containers",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "tim-koehler.helm-intellisense",
+        // Database
+        "ms-ossdata.vscode-pgsql",
+        // Runtime tooling
+        "hverlin.mise-vscode"
+    ],
+
+    // =========================================================
     // SECURITY
     // =========================================================
 
