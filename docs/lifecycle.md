@@ -70,11 +70,43 @@ point.
 share one visual vocabulary — the same banner, phase headers, prompts, glyphs,
 and Catppuccin Frappé palette — so the two feel like one tool.
 
-That engine lives in `scripts/lib/ui.sh` (`ui_init_colors` / `ui_init_glyphs` /
-`ui_init_wizard` and the `say`/`ok`/`warn`/`phase_open`/`ui_banner`/`prompt_*`
-helpers). `chezup`, `doctor`, and `bootstrap-auth` source it.
+That engine lives in `scripts/lib/ui.sh`:
 
-`install.sh` is the one exception: it is fetched via `curl | bash` **before this
-repo exists on disk**, so it cannot source `ui.sh` and instead carries its own
-copy of the same helpers. Keep the two visual contracts in sync when you change
-either — the styling in `install.sh` and `ui.sh` is meant to be identical.
+- `ui_init_colors` / `ui_init_glyphs` — palette + Unicode/ASCII glyphs.
+- `ui_init_logging` — the shared rail-style log helpers (`say`/`ok`/`info`/
+  `warn`/`fail`/`dim`/`hr` plus `line_prefix`/`node_prefix`).
+- `ui_init_wizard` — the superset: depth-aware themed palette, rich glyphs,
+  `ui_init_logging`, and the `phase_open`/`ui_banner`/`prompt_*` helpers.
+
+`chezup` sources it and calls `ui_init_wizard`; `bootstrap-auth` sources it and
+calls `ui_init_logging`; `doctor` uses `ui_init_colors` + `ui_init_glyphs`.
+
+`install.sh` is the one that can't source anything — it's fetched via
+`curl | bash` **before this repo exists on disk**. So rather than hand-maintain a
+second copy of the engine (which had already drifted from `ui.sh`), **install.sh
+is a generated artifact**. The maintained driver lives in `install.sh.in`, and
+`scripts/build-install.sh` expands each `# @inline <path>` line into the region
+between that lib's `# @inline-begin`/`# @inline-end` markers — embedding `ui.sh`,
+`chezmoi-data.sh`, `features.sh`, and `active-modules.sh` so the installer speaks
+the exact same engine as everything else.
+
+Edit `install.sh.in` (or the libs), then run `bash scripts/build-install.sh`;
+never edit `install.sh` directly. CI and pre-commit run
+`build-install.sh --check`, which fails if the committed `install.sh` has drifted
+from its sources.
+
+### Shared libraries (`scripts/lib/`)
+
+The engine libs are the single source of truth for logic that used to be
+copy-pasted across the installer, hooks, and scripts:
+
+| Lib | Provides | Sourced by / inlined into |
+|---|---|---|
+| `ui.sh`            | colors, glyphs, logging, wizard helpers        | chezup, doctor, bootstrap-auth · install.sh (inlined) |
+| `chezmoi-data.sh`  | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, dotfiles-config · install.sh (inlined) |
+| `features.sh`      | `FEATURE_KEYS`, `feature_default`               | dotfiles-config · install.sh (inlined) |
+| `active-modules.sh`| `active_modules` (profile+features → Brewfiles) | install.sh (inlined) |
+| `tty.sh`           | `tty_reattach` (stdin → controlling terminal)   | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
+| `brew-bundle.sh`   | the Homebrew convergence engine                 | `run_after_02-brew-bundle` |
+| `obsidian-apply.sh`| the Obsidian vault seed engine                  | `run_after_02d-obsidian-apply` |
+| `semver.sh`        | `semver_extract` / `semver_lt`                  | doctor |
