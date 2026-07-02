@@ -25,34 +25,20 @@ set -uo pipefail
 SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
-# Shared UI helpers (colors + Unicode/ASCII glyphs), resolved next to this
-# script so they load regardless of the current directory.
+# Shared UI engine (colors, glyphs, and the rail-style log helpers:
+# line_prefix/node_prefix/say/ok/info/warn/fail/dim/hr). ui.sh is a committed
+# sibling of this script; a checkout without it is broken, so fail loudly rather
+# than limp along with degraded output (chezup.sh does the same).
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/ui.sh
-if [ -r "$_UI_DIR/lib/ui.sh" ]; then
-    . "$_UI_DIR/lib/ui.sh"
-    ui_init_colors
-    ui_init_glyphs
-else
-    BOLD=""
-    DIM=""
-    GREEN=""
-    YELLOW=""
-    BLUE=""
-    RED=""
-    CYAN=""
-    RESET=""
-    BAR="|"
-    NODE="*"
-    OK_MARK="OK"
-    ARROW_MARK=">"
-    FAIL_MARK="X"
-    BOX_TOP="+------------------------------------------------------------+"
-    BOX_BOTTOM="+------------------------------------------------------------+"
+if [ ! -r "$_UI_DIR/lib/ui.sh" ]; then
+    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/ui.sh" >&2
+    exit 1
 fi
+# shellcheck source=lib/ui.sh
+. "$_UI_DIR/lib/ui.sh"
+ui_init_logging
 
-line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
-node_prefix() { printf "%s%s%s" "$CYAN" "$NODE" "$RESET"; }
+# bootstrap-specific framing on top of the shared log helpers.
 box_line() {
     local text="$1" pre="${2:-}" post="${3:-}" pad
     pad=$((58 - ${#text}))
@@ -66,13 +52,6 @@ step() {
     printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$2" "$RESET"
     echo
 }
-ok() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
-info() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
-warn() { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
-fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
-say() { printf "%s  %s\n" "$(line_prefix)" "$1"; }
-dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
-hr() { printf "%s\n" "$(line_prefix)"; }
 
 pause_for_enter() {
     local prompt="$1"

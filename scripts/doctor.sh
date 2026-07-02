@@ -87,6 +87,13 @@ if [ -r "$_DOCTOR_DIR/lib/semver.sh" ]; then
     . "$_DOCTOR_DIR/lib/semver.sh"
 fi
 
+# Shared chezmoi data reader (cm_data_json/cm_data_string/cm_data_bool) for the
+# profile + feature toggles the Homebrew section checks below.
+# shellcheck source=lib/chezmoi-data.sh
+if [ -r "$_DOCTOR_DIR/lib/chezmoi-data.sh" ]; then
+    . "$_DOCTOR_DIR/lib/chezmoi-data.sh"
+fi
+
 # ─── 1. Source repo present and up to date ────────────────────────────────────
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
@@ -245,16 +252,13 @@ if command -v brew >/dev/null 2>&1; then
             warn "common Brewfile out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile"
         fi
     fi
-    # Feature/profile-specific modules.
-    data_json="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
-    if command -v jq >/dev/null 2>&1; then
-        profile="$(printf '%s\n' "$data_json" | jq -r '.profile // empty')"
-        feature_macapps="$(printf '%s\n' "$data_json" | jq -r '.features.macApps // true')"
-    else
-        profile="$(printf '%s\n' "$data_json" | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tail -1)"
-        feature_macapps="$(printf '%s\n' "$data_json" | sed -n 's/.*"macApps"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
-        feature_macapps="${feature_macapps:-true}"
-    fi
+    # Feature/profile-specific modules. cm_data_bool reads a literal `false`
+    # correctly (jq's `//` would drop it), so a disabled macApps toggle no longer
+    # gets checked as if enabled.
+    data_json="$(cm_data_json)"
+    profile="$(cm_data_string "$data_json" profile)"
+    feature_macapps="$(cm_data_bool "$data_json" macApps)"
+    feature_macapps="${feature_macapps:-true}"
     if [ "$feature_macapps" = "true" ]; then
         if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.mac-apps" >/dev/null 2>&1; then
             pass "mac apps Brewfile satisfied"
