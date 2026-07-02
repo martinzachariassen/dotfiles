@@ -18,32 +18,22 @@
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "chezmoi"                 # this very repo's manager
-brew "coreutils"               # GNU date/tar/sort/etc. as gdate, gtar, …
-brew "curl"
 brew "gh"                      # GitHub CLI
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
 brew "jq"                      # JSON
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
-brew "tldr"                    # `tldr <cmd>` — concise example-driven help
+brew "tlrc"                    # `tldr <cmd>` — maintained Rust client (old `tldr` formula was disabled upstream)
 brew "typos-cli"               # source-code spell checker (pre-commit hook; CI uses the action)
-brew "wget"
-brew "yq"                      # YAML
 
 # ─── Modern CLI replacements (the shell config aliases these by default) ──────
 brew "bat"                     # cat
-brew "btop"                    # top
 brew "carapace"                # richer shell completions for many CLIs
-brew "duf"                     # df
-brew "dust"                    # disk usage
 brew "eza"                     # ls
 brew "fd"                      # find
 brew "fzf"                     # fuzzy finder; integrated into zsh (Ctrl-R)
-brew "grpcurl"                 # curl, but for gRPC
 brew "hadolint"                # Dockerfile linter (backs the hadolint VS Code ext)
-brew "httpie"                  # curl, but human
-brew "mkcert"                  # locally-trusted dev certificates
 brew "ripgrep"                 # grep
 brew "shellcheck"              # shell-script linter (editor ext + pre-commit + CI)
 brew "shfmt"                   # shell-script formatter (backs the shell-format VS Code ext)
@@ -72,7 +62,6 @@ cask "1password"               # GUI app — SSH agent + git signing live here
 cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
 cask "docker-desktop"          # if you'd rather use colima/podman, swap this line
 cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
-cask "kotlin-lsp"              # JetBrains Kotlin LSP CLI for non-VS Code clients
 cask "visual-studio-code"      # VS Code app; settings/extensions managed by chezmoi
 
 # JDKs are managed by mise (java = ["temurin-21", "temurin-25"] in the global
@@ -80,8 +69,7 @@ cask "visual-studio-code"      # VS Code app; settings/extensions managed by che
 # anchors to them directly — see dot_config/mise/config.toml + settings.json.tmpl.
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
-cask "font-fira-code-nerd-font"        # secondary; nice ligatures
-cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty references this
+cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this
 
 # ─── Mac App Store apps (requires `mas`) ──────────────────────────────────────
 # brew "mas"

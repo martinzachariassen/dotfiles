@@ -19,6 +19,12 @@ brew "kubernetes-cli"           # kubectl
 brew "minikube"                 # local single-node Kubernetes cluster (VS Code k8s ext otherwise downloads its own copy)
 cask "gcloud-cli"               # global Google Cloud account/project CLI
 
+# ─── Dev tooling ──────────────────────────────────────────────────────────────
+# JetBrains' standalone Kotlin LSP CLI, for non-VS Code editors (nvim/Emacs). VS
+# Code uses the jetbrains.kotlin-server extension instead, so this only earns its
+# place on a machine that does JVM/Kotlin work — hence the work tier, not core.
+cask "kotlin-lsp"               # Kotlin LSP CLI for non-VS Code clients
+
 # ─── Work apps ────────────────────────────────────────────────────────────────
 # microsoft-office is the full Microsoft 365 suite for Mac (Word, Excel,
 # PowerPoint, Outlook, OneNote, OneDrive) — one installer pkg. Do NOT also list
