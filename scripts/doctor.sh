@@ -34,6 +34,7 @@ _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ -r "$_DOCTOR_DIR/lib/ui.sh" ]; then
     . "$_DOCTOR_DIR/lib/ui.sh"
     ui_init_colors
+    ui_init_glyphs
 else
     BOLD=""
     DIM=""
@@ -42,6 +43,13 @@ else
     BLUE=""
     RED=""
     RESET=""
+    # ui.sh unavailable — define ASCII glyphs so status marks never print as
+    # mojibake on a non-UTF-8 locale (the whole point of ui_init_glyphs).
+    OK_MARK="OK"
+    FAIL_MARK="X"
+    ARROW_MARK=">"
+    NOTE="-"
+    RULE="--"
 fi
 
 PASS=0
@@ -50,7 +58,7 @@ INFOCOUNT=0
 FAIL=0
 
 pass() {
-    echo "  ${GREEN}✓${RESET}  $1"
+    echo "  ${GREEN}${OK_MARK}${RESET}  $1"
     PASS=$((PASS + 1))
 }
 warn() {
@@ -58,16 +66,16 @@ warn() {
     ACTION=$((ACTION + 1))
 }
 note() {
-    echo "  ${BLUE}•${RESET}  $1"
+    echo "  ${BLUE}${NOTE}${RESET}  $1"
     INFOCOUNT=$((INFOCOUNT + 1))
 }
 fail() {
-    echo "  ${RED}✗${RESET}  $1"
+    echo "  ${RED}${FAIL_MARK}${RESET}  $1"
     FAIL=$((FAIL + 1))
 }
 section() {
     echo
-    echo "${BOLD}${BLUE}── $1 ──${RESET}"
+    echo "${BOLD}${BLUE}${RULE} $1 ${RULE}${RESET}"
 }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
@@ -77,6 +85,13 @@ SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 # shellcheck source=lib/semver.sh
 if [ -r "$_DOCTOR_DIR/lib/semver.sh" ]; then
     . "$_DOCTOR_DIR/lib/semver.sh"
+fi
+
+# Shared chezmoi data reader (cm_data_json/cm_data_string/cm_data_bool) for the
+# profile + feature toggles the Homebrew section checks below.
+# shellcheck source=lib/chezmoi-data.sh
+if [ -r "$_DOCTOR_DIR/lib/chezmoi-data.sh" ]; then
+    . "$_DOCTOR_DIR/lib/chezmoi-data.sh"
 fi
 
 # ─── 1. Source repo present and up to date ────────────────────────────────────
@@ -237,16 +252,13 @@ if command -v brew >/dev/null 2>&1; then
             warn "common Brewfile out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile"
         fi
     fi
-    # Feature/profile-specific modules.
-    data_json="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
-    if command -v jq >/dev/null 2>&1; then
-        profile="$(printf '%s\n' "$data_json" | jq -r '.profile // empty')"
-        feature_macapps="$(printf '%s\n' "$data_json" | jq -r '.features.macApps // true')"
-    else
-        profile="$(printf '%s\n' "$data_json" | sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tail -1)"
-        feature_macapps="$(printf '%s\n' "$data_json" | sed -n 's/.*"macApps"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' | tail -1)"
-        feature_macapps="${feature_macapps:-true}"
-    fi
+    # Feature/profile-specific modules. cm_data_bool reads a literal `false`
+    # correctly (jq's `//` would drop it), so a disabled macApps toggle no longer
+    # gets checked as if enabled.
+    data_json="$(cm_data_json)"
+    profile="$(cm_data_string "$data_json" profile)"
+    feature_macapps="$(cm_data_bool "$data_json" macApps)"
+    feature_macapps="${feature_macapps:-true}"
     if [ "$feature_macapps" = "true" ]; then
         if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.mac-apps" >/dev/null 2>&1; then
             pass "mac apps Brewfile satisfied"
@@ -420,16 +432,16 @@ fi
 # ─── 10. Privacy permissions hint (can't be checked programmatically) ────────
 section "Privacy permissions (manual check)"
 echo "  ${DIM}macOS won't let scripts inspect Privacy permissions. Verify manually:${RESET}"
-echo "  ${DIM}  System Settings → Privacy & Security →${RESET}"
-echo "  ${DIM}    • Full Disk Access:    Ghostty (for protected-dir scans)${RESET}"
-echo "  ${DIM}    • Accessibility:       Rectangle, Raycast, Karabiner (if used)${RESET}"
-echo "  ${DIM}    • Screen Recording:    Raycast / screenshot tools${RESET}"
-echo "  ${DIM}    • Input Monitoring:    Karabiner (if used)${RESET}"
-echo "  ${DIM}    • Developer Tools:     your terminal (avoids Gatekeeper friction)${RESET}"
+echo "  ${DIM}  System Settings ${ARROW_MARK} Privacy & Security ${ARROW_MARK}${RESET}"
+echo "  ${DIM}    ${NOTE} Full Disk Access:    Ghostty (for protected-dir scans)${RESET}"
+echo "  ${DIM}    ${NOTE} Accessibility:       Rectangle, Raycast, Karabiner (if used)${RESET}"
+echo "  ${DIM}    ${NOTE} Screen Recording:    Raycast / screenshot tools${RESET}"
+echo "  ${DIM}    ${NOTE} Input Monitoring:    Karabiner (if used)${RESET}"
+echo "  ${DIM}    ${NOTE} Developer Tools:     your terminal (avoids Gatekeeper friction)${RESET}"
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
 echo
-echo "${BOLD}── Summary ──${RESET}"
+echo "${BOLD}${RULE} Summary ${RULE}${RESET}"
 echo "  ${GREEN}${PASS} pass${RESET}   ${YELLOW}${ACTION} action${RESET}   ${BLUE}${INFOCOUNT} info${RESET}   ${RED}${FAIL} fail${RESET}"
 
 if [ "$FAIL" -gt 0 ]; then

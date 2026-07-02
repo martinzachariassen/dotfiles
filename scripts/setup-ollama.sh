@@ -26,15 +26,21 @@ _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ -r "$_UI_DIR/lib/ui.sh" ]; then
     . "$_UI_DIR/lib/ui.sh"
     ui_init_colors
+    ui_init_glyphs
 else
     GREEN=""
     YELLOW=""
     BLUE=""
     RESET=""
+    # ui.sh unavailable — ASCII glyph fallbacks so output never prints mojibake
+    # on a non-UTF-8 locale.
+    NODE="*"
+    OK_MARK="OK"
+    ARROW_MARK=">"
 fi
 
-info() { echo "  ${BLUE}→${RESET} $1"; }
-ok() { echo "  ${GREEN}✓${RESET} $1"; }
+info() { echo "  ${BLUE}${ARROW_MARK}${RESET} $1"; }
+ok() { echo "  ${GREEN}${OK_MARK}${RESET} $1"; }
 warn() { echo "  ${YELLOW}!${RESET} $1"; }
 
 if ! command -v ollama >/dev/null 2>&1; then
@@ -55,7 +61,7 @@ wait_for_ollama() {
     return 1
 }
 
-echo "◆ Ollama service"
+echo "${NODE} Ollama service"
 
 if ollama list >/dev/null 2>&1; then
     ok "Ollama is already running"

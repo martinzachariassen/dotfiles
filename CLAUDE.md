@@ -74,7 +74,13 @@ sources its lib, then calls the entry point. `02-brew-bundle.sh.tmpl` and
 **User-facing commands (`scripts/`).** `chezup.sh` (pull + apply + converge),
 `doctor.sh` (`chezdoctor` health check), `dotfiles-config.sh` (profile/feature
 management), `bootstrap-auth.sh` (1Password/git-signing setup), `macos-defaults.sh`.
-The `install.sh` at the repo root is the one-shot fresh-Mac bootstrap wizard.
+The `install.sh` at the repo root is the one-shot fresh-Mac bootstrap wizard —
+and it is a **generated artifact**: because `curl | bash` runs it before the repo
+exists on disk, it can't source `scripts/lib/*`, so `scripts/build-install.sh`
+inlines the shared engine (`ui.sh`, `chezmoi-data.sh`, `features.sh`,
+`active-modules.sh`) into it. Edit `install.sh.in` or the libs, then run
+`bash scripts/build-install.sh`; never edit `install.sh` by hand. See
+`docs/lifecycle.md`.
 
 **Runtimes are mise, not Homebrew.** Java/Node/Python come from mise: global
 defaults in `~/.config/mise/config.toml` (source: `dot_config/mise/`), per-project
@@ -92,10 +98,15 @@ bats tests/semver.bats
 # Lint + format-check plain shell scripts (NOT the .tmpl hooks — Go directives
 # break shellcheck). shfmt enforces `-i 4 -ci`; run `shfmt -w -i 4 -ci <files>`
 # to auto-fix. bash -n / zsh -n parse only their FIRST arg, so loop per file:
-shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
-shfmt -d -i 4 -ci install.sh scripts/*.sh scripts/lib/*.sh
-for f in install.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+shellcheck --severity=error --shell=bash install.sh install.sh.in scripts/*.sh scripts/lib/*.sh
+shfmt -d -i 4 -ci install.sh install.sh.in scripts/*.sh scripts/lib/*.sh
+for f in install.sh install.sh.in scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
 for f in dot_zshenv dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
+
+# install.sh is GENERATED from install.sh.in + scripts/lib/* — regenerate after
+# editing either, and let CI/pre-commit verify it hasn't drifted:
+bash scripts/build-install.sh          # regenerate install.sh
+bash scripts/build-install.sh --check  # fail if install.sh is stale
 
 # Local commit gates mirroring CI (shellcheck, shfmt, typos, commit message).
 # Activate once per clone; run across everything on demand:

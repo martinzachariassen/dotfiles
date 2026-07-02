@@ -5,21 +5,32 @@
 # dependency-free so it behaves identically on a fresh machine before every
 # package is installed.
 #
-# Three entry points, all idempotent:
+# Four entry points, all idempotent:
 #   ui_init_colors  — populate BOLD/DIM/GREEN/YELLOW/BLUE/RED/CYAN/RESET
-#   ui_init_glyphs  — populate basic BAR/NODE/OK_MARK/ARROW_MARK/FAIL_MARK + box
-#   ui_init_wizard  — superset: depth-aware themed palette + rich glyphs + the
-#                     phase/setting/banner/prompt helpers used by install.sh,
-#                     so chezup feels like the install wizard
+#   ui_init_glyphs  — basic BAR/NODE/OK_MARK/ARROW_MARK/FAIL_MARK/NOTE/RULE + box
+#   ui_init_logging — the shared rail-style log helpers (line_prefix/node_prefix/
+#                     say/ok/info/warn/fail/dim/hr); colors + glyphs first
+#   ui_init_wizard  — superset: depth-aware themed palette + rich glyphs +
+#                     ui_init_logging + the phase/setting/banner/prompt helpers
+#                     used by install.sh, so chezup feels like the install wizard
+#
+# install.sh cannot source this file (it runs via `curl | bash` before the repo
+# exists on disk), so scripts/build-install.sh embeds the region between the
+# `# @inline-begin`/`# @inline-end` markers below into the generated install.sh.
+# Everything the engine needs lives inside that region.
 #
 # The color/glyph vars and the wizard helper functions are consumed by callers
 # that source this file, so their use isn't visible here. Suppress the
 # false-positive unused-variable and unreached-function warnings.
 # shellcheck disable=SC2034,SC2329
 
-# Source guard so re-sourcing is cheap and safe.
+# Source guard so re-sourcing is cheap and safe. Kept OUTSIDE the @inline region
+# below: a bare `return 0` at install.sh's top level is an error, and install.sh
+# embeds this engine exactly once anyway.
 [ -n "${__DOTFILES_UI_SH:-}" ] && return 0
 __DOTFILES_UI_SH=1
+
+# @inline-begin
 
 # ui_init_colors — define BOLD DIM GREEN YELLOW BLUE RED CYAN RESET.
 # Colors are emitted only when stdout is a terminal, so piped/CI output stays
@@ -47,10 +58,10 @@ ui_init_colors() {
     fi
 }
 
-# ui_init_glyphs — define BAR NODE OK_MARK ARROW_MARK FAIL_MARK BOX_TOP
-# BOX_BOTTOM. Uses Unicode line-drawing when the locale advertises UTF-8,
-# otherwise falls back to ASCII so the output never turns into mojibake on a
-# bare C/POSIX locale.
+# ui_init_glyphs — define BAR NODE OK_MARK ARROW_MARK FAIL_MARK NOTE RULE
+# BOX_TOP BOX_BOTTOM. Uses Unicode line-drawing when the locale advertises
+# UTF-8, otherwise falls back to ASCII so the output never turns into mojibake
+# on a bare C/POSIX locale.
 ui_init_glyphs() {
     case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
         *UTF-8* | *utf8* | *UTF8*)
@@ -59,6 +70,8 @@ ui_init_glyphs() {
             OK_MARK="✓"
             ARROW_MARK="→"
             FAIL_MARK="✗"
+            NOTE="•"
+            RULE="──"
             BOX_TOP="╭────────────────────────────────────────────────────────────╮"
             BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
             ;;
@@ -68,10 +81,38 @@ ui_init_glyphs() {
             OK_MARK="OK"
             ARROW_MARK=">"
             FAIL_MARK="X"
+            NOTE="-"
+            RULE="--"
             BOX_TOP="+------------------------------------------------------------+"
             BOX_BOTTOM="+------------------------------------------------------------+"
             ;;
     esac
+}
+
+# ui_init_logging — define the shared rail-style log helpers as globals:
+#   line_prefix node_prefix say ok info warn fail dim hr
+# This is the "│  ✓ message" vocabulary used by install.sh, chezup, and
+# bootstrap-auth, so every script speaks the same visual language (see
+# docs/lifecycle.md, "one engine, one look"). It initialises colors + glyphs
+# first (both idempotent) so a caller can just `ui_init_logging` and go.
+#
+# node_prefix uses the themed ACCENT (mauve) when a wizard palette is active and
+# falls back to CYAN otherwise, so this one definition serves both the rich
+# wizard (install.sh/chezup) and the plain colors-only callers (bootstrap-auth).
+ui_init_logging() {
+    ui_init_colors
+    ui_init_glyphs
+
+    line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
+    node_prefix() { printf "%s%s%s" "${ACCENT:-$CYAN}" "$NODE" "$RESET"; }
+
+    say() { printf "%s  %s\n" "$(line_prefix)" "$1"; }
+    ok() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+    info() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
+    warn() { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
+    fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
+    dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
+    hr() { printf "%s\n" "$(line_prefix)"; }
 }
 
 # ─── Wizard mode ─────────────────────────────────────────────────────────────
@@ -90,11 +131,10 @@ ui_init_glyphs() {
 # the two visual contracts in sync when you change either.
 
 ui_init_wizard() {
-    ui_init_colors
-    ui_init_glyphs
+    ui_init_logging # colors + glyphs + shared log helpers
     _ui_wizard_capabilities
-    _ui_wizard_palette
-    _ui_wizard_glyphs
+    _ui_wizard_palette # override palette with the themed depth-aware one
+    _ui_wizard_glyphs  # override glyphs with the rich menu/box/spinner set
     _ui_wizard_define_helpers
 }
 
@@ -196,7 +236,6 @@ _ui_wizard_palette() {
         RED="$(fg err)"
         CYAN="$(fg rail)"
         ACCENT="$(fg accent)"
-        INFOC="$(fg info)"
         MUTED="$(fg muted)"
     else
         BOLD=""
@@ -208,7 +247,6 @@ _ui_wizard_palette() {
         RED=""
         CYAN=""
         ACCENT=""
-        INFOC=""
         MUTED=""
     fi
 }
@@ -268,16 +306,9 @@ _ui_wizard_define_helpers() {
         printf '%s' "$out"
     }
 
-    line_prefix() { printf "%s%s%s" "$CYAN" "$BAR" "$RESET"; }
-    node_prefix() { printf "%s%s%s" "$ACCENT" "$NODE" "$RESET"; }
-
-    say() { printf "%s  %s\n" "$(line_prefix)" "$1"; }
-    ok() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
-    info() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
-    warn() { printf "%s  %s!%s %s\n" "$(line_prefix)" "$YELLOW" "$RESET" "$1"; }
-    fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
-    dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
-    hr() { printf "%s\n" "$(line_prefix)"; }
+    # line_prefix/node_prefix/say/ok/info/warn/fail/dim/hr come from
+    # ui_init_logging (called by ui_init_wizard before this). Only the wizard's
+    # richer helpers are defined here.
 
     setting() {
         local label="$1" value="$2"
@@ -526,3 +557,4 @@ _ui_wizard_define_helpers() {
             "${GREEN}${OK_MARK}${RESET}" "$BOLD" "$title" "$RESET" "$GREEN" "$([ "$result" = true ] && echo yes || echo no)" "$RESET"
     }
 }
+# @inline-end

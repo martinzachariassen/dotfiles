@@ -28,6 +28,13 @@ echo "→ mise: not on macOS, skipping"
 exit 0
 {{ end -}}
 
+# Ensure Homebrew's bin dir is on PATH when apply runs outside a login shell
+# (launchd, cron, a bare `chezmoi apply`). Mirrors run_after_02-brew-bundle so
+# the `command -v mise` check below finds the binary the bundle step installed.
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 echo "◆ Apply 2b/5: mise runtimes"
 
 if ! command -v mise >/dev/null 2>&1; then

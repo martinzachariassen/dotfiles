@@ -5,8 +5,21 @@
 set -euo pipefail
 
 CHEZMOI_CONFIG="${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}"
-FEATURE_KEYS=(macApps)
 APPLY=1
+
+# Shared libs: FEATURE_KEYS/feature_default + the chezmoi data reader. Committed
+# siblings, so a missing one means a broken checkout — fail loudly.
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/lib" && pwd)"
+for _lib in features.sh chezmoi-data.sh; do
+    if [ ! -r "$_LIB_DIR/$_lib" ]; then
+        echo "dotfiles: missing $_LIB_DIR/$_lib" >&2
+        exit 1
+    fi
+done
+# shellcheck source=lib/features.sh
+. "$_LIB_DIR/features.sh"
+# shellcheck source=lib/chezmoi-data.sh
+. "$_LIB_DIR/chezmoi-data.sh"
 
 usage() {
     cat <<EOF
@@ -43,13 +56,6 @@ valid_feature() {
         [ "$1" = "$key" ] && return 0
     done
     return 1
-}
-
-feature_default() {
-    case "$1" in
-        macApps) printf 'true' ;;
-        *) printf 'false' ;;
-    esac
 }
 
 toml_quote() {
@@ -99,26 +105,15 @@ ensure_config() {
 
 show_profile() {
     ensure_config
-    if command -v jq >/dev/null 2>&1; then
-        chezmoi data --format=json 2>/dev/null | jq -r '.profile // empty'
-    else
-        chezmoi data --format=json 2>/dev/null |
-            sed -n 's/.*"profile"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-            sed '/^$/d' |
-            tail -1
-    fi
+    cm_data_string "$(cm_data_json)" profile
 }
 
 show_features() {
     ensure_config
     local data key val
-    data="$(chezmoi data --format=json 2>/dev/null || echo '{}')"
+    data="$(cm_data_json)"
     for key in "${FEATURE_KEYS[@]}"; do
-        if command -v jq >/dev/null 2>&1; then
-            val="$(printf '%s\n' "$data" | jq -r --arg key "$key" '.features[$key] // empty')"
-        else
-            val="$(printf '%s\n' "$data" | sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\(true\\|false\\).*/\\1/p" | head -1)"
-        fi
+        val="$(cm_data_bool "$data" "$key")"
         printf '%-10s %s\n' "$key" "${val:-$(feature_default "$key")}"
     done
 }
@@ -269,14 +264,7 @@ cmd_signing() {
         show)
             parse_common_flags "${@:2}"
             ensure_config
-            if command -v jq >/dev/null 2>&1; then
-                chezmoi data --format=json 2>/dev/null | jq -r '.signingKey // empty'
-            else
-                chezmoi data --format=json 2>/dev/null |
-                    sed -n 's/.*"signingKey"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
-                    sed '/^$/d' |
-                    tail -1
-            fi
+            cm_data_string "$(cm_data_json)" signingKey
             ;;
         set)
             local signing_key=""

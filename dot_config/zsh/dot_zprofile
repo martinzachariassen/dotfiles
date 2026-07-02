@@ -8,11 +8,17 @@ if [ -d /opt/homebrew ]; then
     export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
     export HOMEBREW_REPOSITORY="/opt/homebrew"
 
-    case ":$PATH:" in
-        *:/opt/homebrew/bin:/opt/homebrew/sbin:*) ;;
-        *) export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH" ;;
-    esac
+    # `typeset -U path` (set in ~/.zshenv) keeps the array deduped, so an
+    # unconditional prepend is safe across nested shells — no adjacency guard
+    # needed. Assigning `path` updates the tied, already-exported PATH.
+    path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
 
     export MANPATH="/opt/homebrew/share/man${MANPATH+:$MANPATH}:"
     export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
 fi
+
+# Keep ~/.local/bin ahead of everything (user-installed tools, pipx, cargo, this
+# repo's scripts). Set HERE — not in ~/.zshenv — because macOS's /etc/zprofile
+# runs `path_helper` between .zshenv and this file, and would otherwise sink it
+# below /usr/bin. Login shells run this once; subshells inherit the export.
+path=("$HOME/.local/bin" $path)

@@ -28,6 +28,20 @@ OB_FAILURES=()
 OB_CONFIG_DIR="${OB_CONFIG_DIR:-$HOME/.config/obsidian}"
 OB_REGISTRY="$HOME/Library/Application Support/obsidian/obsidian.json"
 
+# ob_seed_copy SRC DST LABEL — create DST's parent dir and copy SRC→DST. On
+# failure (read-only vault, full disk, perms) records LABEL in OB_FAILURES and
+# returns 1 so the caller skips its success message. Never aborts the run under
+# `set -e` — the whole module's contract is continue-on-error.
+ob_seed_copy() {
+    local src="$1" dst="$2" label="$3" rc=0
+    mkdir -p "$(dirname "$dst")" && cp "$src" "$dst" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        OB_FAILURES+=("seed: $label (rc=$rc)")
+        return 1
+    fi
+    return 0
+}
+
 # ─── Vault discovery ──────────────────────────────────────────────────────────
 
 # obsidian_find_vault — print the active vault's absolute path, or nothing.
@@ -152,10 +166,10 @@ obsidian_seed_config() {
         if [ -e "$dst" ]; then
             continue
         fi
-        mkdir -p "$(dirname "$dst")"
-        cp "$src" "$dst"
-        printf "  ${GREEN}seed${RESET} .obsidian/%s\n" "$rel"
-        placed=$((placed + 1))
+        if ob_seed_copy "$src" "$dst" ".obsidian/$rel"; then
+            printf "  ${GREEN}seed${RESET} .obsidian/%s\n" "$rel"
+            placed=$((placed + 1))
+        fi
     done < <(find "$OB_CONFIG_DIR/vault-config" -type f)
     if [ "$placed" -eq 0 ]; then
         printf "  %sconfig: every canonical file already in vault%s\n" "$DIM" "$RESET"
@@ -172,8 +186,9 @@ obsidian_seed_home() {
         printf "  %sHome.md: already in vault%s\n" "$DIM" "$RESET"
         return 0
     fi
-    cp "$src" "$dst"
-    printf "  %sseed%s Home.md\n" "$GREEN" "$RESET"
+    if ob_seed_copy "$src" "$dst" "Home.md"; then
+        printf "  %sseed%s Home.md\n" "$GREEN" "$RESET"
+    fi
 }
 
 # obsidian_seed_vault_guide VAULT — copy vault-guide.md to "99 Meta/Vault Guide.md"
@@ -186,9 +201,9 @@ obsidian_seed_vault_guide() {
         printf "  %sVault Guide.md: already in vault%s\n" "$DIM" "$RESET"
         return 0
     fi
-    mkdir -p "$vault/99 Meta"
-    cp "$src" "$dst"
-    printf "  %sseed%s 99 Meta/Vault Guide.md\n" "$GREEN" "$RESET"
+    if ob_seed_copy "$src" "$dst" "99 Meta/Vault Guide.md"; then
+        printf "  %sseed%s 99 Meta/Vault Guide.md\n" "$GREEN" "$RESET"
+    fi
 }
 
 # obsidian_seed_templates VAULT — copy every template into "99 Meta/_templates/".
@@ -196,7 +211,6 @@ obsidian_seed_templates() {
     local vault="$1" src dst name placed=0
     local tdir="$vault/99 Meta/_templates"
     [ -d "$OB_CONFIG_DIR/templates" ] || return 0
-    mkdir -p "$tdir"
     for src in "$OB_CONFIG_DIR/templates/"*.md; do
         [ -f "$src" ] || continue
         name="$(basename "$src")"
@@ -204,9 +218,10 @@ obsidian_seed_templates() {
         if [ -e "$dst" ]; then
             continue
         fi
-        cp "$src" "$dst"
-        printf "  ${GREEN}seed${RESET} 99 Meta/_templates/%s\n" "$name"
-        placed=$((placed + 1))
+        if ob_seed_copy "$src" "$dst" "99 Meta/_templates/$name"; then
+            printf "  ${GREEN}seed${RESET} 99 Meta/_templates/%s\n" "$name"
+            placed=$((placed + 1))
+        fi
     done
     if [ "$placed" -eq 0 ]; then
         printf "  %stemplates: every canonical template already in vault%s\n" "$DIM" "$RESET"
@@ -229,10 +244,10 @@ obsidian_seed_readmes() {
         if [ -e "$dst" ]; then
             continue
         fi
-        mkdir -p "$vault/$name"
-        cp "$src" "$dst"
-        printf "  ${GREEN}seed${RESET} %s/_README.md\n" "$name"
-        placed=$((placed + 1))
+        if ob_seed_copy "$src" "$dst" "$name/_README.md"; then
+            printf "  ${GREEN}seed${RESET} %s/_README.md\n" "$name"
+            placed=$((placed + 1))
+        fi
     done
     if [ "$placed" -eq 0 ]; then
         printf "  %sreadmes: every folder README already in vault%s\n" "$DIM" "$RESET"
