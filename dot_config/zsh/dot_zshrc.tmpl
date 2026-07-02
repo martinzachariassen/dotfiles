@@ -69,6 +69,13 @@ zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'  # case-insensitive
 
 # ─── Key bindings ─────────────────────────────────────────────────────────────
+# Force the emacs keymap. zsh otherwise INFERS the keymap from $EDITOR/$VISUAL:
+# because we set those to `nvim` (see ~/.zshenv), it would silently pick the vi
+# keymap, where Ctrl-A/E/W/U/K and friends are `self-insert` (they just type the
+# key). This also makes Ctrl-E (end-of-line) accept the zsh-autosuggestions
+# type-ahead. Set this before the bindkeys below so they apply on top of emacs.
+bindkey -e
+
 # Make ↑/↓ do prefix-aware history search: type `git ` then ↑ cycles only the
 # history lines that start with what's already on the line, leaving the cursor
 # at end-of-line. Complements zsh-autosuggestions (type-ahead) — different gesture.
@@ -373,7 +380,7 @@ alias zj='zellij attach -c default'
 
 # ─── zsh-autosuggestions (brew) — fish-like type-ahead from history ───────────
 # As you type, suggests the most recent matching command from history in dim
-# text. Press → (or End) to accept, Ctrl-→ to accept one word.
+# text. Press → (or End, or Ctrl-E) to accept, Ctrl-→ to accept one word.
 if [ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
     # Catppuccin Frappé `overlay0` — readable but unmistakably suggestion-grey
