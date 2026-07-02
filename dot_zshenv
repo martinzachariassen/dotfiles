@@ -58,12 +58,20 @@ export SHELL_SESSIONS_DISABLE=1
 # diff, just re-run the command.
 #
 # Three ways to escape any pager: q · Ctrl-C · (short content auto-exits).
-# The -P prompt is double-quoted so less treats spaces inside as one argument.
-export LESS='-FRK -P"Press q or Ctrl-C to quit · / search · h for help"'
+# The -P prompt runs to the end of the option string, so its spaces need no
+# inner quoting — and less does NOT strip quotes from $LESS, so any quotes here
+# would print literally in the status line. The outer single-quotes already keep
+# the whole value one shell word; that's all that's needed.
+export LESS='-FRK -PPress q or Ctrl-C to quit · / search · h for help'
 
 # Keep less's search history out of $HOME (~/.lesshst). Redirect to XDG state;
 # use "-" instead if you'd rather not persist search history at all.
 export LESSHISTFILE="$XDG_STATE_HOME/less/history"
 
 # ─── PATH ─────────────────────────────────────────────────────────────────────
-export PATH="$HOME/.local/bin:$PATH"
+# Dedup PATH/fpath (keep first occurrence) for every zsh invocation, so nested
+# shells and re-sourcing never accumulate duplicates. The actual prepends
+# (~/.local/bin, Homebrew) live in ~/.config/zsh/.zprofile — they must run AFTER
+# macOS's /etc/zprofile invokes `path_helper`, which otherwise rebuilds PATH with
+# /etc/paths first and would sink anything prepended here below /usr/bin.
+typeset -U path fpath PATH
