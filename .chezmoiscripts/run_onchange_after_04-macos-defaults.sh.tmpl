@@ -32,9 +32,9 @@ echo "◆ Apply 5/5: macOS defaults"
 echo "  System preferences pass (re-runs when the defaults script changes)."
 echo "  Some changes need a reboot."
 
-if [ -e /dev/tty ] && [ -r /dev/tty ]; then
-    exec </dev/tty
-else
+# shellcheck source=../scripts/lib/tty.sh
+. "{{ .chezmoi.sourceDir }}/scripts/lib/tty.sh"
+if ! tty_reattach; then
     echo "! no terminal available; skipping macOS defaults"
     echo "  Run later with: macos-defaults"
     echo "  Or: bash {{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"

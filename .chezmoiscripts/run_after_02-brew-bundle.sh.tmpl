@@ -23,11 +23,9 @@ exit 0
 # Re-attach stdin to the controlling terminal so casks that invoke sudo
 # (docker-desktop, 1password) can read the password. See run_before_00-sudo-cache
 # for the upfront pre-auth; this is the belt-and-braces complement.
-if [ -e /dev/tty ] && [ -r /dev/tty ]; then
-    exec </dev/tty
-else
-    echo "! no terminal available; casks needing sudo may skip or ask later"
-fi
+# shellcheck source=../scripts/lib/tty.sh
+. "{{ .chezmoi.sourceDir }}/scripts/lib/tty.sh"
+tty_reattach || echo "! no terminal available; casks needing sudo may skip or ask later"
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
