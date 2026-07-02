@@ -7,7 +7,7 @@
 #
 # Three entry points, all idempotent:
 #   ui_init_colors  — populate BOLD/DIM/GREEN/YELLOW/BLUE/RED/CYAN/RESET
-#   ui_init_glyphs  — populate basic BAR/NODE/OK_MARK/ARROW_MARK/FAIL_MARK + box
+#   ui_init_glyphs  — basic BAR/NODE/OK_MARK/ARROW_MARK/FAIL_MARK/NOTE/RULE + box
 #   ui_init_wizard  — superset: depth-aware themed palette + rich glyphs + the
 #                     phase/setting/banner/prompt helpers used by install.sh,
 #                     so chezup feels like the install wizard
@@ -47,10 +47,10 @@ ui_init_colors() {
     fi
 }
 
-# ui_init_glyphs — define BAR NODE OK_MARK ARROW_MARK FAIL_MARK BOX_TOP
-# BOX_BOTTOM. Uses Unicode line-drawing when the locale advertises UTF-8,
-# otherwise falls back to ASCII so the output never turns into mojibake on a
-# bare C/POSIX locale.
+# ui_init_glyphs — define BAR NODE OK_MARK ARROW_MARK FAIL_MARK NOTE RULE
+# BOX_TOP BOX_BOTTOM. Uses Unicode line-drawing when the locale advertises
+# UTF-8, otherwise falls back to ASCII so the output never turns into mojibake
+# on a bare C/POSIX locale.
 ui_init_glyphs() {
     case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
         *UTF-8* | *utf8* | *UTF8*)
@@ -59,6 +59,8 @@ ui_init_glyphs() {
             OK_MARK="✓"
             ARROW_MARK="→"
             FAIL_MARK="✗"
+            NOTE="•"
+            RULE="──"
             BOX_TOP="╭────────────────────────────────────────────────────────────╮"
             BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
             ;;
@@ -68,6 +70,8 @@ ui_init_glyphs() {
             OK_MARK="OK"
             ARROW_MARK=">"
             FAIL_MARK="X"
+            NOTE="-"
+            RULE="--"
             BOX_TOP="+------------------------------------------------------------+"
             BOX_BOTTOM="+------------------------------------------------------------+"
             ;;
