@@ -15,8 +15,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Include event_name so a push to main and the weekly schedule (which share
+  # github.ref = refs/heads/main) land in different groups. And never cancel a
+  # scheduled run — otherwise a push during the Monday window silently kills that
+  # week's macOS render canary, which only runs on schedule.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   # Lint plain shell scripts + check shell parser syntax. The .chezmoiscripts/
