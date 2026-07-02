@@ -11,6 +11,13 @@ echo "→ VS Code: not on macOS, skipping"
 exit 0
 {{ end -}}
 
+# Ensure Homebrew's bin dir is on PATH when apply runs outside a login shell
+# (launchd, cron, a bare `chezmoi apply`). Mirrors run_after_02-brew-bundle so
+# the `command -v code` check below finds the binary the bundle installed.
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 SOURCE="{{ .chezmoi.sourceDir }}"
 EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
 DEPRECATED_EXTENSIONS=(
@@ -53,7 +60,9 @@ install_marketplace_extensions() {
             echo "✓ extension already installed: $ext"
         else
             echo "→ installing extension: $ext"
-            code --install-extension "$ext"
+            # Continue-on-error: a yanked ID, version-incompatible extension, or a
+            # transient marketplace failure must not abort the extensions after it.
+            code --install-extension "$ext" || echo "  ! failed to install: $ext (continuing)"
         fi
     done < "$EXTENSIONS_FILE"
 }
@@ -68,7 +77,7 @@ uninstall_deprecated_extensions() {
     for ext in "${DEPRECATED_EXTENSIONS[@]}"; do
         if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "→ uninstalling deprecated extension: $ext"
-            code --uninstall-extension "$ext"
+            code --uninstall-extension "$ext" || echo "  ! failed to uninstall: $ext (continuing)"
         fi
     done
 }

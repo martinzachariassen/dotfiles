@@ -31,6 +31,13 @@ echo "→ Cleanup: not on macOS, skipping"
 exit 0
 {{ end -}}
 
+# Ensure Homebrew's bin dir is on PATH when apply runs outside a login shell
+# (launchd, cron, a bare `chezmoi apply`). Mirrors run_after_02-brew-bundle so
+# the `command -v brew` check below finds the binary and cleanup actually runs.
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 # ─── Deprecation manifest ─────────────────────────────────────────────────────
 # Homebrew packages this repo used to install but no longer does. mise now owns
 # language runtimes (node, the Temurin JDKs), and direnv is replaced by mise's
