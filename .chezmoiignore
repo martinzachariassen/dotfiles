@@ -19,6 +19,7 @@ vscode/
 .DS_Store
 tests/
 templates/
+docs/
 raycast/
 .storecode/
 _typos.toml
