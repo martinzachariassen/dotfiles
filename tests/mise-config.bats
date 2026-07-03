@@ -15,7 +15,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    MISE_TOML="$REPO_ROOT/dot_config/mise/config.toml"
+    MISE_TMPL="$REPO_ROOT/dot_config/mise/config.toml.tmpl"
 
     if ! command -v python3 >/dev/null 2>&1; then
         skip "python3 not installed — needed to parse TOML"
@@ -23,6 +23,14 @@ setup() {
     if ! python3 -c "import tomllib" 2>/dev/null; then
         skip "python3 tomllib not available (needs 3.11+)"
     fi
+
+    # config.toml is now a chezmoi template (the JVM runtimes are gated by the
+    # jvmStack module). Render its fully-enabled form by stripping the Go-template
+    # directive lines ({{ ... }}); the JVM runtimes are then all present, which is
+    # exactly the "active stack" contract these tests pin — without needing
+    # chezmoi in the test environment.
+    MISE_TOML="$BATS_TEST_TMPDIR/mise-config.toml"
+    grep -v '^{{' "$MISE_TMPL" >"$MISE_TOML"
 }
 
 # Print the JSON-encoded value of a dotted key from MISE_TOML, or empty if
@@ -42,8 +50,8 @@ PY
 
 # ─── File presence + shape ─────────────────────────────────────────────────
 
-@test "mise config.toml exists" {
-    [ -f "$MISE_TOML" ]
+@test "mise config.toml.tmpl exists" {
+    [ -f "$MISE_TMPL" ]
 }
 
 @test "mise config.toml parses as valid TOML" {

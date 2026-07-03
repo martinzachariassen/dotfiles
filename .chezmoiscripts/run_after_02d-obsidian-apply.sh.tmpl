@@ -28,8 +28,8 @@ echo "→ obsidian: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-{{ if not (dig "features" "macApps" true .) -}}
-echo "→ obsidian: macApps feature disabled, skipping"
+{{ if not (has "obsidian" (dig "modules" (list) .)) -}}
+echo "→ obsidian: 'obsidian' module not selected, skipping"
 exit 0
 {{ end -}}
 

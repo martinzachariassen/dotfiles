@@ -9,9 +9,9 @@ MAC_APPS="${MAC_APPS:-true}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 case "$PROFILE" in
-    personal | work) ;;
+    personal | work | minimal) ;;
     *)
-        echo "PROFILE must be one of: personal, work" >&2
+        echo "PROFILE must be one of: personal, work, minimal" >&2
         exit 2
         ;;
 esac
@@ -32,6 +32,19 @@ case "$USE_ONE_PASSWORD" in
         ;;
 esac
 
+# Build the modules TOML array. Explicit MODULES (comma-separated) wins; else
+# derive from MAC_APPS for back-compat. "none" or empty yields an empty list.
+if [ -z "${MODULES+x}" ]; then
+    MODULES=""
+    [ "$MAC_APPS" = "true" ] && MODULES="macApps"
+fi
+[ "$MODULES" = "none" ] && MODULES=""
+if [ -z "$MODULES" ]; then
+    modules_toml="[]"
+else
+    modules_toml="$(printf '%s' "$MODULES" | awk -F, '{ out=""; for (i=1;i<=NF;i++) if ($i!="") { if (out!="") out=out", "; out=out"\""$i"\"" } printf "[%s]", out }')"
+fi
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -42,6 +55,7 @@ sourceDir = "$SOURCE_DIR"
 [data]
     name           = "CI"
     email          = "ci@example.com"
+    modules        = $modules_toml
     signingKey     = "ssh-ed25519 AAAAplaceholder"
     profile        = "$PROFILE"
     useOnePassword = $USE_ONE_PASSWORD

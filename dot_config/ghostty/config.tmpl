@@ -10,7 +10,9 @@
 # Custom theme file at ~/.config/ghostty/themes/catppuccin-frappe (also managed
 # by chezmoi). Using a local theme rather than relying on a built-in name gives
 # us deterministic colors regardless of Ghostty version.
+{{ if has "theme" (dig "modules" (list) .) -}}
 theme = catppuccin-frappe
+{{ end -}}
 
 # ─── Font ─────────────────────────────────────────────────────────────────────
 font-family = JetBrainsMono Nerd Font

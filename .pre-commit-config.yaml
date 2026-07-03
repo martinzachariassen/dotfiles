@@ -19,13 +19,13 @@ repos:
         name: shellcheck (severity=error)
         entry: shellcheck --severity=error --shell=bash
         language: system
-        files: '^(install\.sh|install\.sh\.in|scripts/.*\.sh)$'
+        files: '^(install\.sh|scripts/.*\.sh)$'
 
       - id: shfmt
         name: shfmt (lint, -i 4 -ci)
         entry: shfmt -d -i 4 -ci
         language: system
-        files: '^(install\.sh|install\.sh\.in|scripts/.*\.sh)$'
+        files: '^(install\.sh|scripts/.*\.sh)$'
 
       # bash -n / zsh -n only parse their first argument, so loop one file at a
       # time (pre-commit passes the matched files as "$@" after the `--`).
@@ -33,24 +33,13 @@ repos:
         name: bash -n
         entry: bash -c 'for f; do bash -n "$f"; done' --
         language: system
-        files: '^(install\.sh|install\.sh\.in|scripts/.*\.sh)$'
+        files: '^(install\.sh|scripts/.*\.sh)$'
 
       - id: zsh-syntax
         name: zsh -n
         entry: bash -c 'for f; do zsh -n "$f"; done' --
         language: system
         files: '^(dot_zshenv|dot_config/zsh/dot_zprofile)$'
-
-      # ─── Generated install.sh is in sync with its sources ────────────────────
-      # install.sh is generated from install.sh.in + scripts/lib/* (curl|bash
-      # can't source the shared libs). Fail the commit if a source changed but
-      # install.sh wasn't regenerated with `bash scripts/build-install.sh`.
-      - id: build-install-check
-        name: install.sh generated + in sync
-        entry: bash scripts/build-install.sh --check
-        language: system
-        pass_filenames: false
-        files: '^(install\.sh|install\.sh\.in|scripts/build-install\.sh|scripts/lib/.*\.sh)$'
 
       # ─── Spelling (mirrors the `typos` CI job) ───────────────────────────────
       - id: typos

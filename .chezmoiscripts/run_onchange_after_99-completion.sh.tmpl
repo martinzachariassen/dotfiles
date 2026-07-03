@@ -17,11 +17,13 @@ set -euo pipefail
 # ─── Inputs from chezmoi data ────────────────────────────────────────────────
 PROFILE="{{ .profile }}"
 SOURCE="{{ .chezmoi.sourceDir }}"
-USE_OP="{{ dig "useOnePassword" true . }}"
+SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
 
-# Build current workstation extras as a bullet-separated string for compact display.
+# List the enabled optional modules as a bullet-separated string for compact display.
 EXTRAS=""
-{{ if dig "features" "macApps" true . }}EXTRAS="${EXTRAS}macApps · "{{ end }}
+{{ range $m := (dig "modules" (list) .) -}}
+EXTRAS="${EXTRAS}{{ $m }} · "
+{{ end -}}
 EXTRAS="${EXTRAS% · }"
 [ -z "$EXTRAS" ] && EXTRAS="(none enabled)"
 
@@ -43,8 +45,8 @@ ${C}╰────────────────────────�
 
   ${B}Setup${R}
     Profile       ${G}${PROFILE}${R}
-    Extras        ${EXTRAS}
-    1Password     $([ "$USE_OP" = "true" ] && printf "%senabled%s" "$G" "$R" || printf "%sdisabled%s" "$Y" "$R")
+    Modules       ${EXTRAS}
+    Signing       ${G}${SIGNING}${R}
     Source        ${D}${SOURCE}${R}
 
   ${B}Next moves${R}
