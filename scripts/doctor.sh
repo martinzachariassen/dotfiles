@@ -245,54 +245,46 @@ fi
 section "Homebrew packages"
 if command -v brew >/dev/null 2>&1; then
     pass "brew installed"
-    if [ -f "$SOURCE_DIR/Brewfile" ]; then
-        if brew bundle check --file="$SOURCE_DIR/Brewfile" >/dev/null 2>&1; then
-            pass "common Brewfile satisfied"
-        else
-            warn "common Brewfile out of sync — run: brew bundle install --file=$SOURCE_DIR/Brewfile"
-        fi
-    fi
-    # Feature/profile-specific modules. cm_data_bool reads a literal `false`
-    # correctly (jq's `//` would drop it), so a disabled macApps toggle no longer
-    # gets checked as if enabled.
+    # Active Brewfiles come from the single source of truth in
+    # .chezmoidata/packages.toml (core + selected modules + profile) — the same
+    # map the brew hook uses, so doctor never re-encodes the mapping. --no-upgrade
+    # keeps this a presence check (matches convergence semantics: freshness is
+    # `chezbump`'s job, not doctor's).
     data_json="$(cm_data_json)"
-    profile="$(cm_data_string "$data_json" profile)"
-    feature_macapps="$(cm_data_bool "$data_json" macApps)"
-    feature_macapps="${feature_macapps:-true}"
-    if [ "$feature_macapps" = "true" ]; then
-        if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.mac-apps" >/dev/null 2>&1; then
-            pass "mac apps Brewfile satisfied"
-        else
-            warn "Brewfile.mac-apps out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.mac-apps"
-        fi
-        # Ollama ships in the mac-apps module and runs as a brew service
-        # (models are pulled manually).
-        if command -v ollama >/dev/null 2>&1; then
-            if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
-                pass "Ollama service running"
+    active_files="$(printf '%s' "$data_json" | jq -r '
+        (.modules // []) as $mods
+        | (.profile // "") as $prof
+        | ([.brewfiles.core]
+           + (.brewfiles.byModule | to_entries | map(select($mods | index(.key))) | map(.value))
+           + ([.brewfiles.byProfile[$prof]] | map(select(. != null))))
+        | .[]' 2>/dev/null)"
+    if [ -z "$active_files" ]; then
+        warn "could not resolve active Brewfiles from chezmoi data"
+    else
+        while IFS= read -r rel; do
+            [ -n "$rel" ] || continue
+            f="$SOURCE_DIR/$rel"
+            if [ ! -f "$f" ]; then
+                warn "Brewfile missing: $rel"
+            elif brew bundle check --no-upgrade --file="$f" >/dev/null 2>&1; then
+                pass "$rel satisfied"
             else
-                warn "Ollama service not started — run: scripts/setup-ollama.sh"
+                warn "$rel out of sync — run: brew bundle install --no-upgrade --file=$f"
             fi
+        done <<EOF
+$active_files
+EOF
+    fi
+    # Ollama ships in the mac-apps module and runs as a brew service (models are
+    # pulled manually), so only check it when that module is active.
+    if printf '%s' "$data_json" | jq -e '(.modules // []) | index("macApps")' >/dev/null 2>&1 &&
+        command -v ollama >/dev/null 2>&1; then
+        if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
+            pass "Ollama service running"
+        else
+            warn "Ollama service not started — run: scripts/setup-ollama.sh"
         fi
     fi
-    case "$profile" in
-        personal)
-            if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.personal" >/dev/null 2>&1; then
-                pass "personal Brewfile satisfied"
-            else
-                warn "Brewfile.personal out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.personal"
-            fi
-            ;;
-    esac
-    case "$profile" in
-        work)
-            if brew bundle check --file="$SOURCE_DIR/brewfiles/Brewfile.work" >/dev/null 2>&1; then
-                pass "work Brewfile satisfied"
-            else
-                warn "Brewfile.work out of sync — run: brew bundle install --file=$SOURCE_DIR/brewfiles/Brewfile.work"
-            fi
-            ;;
-    esac
     # Drift the OTHER way: ad-hoc installs not tracked anywhere.
     leaves_tmp=$(mktemp)
     brew leaves >"$leaves_tmp" 2>/dev/null || true

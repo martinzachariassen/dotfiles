@@ -1,21 +1,27 @@
-{{/* Upgrade safety: dig defaults useOnePassword to true if the key is missing
-     (pre-upgrade configs). Signing is only actually emitted when there's a
-     signing key, so missing-key users don't get a broken config. */ -}}
-{{- $useOP := dig "useOnePassword" true . -}}
+{{/* Signing mode: prefer the new .signingMode; fall back to the legacy
+     useOnePassword bool for configs initialised before signingMode existed
+     (missing key -> default true -> "1password"). A signing block is only
+     emitted when a mode is active AND a signing key is set, so key-less users
+     never get a broken config.
+       off       -> no signing
+       ssh-key   -> plain SSH signing (git's default ssh-keygen signer)
+       1password -> SSH signing via the 1Password app's signer */ -}}
+{{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
+{{- $signing := and (ne $signingMode "off") .signingKey -}}
 [user]
     name = {{ .name }}
     email = {{ .email }}
-{{- if and $useOP .signingKey }}
+{{- if $signing }}
     signingkey = {{ .signingKey }}
 {{- end }}
 
 [init]
     defaultBranch = main
 
-{{ if and $useOP .signingKey -}}
-# Commit signing is enabled because useOnePassword=true and signingKey is set.
-# To disable: edit ~/.config/chezmoi/chezmoi.toml — set useOnePassword=false or
-# blank out signingKey — then `chezmoi apply`.
+{{ if $signing -}}
+# Commit signing is enabled (signingMode = {{ $signingMode }}, signingKey set).
+# To disable: set signingMode = "off" (or blank signingKey) in
+# ~/.config/chezmoi/chezmoi.toml, then `chezmoi apply`.
 [commit]
     gpgsign = true
 
@@ -23,8 +29,8 @@
     format = ssh
 
 [gpg "ssh"]
-    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
-    allowedSignersFile = ~/.config/git/allowed_signers
+{{ if eq $signingMode "1password" }}    program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+{{ end }}    allowedSignersFile = ~/.config/git/allowed_signers
 {{- end }}
 
 [core]

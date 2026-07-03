@@ -1,4 +1,4 @@
-{{- $useOP := dig "useOnePassword" true . -}}
-{{- if and $useOP .email .signingKey -}}
+{{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
+{{- if and (ne $signingMode "off") .email .signingKey -}}
 {{ .email }} {{ .signingKey }}
 {{- end }}

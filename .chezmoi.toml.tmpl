@@ -55,14 +55,6 @@ sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote 
     signingKey  = {{ $signingKey | quote }}
     modules     = [{{ range $i, $m := $modules }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
 
-    {{/* Legacy bridge keys (added in Phase 1). Templates still on the old model
-         read these; they are removed in Phase 4 once every template gates on the
-         new .modules / .signingMode values. */ -}}
-    useOnePassword = {{ eq $signingMode "1password" }}
-
-    [data.features]
-        macApps = {{ has "macApps" $modules }}
-
 # delta is unconditionally in the core Brewfile, so wiring chezmoi's diff pager to
 # it needs no lookPath gating (it resolves after the first brew bundle).
 [diff]
