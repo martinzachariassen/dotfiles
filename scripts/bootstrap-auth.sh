@@ -30,13 +30,20 @@ ASSUME_YES="${YES:-0}"
 # sibling of this script; a checkout without it is broken, so fail loudly rather
 # than limp along with degraded output (chezup.sh does the same).
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_UI_DIR/lib/ui.sh" ]; then
-    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/ui.sh" >&2
+if [ ! -r "$_UI_DIR/lib/log.sh" ]; then
+    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/log.sh" >&2
     exit 1
 fi
-# shellcheck source=lib/ui.sh
-. "$_UI_DIR/lib/ui.sh"
+# shellcheck source=lib/log.sh
+. "$_UI_DIR/lib/log.sh"
 ui_init_logging
+
+# has_module NAME — true when NAME is in the selected .modules list (chezmoi
+# data). Used to gate the cloud-auth walkthrough on the cloudAuth module.
+has_module() {
+    command -v chezmoi >/dev/null 2>&1 || return 1
+    chezmoi data --format=json 2>/dev/null | jq -e --arg m "$1" '(.modules // []) | index($m)' >/dev/null 2>&1
+}
 
 # bootstrap-specific framing on top of the shared log helpers.
 box_line() {
@@ -116,7 +123,7 @@ if [ "${SKIP_GH:-0}" != "1" ]; then
 fi
 
 # ─── 3. Azure CLI + AKS kubelogin ─────────────────────────────────────────────
-if [ "${SKIP_AZ:-0}" != "1" ]; then
+if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
     step "Azure CLI" "Sign in to Azure for AKS, Azure DevOps, etc."
     if ! command -v az >/dev/null 2>&1; then
         warn "az not installed - skipping. Use the work profile if this Mac needs Azure."
@@ -142,7 +149,7 @@ if [ "${SKIP_AZ:-0}" != "1" ]; then
 fi
 
 # ─── 4. Google Cloud CLI + GKE plugin ─────────────────────────────────────────
-if [ "${SKIP_GCLOUD:-0}" != "1" ]; then
+if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
     step "Google Cloud CLI" "Sign in for GCP/GKE work."
     if ! command -v gcloud >/dev/null 2>&1; then
         warn "gcloud not installed - skipping. Use the work profile if this Mac needs GCP."
