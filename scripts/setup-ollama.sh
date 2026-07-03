@@ -22,9 +22,9 @@ set -euo pipefail
 # Shared UI helpers (ui_init_colors). Resolved next to this script so it works
 # regardless of the current directory.
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/ui.sh
-if [ -r "$_UI_DIR/lib/ui.sh" ]; then
-    . "$_UI_DIR/lib/ui.sh"
+# shellcheck source=lib/log.sh
+if [ -r "$_UI_DIR/lib/log.sh" ]; then
+    . "$_UI_DIR/lib/log.sh"
     ui_init_colors
     ui_init_glyphs
 else

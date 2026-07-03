@@ -30,9 +30,9 @@ set -uo pipefail
 # Loaded from next to this script so they work even when DOTFILES_DIR is
 # overridden or the script is invoked from another directory.
 _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/ui.sh
-if [ -r "$_DOCTOR_DIR/lib/ui.sh" ]; then
-    . "$_DOCTOR_DIR/lib/ui.sh"
+# shellcheck source=lib/log.sh
+if [ -r "$_DOCTOR_DIR/lib/log.sh" ]; then
+    . "$_DOCTOR_DIR/lib/log.sh"
     ui_init_colors
     ui_init_glyphs
 else

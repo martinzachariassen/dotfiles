@@ -30,12 +30,12 @@ ASSUME_YES="${YES:-0}"
 # sibling of this script; a checkout without it is broken, so fail loudly rather
 # than limp along with degraded output (chezup.sh does the same).
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_UI_DIR/lib/ui.sh" ]; then
-    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/ui.sh" >&2
+if [ ! -r "$_UI_DIR/lib/log.sh" ]; then
+    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/log.sh" >&2
     exit 1
 fi
-# shellcheck source=lib/ui.sh
-. "$_UI_DIR/lib/ui.sh"
+# shellcheck source=lib/log.sh
+. "$_UI_DIR/lib/log.sh"
 ui_init_logging
 
 # bootstrap-specific framing on top of the shared log helpers.
