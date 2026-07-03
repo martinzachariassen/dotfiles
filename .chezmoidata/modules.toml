@@ -1,0 +1,21 @@
+# Optional-module catalog — the one place the module list + human labels live.
+#
+# Selected at `chezmoi init` via a single promptMultichoiceOnce in
+# .chezmoi.toml.tmpl; the chosen names land in `.modules` (a list). Templates gate
+# on membership with sprig `has`, e.g. {{ if has "theme" .modules }}...{{ end }}.
+# Prompts, the doctor report, and the apply summary all read these labels so the
+# list is never restated.
+#
+# Keep this namespace (`moduleCatalog`) disjoint from prompted answers — see the
+# note in packages.toml.
+
+[moduleCatalog]
+macApps = "GUI and AI apps (Raycast, Obsidian, Chrome, Claude)"
+macosDefaults = "macOS system defaults (needs sudo)"
+cloudAuth = "Cloud CLIs and auth walkthrough (gh, az, gcloud, op)"
+obsidian = "Obsidian vault seeding and starter content"
+claudePersona = "Claude persona at ~/.config/claude/CLAUDE.md"
+devcontainer = "Dev container template under templates/"
+theme = "Catppuccin Frappe across terminal and editor"
+locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
+jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
