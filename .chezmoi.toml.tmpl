@@ -1,67 +1,75 @@
-{{/* chezmoi init prompts — used as a fallback if the install wizard does not
-     pre-populate the init command.
+{{/* chezmoi V2 config + first-run wizard.
 
-     The wizard in install.sh loads any existing answers, asks once, then passes
-     those values to `chezmoi init` with --promptString/--promptChoice/--promptBool.
-     Plain prompt helpers consume those supplied values; prompt*Once would prompt
-     again during first init.
+     This file IS the setup wizard. chezmoi's built-in prompt* functions ask each
+     question during `chezmoi init`. The *Once variants read the saved answer back
+     from the config [data] on re-runs, so re-initialising is idempotent and never
+     re-asks. To change your setup later, force a re-ask with:
+         chezmoi init --prompt
+     Non-interactive (CI / containers): add --promptDefaults, or pass explicit
+     --promptString / --promptChoice / --promptMultichoice pairs.
 
-     Defaults are intentionally empty for identity fields so forks of this
-     repo don't inherit private values. */ -}}
+     Identity defaults are intentionally blank so forks don't inherit private
+     values. The optional-module list + labels live in .chezmoidata/modules.toml
+     and package selection in .chezmoidata/packages.toml (single sources of
+     truth). Prompted answers (name, profile, modules, ...) stay in a key
+     namespace disjoint from that static data so the two never collide. */ -}}
 
-{{- $name       := promptString "name"       "" -}}
-{{- $email      := promptString "email"      "" -}}
-{{- $signingKey := promptString "signingKey" "" -}}
+{{- $name  := promptStringOnce . "name"  "Full name for git commits" -}}
+{{- $email := promptStringOnce . "email" "Email for git commits" -}}
 
-{{/* Profile picker — controls which casks get installed and which config blocks
-     activate. `personal` and `work` each install only their respective extras
-     on top of the core Brewfile. */ -}}
-{{- $profile    := promptChoice "profile" (list "personal" "work") "personal" -}}
+{{/* personal = my full stack · work = work extras · minimal = neutral base */ -}}
+{{- $profile := promptChoiceOnce . "profile" "Profile" (list "personal" "work" "minimal") "personal" -}}
 
-{{/* Workstation feature toggles. Language runtimes belong in mise (global
-     defaults in ~/.config/mise/config.toml, per-project pins in each project's
-     mise.toml); project CLIs (Kubernetes, Terraform, DB clients) stay in
-     Homebrew or run via Docker — not in global Homebrew runtime modules. */ -}}
-{{- $useOnePassword := promptBool "useOnePassword" true -}}
-{{- $featMacApps    := promptBool "features.macApps" true -}}
+{{/* Git commit signing: 1Password SSH agent · a plain SSH key · or off.
+     Only ask for the public key when signing is actually enabled. */ -}}
+{{- $signingMode := promptChoiceOnce . "signingMode" "Git commit signing" (list "1password" "ssh-key" "off") "1password" -}}
+{{- $signingKey  := dig "signingKey" "" . -}}
+{{- if ne $signingMode "off" -}}
+{{-   $signingKey = promptStringOnce . "signingKey" "Public signing key line (leave blank to configure later)" -}}
+{{- end -}}
 
-# Tell chezmoi the source repo lives under ~/Developer/personal/dotfiles
-# (default is ~/.local/share/chezmoi). Required so subsequent commands find it.
-sourceDir = "{{ .chezmoi.homeDir }}/Developer/personal/dotfiles"
+{{/* Optional modules — one multi-select. Defaults depend on the chosen profile:
+     personal pre-checks my full stack, work leans toward cloud, minimal starts
+     empty.
+     NOTE: the config template is rendered BEFORE .chezmoidata is loaded, so the
+     module names must be listed here literally (they can't be read from
+     .chezmoidata/modules.toml). Keep this list in sync with the [moduleCatalog]
+     keys there — tests/data-model.bats enforces the match. Labels for the
+     doctor report / summary come from that catalog. */ -}}
+{{- $allModules := list "claudePersona" "cloudAuth" "devcontainer" "jvmStack" "locale" "macApps" "macosDefaults" "obsidian" "theme" -}}
+{{- $defaults := list -}}
+{{- if eq $profile "personal" -}}
+{{-   $defaults = list "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "obsidian" "theme" -}}
+{{- else if eq $profile "work" -}}
+{{-   $defaults = list "claudePersona" "cloudAuth" "jvmStack" "macApps" "macosDefaults" "theme" -}}
+{{- end -}}
+{{- $modules := promptMultichoiceOnce . "modules" "Optional modules (space toggles, Enter confirms)" $allModules $defaults -}}
 
-# Note: the minimum chezmoi version is enforced by the `.chezmoiversion` file
-# at the repo root (not a config-file field). chezmoi refuses to interpret
-# the source state if the current version is too old.
+sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote }}
 
 [data]
-    name           = {{ $name | quote }}
-    email          = {{ $email | quote }}
-    signingKey     = {{ $signingKey | quote }}
-    profile        = {{ $profile | quote }}
-    useOnePassword = {{ $useOnePassword }}
+    name        = {{ $name | quote }}
+    email       = {{ $email | quote }}
+    profile     = {{ $profile | quote }}
+    signingMode = {{ $signingMode | quote }}
+    signingKey  = {{ $signingKey | quote }}
+    modules     = [{{ range $i, $m := $modules }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
+
+    {{/* Legacy bridge keys (added in Phase 1). Templates still on the old model
+         read these; they are removed in Phase 4 once every template gates on the
+         new .modules / .signingMode values. */ -}}
+    useOnePassword = {{ eq $signingMode "1password" }}
 
     [data.features]
-        macApps   = {{ $featMacApps }}
+        macApps = {{ has "macApps" $modules }}
 
-# delta is unconditionally in the core Brewfile, so we can wire chezmoi's
-# diff pager to it without `lookPath` gating. The path resolves on first
-# `chezmoi diff` AFTER brew bundle has run; nothing in the install flow calls
-# `chezmoi diff` before that, so there's no chicken-and-egg issue.
+# delta is unconditionally in the core Brewfile, so wiring chezmoi's diff pager to
+# it needs no lookPath gating (it resolves after the first brew bundle).
 [diff]
     pager = "delta"
 
-# Make `chezmoi apply` (and every variant — `apply -v`, etc.) behave as if
-# `--force` were always passed. Reasoning: when a managed file in $HOME has
-# drifted from its source state, plain `chezmoi apply` stops and asks per-file
-#   diff/overwrite/skip/quit/merge?
-# The single-keypress prompt collides with later sudo prompts and feels
-# completely unexpected if you didn't realise you'd edited a managed file
-# locally.
-#
-# Force-by-default makes the apply non-interactive: it just overwrites local
-# drift. The safety net is `chez` (the zshrc wrapper) — it shows
-# `chezmoi status` upfront with a one-shot y/N so you can see and abort if
-# unwanted changes would be clobbered. To preserve a local edit before
-# applying, run `chezmoi re-add ~/.X` to capture it back into source first.
+# Force apply so a locally-drifted managed file is overwritten instead of dropping
+# into a per-file diff/overwrite/skip prompt mid-run. The `chez` wrapper shows
+# `chezmoi status` with a y/N first as the safety net.
 [apply]
     force = true
