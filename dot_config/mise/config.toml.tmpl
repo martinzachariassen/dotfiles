@@ -14,7 +14,9 @@
 # java.configuration.runtimes (settings.json.tmpl):
 #   ~/.local/share/mise/installs/java/temurin-25/Contents/Home   (default)
 #   ~/.local/share/mise/installs/java/temurin-21/Contents/Home
+{{ if has "jvmStack" (dig "modules" (list) .) -}}
 java = ["temurin-25", "temurin-21"]
+{{ end -}}
 
 # Node LTS — mise resolves "lts" to whatever the current LTS line is at install
 # time. Active LTS as of 2026 is Node 24 (Jod). Per-project pins still win.
@@ -30,5 +32,7 @@ python = "3.14"
 # committed mvnw / gradlew wrapper always use the wrapper version (and should);
 # these globals exist for ad-hoc scaffolding, plugin probes, and `mvn archetype:
 # generate`. "latest" lets mise track the newest stable on each `mise install`.
+{{ if has "jvmStack" (dig "modules" (list) .) -}}
 maven = "latest"
 gradle = "latest"
+{{ end -}}

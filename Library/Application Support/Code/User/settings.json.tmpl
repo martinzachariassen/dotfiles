@@ -3,7 +3,9 @@
     // APPEARANCE
     // =========================================================
 
+{{ if has "theme" (dig "modules" (list) .) -}}
     "workbench.colorTheme": "Catppuccin Frappé",
+{{ end -}}
     "workbench.iconTheme": "material-icon-theme",
 
     "window.commandCenter": true,
@@ -300,6 +302,7 @@
     //
     // JDT.LS itself runs on Java 25 — picks up newer language-server features
     // and matches the default project JDK so Lombok/javac plugins line up.
+{{ if has "jvmStack" (dig "modules" (list) .) -}}
     "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.configuration.runtimes": [
@@ -313,6 +316,7 @@
             "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home"
         }
     ],
+{{ end -}}
 
     // Language-server heap/GC tuning.
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
@@ -377,7 +381,9 @@
     //     resolves against. Anchored to the same mise temurin-25 path used by
     //     JDT.LS above so Java + Kotlin agree on what `java.*` looks like.
     "intellij.dev.serverPort": -1,
+{{ if has "jvmStack" (dig "modules" (list) .) -}}
     "intellij.jdkForSymbolResolution": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
+{{ end -}}
     "intellij.trace.server": "off",
 
     "terraform.languageServer.enable": true,
@@ -405,7 +411,7 @@
     // cases) — mirrors the repo .editorconfig.
     "shellformat.flag": "-i 4 -ci",
 
-    "cSpell.language": "en-US,nb",
+    "cSpell.language": "{{ if has "locale" (dig "modules" (list) .) }}en-US,nb{{ else }}en-US{{ end }}",
 
     // Personal dictionary as a chezmoi-managed plain-text file. Words added
     // via "Add Words to personal" in the spell-checker quick-fix get appended

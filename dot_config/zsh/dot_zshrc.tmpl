@@ -385,8 +385,10 @@ alias zj='zellij attach -c default'
 # text. Press → (or End, or Ctrl-E) to accept, Ctrl-→ to accept one word.
 if [ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+{{ if has "theme" (dig "modules" (list) .) -}}
     # Catppuccin Frappé `overlay0` — readable but unmistakably suggestion-grey
     ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#737994'
+{{ end -}}
 fi
 
 # ─── zsh-syntax-highlighting (brew) — MUST be sourced LAST ────────────────────

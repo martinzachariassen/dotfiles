@@ -53,6 +53,10 @@ install_marketplace_extensions() {
         ext="${line%%#*}"
         ext="$(printf '%s' "$ext" | xargs | tr '[:upper:]' '[:lower:]')"
         [ -n "$ext" ] || continue
+{{ if not (has "locale" (dig "modules" (list) .)) -}}
+        # locale module off: skip the Norwegian dictionary extension.
+        [ "$ext" = "streetsidesoftware.code-spell-checker-norwegian-bokmal" ] && continue
+{{ end -}}
 
         # -F = literal match (extension IDs contain "."), -x = whole line.
         # `installed` is already lowercased; `ext` matches that.
