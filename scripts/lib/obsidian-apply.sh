@@ -5,7 +5,7 @@
 # directly. Reads canonical config + templates from ~/.config/obsidian/ and
 # seeds the active vault's .obsidian/ overlay.
 #
-# Design rules (mirrors brew-bundle.sh / mise-install — see docs/lifecycle.md):
+# Design rules (see docs/lifecycle.md):
 #   - State-based, not hash-gated. Runs every apply. Presence-only check, so a
 #     clean machine is a quick no-op. Freshness is chezbump's job.
 #   - Continue-on-error: one failed plugin download doesn't block the rest.

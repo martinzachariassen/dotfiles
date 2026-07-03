@@ -37,7 +37,7 @@ if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-echo "◆ Apply 2e/5: pre-commit hooks"
+echo "▶ pre-commit hooks"
 
 if ! command -v pre-commit >/dev/null 2>&1; then
     echo "  ! pre-commit not on PATH — skipping (run \`chezup\` after brew bundle installs it)"

@@ -38,6 +38,13 @@ fi
 . "$_UI_DIR/lib/log.sh"
 ui_init_logging
 
+# has_module NAME — true when NAME is in the selected .modules list (chezmoi
+# data). Used to gate the cloud-auth walkthrough on the cloudAuth module.
+has_module() {
+    command -v chezmoi >/dev/null 2>&1 || return 1
+    chezmoi data --format=json 2>/dev/null | jq -e --arg m "$1" '(.modules // []) | index($m)' >/dev/null 2>&1
+}
+
 # bootstrap-specific framing on top of the shared log helpers.
 box_line() {
     local text="$1" pre="${2:-}" post="${3:-}" pad
@@ -116,7 +123,7 @@ if [ "${SKIP_GH:-0}" != "1" ]; then
 fi
 
 # ─── 3. Azure CLI + AKS kubelogin ─────────────────────────────────────────────
-if [ "${SKIP_AZ:-0}" != "1" ]; then
+if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
     step "Azure CLI" "Sign in to Azure for AKS, Azure DevOps, etc."
     if ! command -v az >/dev/null 2>&1; then
         warn "az not installed - skipping. Use the work profile if this Mac needs Azure."
@@ -142,7 +149,7 @@ if [ "${SKIP_AZ:-0}" != "1" ]; then
 fi
 
 # ─── 4. Google Cloud CLI + GKE plugin ─────────────────────────────────────────
-if [ "${SKIP_GCLOUD:-0}" != "1" ]; then
+if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
     step "Google Cloud CLI" "Sign in for GCP/GKE work."
     if ! command -v gcloud >/dev/null 2>&1; then
         warn "gcloud not installed - skipping. Use the work profile if this Mac needs GCP."
