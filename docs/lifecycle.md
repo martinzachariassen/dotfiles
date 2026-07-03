@@ -43,10 +43,12 @@ deprecation list, `.pre-commit-config.yaml`, `vscode/extensions.txt`, macOS
 defaults). The action pre-commit or `code` performs is identical regardless of
 apply count, so these re-fire only when their embedded content hash changes.
 
-The real install/convergence logic lives in `scripts/lib/` (`brew-bundle.sh`,
-`obsidian-apply.sh`, …) so it stays shellcheck-able and unit-tested; the hooks
-are thin drivers that do render-time config, source their lib, and call the entry
-point.
+Package convergence uses Homebrew's native `brew bundle` (the `02-brew-bundle`
+hook reads the active file set from `.chezmoidata/packages.toml`, then runs
+`brew bundle --no-upgrade` so it converges *presence*, not freshness). Other
+custom logic (e.g. `obsidian-apply.sh`) lives in `scripts/lib/` so it stays
+shellcheck-able and unit-tested; hooks are thin drivers that do render-time
+config, source their lib (if any), and call the entry point.
 
 ## Where each piece lives
 
@@ -54,7 +56,7 @@ point.
 |---|---|
 | Sudo pre-auth | `.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl` |
 | Homebrew install (first run) | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` |
-| Package convergence | `run_after_02-brew-bundle` + `scripts/lib/brew-bundle.sh` |
+| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `.chezmoidata/packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
 | Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
@@ -63,50 +65,36 @@ point.
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `Brewfile` (core) + `brewfiles/Brewfile.{mac-apps,personal,work}` |
+| Data model + wizard | `.chezmoi.toml.tmpl` — chezmoi `init` prompts (profile / signingMode / modules) |
+| Module catalog + Brewfile map | `.chezmoidata/{modules,packages}.toml` (single source of truth) |
 
-## Look & feel — one engine, one look
+## Bootstrap + look & feel
 
-`install.sh` (fresh-Mac bootstrap) and `chezup` (everyday converge) deliberately
-share one visual vocabulary — the same banner, phase headers, prompts, glyphs,
-and Catppuccin Frappé palette — so the two feel like one tool.
+`install.sh` (fresh-Mac bootstrap) and `chezup` (everyday converge) are separate,
+plain scripts — there is no shared "wizard" engine.
 
-That engine lives in `scripts/lib/ui.sh`:
+`install.sh` is a small hand-written script fetched via `curl | bash` **before
+this repo exists on disk**, so it can't source anything. It installs only the
+prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands off to
+`chezmoi init --apply`. The setup wizard is chezmoi's own `init` prompts, defined
+in `.chezmoi.toml.tmpl` (`profile`, `signingMode`, and a `modules` multi-select);
+`*Once` semantics make re-running idempotent, so `chezmoi init --prompt` is the
+"change my setup" path. Edit `install.sh` directly — it is **not** generated.
+
+Everyday scripts (`chezup`, `doctor`, `bootstrap-auth`, `setup-ollama`, the
+obsidian hook) share a tiny logging library, `scripts/lib/log.sh`:
 
 - `ui_init_colors` / `ui_init_glyphs` — palette + Unicode/ASCII glyphs.
-- `ui_init_logging` — the shared rail-style log helpers (`say`/`ok`/`info`/
-  `warn`/`fail`/`dim`/`hr` plus `line_prefix`/`node_prefix`).
-- `ui_init_wizard` — the superset: depth-aware themed palette, rich glyphs,
-  `ui_init_logging`, and the `phase_open`/`ui_banner`/`prompt_*` helpers.
-
-`chezup` sources it and calls `ui_init_wizard`; `bootstrap-auth` sources it and
-calls `ui_init_logging`; `doctor` uses `ui_init_colors` + `ui_init_glyphs`.
-
-`install.sh` is the one that can't source anything — it's fetched via
-`curl | bash` **before this repo exists on disk**. So rather than hand-maintain a
-second copy of the engine (which had already drifted from `ui.sh`), **install.sh
-is a generated artifact**. The maintained driver lives in `install.sh.in`, and
-`scripts/build-install.sh` expands each `# @inline <path>` line into the region
-between that lib's `# @inline-begin`/`# @inline-end` markers — embedding `ui.sh`,
-`chezmoi-data.sh`, `features.sh`, and `active-modules.sh` so the installer speaks
-the exact same engine as everything else.
-
-Edit `install.sh.in` (or the libs), then run `bash scripts/build-install.sh`;
-never edit `install.sh` directly. CI and pre-commit run
-`build-install.sh --check`, which fails if the committed `install.sh` has drifted
-from its sources.
+- `ui_init_logging` — the rail-style log helpers (`say`/`ok`/`info`/`warn`/
+  `fail`/`dim`/`hr` plus `line_prefix`/`node_prefix`); inits colors + glyphs first.
 
 ### Shared libraries (`scripts/lib/`)
 
-The engine libs are the single source of truth for logic that used to be
-copy-pasted across the installer, hooks, and scripts:
-
-| Lib | Provides | Sourced by / inlined into |
+| Lib | Provides | Sourced by |
 |---|---|---|
-| `ui.sh`            | colors, glyphs, logging, wizard helpers        | chezup, doctor, bootstrap-auth · install.sh (inlined) |
-| `chezmoi-data.sh`  | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, dotfiles-config · install.sh (inlined) |
-| `features.sh`      | `FEATURE_KEYS`, `feature_default`               | dotfiles-config · install.sh (inlined) |
-| `active-modules.sh`| `active_modules` (profile+features → Brewfiles) | install.sh (inlined) |
-| `tty.sh`           | `tty_reattach` (stdin → controlling terminal)   | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
-| `brew-bundle.sh`   | the Homebrew convergence engine                 | `run_after_02-brew-bundle` |
-| `obsidian-apply.sh`| the Obsidian vault seed engine                  | `run_after_02d-obsidian-apply` |
-| `semver.sh`        | `semver_extract` / `semver_lt`                  | doctor |
+| `log.sh`             | colors, glyphs, rail-style log helpers          | chezup, bootstrap-auth, setup-ollama, obsidian hook (doctor uses colors/glyphs) |
+| `chezmoi-data.sh`    | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor |
+| `tty.sh`             | `tty_reattach` (stdin → controlling terminal)   | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
+| `obsidian-apply.sh`  | the Obsidian vault seed engine                  | `run_after_02d-obsidian-apply` |
+| `semver.sh`          | `semver_extract` / `semver_lt`                  | doctor |
+| `check-commit-msg.sh`| Conventional-Commit subject validator           | commit-msg pre-commit hook |

@@ -256,9 +256,8 @@ chez() {
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
-# Converge THIS Mac to the repo — the everyday command. Wizard-styled pull +
-# preview + apply, sharing banner/phase/prompt vocabulary with install.sh
-# (see scripts/lib/ui.sh `ui_init_wizard` and docs/lifecycle.md, "Look & feel").
+# Converge THIS Mac to the repo — the everyday command: pull + preview + apply
+# (scripts/chezup.sh; see docs/lifecycle.md).
 # Because the brew + mise apply scripts reconcile real installed state on EVERY
 # apply (run_after, not hash-gated), this also guarantees packages match the
 # Brewfile — no separate "fix" step. The fresh-machine equivalent is install.sh.

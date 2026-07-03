@@ -30,21 +30,32 @@ local edit back into source, use `chezmoi re-add ~/.X`.
 - `dot_foo` → `~/.foo`; `private_dot_foo` → `~/.foo` with 0600 perms.
 - `remove_foo` → chezmoi deletes `~/.foo` (used to retire old dotfiles).
 - `*.tmpl` → rendered as a Go template with access to `.chezmoi.*` and the
-  `[data]` model (`.profile`, `.email`, `.features.macApps`, `.useOnePassword`, …).
-  Use `dig "key" default .` for data that may be absent on machines that haven't
-  re-run `chezmoi init`.
+  `[data]` model (`.profile`, `.name`, `.email`, `.signingMode`, `.signingKey`,
+  `.modules`). Use `dig "key" default .` for data that may be absent on machines
+  that haven't re-run `chezmoi init` (e.g. `dig "modules" (list) .`).
 - `.chezmoiignore` lists source paths that are **not** deployed to `$HOME` (this
   repo's tooling: `scripts/`, `tests/`, `brewfiles/`, `Brewfile`, `README.md`,
   `CLAUDE.md`, all `AGENTS.md`, etc.).
 
 ## Architecture
 
-**Package tiers (`Brewfile` + `brewfiles/`).** The root `Brewfile` is the core
-tier (always installed). Optional layers are composed on top based on the install
-wizard's answers: `brewfiles/Brewfile.mac-apps` (GUI/AI apps, gated by the
-`features.macApps` toggle) and the profile-specific `Brewfile.personal` /
-`Brewfile.work`. The `02-brew-bundle` hook + `scripts/lib/brew-bundle.sh` decide
-which modules apply.
+**Data model + modules (`.chezmoi.toml.tmpl` + `.chezmoidata/`).** The setup
+wizard IS chezmoi's own `chezmoi init` prompts (no custom wizard): `profile`
+(personal/work/minimal), `signingMode` (1password/ssh-key/off), and a `modules`
+multi-select. The chosen module list drives everything — templates gate on it
+with `has "X" .modules`, the templated `.chezmoiignore` deploys personal content
+(Obsidian, CLAUDE.md) only when its module is on, and hooks skip when theirs is
+off. The module catalog + the profile→Brewfile map live once in
+`.chezmoidata/{modules,packages}.toml`. Change your setup by re-running the
+wizard: `chezmoi init --prompt`.
+
+**Packages (`Brewfile` + `brewfiles/`).** The root `Brewfile` is the core tier
+(always installed). Optional layers compose on top: `brewfiles/Brewfile.mac-apps`
+(gated by the `macApps` module) and the profile-specific `Brewfile.personal` /
+`Brewfile.work`. The map is the single source of truth in
+`.chezmoidata/packages.toml`; the `02-brew-bundle` hook reads it and runs
+Homebrew's native `brew bundle` (`--no-upgrade`, so convergence guarantees
+presence, not freshness — upgrades are `chezbump`'s job).
 
 **Apply lifecycle (`.chezmoiscripts/run_*.sh.tmpl`).** These are the only
 chezmoi-managed *commands* (everything else is managed files). Ordering and
@@ -65,21 +76,22 @@ continue past failing items); include the darwin guard near the top
 OS-agnostic; and `exec </dev/tty` before any `sudo`/`read` (chezmoi runs scripts
 with stdin closed), degrading gracefully with no TTY.
 
-**Engine code (`scripts/lib/`).** Hooks are thin drivers; the real logic lives in
-plain, shellcheckable, testable bash under `scripts/lib/` (e.g. `brew-bundle.sh`,
-`obsidian-apply.sh`, `ui.sh`, `semver.sh`). A hook does render-time config, then
-sources its lib, then calls the entry point. `02-brew-bundle.sh.tmpl` and
-`02d-obsidian-apply` are the reference shape.
+**Engine code (`scripts/lib/`).** Shared, shellcheckable, testable bash under
+`scripts/lib/`: `log.sh` (colors/glyphs + rail-style log helpers),
+`obsidian-apply.sh` (vault-seeding engine), `chezmoi-data.sh` (data reader),
+`semver.sh`, `tty.sh`. A hook does render-time config, then sources its lib, then
+calls the entry point; `02d-obsidian-apply` is the reference shape.
 
 **User-facing commands (`scripts/`).** `chezup.sh` (pull + apply + converge),
-`doctor.sh` (`chezdoctor` health check), `dotfiles-config.sh` (profile/feature
-management), `bootstrap-auth.sh` (1Password/git-signing setup), `macos-defaults.sh`.
-The `install.sh` at the repo root is the one-shot fresh-Mac bootstrap wizard —
-and it is a **generated artifact**: because `curl | bash` runs it before the repo
-exists on disk, it can't source `scripts/lib/*`, so `scripts/build-install.sh`
-inlines the shared engine (`ui.sh`, `chezmoi-data.sh`, `features.sh`,
-`active-modules.sh`) into it. Edit `install.sh.in` or the libs, then run
-`bash scripts/build-install.sh`; never edit `install.sh` by hand. See
+`doctor.sh` (`chezdoctor` health check), `bootstrap-auth.sh` (post-install
+account + git-signing walkthrough), `macos-defaults.sh`. There is no config
+script — change profile/modules/signing by re-running `chezmoi init --prompt`.
+
+The `install.sh` at the repo root is the one-shot fresh-Mac bootstrap: a small
+**hand-written** script (it runs via `curl | bash` before the repo exists, so it
+can't source `scripts/lib/*`). It installs only the prerequisites — Xcode CLT,
+Homebrew, chezmoi, the repo clone — then hands off to `chezmoi init --apply`,
+which runs the wizard and applies. Edit it directly; it is NOT generated. See
 `docs/lifecycle.md`.
 
 **Runtimes are mise, not Homebrew.** Java/Node/Python come from mise: global
@@ -98,15 +110,10 @@ bats tests/semver.bats
 # Lint + format-check plain shell scripts (NOT the .tmpl hooks — Go directives
 # break shellcheck). shfmt enforces `-i 4 -ci`; run `shfmt -w -i 4 -ci <files>`
 # to auto-fix. bash -n / zsh -n parse only their FIRST arg, so loop per file:
-shellcheck --severity=error --shell=bash install.sh install.sh.in scripts/*.sh scripts/lib/*.sh
-shfmt -d -i 4 -ci install.sh install.sh.in scripts/*.sh scripts/lib/*.sh
-for f in install.sh install.sh.in scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
+shfmt -d -i 4 -ci install.sh scripts/*.sh scripts/lib/*.sh
+for f in install.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
 for f in dot_zshenv dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
-
-# install.sh is GENERATED from install.sh.in + scripts/lib/* — regenerate after
-# editing either, and let CI/pre-commit verify it hasn't drifted:
-bash scripts/build-install.sh          # regenerate install.sh
-bash scripts/build-install.sh --check  # fail if install.sh is stale
 
 # Local commit gates mirroring CI (shellcheck, shfmt, typos, commit message).
 # Activate once per clone; run across everything on demand:
@@ -114,8 +121,9 @@ pre-commit install --install-hooks
 pre-commit run --all-files
 
 # Render every template via dry-run apply (catches Go-template/data errors).
-# Vary the env to exercise the matrix of profiles/features:
-PROFILE=personal MAC_APPS=true USE_ONE_PASSWORD=true bash scripts/render-check.sh "$PWD"
+# Vary the env to exercise the profile × modules matrix (MODULES is a CSV; empty
+# or "none" = no modules; unset = derived from MAC_APPS for back-compat):
+PROFILE=personal MODULES=macApps,theme,jvmStack,locale bash scripts/render-check.sh "$PWD"
 
 # Validate all JSON/JSONC/TOML outputs parse:
 bash scripts/lint-config.sh "$PWD"

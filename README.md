@@ -64,14 +64,15 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
   <tr>
     <td width="33%" valign="top">
       <h3>🎯 Two everyday verbs</h3>
-      <a href="install.sh"><code>install.sh</code></a> bootstraps; <a href="scripts/chezup.sh"><code>chezup</code></a>
-      converges. Same banner, phases, and prompts — one engine, one look.
+      <a href="install.sh"><code>install.sh</code></a> bootstraps a fresh Mac;
+      <a href="scripts/chezup.sh"><code>chezup</code></a> converges an existing one
+      (pull → preview → apply).
     </td>
     <td width="33%" valign="top">
       <h3>🧩 Layered packages</h3>
       A core <a href="Brewfile">Brewfile</a> plus composable
-      <a href="brewfiles/">profile + feature layers</a> (mac-apps, personal, work),
-      chosen by the install wizard.
+      <a href="brewfiles/">profile + module layers</a> (mac-apps, personal, work),
+      chosen in the setup wizard and mapped in <code>.chezmoidata/packages.toml</code>.
     </td>
     <td width="33%" valign="top">
       <h3>✅ CI-guarded</h3>
@@ -152,28 +153,24 @@ On a fresh machine that never had the old stack, the cleanup is a silent no-op.
 chezup       # pull latest repo changes, preview, then apply
 ```
 
-Only changing profile, identity, or feature toggles (no full bootstrap):
+Only changing profile, identity, modules, or signing (no full bootstrap):
 
 ```sh
-bash ~/Developer/personal/dotfiles/install.sh --configure-only
+chezmoi init --prompt   # re-answer the wizard, then:
+chez                    # apply
 ```
 
 <details>
 <summary>Advanced install flags</summary>
 
-```sh
-DRY_RUN=1       bash install.sh   # print state-changing commands without running them
-YES=1           bash install.sh   # accept recommended defaults (non-interactive)
-SKIP_BACKUP=1   bash install.sh   # do not snapshot pre-existing legacy dotfiles
-DOTFILES_REPO=<repo-url> bash install.sh   # point at a fork
-DOTFILES_DIR=<path>      bash install.sh   # clone somewhere else
-```
-
-Guarded Homebrew cleanup modes:
+`install.sh` forwards any extra arguments to `chezmoi init`, and reads two env
+vars:
 
 ```sh
-bash install.sh --mirror-brew  # remove packages not in the active Brewfiles
-bash install.sh --reset-brew   # uninstall everything first, then reinstall
+DOTFILES_REPO=<repo-url> bash install.sh          # point at a fork
+DOTFILES_DIR=<path>      bash install.sh          # clone somewhere else
+curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI): accept defaults
+curl -fsSL …/install.sh | bash -s -- --prompt           # force re-asking every question
 ```
 
 </details>
@@ -188,14 +185,13 @@ The whole everyday surface is **two verbs plus a health check**. Both verbs end 
 | `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood). |
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
-Common profile and feature changes:
+Change your setup — profile, optional modules, or signing — by re-running the
+wizard (chezmoi's `init` prompts reuse your saved answers and only re-ask what
+you change):
 
 ```sh
-dotfiles profile set personal
-dotfiles profile set work
-dotfiles features list
-dotfiles features enable macApps
-dotfiles features disable macApps
+chezmoi init --prompt   # re-answer profile / signingMode / modules
+chez                    # apply the changes
 ```
 
 <details>
@@ -203,7 +199,7 @@ dotfiles features disable macApps
 
 | Command | What it does |
 |---|---|
-| `dotfiles` | Jump to the source repo. With arguments, manage profile/features/signing. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezmoi init --prompt`). |
 | `chez` | Apply without pulling — the building block `chezup` calls. |
 | `chezreinit` | Pull, re-run `chezmoi init` to pick up new data-model keys, then apply. Use after wizard/data-model changes. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
@@ -217,11 +213,11 @@ dotfiles features disable macApps
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many commits arrived.
 2. **Review pending changes** — `chezmoi status` lists the drift between the repo and `$HOME` (`A` add, `M` modify, `D` remove). If nothing drifted, it stops here.
-3. **Apply** — one confirmation gate, then `chezmoi apply --force`, timed, followed by a summary card.
+3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
 
 It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
 
-**`install.sh` is the wizard** — a self-contained bootstrap script (it has to run via `curl | bash` before the repo exists on disk). It walks five phases — *check this Mac → choose setup → review plan → execute → self-test* — then prints next steps. `chezup` deliberately mirrors its banner, phases, and prompts so the two feel like one tool.
+**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to `chezmoi init --apply`: chezmoi's own `init` prompts (profile, signing mode, optional modules) *are* the setup wizard, and `--apply` runs the hooks. Re-run the wizard anytime with `chezmoi init --prompt`.
 
 ## Dev containers
 
@@ -260,15 +256,16 @@ that project runs `plan`/`apply`).
 ## Repository layout
 
 ```
-install.sh              # the bootstrap wizard (self-contained)
+install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
 Brewfile                # core Homebrew packages (always installed)
-brewfiles/              # profile + feature layers (mac-apps, personal, work)
-.chezmoi.toml.tmpl      # chezmoi config + first-run prompts
+brewfiles/              # profile + module layers (mac-apps, personal, work)
+.chezmoi.toml.tmpl      # chezmoi config + the init-prompt setup wizard
+.chezmoidata/           # static data: module catalog + profile→Brewfile map
 .chezmoiscripts/        # ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
 dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
-scripts/                # chezup.sh, doctor.sh, dotfiles-config.sh, bootstrap-auth.sh, lib/ui.sh…
+scripts/                # chezup.sh, doctor.sh, bootstrap-auth.sh, lib/log.sh…
 templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
-tests/                  # bats suites + drive-wizard.py (drives install.sh under a pty)
+tests/                  # bats suites
 ```
 
 The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`dot_config/zsh/dot_zshrc.tmpl`](dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
@@ -282,11 +279,11 @@ shellcheck install.sh scripts/*.sh scripts/lib/*.sh
 # Run the bats test suites
 bats tests/
 
-# Drive the real wizard under a pseudo-terminal (DRY_RUN, always aborts safely)
-python3 tests/drive-wizard.py        # or: python3 tests/drive-wizard.py stray
+# Render every template across the profile × modules matrix (dry-run)
+PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/render-check.sh "$PWD"
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/feature matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/modules matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.
 
 ## License
 
