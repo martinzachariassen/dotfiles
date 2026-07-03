@@ -7,7 +7,6 @@ AGENTS.md
 /CLAUDE.md
 LICENSE
 install.sh
-install.sh.in
 scripts/
 Brewfile
 Brewfile.lock.json
@@ -24,3 +23,11 @@ docs/
 raycast/
 .storecode/
 _typos.toml
+
+# --- Optional personal content, gated by the selected modules
+#     (.chezmoidata/modules.toml). When a module is not selected, its files are
+#     ignored and never deployed to $HOME. dig defaults modules to an empty list
+#     so a config without the key (older render fixtures) still renders. ---
+{{ $modules := dig "modules" (list) . -}}
+{{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
+{{ if not (has "obsidian" $modules) }}.config/obsidian{{ end }}
