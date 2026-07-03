@@ -179,17 +179,18 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # fresh Mac or after wiping a system pref pane back to defaults.
 alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/macos-defaults.sh"'
 
-# Dotfiles control panel. With no args it cd's into the source repo; with args
-# it dispatches to scripts/dotfiles-config.sh, e.g.
-#   dotfiles profile set work
-#   dotfiles features disable macApps
+# Dotfiles shortcut. With no args it cd's into the source repo. To change your
+# setup (profile, optional modules, signing), re-run the wizard:
+#   chezmoi init --prompt      # then `chez` to apply
 dotfiles() {
     local src
     src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
     if [ "$#" -eq 0 ]; then
         cd "$src" || return
     else
-        bash "$src/scripts/dotfiles-config.sh" "$@"
+        echo "Change your setup by re-running the wizard:"
+        echo "    chezmoi init --prompt      # profile, optional modules, signing"
+        echo "    chez                       # apply the changes"
     fi
 }
 

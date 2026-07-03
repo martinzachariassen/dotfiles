@@ -202,30 +202,15 @@ fi
 
 # ─── 6. Git signing config ────────────────────────────────────────────────────
 if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
-    step "Git signing config" "Records your 1Password public signing key in chezmoi data, then reapplies the managed git config."
-    SSH_SIGN=/Applications/1Password.app/Contents/MacOS/op-ssh-sign
+    step "Git signing config" "Signing (signingMode + signingKey) is owned by the setup wizard."
     gitkey="$(git config --global user.signingkey 2>/dev/null || true)"
-
-    if [ -z "$gitkey" ] && [ -t 0 ]; then
-        warn "No git signing key is configured yet."
-        info "Copy the public key line from the 1Password SSH key item, then paste it here."
-        dim "    It starts with ssh-ed25519, ssh-rsa, or ecdsa-sha2-*."
-        printf "SSH signing public key: "
-        read -r gitkey
-    fi
-
-    if [ -z "$gitkey" ]; then
-        warn "git signing key still missing - re-run this script after copying the public key from 1Password"
-    elif ! printf '%s\n' "$gitkey" | grep -Eq '^(ssh-(ed25519|rsa)|ecdsa-sha2-[^[:space:]]+)[[:space:]]+'; then
-        warn "git signing key does not look like an SSH public key - leaving config unchanged"
-    elif command -v chezmoi >/dev/null 2>&1 && [ -f "${CHEZMOI_CONFIG:-$HOME/.config/chezmoi/chezmoi.toml}" ]; then
-        if printf '%s\n' "$gitkey" | bash "$SOURCE_DIR/scripts/dotfiles-config.sh" signing set; then
-            ok "managed git signing config applied"
-        else
-            warn "failed to update managed git signing config"
-        fi
+    if [ -n "$gitkey" ]; then
+        ok "git signing key already configured"
     else
-        warn "chezmoi config missing - run install.sh before configuring git signing"
+        warn "no git signing key configured yet"
+        info "Set it by re-running the wizard, then applying:"
+        dim "    chezmoi init --prompt      # choose signingMode, paste the public key"
+        dim "    chez"
     fi
 fi
 
