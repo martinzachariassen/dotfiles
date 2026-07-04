@@ -292,6 +292,36 @@ chezreinit() {
     chezmoi init && chez "$@"
 }
 
+# Set this Mac up "as new": replay first-time setup. Resets chezmoi's persistent
+# state so the `run_once_*` (and `run_onchange_*`) hooks fire again, re-asks the
+# FULL wizard (profile, modules, signing), then applies + converges everything.
+# This is the closest thing to a brand-new machine short of an OS reinstall — it
+# does NOT uninstall packages or delete files; apply reconciles them in place.
+# Guarded by a confirm prompt because it re-runs first-time setup. Extra args
+# pass to apply.
+chezreset() {
+    local src reply
+    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    (cd "$src" && git pull --ff-only) || return $?
+    if [ -r /dev/tty ]; then
+        printf 'chezreset: replay first-time setup (reset run-once state, re-ask the wizard)? [y/N] '
+        IFS= read -r reply </dev/tty || reply=""
+        case "$reply" in
+            y | Y | yes | YES) ;;
+            *)
+                echo "aborted — nothing changed"
+                return 0
+                ;;
+        esac
+    fi
+    # `state reset --force` wipes the whole persistent-state DB (entryState +
+    # scriptState + caches). Version-safe: it doesn't depend on a bucket name,
+    # and it makes both run_once_* and run_onchange_* hooks re-fire.
+    chezmoi state reset --force || return $?
+    # Re-ask via the plain-text wizard, not chezmoi's fragile TUI picker.
+    bash "$src/scripts/wizard.sh" "$@"
+}
+
 # Routine dependency bump: update brew + mise global runtimes.
 # Per-project runtimes live in each project's own mise.toml and travel with
 # the project's repo — not bumped here.

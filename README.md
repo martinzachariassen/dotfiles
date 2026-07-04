@@ -153,24 +153,31 @@ On a fresh machine that never had the old stack, the cleanup is a silent no-op.
 chezup       # pull latest repo changes, preview, then apply
 ```
 
-Only changing profile, identity, modules, or signing (no full bootstrap):
+Only changing profile, identity, modules, or signing (no full bootstrap) — the
+plain-text wizard re-asks the questions, then applies for you:
 
 ```sh
-chezmoi init --prompt   # re-answer the wizard, then:
-chez                    # apply
+bash ~/Developer/personal/dotfiles/scripts/wizard.sh
 ```
+
+> The wizard exists because chezmoi's own `chezmoi init --prompt` renders an
+> interactive TUI picker that is unreliable under `curl | bash` and some
+> terminals (it can fail to register navigation and just confirm the default).
+> The wizard asks with plain prompts, then feeds chezmoi the answers as flags.
+> To set the Mac up **as new** (replay first-time setup too), use `chezreset`.
 
 <details>
 <summary>Advanced install flags</summary>
 
-`install.sh` forwards any extra arguments to `chezmoi init`, and reads two env
-vars:
+With no extra arguments `install.sh` runs the plain-text wizard
+(`scripts/wizard.sh`), which asks the setup questions and applies. Passing any
+extra arguments **bypasses the wizard** and forwards them straight to
+`chezmoi init --apply` (for scripted/CI use). It also reads two env vars:
 
 ```sh
 DOTFILES_REPO=<repo-url> bash install.sh          # point at a fork
 DOTFILES_DIR=<path>      bash install.sh          # clone somewhere else
-curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI): accept defaults
-curl -fsSL …/install.sh | bash -s -- --prompt           # force re-asking every question
+curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI): skip wizard, accept defaults
 ```
 
 </details>
@@ -202,6 +209,7 @@ chez                    # apply the changes
 | `dotfiles` | Jump to the source repo (with args, points you at `chezmoi init --prompt`). |
 | `chez` | Apply without pulling — the building block `chezup` calls. |
 | `chezreinit` | Pull, re-run `chezmoi init` to pick up new data-model keys, then apply. Use after wizard/data-model changes. |
+| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard, then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
 | `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection). |
 

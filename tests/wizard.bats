@@ -1,0 +1,70 @@
+#!/usr/bin/env bats
+# Unit tests for scripts/wizard.sh pure helpers.
+#
+# The wizard is sourced with WIZARD_LIB_ONLY=1, which defines its functions and
+# loads the module catalog, then returns BEFORE any /dev/tty prompting or apply —
+# so these run headless in CI. The interactive flow itself is exercised manually
+# via a pty (see the PR notes); here we lock down the drift-prone bits: the prompt
+# messages / choices extracted from the template, and the module data readers.
+
+setup() {
+    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    WIZ="$REPO_ROOT/scripts/wizard.sh"
+}
+
+# wiz EXPR — source the helpers in a clean bash and evaluate EXPR; echoes result.
+wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
+
+@test "wizard sources cleanly in lib-only mode" {
+    run wiz 'true'
+    [ "$status" -eq 0 ]
+}
+
+@test "prompt_msg reads each prompt's message from the template" {
+    run wiz 'prompt_msg name'
+    [ "$output" = "Full name for git commits" ]
+    run wiz 'prompt_msg email'
+    [ "$output" = "Email for git commits" ]
+    run wiz 'prompt_msg profile'
+    [ "$output" = "Profile" ]
+    run wiz 'prompt_msg signingMode'
+    [ "$output" = "Git commit signing" ]
+    run wiz 'prompt_msg modules'
+    [ "$output" = "Optional modules" ]
+}
+
+# The prompt message doubles as a chezmoi --prompt* flag KEY, and a comma in a
+# key would be misread by cobra's stringToString. None may contain one.
+@test "no prompt message contains a comma" {
+    local k
+    for k in name email profile signingMode signingKey modules; do
+        run wiz "prompt_msg $k"
+        [ "$status" -eq 0 ]
+        [ -n "$output" ]
+        [[ "$output" != *,* ]]
+    done
+}
+
+@test "prompt_choices returns the profile and signing options in order" {
+    run wiz 'prompt_choices profile | tr "\n" " "'
+    [ "$output" = "personal work minimal " ]
+    run wiz 'prompt_choices signingMode | tr "\n" " "'
+    [ "$output" = "1password ssh-key off " ]
+}
+
+@test "profile_defaults reads [profileDefaults] from modules.toml" {
+    run wiz 'profile_defaults personal'
+    [ "$output" = "claudePersona jvmStack locale macApps macosDefaults obsidian theme" ]
+    run wiz 'profile_defaults work'
+    [ "$output" = "claudePersona cloudAuth jvmStack macApps macosDefaults theme" ]
+    run wiz 'profile_defaults minimal'
+    [ "$output" = "" ]
+}
+
+@test "module catalog loads keys and labels in parallel" {
+    run wiz 'echo "${#MOD_KEYS[@]}:${#MOD_LABELS[@]}"'
+    [ "$status" -eq 0 ]
+    local n="${output%%:*}" m="${output##*:}"
+    [ "$n" -gt 0 ]
+    [ "$n" = "$m" ]
+}

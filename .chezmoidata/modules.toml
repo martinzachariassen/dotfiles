@@ -19,3 +19,13 @@ devcontainer = "Dev container template under templates/"
 theme = "Catppuccin Frappe across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
+
+# Per-profile default module selection the wizard (scripts/wizard.sh) pre-checks.
+# This MUST mirror the $defaults blocks in .chezmoi.toml.tmpl — the config
+# template is rendered before .chezmoidata loads, so it can't read this table and
+# has to restate the same lists literally. tests/data-model.bats enforces the
+# match so the two never drift. Keys must be [moduleCatalog] names.
+[profileDefaults]
+personal = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "obsidian", "theme"]
+work = ["claudePersona", "cloudAuth", "jvmStack", "macApps", "macosDefaults", "theme"]
+minimal = []

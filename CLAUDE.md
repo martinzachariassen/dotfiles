@@ -40,14 +40,28 @@ local edit back into source, use `chezmoi re-add ~/.X`.
 ## Architecture
 
 **Data model + modules (`.chezmoi.toml.tmpl` + `.chezmoidata/`).** The setup
-wizard IS chezmoi's own `chezmoi init` prompts (no custom wizard): `profile`
+questions are chezmoi's own `chezmoi init` prompt*Once functions: `profile`
 (personal/work/minimal), `signingMode` (1password/ssh-key/off), and a `modules`
 multi-select. The chosen module list drives everything — templates gate on it
 with `has "X" .modules`, the templated `.chezmoiignore` deploys personal content
 (Obsidian, CLAUDE.md) only when its module is on, and hooks skip when theirs is
-off. The module catalog + the profile→Brewfile map live once in
-`.chezmoidata/{modules,packages}.toml`. Change your setup by re-running the
-wizard: `chezmoi init --prompt`.
+off. The module catalog + per-profile default selection + the profile→Brewfile
+map live once in `.chezmoidata/{modules,packages}.toml`.
+
+**The wizard front-end (`scripts/wizard.sh`).** chezmoi's `promptChoice`/
+`promptMultichoice` render an interactive TUI picker (charmbracelet/`huh`) that
+reads `/dev/tty` in raw mode and is unreliable under `curl | bash` and some
+terminals — it can fail to register navigation and just confirm the highlighted
+default. So the interactive path is a thin plain-text wrapper: `wizard.sh` asks
+each question with plain `read` from `/dev/tty` (numbered menus / typed answers /
+number-toggle multi-select — all terminal-agnostic), then hands the answers to
+chezmoi via its non-interactive flags (`--promptString/-Choice/-Multichoice`,
+keyed by each prompt's *message* text, multichoice items joined with `/`). It
+stays bash-3.2 compatible (a fresh Mac has only system bash until Homebrew) and
+extracts the messages/choices from `.chezmoi.toml.tmpl` at runtime so they never
+drift. Change your setup by re-running `bash scripts/wizard.sh` (or `chezreset`
+for a full first-run replay). `[profileDefaults]` in `modules.toml` mirrors the
+template's `$defaults` — `tests/data-model.bats` enforces the match.
 
 **Packages (`Brewfile` + `brewfiles/`).** The root `Brewfile` is the core tier
 (always installed). Optional layers compose on top: `brewfiles/Brewfile.mac-apps`
@@ -84,14 +98,16 @@ calls the entry point; `02d-obsidian-apply` is the reference shape.
 
 **User-facing commands (`scripts/`).** `chezup.sh` (pull + apply + converge),
 `doctor.sh` (`chezdoctor` health check), `bootstrap-auth.sh` (post-install
-account + git-signing walkthrough), `macos-defaults.sh`. There is no config
-script — change profile/modules/signing by re-running `chezmoi init --prompt`.
+account + git-signing walkthrough), `macos-defaults.sh`, and `wizard.sh` (the
+plain-text setup wizard). Change profile/modules/signing by re-running
+`bash scripts/wizard.sh`.
 
 The `install.sh` at the repo root is the one-shot fresh-Mac bootstrap: a small
 **hand-written** script (it runs via `curl | bash` before the repo exists, so it
 can't source `scripts/lib/*`). It installs only the prerequisites — Xcode CLT,
-Homebrew, chezmoi, the repo clone — then hands off to `chezmoi init --apply`,
-which runs the wizard and applies. Edit it directly; it is NOT generated. See
+Homebrew, chezmoi, the repo clone — then hands off to `scripts/wizard.sh` (which
+asks the questions and runs `chezmoi init --apply`; passing extra args bypasses
+the wizard and goes straight to chezmoi). Edit it directly; it is NOT generated. See
 `docs/lifecycle.md`.
 
 **Runtimes are mise, not Homebrew.** Java/Node/Python come from mise: global

@@ -43,7 +43,12 @@
 {{- else if eq $profile "work" -}}
 {{-   $defaults = list "claudePersona" "cloudAuth" "jvmStack" "macApps" "macosDefaults" "theme" -}}
 {{- end -}}
-{{- $modules := promptMultichoiceOnce . "modules" "Optional modules (space toggles, Enter confirms)" $allModules $defaults -}}
+{{- $modules := promptMultichoiceOnce . "modules" "Optional modules" $allModules $defaults -}}
+{{/* scripts/wizard.sh bypasses chezmoi's fragile TUI picker and supplies the
+     selection via --promptMultichoice (see docs/lifecycle.md). An empty
+     selection arrives from that flag as the one-element list [""], so normalise it back to
+     a genuinely empty list before it lands in .modules. */ -}}
+{{- $modules = without $modules "" -}}
 
 sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote }}
 
