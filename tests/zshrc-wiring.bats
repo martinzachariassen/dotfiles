@@ -16,9 +16,9 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/dot_config/zsh/dot_zshrc.tmpl"
-    ZSHENV="$REPO_ROOT/dot_zshenv"
-    ZPROFILE="$REPO_ROOT/dot_config/zsh/dot_zprofile"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    ZSHENV="$REPO_ROOT/src/dot_zshenv"
+    ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
 }
 
 # ─── ~/.zshenv: must stay in $HOME (zsh reads it before ZDOTDIR is set) ────

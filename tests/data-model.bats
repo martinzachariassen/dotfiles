@@ -4,9 +4,9 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    TMPL="$REPO_ROOT/.chezmoi.toml.tmpl"
-    MODULES_DATA="$REPO_ROOT/.chezmoidata/modules.toml"
-    PACKAGES_DATA="$REPO_ROOT/.chezmoidata/packages.toml"
+    TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
+    MODULES_DATA="$REPO_ROOT/src/.chezmoidata/modules.toml"
+    PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/packages.toml"
 }
 
 # The config template is rendered before .chezmoidata loads, so it must list the

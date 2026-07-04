@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup-ollama.sh — start Ollama as a background service. Ollama is installed by
-# the mac-apps Homebrew module (brewfiles/Brewfile.mac-apps).
+# the mac-apps Homebrew module (packages/Brewfile.mac-apps).
 #
 # This script does NOT download any models. Models are large and
 # machine-specific, so you pull the ones you want by hand:
@@ -45,7 +45,7 @@ warn() { echo "  ${YELLOW}!${RESET} $1"; }
 
 if ! command -v ollama >/dev/null 2>&1; then
     echo "setup-ollama: ollama not found. Install the workstation apps first:" >&2
-    echo "  brew bundle install --file=brewfiles/Brewfile.mac-apps" >&2
+    echo "  brew bundle install --file=packages/Brewfile.mac-apps" >&2
     echo "  (or run install.sh / chezmoi apply)" >&2
     exit 1
 fi

@@ -16,7 +16,10 @@ set -euo pipefail
 
 # ─── Inputs from chezmoi data ────────────────────────────────────────────────
 PROFILE="{{ .profile }}"
-SOURCE="{{ .chezmoi.sourceDir }}"
+# The repo root (git working tree) — where install.sh + scripts/ live. chezmoi's
+# source dir is the src/ subdir under this, but users think of the repo root as
+# "the dotfiles", so show and reference that.
+SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
 
 # List the enabled optional modules as a bullet-separated string for compact display.

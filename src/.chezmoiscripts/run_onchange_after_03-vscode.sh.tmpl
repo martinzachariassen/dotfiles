@@ -2,7 +2,7 @@
 # Installs VS Code extensions from the repo manifest when this script or the
 # extension manifest changes.
 #
-# Marketplace extension manifest hash: {{ include "vscode/extensions.txt" | sha256sum }}
+# Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
 
 set -euo pipefail
 
@@ -18,8 +18,10 @@ if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-SOURCE="{{ .chezmoi.sourceDir }}"
-EXTENSIONS_FILE="$SOURCE/vscode/extensions.txt"
+# packages/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
+ROOT="{{ .chezmoi.workingTree }}"
+EXTENSIONS_FILE="$ROOT/packages/vscode-extensions.txt"
 DEPRECATED_EXTENSIONS=(
     "continue.continue"
     "fwcd.kotlin"

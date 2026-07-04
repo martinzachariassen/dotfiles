@@ -183,8 +183,10 @@ alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/macos-defa
 # setup (profile, optional modules, signing), re-run the wizard:
 #   chezmoi init --prompt      # then `chez` to apply
 dotfiles() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     if [ "$#" -eq 0 ]; then
         cd "$src" || return
     else
@@ -267,16 +269,20 @@ chez() {
 #   DRY_RUN=1   print state-changing commands without running them
 # Extra args go straight to `chezmoi apply` (e.g. `chezup -v`).
 chezup() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     bash "$src/scripts/chezup.sh" "$@"
 }
 
-# Full-stack health check (runs scripts/doctor.sh from the source dir). The other
+# Full-stack health check (runs scripts/doctor.sh from the repo root). The other
 # everyday command alongside chezup — run it any time something feels off.
 chezdoctor() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     bash "$src/scripts/doctor.sh"
 }
 
@@ -286,8 +292,10 @@ chezdoctor() {
 # init's promptOnce functions preserve existing answers and only prompt for
 # fields you haven't answered yet. Safe to run any time.
 chezreinit() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     (cd "$src" && git pull --ff-only) || return $?
     chezmoi init && chez "$@"
 }
@@ -297,18 +305,20 @@ chezreinit() {
 # the project's repo — not bumped here.
 # Doesn't auto-commit — you review the diff and commit yourself.
 chezbump() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     echo "── brew update + upgrade ─────────────────────────────────────"
     brew update && brew upgrade
     echo
     echo "── brew bundle cleanup (preview) ──────────────────────────────"
     echo "  Packages installed locally but not in any Brewfile:"
-    brew bundle cleanup --file="$src/Brewfile" \
-                        --file="$src/brewfiles/Brewfile.mac-apps" \
-                        --file="$src/brewfiles/Brewfile.personal" \
-                        --file="$src/brewfiles/Brewfile.work" 2>/dev/null \
-        || brew bundle cleanup --file="$src/Brewfile"
+    brew bundle cleanup --file="$src/packages/Brewfile" \
+                        --file="$src/packages/Brewfile.mac-apps" \
+                        --file="$src/packages/Brewfile.personal" \
+                        --file="$src/packages/Brewfile.work" 2>/dev/null \
+        || brew bundle cleanup --file="$src/packages/Brewfile"
     echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
     if command -v mise >/dev/null 2>&1; then
         echo
@@ -323,12 +333,14 @@ chezbump() {
 # any Brewfile. Inverse of `chezmoi diff` — catches what you `brew install`d
 # casually and forgot to add to the repo.
 chezaudit() {
-    local src
-    src="$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")"
+    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
+    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
+    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+    local src={{ .chezmoi.workingTree | quote }}
     local tracked untracked leaves_tmp
     leaves_tmp=$(mktemp)
     brew leaves > "$leaves_tmp"
-    tracked=$(grep -h '^\(brew\|cask\) ' "$src"/Brewfile "$src"/brewfiles/Brewfile.* 2>/dev/null \
+    tracked=$(grep -h '^\(brew\|cask\) ' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null \
         | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
         | awk -F/ '{print $NF}' \
         | sort -u)
@@ -340,8 +352,8 @@ chezaudit() {
         echo "── Untracked (installed locally, not in any Brewfile) ────────"
         echo "$untracked"
         echo
-        echo "Add to the right Brewfile (Brewfile / brewfiles/Brewfile.mac-apps /"
-        echo "brewfiles/Brewfile.personal / brewfiles/Brewfile.work),"
+        echo "Add to the right Brewfile (packages/Brewfile / packages/Brewfile.mac-apps /"
+        echo "packages/Brewfile.personal / packages/Brewfile.work),"
         echo "or \`brew uninstall <name>\` if you don't actually use it."
     fi
 }

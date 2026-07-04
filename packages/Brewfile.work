@@ -4,7 +4,7 @@
 # when your profile is "work". Skipped when your profile is "personal".
 # Entries are sorted alphabetically within each section.
 #
-# Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/brewfiles/Brewfile.work
+# Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/packages/Brewfile.work
 
 # ─── Cloud / Kubernetes / IaC ─────────────────────────────────────────────────
 # Taps stay first: the kubelogin + terraform formulae below resolve from them.

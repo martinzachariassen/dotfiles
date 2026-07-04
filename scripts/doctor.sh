@@ -125,8 +125,8 @@ if command -v chezmoi >/dev/null 2>&1; then
     # (.chezmoiversion). chezmoi refuses to read the source if it's too old, but
     # being far ahead is worth knowing too since template helpers shift between
     # releases.
-    if command -v semver_lt >/dev/null 2>&1 && [ -r "$SOURCE_DIR/.chezmoiversion" ]; then
-        min_ver="$(semver_extract "$(cat "$SOURCE_DIR/.chezmoiversion")")"
+    if command -v semver_lt >/dev/null 2>&1 && [ -r "$SOURCE_DIR/src/.chezmoiversion" ]; then
+        min_ver="$(semver_extract "$(cat "$SOURCE_DIR/src/.chezmoiversion")")"
         cur_ver="$(semver_extract "$(chezmoi --version 2>/dev/null)")"
         if [ -n "$min_ver" ] && [ -n "$cur_ver" ]; then
             if semver_lt "$cur_ver" "$min_ver"; then
@@ -288,7 +288,7 @@ EOF
     # Drift the OTHER way: ad-hoc installs not tracked anywhere.
     leaves_tmp=$(mktemp)
     brew leaves >"$leaves_tmp" 2>/dev/null || true
-    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.* 2>/dev/null |
+    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.* 2>/dev/null |
         sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
         awk -F/ '{print $NF}' |
         sort -u)

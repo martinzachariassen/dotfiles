@@ -50,8 +50,10 @@ fi
 
 # 2+3) Re-attach stdin to the controlling terminal (chezmoi closes it). No TTY
 #       (CI / launchd / piped output) means nobody to ask — warn and skip.
-# shellcheck source=../scripts/lib/tty.sh
-. "{{ .chezmoi.sourceDir }}/scripts/lib/tty.sh"
+# scripts/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
+# shellcheck source=../../scripts/lib/tty.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 if ! tty_reattach; then
     echo "! no terminal available for sudo pre-auth; sudo steps may ask later or skip"
     exit 0

@@ -33,13 +33,15 @@ echo "→ obsidian: 'obsidian' module not selected, skipping"
 exit 0
 {{ end -}}
 
+# scripts/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
 # shellcheck source=/dev/null
-. "{{ .chezmoi.sourceDir }}/scripts/lib/log.sh"
+. "{{ .chezmoi.workingTree }}/scripts/lib/log.sh"
 ui_init_colors
 ui_init_glyphs
 
 # shellcheck source=/dev/null
-. "{{ .chezmoi.sourceDir }}/scripts/lib/obsidian-apply.sh"
+. "{{ .chezmoi.workingTree }}/scripts/lib/obsidian-apply.sh"
 
 echo "▶ Obsidian vault"
 

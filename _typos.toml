@@ -7,10 +7,10 @@
 [files]
 extend-exclude = [
     # Neovim plugin lock — plugin names + commit hashes, machine-managed.
-    "dot_config/nvim/lazy-lock.json",
+    "src/dot_config/nvim/lazy-lock.json",
     # Obsidian community plugin IDs / per-plugin data — vendor JSON.
-    "dot_config/obsidian/vault-config/community-plugins.json",
-    "dot_config/obsidian/vault-config/plugins/**/*.json",
+    "src/dot_config/obsidian/vault-config/community-plugins.json",
+    "src/dot_config/obsidian/vault-config/plugins/**/*.json",
 ]
 
 # Real technical abbreviations that aren't in typos' default dictionary. Add

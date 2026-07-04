@@ -21,8 +21,10 @@ exit 0
 # Reattach stdin to the controlling terminal so casks that invoke sudo
 # (docker-desktop, 1password) can read the password. run_before_00-sudo-cache
 # does the upfront pre-auth; this is the belt-and-braces complement.
-# shellcheck source=../scripts/lib/tty.sh
-. "{{ .chezmoi.sourceDir }}/scripts/lib/tty.sh"
+# scripts/ + packages/ live at the repo root, not under the source dir (src/),
+# so reach them via .chezmoi.workingTree (the git working tree = repo root).
+# shellcheck source=../../scripts/lib/tty.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 tty_reattach || echo "! no terminal available; casks needing sudo may ask later"
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -31,15 +33,15 @@ eval "$(/opt/homebrew/bin/brew shellenv)"
 # core (always) + each selected module's file + the profile's file (if any).
 {{ $modules := dig "modules" (list) . -}}
 FILES=(
-    "{{ .chezmoi.sourceDir }}/{{ .brewfiles.core }}"
+    "{{ .chezmoi.workingTree }}/{{ .brewfiles.core }}"
 {{- range $mod, $path := .brewfiles.byModule }}
 {{- if has $mod $modules }}
-    "{{ $.chezmoi.sourceDir }}/{{ $path }}"
+    "{{ $.chezmoi.workingTree }}/{{ $path }}"
 {{- end }}
 {{- end }}
 {{- $profileFile := index .brewfiles.byProfile .profile }}
 {{- if $profileFile }}
-    "{{ .chezmoi.sourceDir }}/{{ $profileFile }}"
+    "{{ .chezmoi.workingTree }}/{{ $profileFile }}"
 {{- end }}
 )
 

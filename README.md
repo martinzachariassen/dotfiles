@@ -70,9 +70,9 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
     </td>
     <td width="33%" valign="top">
       <h3>🧩 Layered packages</h3>
-      A core <a href="Brewfile">Brewfile</a> plus composable
-      <a href="brewfiles/">profile + module layers</a> (mac-apps, personal, work),
-      chosen in the setup wizard and mapped in <code>.chezmoidata/packages.toml</code>.
+      A core <a href="packages/Brewfile">Brewfile</a> plus composable
+      <a href="packages/">profile + module layers</a> (mac-apps, personal, work),
+      chosen in the setup wizard and mapped in <code>src/.chezmoidata/packages.toml</code>.
     </td>
     <td width="33%" valign="top">
       <h3>✅ CI-guarded</h3>
@@ -90,7 +90,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
 |---|---|
 | 🖥 **Terminal** | Ghostty, Zellij, Starship, Catppuccin Frappé, JetBrainsMono Nerd Font. |
 | 🐚 **Shell** | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases. |
-| ✏️ **Editors** | VS Code via Homebrew (extensions in [`vscode/extensions.txt`](vscode/extensions.txt)), Neovim with LazyVim. |
+| ✏️ **Editors** | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim. |
 | 🔀 **Git** | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | 📦 **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
 | 🤖 **Local AI** | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
@@ -255,20 +255,32 @@ that project runs `plan`/`apply`).
 
 ## Repository layout
 
+The repo root splits cleanly into **what chezmoi deploys** (everything under
+`src/`, its source directory — see [`.chezmoiroot`](.chezmoiroot)) and **the
+tooling that supports it** (everything else at the root, never deployed to
+`$HOME`):
+
 ```
-install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
-Brewfile                # core Homebrew packages (always installed)
-brewfiles/              # profile + module layers (mac-apps, personal, work)
-.chezmoi.toml.tmpl      # chezmoi config + the init-prompt setup wizard
-.chezmoidata/           # static data: module catalog + profile→Brewfile map
-.chezmoiscripts/        # ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
-dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
+.chezmoiroot            # one line: "src" — points chezmoi at the src/ subdir
+src/                    # ← chezmoi's source dir; everything here deploys to $HOME
+  .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup wizard
+  .chezmoidata/         #   static data: module catalog + profile→Brewfile map
+  .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
+  dot_config/           #   → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
+  dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
+packages/               # what to install: core Brewfile + profile/module layers + editor lists
 scripts/                # chezup.sh, doctor.sh, bootstrap-auth.sh, lib/log.sh…
+install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
 templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
 tests/                  # bats suites
+docs/                   # deeper guides (apply lifecycle…)
 ```
 
-The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`dot_config/zsh/dot_zshrc.tmpl`](dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
+Repo tooling reaches the managed hooks and vice-versa across that boundary via
+chezmoi's `{{ .chezmoi.workingTree }}` (the repo root) — see
+[`docs/lifecycle.md`](docs/lifecycle.md).
+
+The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
 
 ## Development
 

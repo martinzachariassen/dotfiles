@@ -10,7 +10,7 @@
 # defaults script silently did nothing because `run_once_*` had already recorded
 # a successful run.
 #
-# scripts/macos-defaults.sh  hash: {{ include "scripts/macos-defaults.sh" | sha256sum }}
+# scripts/macos-defaults.sh  hash: {{ include "../scripts/macos-defaults.sh" | sha256sum }}
 #
 # To re-apply the current defaults without changing the script (e.g. after a
 # macOS update reset something), run the `macos-defaults` zsh alias by hand.
@@ -37,15 +37,17 @@ echo "▶ macOS defaults"
 echo "  System preferences pass (re-runs when the defaults script changes)."
 echo "  Some changes need a reboot."
 
-# shellcheck source=../scripts/lib/tty.sh
-. "{{ .chezmoi.sourceDir }}/scripts/lib/tty.sh"
+# scripts/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
+# shellcheck source=../../scripts/lib/tty.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 if ! tty_reattach; then
     echo "! no terminal available; skipping macOS defaults"
     echo "  Run later with: macos-defaults"
-    echo "  Or: bash {{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"
+    echo "  Or: bash {{ .chezmoi.workingTree }}/scripts/macos-defaults.sh"
     exit 0
 fi
 
-bash "{{ .chezmoi.sourceDir }}/scripts/macos-defaults.sh"
+bash "{{ .chezmoi.workingTree }}/scripts/macos-defaults.sh"
 
 echo "✓ macOS defaults applied"

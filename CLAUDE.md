@@ -5,10 +5,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this repo is
 
 Personal macOS (Apple Silicon) dotfiles managed by [chezmoi](https://chezmoi.io).
-The source of truth lives here at `~/Developer/personal/dotfiles` (not the
-default `~/.local/share/chezmoi` — set via `sourceDir` in `.chezmoi.toml.tmpl`).
+The repo lives at `~/Developer/personal/dotfiles` (not the default
+`~/.local/share/chezmoi` — set via `sourceDir` in `src/.chezmoi.toml.tmpl`).
 `chezmoi apply` renders templated source files into `$HOME` and runs the hook
-scripts in `.chezmoiscripts/`.
+scripts in `src/.chezmoiscripts/`.
+
+**Repo layout — the `src/` split.** `.chezmoiroot` (one line, `src`) makes `src/`
+chezmoi's **source directory**: everything under `src/` is managed content that
+deploys to `$HOME` (`dot_config/`, `dot_zshenv`, `private_dot_ssh/`, `Library/`,
+plus the `.chezmoi*` machinery). Everything at the **repo root** is tooling
+chezmoi never sees: `scripts/` (+ `lib/`), `packages/` (Brewfiles + editor
+lists), `tests/`, `docs/`, `templates/`, `install.sh`, `.github/`. So inside a
+hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`; reaching root-level tooling
+(`scripts/lib/*`, `packages/Brewfile*`) uses `{{ .chezmoi.workingTree }}` (the
+git working tree = repo root). That `.chezmoi.workingTree` idiom is how the
+boundary is crossed — grep for it when wiring a hook to a root-level file.
 
 **Edit source files here, never the rendered copies in `$HOME`.** A managed file
 in `$HOME` is overwritten on the next apply (`apply.force = true`). To capture a
@@ -33,31 +44,35 @@ local edit back into source, use `chezmoi re-add ~/.X`.
   `[data]` model (`.profile`, `.name`, `.email`, `.signingMode`, `.signingKey`,
   `.modules`). Use `dig "key" default .` for data that may be absent on machines
   that haven't re-run `chezmoi init` (e.g. `dig "modules" (list) .`).
-- `.chezmoiignore` lists source paths that are **not** deployed to `$HOME` (this
-  repo's tooling: `scripts/`, `tests/`, `brewfiles/`, `Brewfile`, `README.md`,
-  `CLAUDE.md`, all `AGENTS.md`, etc.).
+- `src/.chezmoiignore` lists source paths that are **not** deployed to `$HOME`.
+  Since the repo tooling now lives *outside* the source dir (at the repo root,
+  above `src/`), chezmoi can't see it anyway, so this file slimmed to just the
+  in-`src/` cases (the Obsidian vault's own `README.md`/`AGENTS.md`, and the
+  module-gated personal content).
 
 ## Architecture
 
-**Data model + modules (`.chezmoi.toml.tmpl` + `.chezmoidata/`).** The setup
-wizard IS chezmoi's own `chezmoi init` prompts (no custom wizard): `profile`
-(personal/work/minimal), `signingMode` (1password/ssh-key/off), and a `modules`
-multi-select. The chosen module list drives everything — templates gate on it
-with `has "X" .modules`, the templated `.chezmoiignore` deploys personal content
-(Obsidian, CLAUDE.md) only when its module is on, and hooks skip when theirs is
-off. The module catalog + the profile→Brewfile map live once in
-`.chezmoidata/{modules,packages}.toml`. Change your setup by re-running the
+**Data model + modules (`src/.chezmoi.toml.tmpl` + `src/.chezmoidata/`).** The
+setup wizard IS chezmoi's own `chezmoi init` prompts (no custom wizard):
+`profile` (personal/work/minimal), `signingMode` (1password/ssh-key/off), and a
+`modules` multi-select. The chosen module list drives everything — templates gate
+on it with `has "X" .modules`, the templated `src/.chezmoiignore` deploys
+personal content (Obsidian, CLAUDE.md) only when its module is on, and hooks skip
+when theirs is off. The module catalog + the profile→Brewfile map live once in
+`src/.chezmoidata/{modules,packages}.toml`. Change your setup by re-running the
 wizard: `chezmoi init --prompt`.
 
-**Packages (`Brewfile` + `brewfiles/`).** The root `Brewfile` is the core tier
-(always installed). Optional layers compose on top: `brewfiles/Brewfile.mac-apps`
-(gated by the `macApps` module) and the profile-specific `Brewfile.personal` /
-`Brewfile.work`. The map is the single source of truth in
-`.chezmoidata/packages.toml`; the `02-brew-bundle` hook reads it and runs
-Homebrew's native `brew bundle` (`--no-upgrade`, so convergence guarantees
-presence, not freshness — upgrades are `chezbump`'s job).
+**Packages (`packages/`).** `packages/Brewfile` is the core tier (always
+installed). Optional layers compose on top: `packages/Brewfile.mac-apps` (gated
+by the `macApps` module) and the profile-specific `packages/Brewfile.personal` /
+`packages/Brewfile.work` (`packages/` also holds the VS Code + cspell editor
+lists). The map is the single source of truth in `src/.chezmoidata/packages.toml`
+(paths relative to the repo root); the `02-brew-bundle` hook joins them with
+`{{ .chezmoi.workingTree }}` and runs Homebrew's native `brew bundle`
+(`--no-upgrade`, so convergence guarantees presence, not freshness — upgrades are
+`chezbump`'s job).
 
-**Apply lifecycle (`.chezmoiscripts/run_*.sh.tmpl`).** These are the only
+**Apply lifecycle (`src/.chezmoiscripts/run_*.sh.tmpl`).** These are the only
 chezmoi-managed *commands* (everything else is managed files). Ordering and
 re-run behavior come from the filename prefix:
 - `run_before_NN-…` / `run_after_NN-…` — every apply, before/after file actions.
@@ -77,10 +92,11 @@ OS-agnostic; and `exec </dev/tty` before any `sudo`/`read` (chezmoi runs scripts
 with stdin closed), degrading gracefully with no TTY.
 
 **Engine code (`scripts/lib/`).** Shared, shellcheckable, testable bash under
-`scripts/lib/`: `log.sh` (colors/glyphs + rail-style log helpers),
-`obsidian-apply.sh` (vault-seeding engine), `chezmoi-data.sh` (data reader),
-`semver.sh`, `tty.sh`. A hook does render-time config, then sources its lib, then
-calls the entry point; `02d-obsidian-apply` is the reference shape.
+`scripts/lib/` (at the repo root, so hooks source it via
+`{{ .chezmoi.workingTree }}/scripts/lib/…`): `log.sh` (colors/glyphs + rail-style
+log helpers), `obsidian-apply.sh` (vault-seeding engine), `chezmoi-data.sh` (data
+reader), `semver.sh`, `tty.sh`. A hook does render-time config, then sources its
+lib, then calls the entry point; `02d-obsidian-apply` is the reference shape.
 
 **User-facing commands (`scripts/`).** `chezup.sh` (pull + apply + converge),
 `doctor.sh` (`chezdoctor` health check), `bootstrap-auth.sh` (post-install
@@ -95,8 +111,9 @@ which runs the wizard and applies. Edit it directly; it is NOT generated. See
 `docs/lifecycle.md`.
 
 **Runtimes are mise, not Homebrew.** Java/Node/Python come from mise: global
-defaults in `~/.config/mise/config.toml` (source: `dot_config/mise/`), per-project
-pins in each project's `mise.toml`. Don't add language runtimes to Homebrew.
+defaults in `~/.config/mise/config.toml` (source: `src/dot_config/mise/`),
+per-project pins in each project's `mise.toml`. Don't add language runtimes to
+Homebrew.
 
 ## Development commands
 
@@ -113,7 +130,7 @@ bats tests/semver.bats
 shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
 shfmt -d -i 4 -ci install.sh scripts/*.sh scripts/lib/*.sh
 for f in install.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
-for f in dot_zshenv dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
+for f in src/dot_zshenv src/dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
 
 # Local commit gates mirroring CI (shellcheck, shfmt, typos, commit message).
 # Activate once per clone; run across everything on demand:

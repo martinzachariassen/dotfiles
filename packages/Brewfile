@@ -5,16 +5,16 @@
 # the modern CLI replacements wired into aliases, mise for language runtimes,
 # chezmoi for managing this repo, and 1Password for SSH + git signing.
 #
-# Optional add-ons live in brewfiles/Brewfile.<feature> files and are layered on
+# Optional add-ons live in packages/Brewfile.<feature> files and are layered on
 # top of this one based on your answers to the install wizard. See:
-#   brewfiles/Brewfile.mac-apps   — GUI apps (productivity, media, dev) + AI tooling
-#   brewfiles/Brewfile.personal   — personal-only casks (you fill in)
-#   brewfiles/Brewfile.work       — work-only casks (cloud CLIs + work apps)
+#   packages/Brewfile.mac-apps   — GUI apps (productivity, media, dev) + AI tooling
+#   packages/Brewfile.personal   — personal-only casks (you fill in)
+#   packages/Brewfile.work       — work-only casks (cloud CLIs + work apps)
 #
 # Entries are sorted alphabetically within each section. Regenerate from a
 # known-good machine:
-#   brew bundle dump --describe --force --file=~/Developer/personal/dotfiles/Brewfile
-# (then move feature-specific lines back into the matching brewfiles/Brewfile.<feature>)
+#   brew bundle dump --describe --force --file=~/Developer/personal/dotfiles/packages/Brewfile
+# (then move feature-specific lines back into the matching packages/Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "chezmoi"                 # this very repo's manager

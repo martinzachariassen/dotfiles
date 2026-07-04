@@ -21,7 +21,7 @@
 #   is on PATH by the time this 02e step runs. If it isn't (bundle skipped), we
 #   no-op with a hint rather than fail the apply.
 #
-# pre-commit config hash: {{ include ".pre-commit-config.yaml" | sha256sum }}
+# pre-commit config hash: {{ include "../.pre-commit-config.yaml" | sha256sum }}
 
 set -euo pipefail
 
@@ -44,7 +44,9 @@ if ! command -v pre-commit >/dev/null 2>&1; then
     exit 0
 fi
 
-repo="{{ .chezmoi.sourceDir }}"
+# .git + .pre-commit-config.yaml live at the repo root (the git working tree),
+# not the source dir (src/).
+repo="{{ .chezmoi.workingTree }}"
 if [ ! -d "$repo/.git" ]; then
     echo "  ! ${repo} is not a git checkout — skipping hook install"
     exit 0

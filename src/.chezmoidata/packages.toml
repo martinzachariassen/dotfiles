@@ -8,19 +8,23 @@
 # This replaces the profile+feature -> Brewfile mapping that V1 duplicated across
 # the brew-bundle hook, scripts/lib/active-modules.sh, and scripts/doctor.sh.
 #
+# Paths are relative to the repo root (the git working tree), NOT chezmoi's
+# source dir (src/) — the Brewfiles live in packages/ at the root. The
+# brew-bundle hook joins these with {{ .chezmoi.workingTree }} accordingly.
+#
 # NOTE: .chezmoidata files are plain data and CANNOT be templated. Keep them in a
 # key namespace (`brewfiles`, `moduleCatalog`) disjoint from prompted answers
 # (`profile`, `modules`, ...) so there is never a merge/precedence collision.
 
 [brewfiles]
 # Always installed, on every machine.
-core = "Brewfile"
+core = "packages/Brewfile"
 
 # Installed when the named module is selected (see .chezmoidata/modules.toml).
 [brewfiles.byModule]
-macApps = "brewfiles/Brewfile.mac-apps"
+macApps = "packages/Brewfile.mac-apps"
 
 # Installed for the active profile only.
 [brewfiles.byProfile]
-personal = "brewfiles/Brewfile.personal"
-work = "brewfiles/Brewfile.work"
+personal = "packages/Brewfile.personal"
+work = "packages/Brewfile.work"

@@ -45,7 +45,7 @@ check_deprecation() {
     fi
 }
 
-for f in "$SOURCE_DIR"/Brewfile "$SOURCE_DIR"/brewfiles/Brewfile.*; do
+for f in "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.*; do
     [ -f "$f" ] || continue
     case "$f" in *.lock.json) continue ;; esac
     echo "── $(basename "$f") ──"
