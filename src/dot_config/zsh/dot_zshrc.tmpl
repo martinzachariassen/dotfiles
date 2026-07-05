@@ -179,9 +179,10 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # fresh Mac or after wiping a system pref pane back to defaults.
 alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/macos-defaults.sh"'
 
-# Dotfiles shortcut. With no args it cd's into the source repo. To change your
-# setup (profile, optional modules, signing), re-run the wizard:
-#   chezmoi init --prompt      # then `chez` to apply
+# Dotfiles shortcut. With no args it cd's into the source repo. To re-choose your
+# setup (profile, optional modules, signing) from scratch, use the plain-text
+# wizard via `chezreset` — not `chezmoi init --prompt`, which forces chezmoi's
+# fragile TUI picker.
 dotfiles() {
     # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
     # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
@@ -190,9 +191,11 @@ dotfiles() {
     if [ "$#" -eq 0 ]; then
         cd "$src" || return
     else
-        echo "Change your setup by re-running the wizard:"
-        echo "    chezmoi init --prompt      # profile, optional modules, signing"
-        echo "    chez                       # apply the changes"
+        echo "Re-choose your setup (profile, modules, signing):"
+        echo "    chezreset                  # plain-text wizard, then applies"
+        echo
+        echo "Or just fill in newly-added setup keys (keeps current answers):"
+        echo "    chezreinit"
     fi
 }
 
@@ -255,6 +258,21 @@ chez() {
         esac
     fi
     chezmoi apply --force "$@"
+    local rc=$?
+    # Brewfile drift notice (removal direction only). The apply already INSTALLED
+    # anything the Brewfile lists that was missing; here we merely FLAG packages
+    # present locally but tracked in no Brewfile, so `chez` never silently
+    # uninstalls. `chezmirror` reconciles on demand. Cheap: `brew leaves` + grep.
+    if command -v brew >/dev/null 2>&1; then
+        local untracked
+        untracked=$(_chez_brew_untracked)
+        if [ -n "$untracked" ]; then
+            echo
+            echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but in no Brewfile."
+            echo "    review: chezaudit   ·   reconcile (uninstall): chezmirror"
+        fi
+    fi
+    return $rc
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
@@ -287,16 +305,19 @@ chezdoctor() {
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
-# Reinitialise chezmoi data and apply — the "the upstream wizard prompts
-# changed and I want to fill in any new keys" workflow. Idempotent: chezmoi
-# init's promptOnce functions preserve existing answers and only prompt for
-# fields you haven't answered yet. Safe to run any time.
+# Fill in NEWLY-ADDED setup keys only — the "the wizard grew a new question and
+# I want to answer it" workflow. It does NOT re-ask questions you've already
+# answered: chezmoi's prompt*Once functions read your persisted answers and only
+# prompt for fields still blank. To RE-CHOOSE profile / modules / signing from
+# scratch, use `chezreset` instead. Idempotent; safe to run any time.
 chezreinit() {
     # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
     # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
     # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
     (cd "$src" && git pull --ff-only) || return $?
+    echo "chezreinit: filling in any new/unanswered setup keys only."
+    echo "            to re-choose profile/modules/signing, run: chezreset"
     chezmoi init && chez "$@"
 }
 
@@ -361,23 +382,29 @@ chezbump() {
     echo "Now: cd $src && git diff   to review, then commit."
 }
 
-# Drift detection: report brew packages installed locally but not tracked in
-# any Brewfile. Inverse of `chezmoi diff` — catches what you `brew install`d
-# casually and forgot to add to the repo.
-chezaudit() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
+# Internal: names of top-level brew packages (`brew leaves`) installed locally
+# but listed in NO Brewfile tier. One name per line; empty when in sync. Fast
+# (no network): `brew leaves` diffed against the tracked set. Shared by the
+# `chez` drift notice, `chezaudit`, and `chezmirror`. Note `brew leaves` reports
+# formulae only, so casks never show here — `chezmirror` uses `brew bundle
+# cleanup` for the authoritative removal set (formulae + casks + unused deps).
+_chez_brew_untracked() {
+    # Repo root, baked in at apply time (git working tree; source dir is src/).
     local src={{ .chezmoi.workingTree | quote }}
-    local tracked untracked leaves_tmp
-    leaves_tmp=$(mktemp)
-    brew leaves > "$leaves_tmp"
+    local tracked
     tracked=$(grep -h '^\(brew\|cask\) ' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null \
         | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
         | awk -F/ '{print $NF}' \
         | sort -u)
-    untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked"))
-    rm -f "$leaves_tmp"
+    comm -23 <(brew leaves 2>/dev/null | sort -u) <(printf '%s\n' "$tracked")
+}
+
+# Drift detection: report brew packages installed locally but not tracked in
+# any Brewfile. Inverse of `chezmoi diff` — catches what you `brew install`d
+# casually and forgot to add to the repo. Reports only; use `chezmirror` to act.
+chezaudit() {
+    local untracked
+    untracked=$(_chez_brew_untracked)
     if [ -z "$untracked" ]; then
         echo "  ✓ no untracked brew packages"
     else
@@ -386,8 +413,48 @@ chezaudit() {
         echo
         echo "Add to the right Brewfile (packages/Brewfile / packages/Brewfile.mac-apps /"
         echo "packages/Brewfile.personal / packages/Brewfile.work),"
-        echo "or \`brew uninstall <name>\` if you don't actually use it."
+        echo "or reconcile with \`chezmirror\` to uninstall everything untracked."
     fi
+}
+
+# Enforce the Brewfile as the source of truth in the REMOVAL direction:
+# uninstall Homebrew packages listed in no Brewfile. The additive direction
+# (installing what the Brewfiles list) already runs on every `chez` via the
+# brew-bundle hook; this is its deliberate, confirmed counterpart — NOT wired
+# into `chez`, because a routine apply should never silently uninstall.
+#
+# Destructive: previews first (plain `brew bundle cleanup`), then on confirm runs
+# `--force` to uninstall untracked formulae/casks and prune now-unused deps.
+# Compares against the UNION of all Brewfile tiers, so a package tracked in a
+# profile/module you don't currently use is preserved, not removed.
+chezmirror() {
+    # Repo root, baked in at apply time (git working tree; source dir is src/).
+    local src={{ .chezmoi.workingTree | quote }} reply
+    local -a files=(
+        --file="$src/packages/Brewfile"
+        --file="$src/packages/Brewfile.mac-apps"
+        --file="$src/packages/Brewfile.personal"
+        --file="$src/packages/Brewfile.work"
+    )
+    echo "── Would uninstall (installed locally, not in any Brewfile) ───"
+    brew bundle cleanup "${files[@]}" 2>/dev/null \
+        || brew bundle cleanup --file="$src/packages/Brewfile"
+    echo
+    if [ ! -r /dev/tty ]; then
+        echo "No TTY — not removing. Re-run interactively to confirm."
+        return 0
+    fi
+    printf 'Uninstall the above to mirror the Brewfile? [y/N] '
+    IFS= read -r reply </dev/tty || reply=""
+    case "$reply" in
+        y | Y | yes | YES) ;;
+        *)
+            echo "aborted — nothing removed"
+            return 0
+            ;;
+    esac
+    brew bundle cleanup --force "${files[@]}" 2>/dev/null \
+        || brew bundle cleanup --force --file="$src/packages/Brewfile"
 }
 
 # ─── Zellij (terminal multiplexer) ────────────────────────────────────────────

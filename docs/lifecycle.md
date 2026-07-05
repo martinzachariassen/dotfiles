@@ -56,7 +56,11 @@ of apply count, so these re-fire only when their embedded content hash changes.
 
 Package convergence uses Homebrew's native `brew bundle` (the `02-brew-bundle`
 hook reads the active file set from `src/.chezmoidata/packages.toml`, then runs
-`brew bundle --no-upgrade` so it converges *presence*, not freshness). Other
+`brew bundle --no-upgrade` so it converges *presence*, not freshness). It only
+ever *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling packages
+the Brewfile no longer lists) is `chezmirror`'s: an apply must never silently
+uninstall, so `chez` just flags untracked packages and `chezmirror` reconciles
+them behind a confirm. Other
 custom logic (e.g. `obsidian-apply.sh`) lives in `scripts/lib/` so it stays
 shellcheck-able and unit-tested; hooks are thin drivers that do render-time
 config, source their lib (if any), and call the entry point.

@@ -184,7 +184,7 @@ curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI)
 
 ## Daily commands
 
-The whole everyday surface is **two verbs plus a health check**. Both verbs end in the same `chezmoi apply`, which reconciles *real installed state* on every run — so it always installs what the Brewfile declares.
+The whole everyday surface is **two verbs plus a health check**. Both verbs end in the same `chezmoi apply`, which reconciles *real installed state* on every run — so it always installs what the Brewfile declares. It never *uninstalls*, though: `chez` only flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles that removal direction on demand.
 
 | Command | What it does |
 |---|---|
@@ -193,25 +193,29 @@ The whole everyday surface is **two verbs plus a health check**. Both verbs end 
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
 Change your setup — profile, optional modules, or signing — by re-running the
-wizard (chezmoi's `init` prompts reuse your saved answers and only re-ask what
-you change):
+plain-text wizard, which overrides your saved answers:
 
 ```sh
-chezmoi init --prompt   # re-answer profile / signingMode / modules
-chez                    # apply the changes
+chezreset               # re-ask profile / modules / signing, then apply
 ```
+
+> `chezreinit` is a different tool: it runs plain `chezmoi init`, which — via
+> chezmoi's `prompt*Once` functions — keeps every answer you've already given
+> and only asks for setup keys still blank. So it fills in newly-added questions
+> but never lets you re-choose existing ones; reach for `chezreset` for that.
 
 <details>
 <summary>Advanced / occasional commands</summary>
 
 | Command | What it does |
 |---|---|
-| `dotfiles` | Jump to the source repo (with args, points you at `chezmoi init --prompt`). |
-| `chez` | Apply without pulling — the building block `chezup` calls. |
-| `chezreinit` | Pull, re-run `chezmoi init` to pick up new data-model keys, then apply. Use after wizard/data-model changes. |
-| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard, then apply. Confirm-gated; doesn't uninstall packages or delete files. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit`). |
+| `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
+| `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
+| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
-| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection). |
+| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview, then (confirm-gated) `brew bundle cleanup --force` to uninstall everything untracked. |
 
 </details>
 
@@ -225,7 +229,7 @@ chez                    # apply the changes
 
 It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
 
-**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to `chezmoi init --apply`: chezmoi's own `init` prompts (profile, signing mode, optional modules) *are* the setup wizard, and `--apply` runs the hooks. Re-run the wizard anytime with `chezmoi init --prompt`.
+**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to the plain-text wizard (`scripts/wizard.sh`), which asks the setup questions (profile, signing mode, optional modules) and feeds them to `chezmoi init --apply` — `--apply` runs the hooks. Re-choose your setup anytime with `chezreset`.
 
 ## Repository layout
 
