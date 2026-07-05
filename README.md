@@ -96,7 +96,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
 | 📦 **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
 | 🤖 **Local AI** | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
 | 🧰 **Workstation apps** | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers. |
-| 🍎 **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
+| 🍎 **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md). |
 
 ## Quick start
 
@@ -230,6 +230,7 @@ Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
 | [packages.md](docs/packages.md) | Package tiers, profiles, the module catalog, and the wizard. |
 | [architecture.md](docs/architecture.md) | The `src/` split, repo layout, and `scripts/` organization. |
 | [lifecycle.md](docs/lifecycle.md) | What `chezmoi apply` does, stage by stage. |
+| [macos.md](docs/macos.md) | Every macOS system setting applied (keyboard, Finder, Dock, screenshots, security). |
 | [development.md](docs/development.md) | Quality gates, the CI matrix, and the bats suites. |
 | [shell.md](docs/shell.md) · [terminal.md](docs/terminal.md) · [editors.md](docs/editors.md) · [ai.md](docs/ai.md) | The configured environment — zsh/CLI/mise/git, Ghostty/Zellij/Starship, VS Code/Neovim, and AI tooling. |
 

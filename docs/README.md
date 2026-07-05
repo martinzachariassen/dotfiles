@@ -17,6 +17,7 @@ is the overview and quick start; these docs are the detail behind it.
 |---|---|
 | [architecture.md](architecture.md) | The `src/` vs. root-tooling split, repository layout, and how `scripts/` is organized. |
 | [lifecycle.md](lifecycle.md) | What `chezmoi apply` does stage by stage — the hook ordering, the convergence guarantee, and where each piece lives. |
+| [macos.md](macos.md) | Every macOS system setting applied — keyboard, Finder, Dock, screenshots, security, Touch ID for sudo. |
 | [development.md](development.md) | Quality gates, the CI matrix, the bats suites, and how to run every check locally. |
 
 ## The configured environment
