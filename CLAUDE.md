@@ -72,8 +72,15 @@ chezmoi via its non-interactive flags (`--promptString/-Choice/-Multichoice`,
 keyed by each prompt's *message* text, multichoice items joined with `/`). It
 stays bash-3.2 compatible (a fresh Mac has only system bash until Homebrew) and
 extracts the messages/choices from `src/.chezmoi.toml.tmpl` at runtime so they
-never drift (`wizard.sh` reads it via `$ROOT/src/...`). Change your setup by
-re-running `bash scripts/wizard.sh` (or `chezreset` for a full first-run replay).
+never drift (`wizard.sh` reads it via `$ROOT/src/...`). Progressive enhancement:
+when `gum` is on `PATH` and a real TTY is present (any re-run after first
+install), the choice/module/input prompts upgrade to gum's arrow + space-toggle
+pickers (current selection pre-checked via `--selected`; labels are rendered
+comma-free because that flag is comma-delimited, then mapped back to keys by
+exact match) — always behind the plain-text fallback, gated by `use_gum`
+(honors `WIZARD_NO_GUM=1`). It's the CLI of the same charmbracelet engine as the
+rejected embedded picker, so it runs only here, never at first-boot. Change your
+setup by re-running `bash scripts/wizard.sh` (or `chezreset` for a full replay).
 `[profileDefaults]` in `src/.chezmoidata/modules.toml` mirrors the template's
 `$defaults` — `tests/data-model.bats` enforces the match.
 

@@ -21,6 +21,7 @@ brew "chezmoi"                 # this very repo's manager
 brew "gh"                      # GitHub CLI
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
+brew "gum"                     # interactive shell prompts (backs the wizard's arrow/space pickers)
 brew "jq"                      # JSON
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework

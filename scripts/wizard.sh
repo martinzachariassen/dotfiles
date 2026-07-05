@@ -11,7 +11,15 @@
 # This wizard sidesteps the picker entirely: it asks each question with plain
 # `read` from /dev/tty (numbered menus, typed answers, number-toggle multi-select
 # — all of which work in ANY terminal) and then feeds the answers to chezmoi via
-# its non-interactive flags:
+# its non-interactive flags.
+#
+# Progressive enhancement: when `gum` is installed AND we're on a real terminal,
+# the choice/multi-select/input prompts upgrade to gum's arrow-key + space-toggle
+# pickers (with the current selection pre-checked). gum is the CLI of the SAME
+# charmbracelet engine as chezmoi's flaky embedded picker, so it's used ONLY here
+# — on interactive re-runs, always behind the plain-text fallback below, and never
+# at first-boot (gum isn't installed until Homebrew runs). Force the plain path
+# with WIZARD_NO_GUM=1. The answers still go to chezmoi via the same flags:
 #     chezmoi init --apply --prompt \
 #         --promptString  "<message>=<value>"   (name, email, signing key)
 #         --promptChoice  "<message>=<value>"   (profile, signing mode)
@@ -26,6 +34,7 @@
 # Usage:   bash scripts/wizard.sh [extra chezmoi-init args...]
 # Env:     DOTFILES_DIR      override the chezmoi source dir (default: repo root)
 #          DRY_RUN=1         print the resulting `chezmoi init` command, don't run
+#          WIZARD_NO_GUM=1   force the plain-text menus even when gum is installed
 #          WIZARD_LIB_ONLY=1 source the helpers only; skip the interactive run
 # No TTY (CI/containers): falls back to `chezmoi init --apply --promptDefaults`.
 
@@ -97,8 +106,20 @@ existing_modules() {
 }
 
 # ─── Prompt helpers (all I/O on /dev/tty; the answer goes to stdout) ──────────
+# use_gum — true when the gum rich-picker path should be used: gum is installed
+# and not disabled. (The wizard has already guaranteed /dev/tty by this point;
+# first-boot never reaches here with gum, since Homebrew hasn't run yet.)
+use_gum() { [ "${WIZARD_NO_GUM:-0}" != "1" ] && command -v gum >/dev/null 2>&1; }
+
 ask_string() { # message default → echoes answer
     local msg="$1" def="${2:-}" ans
+    if use_gum; then
+        # gum input: default pre-filled + editable, arrow/emacs line editing.
+        ans="$(gum input --prompt "$msg: " --value "$def")" || ans="$def"
+        [ -n "$ans" ] || ans="$def"
+        printf '%s' "$ans"
+        return
+    fi
     if [ -n "$def" ]; then
         printf '%s [%s]: ' "$msg" "$def" >/dev/tty
     else
@@ -113,6 +134,16 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
     local msg="$1" def="$2"
     shift 2
     local opts=("$@") i sel mark
+    if use_gum; then
+        # gum choose (single-select): arrows move, enter picks; default pre-highlighted.
+        local picked
+        local -a ga=(--header "$msg")
+        [ -n "$def" ] && ga+=(--selected "$def")
+        picked="$(gum choose "${ga[@]}" "${opts[@]}")" || picked="$def"
+        [ -n "$picked" ] || picked="$def"
+        printf '%s' "$picked"
+        return
+    fi
     printf '\n%s:\n' "$msg" >/dev/tty
     for i in "${!opts[@]}"; do
         mark="  "
@@ -141,7 +172,52 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
     done
 }
 
+# mod_display INDEX — the "key  label" line shown for a module in the gum picker.
+# gum's --selected takes a COMMA-separated list, and some labels contain commas
+# (jvmStack, cloudAuth), so commas are swapped for '·' here; results are mapped
+# back to keys by exact-line match, not by parsing. Kept a function so a test can
+# assert the comma-free invariant.
+mod_display() { # index → display line
+    printf '%-13s %s' "${MOD_KEYS[$1]}" "${MOD_LABELS[$1]//,/·}"
+}
+
+select_modules_gum() { # default-selected keys... → echoes chosen keys (catalog order)
+    local i d chosen
+    local -a display=() selected=() gargs
+    for i in "${!MOD_KEYS[@]}"; do display[$i]="$(mod_display "$i")"; done
+    # Pre-check the incoming default keys (their display lines).
+    for d in "$@"; do
+        for i in "${!MOD_KEYS[@]}"; do
+            [ "${MOD_KEYS[$i]}" = "$d" ] && selected+=("${display[$i]}")
+        done
+    done
+    gargs=(--no-limit --header "$(prompt_msg modules) (space toggles, enter confirms)")
+    if [ "${#selected[@]}" -gt 0 ]; then
+        local sel_csv
+        sel_csv="$(
+            IFS=,
+            printf '%s' "${selected[*]}"
+        )"
+        gargs+=(--selected "$sel_csv")
+    fi
+    # gum reads options from stdin and drives the TUI on the controlling terminal.
+    chosen="$(printf '%s\n' "${display[@]}" | gum choose "${gargs[@]}")" || chosen=""
+    # Map chosen lines back to keys, preserving catalog order (exact match; safe
+    # against glob/regex chars in labels).
+    local out=()
+    for i in "${!MOD_KEYS[@]}"; do
+        if printf '%s\n' "$chosen" | grep -Fxq -- "${display[$i]}"; then
+            out+=("${MOD_KEYS[$i]}")
+        fi
+    done
+    printf '%s' "${out[*]:-}"
+}
+
 select_modules() { # default-selected keys... → echoes chosen keys (catalog order)
+    if use_gum; then
+        select_modules_gum "$@"
+        return
+    fi
     # bash 3.2 (macOS default, and all a fresh Mac has before Homebrew) lacks
     # associative arrays, so track selection in an indexed 0/1 flag array that
     # runs parallel to MOD_KEYS.
