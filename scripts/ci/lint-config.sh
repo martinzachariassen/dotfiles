@@ -15,7 +15,7 @@
 # execute-template`.
 #
 # Run from the repo root, or pass the source dir as $1.
-#   bash scripts/lint-config.sh
+#   bash scripts/ci/lint-config.sh
 
 set -euo pipefail
 

@@ -177,7 +177,7 @@ mkcd() { mkdir -p "$1" && cd "$1" || return; }
 # Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
 # Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
 # fresh Mac or after wiping a system pref pane back to defaults.
-alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/macos-defaults.sh"'
+alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/bin/macos-defaults.sh"'
 
 # Dotfiles shortcut. With no args it cd's into the source repo. To re-choose your
 # setup (profile, optional modules, signing) from scratch, use the plain-text
@@ -277,7 +277,7 @@ chez() {
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
 # Converge THIS Mac to the repo — the everyday command: pull + preview + apply
-# (scripts/chezup.sh; see docs/lifecycle.md).
+# (scripts/bin/chezup.sh; see docs/lifecycle.md).
 # Because the brew + mise apply scripts reconcile real installed state on EVERY
 # apply (run_after, not hash-gated), this also guarantees packages match the
 # Brewfile — no separate "fix" step. The fresh-machine equivalent is install.sh.
@@ -291,17 +291,17 @@ chezup() {
     # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
     # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
-    bash "$src/scripts/chezup.sh" "$@"
+    bash "$src/scripts/bin/chezup.sh" "$@"
 }
 
-# Full-stack health check (runs scripts/doctor.sh from the repo root). The other
+# Full-stack health check (runs scripts/bin/doctor.sh from the repo root). The other
 # everyday command alongside chezup — run it any time something feels off.
 chezdoctor() {
     # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
     # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
     # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
-    bash "$src/scripts/doctor.sh"
+    bash "$src/scripts/bin/doctor.sh"
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
@@ -331,7 +331,7 @@ chezreinit() {
 chezreset() {
     local src reply
     # Repo root (git working tree), baked at apply time. chezmoi's source dir is
-    # the src/ subdir (.chezmoiroot); scripts/wizard.sh lives at the repo root.
+    # the src/ subdir (.chezmoiroot); scripts/bin/wizard.sh lives at the repo root.
     src={{ .chezmoi.workingTree | quote }}
     (cd "$src" && git pull --ff-only) || return $?
     if [ -r /dev/tty ]; then
@@ -350,7 +350,7 @@ chezreset() {
     # and it makes both run_once_* and run_onchange_* hooks re-fire.
     chezmoi state reset --force || return $?
     # Re-ask via the plain-text wizard, not chezmoi's fragile TUI picker.
-    bash "$src/scripts/wizard.sh" "$@"
+    bash "$src/scripts/bin/wizard.sh" "$@"
 }
 
 # Routine dependency bump: update brew + mise global runtimes.

@@ -2,7 +2,7 @@
 # doctor.sh — health check for the dotfiles install on this machine.
 #
 # Run anytime (idempotent, read-only):
-#   bash ~/Developer/personal/dotfiles/scripts/doctor.sh
+#   bash ~/Developer/personal/dotfiles/scripts/bin/doctor.sh
 #   chezdoctor                                 # zsh alias
 #
 # Output convention:
@@ -27,71 +27,59 @@
 set -uo pipefail
 
 # ─── Color + shared helpers ───────────────────────────────────────────────────
-# Loaded from next to this script so they work even when DOTFILES_DIR is
-# overridden or the script is invoked from another directory.
+# Loaded from lib/ (one level up now that this script lives under bin/) so they
+# work even when DOTFILES_DIR is overridden or the script is invoked from another
+# directory. log.sh is a committed sibling; a checkout without it is broken, so
+# fail loudly rather than limp along with degraded output (chezup.sh +
+# bootstrap-auth.sh do the same).
 _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/log.sh
-if [ -r "$_DOCTOR_DIR/lib/log.sh" ]; then
-    . "$_DOCTOR_DIR/lib/log.sh"
-    ui_init_colors
-    ui_init_glyphs
-else
-    BOLD=""
-    DIM=""
-    GREEN=""
-    YELLOW=""
-    BLUE=""
-    RED=""
-    RESET=""
-    # ui.sh unavailable — define ASCII glyphs so status marks never print as
-    # mojibake on a non-UTF-8 locale (the whole point of ui_init_glyphs).
-    OK_MARK="OK"
-    FAIL_MARK="X"
-    ARROW_MARK=">"
-    NOTE="-"
-    RULE="--"
+if [ ! -r "$_DOCTOR_DIR/../lib/log.sh" ]; then
+    printf 'doctor: missing %s\n' "$_DOCTOR_DIR/../lib/log.sh" >&2
+    exit 1
 fi
+# shellcheck source=../lib/log.sh
+. "$_DOCTOR_DIR/../lib/log.sh"
+ui_init_status
 
 PASS=0
 ACTION=0
 INFOCOUNT=0
 FAIL=0
 
+# doctor's status lines share the flat printers from log.sh (s_pass/s_warn/…);
+# these thin wrappers add the running tallies the summary prints.
 pass() {
-    echo "  ${GREEN}${OK_MARK}${RESET}  $1"
+    s_pass "$1"
     PASS=$((PASS + 1))
 }
 warn() {
-    echo "  ${YELLOW}!${RESET}  $1"
+    s_warn "$1"
     ACTION=$((ACTION + 1))
 }
 note() {
-    echo "  ${BLUE}${NOTE}${RESET}  $1"
+    s_note "$1"
     INFOCOUNT=$((INFOCOUNT + 1))
 }
 fail() {
-    echo "  ${RED}${FAIL_MARK}${RESET}  $1"
+    s_fail "$1"
     FAIL=$((FAIL + 1))
 }
-section() {
-    echo
-    echo "${BOLD}${BLUE}${RULE} $1 ${RULE}${RESET}"
-}
+section() { s_section "$1"; }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
 # Shared semver helpers (semver_extract / semver_lt) for the chezmoi
 # version-minimum check below. Same script-relative dir resolved above.
-# shellcheck source=lib/semver.sh
-if [ -r "$_DOCTOR_DIR/lib/semver.sh" ]; then
-    . "$_DOCTOR_DIR/lib/semver.sh"
+# shellcheck source=../lib/semver.sh
+if [ -r "$_DOCTOR_DIR/../lib/semver.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/semver.sh"
 fi
 
 # Shared chezmoi data reader (cm_data_json/cm_data_string/cm_data_bool) for the
 # profile + feature toggles the Homebrew section checks below.
-# shellcheck source=lib/chezmoi-data.sh
-if [ -r "$_DOCTOR_DIR/lib/chezmoi-data.sh" ]; then
-    . "$_DOCTOR_DIR/lib/chezmoi-data.sh"
+# shellcheck source=../lib/chezmoi-data.sh
+if [ -r "$_DOCTOR_DIR/../lib/chezmoi-data.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/chezmoi-data.sh"
 fi
 
 # ─── 1. Source repo present and up to date ────────────────────────────────────
@@ -282,7 +270,7 @@ EOF
         if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
             pass "Ollama service running"
         else
-            warn "Ollama service not started — run: scripts/setup-ollama.sh"
+            warn "Ollama service not started — run: scripts/bin/setup-ollama.sh"
         fi
     fi
     # Drift the OTHER way: ad-hoc installs not tracked anywhere.

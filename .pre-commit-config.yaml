@@ -54,7 +54,7 @@ repos:
       # JSON/TOML in the source tree parses (the script scans the tree itself).
       - id: lint-config
         name: lint-config (JSON/TOML)
-        entry: bash scripts/lint-config.sh
+        entry: bash scripts/ci/lint-config.sh
         language: system
         pass_filenames: false
 
@@ -63,5 +63,5 @@ repos:
       - id: conventional-commit
         name: Conventional Commits subject
         stages: [commit-msg]
-        entry: bash scripts/lib/check-commit-msg.sh
+        entry: bash scripts/ci/check-commit-msg.sh
         language: system

@@ -31,7 +31,7 @@
 # Kept POSIX-ish and bash-3.2 compatible (no associative arrays): a fresh Mac has
 # only the system bash 3.2 until Homebrew installs a newer one.
 #
-# Usage:   bash scripts/wizard.sh [extra chezmoi-init args...]
+# Usage:   bash scripts/bin/wizard.sh [extra chezmoi-init args...]
 # Env:     DOTFILES_DIR      override the chezmoi source dir (default: repo root)
 #          DRY_RUN=1         print the resulting `chezmoi init` command, don't run
 #          WIZARD_NO_GUM=1   skip the gum picker (use the bash TUI / numbered menu)
@@ -44,7 +44,8 @@ set -euo pipefail
 DRY_RUN="${DRY_RUN:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-ROOT="$(cd "$_DIR/.." && pwd)"
+# This script lives at scripts/bin/, so the repo root is two levels up.
+ROOT="$(cd "$_DIR/../.." && pwd)"
 # SOURCE_DIR is the repo root; chezmoi descends into src/ itself via .chezmoiroot
 # (so `chezmoi init --source="$SOURCE_DIR"` is correct). The template + module
 # data live under src/, chezmoi's actual source dir.
@@ -52,10 +53,10 @@ SOURCE_DIR="${DOTFILES_DIR:-$ROOT}"
 TMPL="$ROOT/src/.chezmoi.toml.tmpl"
 MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 
-# shellcheck source=lib/log.sh
-. "$_DIR/lib/log.sh"
-# shellcheck source=lib/chezmoi-data.sh
-. "$_DIR/lib/chezmoi-data.sh"
+# shellcheck source=../lib/log.sh
+. "$_DIR/../lib/log.sh"
+# shellcheck source=../lib/chezmoi-data.sh
+. "$_DIR/../lib/chezmoi-data.sh"
 ui_init_logging
 
 [ -f "$TMPL" ] || {
