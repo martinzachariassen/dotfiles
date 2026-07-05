@@ -164,10 +164,13 @@ bash ~/Developer/personal/dotfiles/scripts/wizard.sh
 > interactive TUI picker that is unreliable under `curl | bash` and some
 > terminals (it can fail to register navigation and just confirm the default).
 > The wizard asks with plain prompts, then feeds chezmoi the answers as flags.
-> When `gum` is installed and you're on a real terminal (i.e. any re-run after
-> the first install), the choice/module prompts upgrade to arrow-key + space-
-> toggle pickers with your current selection pre-checked; otherwise the plain
-> numbered menus are used. Force plain with `WIZARD_NO_GUM=1`.
+> The prompts have three tiers, degrading to fit the terminal: **gum** pickers
+> when `gum` is installed (any re-run after the first install) with your current
+> selection pre-checked; a **pure-bash arrow/space picker** when there's no gum
+> yet but the terminal is capable (the first-boot case — it also accepts number
+> keys, so it works even if arrows don't register); and the **numbered menu** on
+> a dumb/non-ANSI terminal. `WIZARD_NO_GUM=1` skips the first tier,
+> `WIZARD_NO_TUI=1` the first two.
 > To set the Mac up **as new** (replay first-time setup too), use `chezreset`.
 
 <details>

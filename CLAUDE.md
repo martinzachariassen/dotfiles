@@ -72,15 +72,18 @@ chezmoi via its non-interactive flags (`--promptString/-Choice/-Multichoice`,
 keyed by each prompt's *message* text, multichoice items joined with `/`). It
 stays bash-3.2 compatible (a fresh Mac has only system bash until Homebrew) and
 extracts the messages/choices from `src/.chezmoi.toml.tmpl` at runtime so they
-never drift (`wizard.sh` reads it via `$ROOT/src/...`). Progressive enhancement:
-when `gum` is on `PATH` and a real TTY is present (any re-run after first
-install), the choice/module/input prompts upgrade to gum's arrow + space-toggle
-pickers (current selection pre-checked via `--selected`; labels are rendered
-comma-free because that flag is comma-delimited, then mapped back to keys by
-exact match) — always behind the plain-text fallback, gated by `use_gum`
-(honors `WIZARD_NO_GUM=1`). It's the CLI of the same charmbracelet engine as the
-rejected embedded picker, so it runs only here, never at first-boot. Change your
-setup by re-running `bash scripts/wizard.sh` (or `chezreset` for a full replay).
+never drift (`wizard.sh` reads it via `$ROOT/src/...`). The choice/module prompts
+have three degrading tiers, each behind a predicate: `use_gum` → gum's arrow +
+space-toggle pickers (re-runs; current selection pre-checked via `--selected`,
+labels rendered comma-free because that flag is comma-delimited, mapped back to
+keys by exact match; `WIZARD_NO_GUM=1` skips); else `use_tui` → a pure-bash 3.2
+arrow/space picker (`_tui_read_key` decodes the ESC[A/B burst; also accepts
+digit + j/k so it survives a terminal that eats arrow escapes; `WIZARD_NO_TUI=1`
+skips); else the numbered menu (dumb/non-ANSI terminal). The bash tier is what
+makes the very first `install.sh` run interactive before gum exists; gum is the
+CLI of the same charmbracelet engine as the rejected embedded picker, so it's
+used only on re-runs. Change your setup by re-running `bash scripts/wizard.sh`
+(or `chezreset` for a full replay).
 `[profileDefaults]` in `src/.chezmoidata/modules.toml` mirrors the template's
 `$defaults` — `tests/data-model.bats` enforces the match.
 

@@ -93,3 +93,21 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$status" -eq 0 ]
     [ "$output" = "ok" ]
 }
+
+# The pure-bash TUI is the middle tier (first-boot, no gum). Its safety net is
+# use_tui: it MUST refuse a dumb/disabled terminal so we fall through to the
+# numbered menu rather than drawing escape codes into a terminal that can't.
+@test "use_tui is disabled by WIZARD_NO_TUI" {
+    run bash -c "export WIZARD_LIB_ONLY=1 WIZARD_NO_TUI=1 TERM=xterm; source '$WIZ'; use_tui && echo on || echo off"
+    [ "$output" = "off" ]
+}
+
+@test "use_tui is disabled on a dumb terminal" {
+    run bash -c "export WIZARD_LIB_ONLY=1 TERM=dumb; source '$WIZ'; use_tui && echo on || echo off"
+    [ "$output" = "off" ]
+}
+
+@test "the bash TUI picker functions are defined" {
+    run wiz 'declare -F _tui_read_key _tui_choose _tui_multiselect >/dev/null && echo ok'
+    [ "$output" = "ok" ]
+}

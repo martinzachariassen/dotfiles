@@ -34,7 +34,8 @@
 # Usage:   bash scripts/wizard.sh [extra chezmoi-init args...]
 # Env:     DOTFILES_DIR      override the chezmoi source dir (default: repo root)
 #          DRY_RUN=1         print the resulting `chezmoi init` command, don't run
-#          WIZARD_NO_GUM=1   force the plain-text menus even when gum is installed
+#          WIZARD_NO_GUM=1   skip the gum picker (use the bash TUI / numbered menu)
+#          WIZARD_NO_TUI=1   skip the bash arrow-key picker too (numbered menu only)
 #          WIZARD_LIB_ONLY=1 source the helpers only; skip the interactive run
 # No TTY (CI/containers): falls back to `chezmoi init --apply --promptDefaults`.
 
@@ -106,10 +107,140 @@ existing_modules() {
 }
 
 # ─── Prompt helpers (all I/O on /dev/tty; the answer goes to stdout) ──────────
-# use_gum — true when the gum rich-picker path should be used: gum is installed
-# and not disabled. (The wizard has already guaranteed /dev/tty by this point;
-# first-boot never reaches here with gum, since Homebrew hasn't run yet.)
+# Three tiers of interactivity, most→least capable, each gated by a predicate:
+#   1. gum        — installed + on PATH (re-runs after first install)
+#   2. bash TUI   — a capable terminal but no gum (the first-boot case: pure
+#                   bash 3.2 arrow/space picker, works before Homebrew exists)
+#   3. numbered   — anything else (dumb/non-ANSI terminal): type numbers to pick
+# The tiers degrade cleanly: gum → use_gum, TUI → use_tui, else the numbered
+# menus below. So a fresh Mac's very first `install.sh` run still gets arrow/space
+# selection with no dependency, and a terminal that can't do it falls all the way
+# through to the numbered menu.
+
+# use_gum — gum path: installed and not disabled. (The wizard has already
+# guaranteed /dev/tty; first-boot never reaches here with gum, as Homebrew
+# hasn't run yet — that's the bash-TUI tier's job.)
 use_gum() { [ "${WIZARD_NO_GUM:-0}" != "1" ] && command -v gum >/dev/null 2>&1; }
+
+# use_tui — pure-bash arrow/space picker path: an interactive, non-dumb terminal
+# and not disabled. Gated OUT for TERM=dumb / no readable-writable /dev/tty /
+# WIZARD_NO_TUI=1, so a degraded terminal cleanly falls through to the numbered
+# menu. The picker also accepts number keys, so even if a terminal silently
+# swallows arrow escapes the user can still toggle by digit.
+use_tui() {
+    [ "${WIZARD_NO_TUI:-0}" != "1" ] || return 1
+    [ "${TERM:-dumb}" != "dumb" ] || return 1
+    [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
+# _tui_read_key — read one keypress from /dev/tty; echo a normalized token:
+# UP DOWN SPACE ENTER, a bare digit, or the raw char. Arrow keys arrive as the
+# escape burst ESC [ A/B; we read the 2-byte tail with an integer timeout so a
+# real arrow returns instantly (bytes already buffered) while a lone ESC press
+# doesn't hang. bash-3.2 safe: `read -t` takes integer seconds (no fractional).
+_tui_read_key() {
+    local k rest
+    IFS= read -rsn1 k </dev/tty || {
+        printf 'ENTER'
+        return
+    }
+    case "$k" in
+        '' | $'\n' | $'\r') printf 'ENTER' ;; # Enter: empty under -n1, or CR/LF
+        ' ') printf 'SPACE' ;;
+        $'\x1b')
+            IFS= read -rsn2 -t 1 rest </dev/tty || rest=''
+            case "$rest" in
+                '[A') printf 'UP' ;;
+                '[B') printf 'DOWN' ;;
+                *) printf 'ESC' ;;
+            esac
+            ;;
+        k | K) printf 'UP' ;; # vi-style, and a fallback if arrows don't register
+        j | J) printf 'DOWN' ;;
+        *) printf '%s' "$k" ;; # digits and everything else, verbatim
+    esac
+}
+
+# _tui_choose — single-select picker. message def opt... → echoes chosen option.
+_tui_choose() {
+    local msg="$1" def="$2"
+    shift 2
+    local opts=("$@") n=${#opts[@]} cur=0 i key arrow drawn=0
+    for i in "${!opts[@]}"; do [ "${opts[$i]}" = "$def" ] && cur=$i; done
+    {
+        printf '\n%s\n' "$msg"
+        printf '  ↑/↓ or j/k move · 1-%d picks by number · Enter selects\n\n' "$n"
+    } >/dev/tty
+    while :; do
+        [ "$drawn" = 1 ] && printf '\033[%dA' "$n" >/dev/tty
+        for i in "${!opts[@]}"; do
+            arrow='  '
+            [ "$i" = "$cur" ] && arrow='❯ '
+            printf '\033[K%s%s\n' "$arrow" "${opts[$i]}" >/dev/tty
+        done
+        drawn=1
+        key="$(_tui_read_key)"
+        case "$key" in
+            UP) cur=$(((cur - 1 + n) % n)) ;;
+            DOWN) cur=$(((cur + 1) % n)) ;;
+            ENTER) break ;;
+            [1-9]) [ "$key" -le "$n" ] && {
+                cur=$((key - 1))
+                break
+            } ;;
+            *) : ;;
+        esac
+    done
+    printf '%s' "${opts[$cur]}"
+}
+
+# _tui_multiselect — module checkbox picker over MOD_KEYS/MOD_LABELS.
+# default-selected keys... → echoes chosen keys (catalog order).
+_tui_multiselect() {
+    local n=${#MOD_KEYS[@]} cur=0 i key mark arrow drawn=0 d idx
+    local on=() out=()
+    for i in "${!MOD_KEYS[@]}"; do on[$i]=0; done
+    for d in "$@"; do
+        for i in "${!MOD_KEYS[@]}"; do
+            [ "${MOD_KEYS[$i]}" = "$d" ] && on[$i]=1
+        done
+    done
+    {
+        printf '\n%s\n' "$(prompt_msg modules)"
+        printf '  ↑/↓ or j/k move · space toggles · 1-%d toggles by number · Enter confirms\n\n' "$n"
+    } >/dev/tty
+    while :; do
+        [ "$drawn" = 1 ] && printf '\033[%dA' "$n" >/dev/tty
+        for i in "${!MOD_KEYS[@]}"; do
+            mark='[ ]'
+            [ "${on[$i]}" = "1" ] && mark='[x]'
+            arrow='  '
+            [ "$i" = "$cur" ] && arrow='❯ '
+            printf '\033[K%s%s %-13s %s\n' \
+                "$arrow" "$mark" "${MOD_KEYS[$i]}" "${MOD_LABELS[$i]}" >/dev/tty
+        done
+        drawn=1
+        key="$(_tui_read_key)"
+        case "$key" in
+            UP) cur=$(((cur - 1 + n) % n)) ;;
+            DOWN) cur=$(((cur + 1) % n)) ;;
+            SPACE) if [ "${on[$cur]}" = "1" ]; then on[$cur]=0; else on[$cur]=1; fi ;;
+            ENTER) break ;;
+            [1-9])
+                idx=$((key - 1))
+                [ "$idx" -lt "$n" ] && {
+                    if [ "${on[$idx]}" = "1" ]; then on[$idx]=0; else on[$idx]=1; fi
+                    cur=$idx
+                }
+                ;;
+            *) : ;;
+        esac
+    done
+    for i in "${!MOD_KEYS[@]}"; do
+        [ "${on[$i]}" = "1" ] && out+=("${MOD_KEYS[$i]}")
+    done
+    printf '%s' "${out[*]:-}"
+}
 
 ask_string() { # message default → echoes answer
     local msg="$1" def="${2:-}" ans
@@ -142,6 +273,10 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
         picked="$(gum choose "${ga[@]}" "${opts[@]}")" || picked="$def"
         [ -n "$picked" ] || picked="$def"
         printf '%s' "$picked"
+        return
+    fi
+    if use_tui; then
+        _tui_choose "$msg" "$def" "${opts[@]}"
         return
     fi
     printf '\n%s:\n' "$msg" >/dev/tty
@@ -216,6 +351,10 @@ select_modules_gum() { # default-selected keys... → echoes chosen keys (catalo
 select_modules() { # default-selected keys... → echoes chosen keys (catalog order)
     if use_gum; then
         select_modules_gum "$@"
+        return
+    fi
+    if use_tui; then
+        _tui_multiselect "$@"
         return
     fi
     # bash 3.2 (macOS default, and all a fresh Mac has before Homebrew) lacks
