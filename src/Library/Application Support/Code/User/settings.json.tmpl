@@ -279,6 +279,34 @@
         }
     ],
 
+    // Global house style for Copilot-generated code — the personal-defaults
+    // analog of ~/.config/claude/CLAUDE.md, applied in every workspace. A repo's
+    // own .github/copilot-instructions.md stacks on top of this.
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "text": "Primary stack: Kotlin with Spring Boot on Java 25; plain Java only when a project already uses it. Node/TypeScript for tooling, scripts, and edge/serverless. Readability over cleverness; comments explain *why*, not *what*. Follow existing project patterns over these defaults."
+        },
+        {
+            "text": "Kotlin: `data class` for value types, `sealed interface` for closed hierarchies, immutable by default (`val`, `List`, `Map`), avoid `!!`. Constructor injection is implicit — no annotation on primary-constructor params."
+        },
+        {
+            "text": "Java: records for immutable carriers, sealed types for closed hierarchies, pattern-matching `switch` over `if`/`instanceof` chains. Lombok where the project uses it (`@RequiredArgsConstructor`, `@Slf4j`); never field-level `@Autowired`."
+        },
+        {
+            "text": "Spring Boot: constructor injection; thin controllers → services → repositories. Typed `@ConfigurationProperties` over scattered `@Value`; Jakarta Bean Validation at boundaries. Error responses via `@RestControllerAdvice` returning `ProblemDetail` (RFC 7807). SLF4J parameterized logging — never string concatenation. Never log secrets, tokens, or PII."
+        },
+        {
+            "text": "Persistence & API: Postgres with UUID primary keys always (no serial/bigint surrogates); Flyway migrations. REST + OpenAPI via springdoc-openapi. Default cloud examples to Azure or GCP. Never hard-code secrets, tokens, or keys — use placeholders or a secret-manager reference."
+        }
+    ],
+
+    // Test generation follows the same slice-first testing approach.
+    "github.copilot.chat.testGeneration.instructions": [
+        {
+            "text": "JUnit 5 + AssertJ. Prefer narrow slice annotations (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`) over `@SpringBootTest`; use a full context only when the test genuinely needs one. MockMvc / WebTestClient for the HTTP layer; Testcontainers for anything touching a real database or queue."
+        }
+    ],
+
     "chat.editor.fontSize": 14,
 
     // =========================================================

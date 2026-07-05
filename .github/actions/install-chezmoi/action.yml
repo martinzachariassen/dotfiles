@@ -3,7 +3,17 @@ description: Install the chezmoi binary into ~/.local/bin and add it to PATH.
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Install chezmoi
+      shell: bash
       run: |
-        sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        bin="$HOME/.local/bin"
+        # Download the installer fully before running it — a truncated fetch
+        # fails here rather than executing half a script — and retry a few
+        # times to ride out transient network blips on the runner.
+        script="$(curl -fsLS --retry 3 --retry-delay 2 get.chezmoi.io)"
+        sh -c "$script" -- -b "$bin"
+        echo "$bin" >> "$GITHUB_PATH"
+        # $GITHUB_PATH only takes effect in later steps, so verify via the full
+        # path here — fails the job immediately with a clear error if the
+        # install didn't land.
+        "$bin/chezmoi" --version

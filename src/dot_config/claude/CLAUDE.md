@@ -8,12 +8,13 @@ here.
 
 Senior backend developer on macOS (Apple Silicon).
 
-**Primary stack:** Java (21 or 25) + Kotlin with Spring Boot. Reach for
-Node/TypeScript when the situation calls for it.
+**Primary stack:** Kotlin with Spring Boot on Java 25; plain Java when a project
+already uses it or the situation calls for it. Node/TypeScript for tooling,
+scripts, and edge/serverless work.
 
 **Cloud / infra:** Kubernetes, Azure, GCP. Terraform for IaC. I'm still building
 intuition with Terraform, so a brief *why* behind Terraform suggestions is
-welcome. For my main stack (Java/Kotlin/Spring Boot), don't over-explain
+welcome. For my main stack (Kotlin/Java + Spring Boot), don't over-explain
 fundamentals.
 
 ## Communication
@@ -36,20 +37,14 @@ fundamentals.
 
 ## Operating posture
 
-Read the repo's workflow and match it — one posture, applied to context:
+These are all my own personal/solo repos — high autonomy is the default:
 
-- **Solo / personal repo:** high autonomy. Make the change, run the narrowest
-  useful check, report — don't stop at a proposal for routine work. Committing
-  straight to `main` is fine. Experimentation and small opportunistic cleanups
-  alongside a change are welcome.
-- **Team / PR-based repo:** branch and open a PR; never push to `main`, never
-  force-push, never rewrite shared history. Keep commits small and reviewable.
-  Match team conventions over personal preference. Scope the diff to exactly what
-  the task needs.
-- **Always, regardless of repo:** pause and ask before blast-radius changes —
-  schema/migrations, shared contracts, auth, concurrency, public APIs, infra,
-  CI/pipelines, or adding a dependency in a team repo. On solo repos, add a
-  dependency when it clearly helps and just mention it.
+- Make the change, run the narrowest useful check, report — don't stop at a
+  proposal for routine work. Committing straight to `main` is fine.
+  Experimentation and small opportunistic cleanups alongside a change are
+  welcome. Add a dependency when it clearly helps and just mention it.
+- Still pause and ask before blast-radius changes — schema/migrations, auth,
+  concurrency, public APIs, infra, CI/pipelines.
 - **Verification scales with blast radius:** narrowest useful check first
   (targeted test/build/typecheck/lint); broaden to integration when touching
   persistence, cross-module contracts, auth, or user-facing flows. State what you
@@ -66,47 +61,25 @@ Read the repo's workflow and match it — one posture, applied to context:
 
 ## Code style
 
-### General
+These are my deltas from sensible defaults — assume the usual best practices
+(readability over cleverness, comments for *why* not *what*, modern syntax that
+clarifies rather than shows off) without being told.
 
-- Readability over cleverness; code is read more than it's written.
-- Apply language/framework best practices, but don't reach for advanced features
-  just because they exist — modern syntax should clarify, not show off.
-- Add dependencies only when they remove real complexity or match an existing
-  project pattern.
-- Comments explain *why*, not *what* — surprising decisions, workarounds,
-  non-obvious algorithms. Skip obvious-comment noise.
+### Kotlin (primary) & Java
 
-### Java (target 21, ready for 25)
-
-- Records for immutable carriers; sealed interfaces/classes for closed
-  hierarchies.
-- Pattern matching + switch expressions over `if`/`instanceof` chains.
-- `var` only when the type is self-evident from the right-hand side.
-- Lombok in projects that use it (and new Spring Boot Java services unless
+- Kotlin: avoid `!!` outside truly unreachable paths; constructor injection is
+  implicit — no annotation on primary-constructor params.
+- Java: Lombok in projects that use it (and new Spring Boot Java services unless
   there's a concrete reason not to): `@RequiredArgsConstructor` for injection,
   `@Slf4j` for the logger, `@Value`/`@Data`/`@Builder` where they earn their
   keep. Never field-level `@Autowired`.
-
-### Kotlin
-
-- `data class` for value types; `sealed interface` for closed hierarchies.
-- Immutable by default (`val`, `List`, `Map`).
-- Scope functions (`let`/`apply`/`also`/`run`/`with`) only where they genuinely
-  improve readability; extension functions over utility classes.
-- Lean on null safety; avoid `!!` outside truly unreachable paths.
-- Constructor injection is implicit — no annotation on primary-constructor
-  params.
 
 ### Spring Boot
 
 - Both 3.x and 4.x in play: new projects target 4+, maintenance projects stay on
   what they already use. Don't force-upgrade APIs unless I ask.
-- Constructor injection always. Thin controllers, services for business logic,
-  repositories for persistence.
-- `@ConfigurationProperties` (typed) over scattered `@Value`.
-- Jakarta Bean Validation (`@Valid`, `@NotNull`, …) at boundaries.
-- SLF4J parameterized logging (via Lombok `@Slf4j` in Java), never
-  concatenation: `log.debug("user {} requested {}", userId, resource)`.
+- `@ConfigurationProperties` (typed) over scattered `@Value`; Jakarta Bean
+  Validation at boundaries.
 - Error responses via `@RestControllerAdvice` returning `ProblemDetail` (RFC
   7807). Throw unchecked exceptions for non-recoverable conditions and map them
   in one place — don't catch-and-rethrow through the call stack.
@@ -147,10 +120,12 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   `~/Developer/personal/dotfiles`; edit chezmoi sources via `chezmoi edit ~/.X`
   (editing the live file in `$HOME` creates drift) and apply with the `chez` zsh
   function. Full conventions for that repo are in its `CLAUDE.md`.
-- **Language runtimes come from mise** — global defaults in
+- **mise owns runtimes, env, and tasks** — global defaults in
   `~/.config/mise/config.toml`, per-project versions + env in each project's
-  committed `mise.toml` (`[env]` section, not direnv). For new projects propose a
-  committed `mise.toml`; for Node prefer `pnpm`. Never suggest
+  committed `mise.toml` (`[env]` section, not direnv). Reach for `[tasks]` +
+  `mise run` over ad-hoc scripts or a Makefile, and mise backends (cargo/npm/
+  pipx/aqua/ubi) to pin project-local CLIs. For new projects propose a committed
+  `mise.toml`; for Node prefer `pnpm`. Never suggest
   asdf/nvm/jenv/pyenv/rbenv/Volta/SDKMAN or installing runtimes via brew.
 - **Global CLIs and apps come from Homebrew**; databases and project services run
   via Docker / Testcontainers — mise owns language runtimes, not everything.
@@ -161,7 +136,7 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
   config. Local dev may use `.env` + Spring profiles with placeholders.
 - Shell: plain zsh, no framework (oh-my-zsh/prezto/zinit) — extend the managed
   `.zshrc`. Terminal: Ghostty + Zellij (not tmux). Prompt: Starship. Prefer
-  modern CLI replacements where they exist.
+  modern CLI replacements when present: `rg`, `fd`, `bat`, `eza`, `zoxide`.
 - Editors: VS Code (GUI), Neovim + LazyVim (terminal), IntelliJ for non-trivial
   Java/Kotlin. Commits signed through 1Password's `op-ssh-sign`.
 - Favor declarative/idempotent approaches; for state-mutating shell,
@@ -169,21 +144,17 @@ it to the Brewfile or mise rather than reaching for `npm -g` / `pip --user`.
 - Durable notes and personal knowledge live in Obsidian — reach for the vault
   over scratch files when capturing thinking that should outlast the session.
 
-## Secrets — hard rule
+## Secrets & confidentiality — hard rule
 
 - Never print, commit, move, or transform secrets, tokens, keys, cloud
-  credentials, signing material, or auth files.
+  credentials, signing material, or auth files. Use `.env.example`,
+  placeholders, or secret-manager references — never real values.
 - Treat `~/.ssh`, `~/.config/{gh,gcloud,1Password}`, `~/.azure`, `~/.claude*`,
   and `.env` files as sensitive unless I say otherwise.
-- Use `.env.example`, placeholders, or secret-manager references — never real
-  values.
-
-## Confidentiality
-
-Keep proprietary or internal context (cluster names, namespaces, internal URLs,
-ticket contents, chat messages, private code) out of commits, PR descriptions,
-and prompts to external tools or pastebins. When in doubt, treat it as
-need-to-know and keep it in the repo it came from.
+- Keep proprietary or internal context (cluster names, namespaces, internal
+  URLs, ticket contents, chat messages, private code) out of commits, PR
+  descriptions, and prompts to external tools or pastebins. When in doubt, treat
+  it as need-to-know and keep it in the repo it came from.
 
 ## Commits & PRs
 
