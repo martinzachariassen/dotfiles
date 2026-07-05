@@ -4,22 +4,18 @@ How `chezmoi apply` (and therefore `install.sh` / `chezup`) turns this repo into
 a configured machine, and the rules the hook scripts follow. This is the doc the
 `src/.chezmoiscripts/` hooks and `scripts/lib/` engines point back to.
 
-## Repo split: `src/` vs. root tooling
-
-`.chezmoiroot` (one line, `src`) makes `src/` chezmoi's **source directory**:
-everything under it deploys to `$HOME`, and everything at the repo root
-(`scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`) is tooling chezmoi
-never sees. Inside a hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so
-reaching root-level tooling (the `scripts/lib/*` engines, `packages/Brewfile*`)
-uses `{{ .chezmoi.workingTree }}` — the git working tree, i.e. the repo root —
-instead. That's the one path idiom the hooks rely on.
+For the repo split, naming conventions, and how `scripts/` is laid out, see
+[architecture.md](architecture.md) — the one path idiom worth repeating here is
+that inside a hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level
+tooling (`scripts/lib/*`, `packages/Brewfile*`) is reached via
+`{{ .chezmoi.workingTree }}` (the git working tree = repo root).
 
 ## The stages
 
 `chezmoi apply` renders the managed files into `$HOME`, then runs the scripts in
-`src/.chezmoiscripts/`. Ordering and re-run behavior come entirely from the
-filename prefix; the two-digit `NN` orders within a bucket (`02` → `02b` → `02c`
-→ …):
+[`src/.chezmoiscripts/`](../src/.chezmoiscripts). Ordering and re-run behavior
+come entirely from the filename prefix; the two-digit `NN` orders within a bucket
+(`02` → `02b` → `02c` → …):
 
 | Prefix | When it runs |
 |---|---|
@@ -55,15 +51,16 @@ macOS defaults). The action pre-commit or `code` performs is identical regardles
 of apply count, so these re-fire only when their embedded content hash changes.
 
 Package convergence uses Homebrew's native `brew bundle` (the `02-brew-bundle`
-hook reads the active file set from `src/.chezmoidata/packages.toml`, then runs
+hook reads the active file set from
+[`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml), then runs
 `brew bundle --no-upgrade` so it converges *presence*, not freshness). It only
 ever *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling packages
 the Brewfile no longer lists) is `chezmirror`'s: an apply must never silently
 uninstall, so `chez` just flags untracked packages and `chezmirror` reconciles
-them behind a confirm. Other
-custom logic (e.g. `obsidian-apply.sh`) lives in `scripts/lib/` so it stays
-shellcheck-able and unit-tested; hooks are thin drivers that do render-time
-config, source their lib (if any), and call the entry point.
+them behind a confirm. Other custom logic (e.g. `obsidian-apply.sh`) lives in
+`scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin
+drivers that do render-time config, source their lib (if any), and call the entry
+point.
 
 ## Where each piece lives
 
@@ -72,9 +69,9 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 
 | Concern | Source |
 |---|---|
-| Sudo pre-auth | `src/.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl` |
-| Homebrew install (first run) | `src/.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` |
-| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `src/.chezmoidata/packages.toml`) |
+| Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` |
+| Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` |
+| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
 | Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
@@ -83,66 +80,18 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |
-| Data model + wizard | `src/.chezmoi.toml.tmpl` (chezmoi `init` prompt data) + `scripts/bin/wizard.sh` (plain-text front-end) |
-| Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` (single source of truth) |
+| Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |
+| Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` |
 
-## Bootstrap + look & feel
+## Bootstrap
 
 `install.sh` (fresh-Mac bootstrap) and `chezup` (everyday converge) are separate,
-plain scripts.
+plain scripts — see [install.md](install.md) and [commands.md](commands.md).
 
 `install.sh` is a small hand-written script fetched via `curl | bash` **before
 this repo exists on disk**, so it can't source anything. It installs only the
 prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands off to
 `scripts/bin/wizard.sh` (repo now on disk, so it *can* source `scripts/lib/*`).
-
-The setup questions are chezmoi's own `init` prompt data, defined in
-`.chezmoi.toml.tmpl` (`profile`, `signingMode`, and a `modules` multi-select) with
-`*Once` semantics so re-running is idempotent. But chezmoi renders those prompts
-as an interactive TUI picker that is unreliable under `curl | bash` and some
-terminals, so `wizard.sh` is the front-end: it asks each question with plain
-`read` from `/dev/tty` and passes the answers to `chezmoi init --apply` via its
-`--promptString/-Choice/-Multichoice` flags (no TUI). `bash scripts/bin/wizard.sh` is
-the "change my setup" path; `chezreset` is the "set up as new" replay. Passing
-extra args to `install.sh` bypasses the wizard and calls `chezmoi init` directly.
-Edit `install.sh` directly — it is **not** generated.
-
-### How `scripts/` is organized
-
-Grouped by who invokes each script, so the entry points are obvious at a glance:
-
-- **`scripts/bin/`** — user-facing verbs run by hand or via the zsh functions:
-  `chezup`, `doctor`, `bootstrap-auth`, `wizard`, `setup-ollama`,
-  `macos-defaults`.
-- **`scripts/ci/`** — checks wired into CI (`.github/workflows/ci.yml`) and the
-  pre-commit hooks: `lint-config`, `render-check`, `brew-resolve`,
-  `brew-check-modules`, `check-commit-msg`.
-- **`scripts/lib/`** — helpers the above `source`, never run directly.
-
-`bin/` and `ci/` scripts reach the helpers one level up as `"$_DIR/../lib/…"`;
-the chezmoi hooks reach them across the source/root boundary via
-`{{ .chezmoi.workingTree }}/scripts/lib/…`.
-
-Everyday scripts (`chezup`, `doctor`, `bootstrap-auth`, `setup-ollama`, the
-obsidian hook) share a tiny logging library, `scripts/lib/log.sh`:
-
-- `ui_init_colors` / `ui_init_glyphs` — palette + Unicode/ASCII glyphs.
-- `ui_init_logging` — the rail-style log helpers (`say`/`ok`/`info`/`warn`/
-  `fail`/`dim`/`hr` plus `line_prefix`/`node_prefix`); inits colors + glyphs first.
-- `ui_init_status` — the flat status helpers (`s_pass`/`s_warn`/`s_note`/
-  `s_fail`/`s_info`/`s_section`) for the report-style scripts (`doctor`,
-  `setup-ollama`); inits colors + glyphs first.
-
-### Shared libraries (`scripts/lib/`)
-
-| Lib | Provides | Sourced by |
-|---|---|---|
-| `log.sh`             | colors, glyphs, rail + flat status helpers      | chezup, bootstrap-auth, setup-ollama, wizard, doctor, macos-defaults, obsidian hook |
-| `chezmoi-data.sh`    | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, wizard |
-| `tty.sh`             | `tty_reattach` (stdin → controlling terminal)   | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
-| `obsidian-apply.sh`  | the Obsidian vault seed engine                  | `run_after_02d-obsidian-apply` |
-| `semver.sh`          | `semver_extract` / `semver_lt`                  | doctor |
-
-`scripts/ci/check-commit-msg.sh` (the Conventional-Commit subject validator run
-by the commit-msg pre-commit hook) is an executed check, not a sourced lib, so
-it lives under `ci/`.
+The wizard asks the setup questions and feeds them to `chezmoi init --apply` —
+`--apply` runs the hooks above. See [packages.md](packages.md#the-wizard) for the
+wizard's three prompt tiers.
