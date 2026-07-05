@@ -6,4 +6,4 @@
 # Run standalone: brew bundle install --file=~/Developer/personal/dotfiles/packages/Brewfile.personal
 
 # ─── Personal apps ────────────────────────────────────────────────────────────
-cask "discord"
+
