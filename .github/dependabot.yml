@@ -10,5 +10,15 @@ updates:
     directory: "/"
     schedule:
       interval: daily
+    # One grouped PR for all action bumps instead of up to three separate ones.
+    groups:
+      github-actions:
+        patterns: ["*"]
+    # Let a release settle before proposing it — dodges yanked/hotfixed tags.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     commit-message:
       prefix: ci
+      include: scope
+    labels: ["dependencies"]
