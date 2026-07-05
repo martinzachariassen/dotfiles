@@ -1,20 +1,22 @@
-# Pre-commit hooks — mirror the CI gates in .github/workflows/ci.yml so a commit
-# (including the direct-to-main commits this repo expects) is checked before it
-# lands, not after. Hooks shell out to the Homebrew-installed tools rather than
-# pre-commit's managed virtualenvs, matching this repo's rule that tooling comes
-# from brew/mise, not ad-hoc downloads.
+# Pre-commit hooks that mirror the CI jobs in .github/workflows/ci.yml.
+# Catches problems locally before they reach CI.
 #
-# Activate once per clone (the hooks live in this repo, so run from its root):
-#   pre-commit install --install-hooks
-# Check everything on demand:
-#   pre-commit run --all-files
+# Activate: pre-commit install --install-hooks
+# Run manually: pre-commit run --all-files
+#
+# All hooks use language: system — they shell out to Homebrew-installed
+# binaries rather than pre-commit's own managed copies, keeping tooling
+# sourced from brew/mise as the rest of this repo expects.
 minimum_pre_commit_version: "3.5.0"
 default_install_hook_types: [pre-commit, commit-msg]
+
+# Run every hook even after one fails, so a single commit surfaces all problems.
+fail_fast: false
 
 repos:
   - repo: local
     hooks:
-      # ─── Shell scripts (mirrors the `shell scripts` CI job) ──────────────────
+      # Shell scripts — mirrors the `shell scripts` CI job
       - id: shellcheck
         name: shellcheck (severity=error)
         entry: shellcheck --severity=error --shell=bash
@@ -22,34 +24,42 @@ repos:
         files: '^(install\.sh|scripts/.*\.sh)$'
 
       - id: shfmt
-        name: shfmt (lint, -i 4 -ci)
+        name: shfmt (-i 4 -ci)
         entry: shfmt -d -i 4 -ci
         language: system
         files: '^(install\.sh|scripts/.*\.sh)$'
 
-      # bash -n / zsh -n only parse their first argument, so loop one file at a
-      # time (pre-commit passes the matched files as "$@" after the `--`).
+      # bash/zsh -n only parses its first argument, so loop over files manually.
       - id: bash-syntax
         name: bash -n
         entry: bash -c 'for f; do bash -n "$f"; done' --
         language: system
         files: '^(install\.sh|scripts/.*\.sh)$'
 
+      # dot_zshrc.tmpl is excluded — chezmoi {{ }} syntax breaks zsh -n.
       - id: zsh-syntax
         name: zsh -n
         entry: bash -c 'for f; do zsh -n "$f"; done' --
         language: system
         files: '^src/(dot_zshenv|dot_config/zsh/dot_zprofile)$'
 
-      # ─── Spelling (mirrors the `typos` CI job) ───────────────────────────────
+      # Spelling — mirrors the `typos` CI job; exclusions/allowlist in _typos.toml.
       - id: typos
         name: typos
         entry: typos
         language: system
         pass_filenames: false
 
-      # ─── Commit message — closes the gap CI's PR-title check leaves for the
-      #     direct-to-main commits this repo expects ─────────────────────────────
+      # Config files — mirrors the `config files` CI job. Validates that every
+      # JSON/TOML in the source tree parses (the script scans the tree itself).
+      - id: lint-config
+        name: lint-config (JSON/TOML)
+        entry: bash scripts/lint-config.sh
+        language: system
+        pass_filenames: false
+
+      # Commit message — enforces Conventional Commits for direct-to-main commits,
+      # which bypass CI's PR-title check.
       - id: conventional-commit
         name: Conventional Commits subject
         stages: [commit-msg]
