@@ -91,7 +91,7 @@ else
 fi
 
 # --- 5. Hand off to the setup wizard -------------------------------------
-# The normal path is the plain-text wizard (scripts/wizard.sh): it asks the
+# The normal path is the plain-text wizard (scripts/bin/wizard.sh): it asks the
 # setup questions with plain `read` from /dev/tty and then applies. We use it
 # instead of chezmoi's own promptChoice/promptMultichoice TUI because that TUI
 # reads /dev/tty in raw mode and is unreliable under `curl | bash` (it fails to
@@ -103,7 +103,7 @@ fi
 # `... | bash -s -- --promptDefaults`) skip the wizard and go straight to chezmoi.
 if [ "$#" -eq 0 ]; then
     info "Starting the setup wizard, then applying."
-    exec bash "$SOURCE_DIR/scripts/wizard.sh"
+    exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"
 fi
 info "Extra args given — handing off directly to chezmoi init."
 exec chezmoi init --apply --source="$SOURCE_DIR" "$@"

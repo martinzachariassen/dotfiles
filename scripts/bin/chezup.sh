@@ -2,10 +2,10 @@
 # chezup.sh — converge this Mac to the repo: pull, preview drift, apply.
 #
 # Invoked by the `chezup` zsh function; can also be run directly:
-#   bash ~/Developer/personal/dotfiles/scripts/chezup.sh
+#   bash ~/Developer/personal/dotfiles/scripts/bin/chezup.sh
 # No package version bumps — that's `chezbump`.
 #
-# Usage:   bash scripts/chezup.sh [chezmoi-apply-args...]   (e.g. -v)
+# Usage:   bash scripts/bin/chezup.sh [chezmoi-apply-args...]   (e.g. -v)
 # Env:     DRY_RUN=1  print instead of run    YES=1  skip the confirm gate
 #          DOTFILES_DIR  override source dir (default: ~/Developer/personal/dotfiles)
 
@@ -16,13 +16,13 @@ DRY_RUN="${DRY_RUN:-0}"
 ASSUME_YES="${YES:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/log.sh
-if [ ! -r "$_DIR/lib/log.sh" ]; then
-    printf 'chezup: missing %s\n' "$_DIR/lib/log.sh" >&2
+# shellcheck source=../lib/log.sh
+if [ ! -r "$_DIR/../lib/log.sh" ]; then
+    printf 'chezup: missing %s\n' "$_DIR/../lib/log.sh" >&2
     exit 1
 fi
-# shellcheck source=lib/log.sh
-. "$_DIR/lib/log.sh"
+# shellcheck source=../lib/log.sh
+. "$_DIR/../lib/log.sh"
 ui_init_logging
 
 run() {

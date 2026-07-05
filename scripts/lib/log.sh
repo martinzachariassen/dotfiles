@@ -5,11 +5,13 @@
 # obsidian apply hook. Kept dependency-free so it behaves identically on a fresh
 # machine before any package is installed.
 #
-# Three idempotent entry points:
+# Four idempotent entry points:
 #   ui_init_colors  — populate BOLD/DIM/GREEN/YELLOW/BLUE/RED/CYAN/RESET
 #   ui_init_glyphs  — BAR/NODE/OK_MARK/ARROW_MARK/FAIL_MARK/NOTE/RULE + box glyphs
 #   ui_init_logging — the rail-style log helpers (line_prefix/node_prefix/
 #                     say/ok/info/warn/fail/dim/hr); inits colors + glyphs first
+#   ui_init_status  — the flat status helpers (s_pass/s_warn/s_note/s_fail/
+#                     s_info/s_section) for report-style scripts; inits too
 #
 # Callers consume the color/glyph vars and the helper functions, so their use
 # isn't visible in this file. Suppress the false-positive unused/unreached
@@ -97,4 +99,23 @@ ui_init_logging() {
     fail() { printf "%s  %s%s%s %s\n" "$(line_prefix)" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
     dim() { printf "%s  %s%s%s\n" "$(line_prefix)" "$DIM" "$1" "$RESET"; }
     hr() { printf "%s\n" "$(line_prefix)"; }
+}
+
+# ui_init_status — the "flat" status vocabulary (no rail prefix): a 2-space
+# indent + a colored glyph, plus a bold section header. Used by the read-only,
+# report-style scripts (doctor.sh, setup-ollama.sh) that print a column of
+# ✓/!/•/✗ lines rather than the │-railed narrative of the apply scripts. Callers
+# wrap these when they need side effects — doctor's pass()/fail() delegate here
+# and then bump their own counters. Initialises colors + glyphs first (both
+# idempotent) so a caller can just `ui_init_status` and go.
+ui_init_status() {
+    ui_init_colors
+    ui_init_glyphs
+
+    s_pass() { printf "  %s%s%s  %s\n" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+    s_warn() { printf "  %s!%s  %s\n" "$YELLOW" "$RESET" "$1"; }
+    s_note() { printf "  %s%s%s  %s\n" "$BLUE" "$NOTE" "$RESET" "$1"; }
+    s_fail() { printf "  %s%s%s  %s\n" "$RED" "$FAIL_MARK" "$RESET" "$1"; }
+    s_info() { printf "  %s%s%s %s\n" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
+    s_section() { printf "\n%s%s%s %s %s%s\n" "$BOLD" "$BLUE" "$RULE" "$1" "$RULE" "$RESET"; }
 }

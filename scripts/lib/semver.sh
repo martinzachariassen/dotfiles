@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # semver.sh — tiny semantic-version helpers shared across scripts.
 #
-# Sourced by scripts/doctor.sh; unit-tested by tests/semver.bats. Kept
+# Sourced by scripts/bin/doctor.sh; unit-tested by tests/semver.bats. Kept
 # dependency-free (no sort -V) so behaviour is identical on macOS and Linux CI.
 
 # semver_extract STR — echo the first dotted-numeric run in STR.

@@ -15,33 +15,26 @@
 #
 # Idempotent: safe to re-run. Starting an already-running service is a no-op.
 #
-# Usage: scripts/setup-ollama.sh
+# Usage: scripts/bin/setup-ollama.sh
 
 set -euo pipefail
 
-# Shared UI helpers (ui_init_colors). Resolved next to this script so it works
-# regardless of the current directory.
+# Shared status helpers (s_info/s_pass/s_warn + glyphs). Loaded from lib/ (one
+# level up now that this script lives under bin/), resolved next to this script
+# so it works regardless of the current directory. log.sh is a committed
+# sibling; fail loudly if a checkout is missing it.
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=lib/log.sh
-if [ -r "$_UI_DIR/lib/log.sh" ]; then
-    . "$_UI_DIR/lib/log.sh"
-    ui_init_colors
-    ui_init_glyphs
-else
-    GREEN=""
-    YELLOW=""
-    BLUE=""
-    RESET=""
-    # ui.sh unavailable — ASCII glyph fallbacks so output never prints mojibake
-    # on a non-UTF-8 locale.
-    NODE="*"
-    OK_MARK="OK"
-    ARROW_MARK=">"
+if [ ! -r "$_UI_DIR/../lib/log.sh" ]; then
+    printf 'setup-ollama: missing %s\n' "$_UI_DIR/../lib/log.sh" >&2
+    exit 1
 fi
+# shellcheck source=../lib/log.sh
+. "$_UI_DIR/../lib/log.sh"
+ui_init_status
 
-info() { echo "  ${BLUE}${ARROW_MARK}${RESET} $1"; }
-ok() { echo "  ${GREEN}${OK_MARK}${RESET} $1"; }
-warn() { echo "  ${YELLOW}!${RESET} $1"; }
+info() { s_info "$1"; }
+ok() { s_pass "$1"; }
+warn() { s_warn "$1"; }
 
 if ! command -v ollama >/dev/null 2>&1; then
     echo "setup-ollama: ollama not found. Install the workstation apps first:" >&2

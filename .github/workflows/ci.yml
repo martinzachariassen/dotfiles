@@ -37,14 +37,14 @@ jobs:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck shfmt zsh
       - name: ShellCheck
-        run: shellcheck --severity=error --shell=bash install.sh scripts/*.sh scripts/lib/*.sh
+        run: shellcheck --severity=error --shell=bash install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
       - name: shfmt
-        run: shfmt -d -i 4 -ci install.sh scripts/*.sh scripts/lib/*.sh
+        run: shfmt -d -i 4 -ci install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
       - name: Parser syntax
         # bash -n / zsh -n only parse their FIRST argument, so each file must be
         # checked on its own — a bare `bash -n a b c` silently skips b and c.
         run: |
-          for f in install.sh scripts/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+          for f in install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh; do bash -n "$f"; done
           for f in src/dot_zshenv src/dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
 
   # Render every template via `chezmoi apply --dry-run` against stub data — no
@@ -75,7 +75,7 @@ jobs:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: ${{ matrix.mac_apps }}
           USE_ONE_PASSWORD: ${{ matrix.use_one_password }}
-        run: bash scripts/render-check.sh "$PWD"
+        run: bash scripts/ci/render-check.sh "$PWD"
 
   # bats-core suite in tests/: semver helper, shell functions, mise config,
   # obsidian-apply, and the static + dynamic checks on every chezmoi hook
@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
-      - run: bash scripts/lint-config.sh "$PWD"
+      - run: bash scripts/ci/lint-config.sh "$PWD"
 
   typos:
     name: typos
@@ -155,10 +155,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Resolve names (no install)
-        run: bash scripts/brew-resolve.sh "$PWD"
+        run: bash scripts/ci/brew-resolve.sh "$PWD"
       - name: Bundle check (advisory)
         continue-on-error: true
-        run: bash scripts/brew-check-modules.sh "$PWD"
+        run: bash scripts/ci/brew-check-modules.sh "$PWD"
 
   # The Linux `render` job never executes the real macOS hook bodies (the darwin
   # guards exit 0). This re-runs the render on macOS where those guards fall
@@ -181,4 +181,4 @@ jobs:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: "true"
           USE_ONE_PASSWORD: "true"
-        run: bash scripts/render-check.sh "$PWD"
+        run: bash scripts/ci/render-check.sh "$PWD"

@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
 # macos-defaults.sh — opinionated macOS system defaults
-# Run manually:  bash ~/Developer/personal/dotfiles/scripts/macos-defaults.sh
+# Run manually:  bash ~/Developer/personal/dotfiles/scripts/bin/macos-defaults.sh
 # Or applied automatically by chezmoi via .chezmoiscripts/run_once_after_*.sh
 #
 # Safe to re-run. Some changes need a logout/restart to take full effect.
 # Each `defaults write` is annotated; comment out anything you don't want.
 
 set -euo pipefail
-echo "◆ macOS defaults"
+
+# Shared glyphs + status printers from lib/ (one level up: this lives under
+# bin/), so the banner/status marks fall back to ASCII on a non-UTF-8 locale
+# instead of printing mojibake. log.sh is a committed sibling; fail loudly if a
+# checkout is missing it.
+_MD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+if [ ! -r "$_MD_DIR/../lib/log.sh" ]; then
+    printf 'macos-defaults: missing %s\n' "$_MD_DIR/../lib/log.sh" >&2
+    exit 1
+fi
+# shellcheck source=../lib/log.sh
+. "$_MD_DIR/../lib/log.sh"
+ui_init_status
+
+printf '%s macOS defaults\n' "$NODE"
 echo "  Applying Finder, Dock, keyboard, screenshots, security, and developer preferences."
 
 # When this script runs as part of `chezmoi apply`, the run_before_00-sudo-cache
@@ -149,7 +163,7 @@ def_write com.apple.screencapture include-date -bool true
     defaults write com.apple.TextEdit RichText -int 0
     defaults write com.apple.TextEdit PlainTextEncoding -int 4
     defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
-} 2>/dev/null || echo "  ! TextEdit defaults skipped (sandbox)."
+} 2>/dev/null || s_warn "TextEdit defaults skipped (sandbox)."
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECURITY & PRIVACY
@@ -198,10 +212,10 @@ if [ "$macos_major" -ge 14 ]; then
         fi
         printf '# Managed by dotfiles macos-defaults.sh\nauth       sufficient     pam_tid.so\n' |
             sudo tee -a "$SUDO_LOCAL" >/dev/null
-        echo "  ✓ Touch ID for sudo enabled"
+        s_pass "Touch ID for sudo enabled"
     fi
 else
-    echo "  ! Touch ID for sudo skipped — requires macOS Sonoma (14+)"
+    s_warn "Touch ID for sudo skipped — requires macOS Sonoma (14+)"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -227,5 +241,6 @@ restart_if_changed Finder com.apple.finder com.apple.desktopservices
 restart_if_changed Dock com.apple.dock
 restart_if_changed SystemUIServer com.apple.screencapture com.apple.systemuiserver
 
-echo "✓ macOS defaults complete — ${#CHANGED_DOMAINS[@]} write(s) applied"
+printf '%s%s%s macOS defaults complete — %d write(s) applied\n' \
+    "$GREEN" "$OK_MARK" "$RESET" "${#CHANGED_DOMAINS[@]}"
 echo "  A logout or reboot may be needed for keyboard repeat and screenshot changes."

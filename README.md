@@ -65,7 +65,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
     <td width="33%" valign="top">
       <h3>🎯 Two everyday verbs</h3>
       <a href="install.sh"><code>install.sh</code></a> bootstraps a fresh Mac;
-      <a href="scripts/chezup.sh"><code>chezup</code></a> converges an existing one
+      <a href="scripts/bin/chezup.sh"><code>chezup</code></a> converges an existing one
       (pull → preview → apply).
     </td>
     <td width="33%" valign="top">
@@ -113,7 +113,7 @@ When the wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                              # skip if disabled
-bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh  # finishes git signing
+bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # finishes git signing
 exec zsh                                                       # reload the managed shell
 chezdoctor                                                     # verify everything is healthy
 sudo shutdown -r now                                           # reboot to finish macOS defaults
@@ -157,7 +157,7 @@ Only changing profile, identity, modules, or signing (no full bootstrap) — the
 plain-text wizard re-asks the questions, then applies for you:
 
 ```sh
-bash ~/Developer/personal/dotfiles/scripts/wizard.sh
+bash ~/Developer/personal/dotfiles/scripts/bin/wizard.sh
 ```
 
 > The wizard exists because chezmoi's own `chezmoi init --prompt` renders an
@@ -177,7 +177,7 @@ bash ~/Developer/personal/dotfiles/scripts/wizard.sh
 <summary>Advanced install flags</summary>
 
 With no extra arguments `install.sh` runs the plain-text wizard
-(`scripts/wizard.sh`), which asks the setup questions and applies. Passing any
+(`scripts/bin/wizard.sh`), which asks the setup questions and applies. Passing any
 extra arguments **bypasses the wizard** and forwards them straight to
 `chezmoi init --apply` (for scripted/CI use). It also reads two env vars:
 
@@ -236,7 +236,7 @@ chezreset               # re-ask profile / modules / signing, then apply
 
 It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
 
-**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to the plain-text wizard (`scripts/wizard.sh`), which asks the setup questions (profile, signing mode, optional modules) and feeds them to `chezmoi init --apply` — `--apply` runs the hooks. Re-choose your setup anytime with `chezreset`.
+**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to the plain-text wizard (`scripts/bin/wizard.sh`), which asks the setup questions (profile, signing mode, optional modules) and feeds them to `chezmoi init --apply` — `--apply` runs the hooks. Re-choose your setup anytime with `chezreset`.
 
 ## Repository layout
 
@@ -254,7 +254,10 @@ src/                    # ← chezmoi's source dir; everything here deploys to $
   dot_config/           #   → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
   dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
 packages/               # what to install: core Brewfile + profile/module layers + editor lists
-scripts/                # chezup.sh, doctor.sh, bootstrap-auth.sh, lib/log.sh…
+scripts/                # tooling, grouped by who runs it:
+  bin/                  #   user-facing verbs — chezup, doctor, bootstrap-auth, wizard, setup-ollama, macos-defaults
+  ci/                   #   CI + pre-commit checks — lint-config, render-check, brew-resolve, brew-check-modules, check-commit-msg
+  lib/                  #   sourced helpers — log, tty, semver, chezmoi-data, obsidian-apply
 install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
 tests/                  # bats suites
 docs/                   # deeper guides (apply lifecycle…)
@@ -270,13 +273,13 @@ The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`src/d
 
 ```sh
 # Lint + parse shell
-shellcheck install.sh scripts/*.sh scripts/lib/*.sh
+shellcheck install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
 
 # Run the bats test suites
 bats tests/
 
 # Render every template across the profile × modules matrix (dry-run)
-PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/render-check.sh "$PWD"
+PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"
 ```
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/modules matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.

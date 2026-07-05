@@ -7,7 +7,8 @@ matter most when proposing changes here:
 
 - Managed content lives under `src/` — chezmoi's source dir (set via
   `.chezmoiroot`, one line: `src`). Everything at the repo **root** is tooling
-  chezmoi never renders: `scripts/` (+ `scripts/lib/`), `packages/` (Brewfiles +
+  chezmoi never renders: `scripts/` (grouped `bin/` user-facing verbs, `ci/`
+  CI + pre-commit checks, `lib/` sourced helpers), `packages/` (Brewfiles +
   editor lists), `tests/`, `docs/`, `install.sh`, `.github/`.
 - Edit source files here, never the rendered copies in `$HOME` — `chezmoi apply`
   overwrites local drift (`apply.force = true`). To capture a live edit back into

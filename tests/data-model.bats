@@ -35,7 +35,7 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in defaults:$bad"; false; }
 }
 
-# scripts/wizard.sh reads its per-profile default module sets from
+# scripts/bin/wizard.sh reads its per-profile default module sets from
 # [profileDefaults] in modules.toml; the config template restates the same sets
 # literally (it renders before .chezmoidata loads). They MUST agree per profile,
 # or the wizard and a raw `chezmoi init --prompt` would pre-check different boxes.

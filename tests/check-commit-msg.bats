@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/lib/check-commit-msg.sh
+# Unit tests for scripts/ci/check-commit-msg.sh
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SCRIPT="$REPO_ROOT/scripts/lib/check-commit-msg.sh"
+    SCRIPT="$REPO_ROOT/scripts/ci/check-commit-msg.sh"
     MSG="$BATS_TEST_TMPDIR/msg"
 }
 

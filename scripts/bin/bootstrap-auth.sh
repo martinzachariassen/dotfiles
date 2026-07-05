@@ -8,7 +8,7 @@
 # already signed in.
 #
 # Usage:
-#   bash ~/Developer/personal/dotfiles/scripts/bootstrap-auth.sh
+#   bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh
 #
 # Environment variables:
 #   SKIP_GH=1       skip gh auth login
@@ -29,16 +29,17 @@ SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi execute-template '{{ .chezmoi.workingTree 
 ASSUME_YES="${YES:-0}"
 
 # Shared UI engine (colors, glyphs, and the rail-style log helpers:
-# line_prefix/node_prefix/say/ok/info/warn/fail/dim/hr). ui.sh is a committed
-# sibling of this script; a checkout without it is broken, so fail loudly rather
-# than limp along with degraded output (chezup.sh does the same).
+# line_prefix/node_prefix/say/ok/info/warn/fail/dim/hr) from lib/, one level up
+# now that this script lives under bin/. log.sh is a committed sibling of this
+# script; a checkout without it is broken, so fail loudly rather than limp along
+# with degraded output (chezup.sh does the same).
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_UI_DIR/lib/log.sh" ]; then
-    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/lib/log.sh" >&2
+if [ ! -r "$_UI_DIR/../lib/log.sh" ]; then
+    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/../lib/log.sh" >&2
     exit 1
 fi
-# shellcheck source=lib/log.sh
-. "$_UI_DIR/lib/log.sh"
+# shellcheck source=../lib/log.sh
+. "$_UI_DIR/../lib/log.sh"
 ui_init_logging
 
 # has_module NAME — true when NAME is in the selected .modules list (chezmoi

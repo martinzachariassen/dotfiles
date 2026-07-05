@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/wizard.sh pure helpers.
+# Unit tests for scripts/bin/wizard.sh pure helpers.
 #
 # The wizard is sourced with WIZARD_LIB_ONLY=1, which defines its functions and
 # loads the module catalog, then returns BEFORE any /dev/tty prompting or apply —
@@ -9,7 +9,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    WIZ="$REPO_ROOT/scripts/wizard.sh"
+    WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
 }
 
 # wiz EXPR — source the helpers in a clean bash and evaluate EXPR; echoes result.
@@ -72,7 +72,11 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 # gum is progressive enhancement: WIZARD_NO_GUM=1 must force the plain-text path
 # regardless of whether gum is installed (keeps first-boot + tests deterministic).
 @test "use_gum is disabled by WIZARD_NO_GUM" {
-    run bash -c "WIZARD_LIB_ONLY=1 WIZARD_NO_GUM=1 source '$WIZ'; use_gum && echo on || echo off"
+    # export so the flag survives the `source` return: bash's `source` is a
+    # regular builtin (outside POSIX mode), so a bare `WIZARD_NO_GUM=1 source …`
+    # prefix reverts once sourcing finishes and use_gum would miss it — passing
+    # only on machines without gum (like CI). export makes the check real.
+    run bash -c "export WIZARD_NO_GUM=1 WIZARD_LIB_ONLY=1; source '$WIZ'; use_gum && echo on || echo off"
     [ "$output" = "off" ]
 }
 
