@@ -79,21 +79,29 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |
-| Data model + wizard | `src/.chezmoi.toml.tmpl` — chezmoi `init` prompts (profile / signingMode / modules) |
+| Data model + wizard | `src/.chezmoi.toml.tmpl` (chezmoi `init` prompt data) + `scripts/wizard.sh` (plain-text front-end) |
 | Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` (single source of truth) |
 
 ## Bootstrap + look & feel
 
 `install.sh` (fresh-Mac bootstrap) and `chezup` (everyday converge) are separate,
-plain scripts — there is no shared "wizard" engine.
+plain scripts.
 
 `install.sh` is a small hand-written script fetched via `curl | bash` **before
 this repo exists on disk**, so it can't source anything. It installs only the
 prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands off to
-`chezmoi init --apply`. The setup wizard is chezmoi's own `init` prompts, defined
-in `.chezmoi.toml.tmpl` (`profile`, `signingMode`, and a `modules` multi-select);
-`*Once` semantics make re-running idempotent, so `chezmoi init --prompt` is the
-"change my setup" path. Edit `install.sh` directly — it is **not** generated.
+`scripts/wizard.sh` (repo now on disk, so it *can* source `scripts/lib/*`).
+
+The setup questions are chezmoi's own `init` prompt data, defined in
+`.chezmoi.toml.tmpl` (`profile`, `signingMode`, and a `modules` multi-select) with
+`*Once` semantics so re-running is idempotent. But chezmoi renders those prompts
+as an interactive TUI picker that is unreliable under `curl | bash` and some
+terminals, so `wizard.sh` is the front-end: it asks each question with plain
+`read` from `/dev/tty` and passes the answers to `chezmoi init --apply` via its
+`--promptString/-Choice/-Multichoice` flags (no TUI). `bash scripts/wizard.sh` is
+the "change my setup" path; `chezreset` is the "set up as new" replay. Passing
+extra args to `install.sh` bypasses the wizard and calls `chezmoi init` directly.
+Edit `install.sh` directly — it is **not** generated.
 
 Everyday scripts (`chezup`, `doctor`, `bootstrap-auth`, `setup-ollama`, the
 obsidian hook) share a tiny logging library, `scripts/lib/log.sh`:
@@ -106,8 +114,8 @@ obsidian hook) share a tiny logging library, `scripts/lib/log.sh`:
 
 | Lib | Provides | Sourced by |
 |---|---|---|
-| `log.sh`             | colors, glyphs, rail-style log helpers          | chezup, bootstrap-auth, setup-ollama, obsidian hook (doctor uses colors/glyphs) |
-| `chezmoi-data.sh`    | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor |
+| `log.sh`             | colors, glyphs, rail-style log helpers          | chezup, bootstrap-auth, setup-ollama, wizard, obsidian hook (doctor uses colors/glyphs) |
+| `chezmoi-data.sh`    | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, wizard |
 | `tty.sh`             | `tty_reattach` (stdin → controlling terminal)   | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
 | `obsidian-apply.sh`  | the Obsidian vault seed engine                  | `run_after_02d-obsidian-apply` |
 | `semver.sh`          | `semver_extract` / `semver_lt`                  | doctor |

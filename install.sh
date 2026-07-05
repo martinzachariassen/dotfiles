@@ -90,14 +90,20 @@ else
     git clone "$REPO" "$SOURCE_DIR"
 fi
 
-# --- 5. Hand off to chezmoi ----------------------------------------------
-# chezmoi runs the setup wizard on the terminal — it opens /dev/tty for prompts,
-# so `curl | bash` works — then applies. With no terminal at all (CI/containers)
-# accept defaults so it can't hang. Extra script args pass straight through.
-init_args=(init --apply --source="$SOURCE_DIR")
-if [ "$#" -eq 0 ] && [ ! -t 0 ] && [ ! -r /dev/tty ]; then
-    warn "no terminal detected — accepting default answers (--promptDefaults)."
-    init_args+=(--promptDefaults)
+# --- 5. Hand off to the setup wizard -------------------------------------
+# The normal path is the plain-text wizard (scripts/wizard.sh): it asks the
+# setup questions with plain `read` from /dev/tty and then applies. We use it
+# instead of chezmoi's own promptChoice/promptMultichoice TUI because that TUI
+# reads /dev/tty in raw mode and is unreliable under `curl | bash` (it fails to
+# register navigation and just confirms the default). The wizard reads /dev/tty
+# directly, so it works even though our stdin here is the consumed curl pipe, and
+# it falls back to chezmoi's defaults when there is no terminal at all.
+#
+# Advanced/scripted callers who pass their own chezmoi flags (e.g.
+# `... | bash -s -- --promptDefaults`) skip the wizard and go straight to chezmoi.
+if [ "$#" -eq 0 ]; then
+    info "Starting the setup wizard, then applying."
+    exec bash "$SOURCE_DIR/scripts/wizard.sh"
 fi
-info "Handing off to chezmoi: setup wizard, then apply."
-exec chezmoi "${init_args[@]}" "$@"
+info "Extra args given — handing off directly to chezmoi init."
+exec chezmoi init --apply --source="$SOURCE_DIR" "$@"

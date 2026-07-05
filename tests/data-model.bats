@@ -35,6 +35,39 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in defaults:$bad"; false; }
 }
 
+# scripts/wizard.sh reads its per-profile default module sets from
+# [profileDefaults] in modules.toml; the config template restates the same sets
+# literally (it renders before .chezmoidata loads). They MUST agree per profile,
+# or the wizard and a raw `chezmoi init --prompt` would pre-check different boxes.
+@test "[profileDefaults] mirrors the template's \$defaults per profile" {
+    local p tmpl data
+    for p in personal work minimal; do
+        tmpl="$(sed -nE '/eq [$]profile "'"$p"'"/{n;p;}' "$TMPL" \
+            | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tr '\n' ' ')"
+        data="$(awk -F' *= *' -v pr="$p" '
+            /^\[profileDefaults\]/ {f=1; next} /^\[/ {f=0}
+            f && $1==pr {v=$2; gsub(/[][",]/,"",v); print v; exit}' "$MODULES_DATA" \
+            | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')"
+        [ "$tmpl" = "$data" ] || {
+            echo "profile $p: template=[$tmpl] data=[$data]"
+            false
+        }
+    done
+}
+
+# Every profileDefaults module name must be a real catalog module.
+@test "[profileDefaults] entries reference known modules" {
+    local known bad m
+    known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&NF>1{print $1}' "$MODULES_DATA")"
+    bad=""
+    while IFS= read -r m; do
+        [ -z "$m" ] && continue
+        printf '%s\n' "$known" | grep -qx "$m" || bad="$bad $m"
+    done < <(awk -F' *= *' '/^\[profileDefaults\]/{f=1;next} /^\[/{f=0} f{print $2}' "$MODULES_DATA" \
+        | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)
+    [ -z "$bad" ] || { echo "unknown modules in profileDefaults:$bad"; false; }
+}
+
 # Every Brewfile path in the package catalog must exist on disk.
 @test "packages.toml Brewfile paths all exist" {
     local path
