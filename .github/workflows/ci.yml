@@ -103,7 +103,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - uses: crate-ci/typos@v1.47.2
+      - uses: crate-ci/typos@v1.48.0
 
   # Conventional Commits PR title (subject 1-72 chars). PR-only.
   pr-title:
