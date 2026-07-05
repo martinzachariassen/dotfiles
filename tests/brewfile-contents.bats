@@ -21,10 +21,10 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    CORE="$REPO_ROOT/Brewfile"
-    MAC_APPS="$REPO_ROOT/brewfiles/Brewfile.mac-apps"
-    WORK="$REPO_ROOT/brewfiles/Brewfile.work"
-    PERSONAL="$REPO_ROOT/brewfiles/Brewfile.personal"
+    CORE="$REPO_ROOT/packages/Brewfile"
+    MAC_APPS="$REPO_ROOT/packages/Brewfile.mac-apps"
+    WORK="$REPO_ROOT/packages/Brewfile.work"
+    PERSONAL="$REPO_ROOT/packages/Brewfile.personal"
 }
 
 # 0 if FILE has a line declaring `KIND "NAME"`, ignoring trailing comments.

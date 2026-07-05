@@ -16,9 +16,9 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/dot_config/zsh/dot_zshrc.tmpl"
-    ZSHENV="$REPO_ROOT/dot_zshenv"
-    ZPROFILE="$REPO_ROOT/dot_config/zsh/dot_zprofile"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    ZSHENV="$REPO_ROOT/src/dot_zshenv"
+    ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
 }
 
 # ─── ~/.zshenv: must stay in $HOME (zsh reads it before ZDOTDIR is set) ────
@@ -114,4 +114,18 @@ setup() {
 
 @test "zshrc defines the chez wrapper around chezmoi apply" {
     grep -qE '^chez\(\) \{' "$ZSHRC"
+}
+
+@test "zshrc defines the chezmirror function (Brewfile removal reconcile)" {
+    grep -qE '^chezmirror\(\) \{' "$ZSHRC"
+    # It must actually enforce removal via brew bundle cleanup --force.
+    grep -qF 'brew bundle cleanup --force' "$ZSHRC"
+}
+
+@test "chez surfaces Brewfile drift but never auto-uninstalls" {
+    # The drift notice reuses the shared helper and points at chezmirror...
+    grep -qE '^_chez_brew_untracked\(\) \{' "$ZSHRC"
+    grep -qF 'reconcile (uninstall): chezmirror' "$ZSHRC"
+    # ...but the chez() body itself must not run a destructive cleanup.
+    ! sed -n '/^chez() {/,/^}/p' "$ZSHRC" | grep -qF 'brew bundle cleanup'
 }

@@ -23,7 +23,8 @@ SOURCE_DIR="${1:-$(pwd)}"
 cd "$SOURCE_DIR"
 
 # VS Code's settings.json + keybindings.json are JSONC, not strict JSON.
-VSCODE_DIR='./Library/Application Support/Code/User'
+# Under src/ since the chezmoi-managed tree moved there (.chezmoiroot).
+VSCODE_DIR='./src/Library/Application Support/Code/User'
 
 errors=0
 

@@ -39,7 +39,7 @@ repos:
         name: zsh -n
         entry: bash -c 'for f; do zsh -n "$f"; done' --
         language: system
-        files: '^(dot_zshenv|dot_config/zsh/dot_zprofile)$'
+        files: '^src/(dot_zshenv|dot_config/zsh/dot_zprofile)$'
 
       # ─── Spelling (mirrors the `typos` CI job) ───────────────────────────────
       - id: typos

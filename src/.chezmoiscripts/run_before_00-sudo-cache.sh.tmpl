@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# run_before_00-sudo-cache — pre-authenticate sudo at the very start of every
+# chezmoi apply, before any other script runs and before any heavy output
+# touches the terminal.
+#
+# Why this exists (the bug we're fixing):
+#
+#   Several scripts later in the apply need sudo:
+#     • brew-bundle invokes sudo internally for casks that need it
+#       (docker-desktop, 1password, etc. — they copy themselves to /Applications
+#       and install privileged helpers).
+#     • macos-defaults runs `sudo -v` and a flurry of `defaults write` /
+#       `chflags` / `tee` to /etc/pam.d/sudo_local.
+#
+#   Without pre-authentication, those sudo prompts fire mid-apply — after
+#   brew-bundle has printed a wall of cask download progress. On
+#   GPU-accelerated terminals (Ghostty, Alacritty, Kitty) the first
+#   keystroke of the password can land in the TTY *before* sudo finishes
+#   switching the line discipline to no-echo mode, so the keystroke gets
+#   eaten by the previous TTY mode and lost. User has to retype.
+#
+#   By prompting once up front, on a clean terminal, with nothing else
+#   competing for stdin, that race window closes and the password works the
+#   first time. A background refresher then keeps the credentials warm so
+#   every subsequent sudo call inside the apply runs silently — even if
+#   brew bundle takes 20 minutes downloading.
+#
+# Behaviour:
+#   1. macOS only (Linux exits 0).
+#   2. If sudo cache is already warm, exit silently (no-op).
+#   3. If no TTY is available (CI / launchd / piped output), exit silently
+#      with a hint. Scripts that need sudo will either skip themselves
+#      gracefully or fail.
+#   4. Otherwise: re-attach stdin to /dev/tty, prompt for the password with
+#      a distinct prompt string, then fork a keeper that refreshes the
+#      sudo timestamp every 50s for as long as the chezmoi process is
+#      alive.
+
+set -uo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+exit 0
+{{ end -}}
+
+# 1) Fast path — sudo cache already warm.
+if sudo -n true 2>/dev/null; then
+    echo "✓ sudo already cached"
+    exit 0
+fi
+
+# 2+3) Re-attach stdin to the controlling terminal (chezmoi closes it). No TTY
+#       (CI / launchd / piped output) means nobody to ask — warn and skip.
+# scripts/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
+# shellcheck source=../../scripts/lib/tty.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
+if ! tty_reattach; then
+    echo "! no terminal available for sudo pre-auth; sudo steps may ask later or skip"
+    exit 0
+fi
+
+cat <<'EOF'
+
+▶ sudo access
+
+  Some later steps need admin access for Nix, Homebrew casks, and macOS
+  defaults. Enter the password once here, before the noisy install output.
+
+  If Touch ID for sudo is already enabled, just tap your finger.
+EOF
+
+# Brief settle pause so any pending terminal output from chezmoi's own
+# preamble has been fully drained before sudo flips the line discipline.
+# Defensive against the "first keystroke eaten by TTY mode race" bug.
+sleep 0.2
+
+# Custom prompt makes it visually obvious we're at the sudo prompt rather
+# than at any other interactive question that might appear later.
+if ! sudo -v -p "[chezmoi] sudo password: "; then
+    echo "! sudo was not cached; steps that need admin access may skip or ask again"
+    exit 0
+fi
+
+# 4) Background keeper — refresh the sudo timestamp while chezmoi is alive.
+#
+# Why the double-fork: a single `command &` keeper inherits this script's
+# process group. On macOS, zsh sometimes waits for that group to drain
+# before returning to a prompt, which can cause a perceived "halt" after
+# the apply finishes. The classic double-fork idiom `( command & )` runs
+# the keeper inside an inner subshell that exits immediately, orphaning the
+# keeper to init/launchd. The keeper is then fully detached — no process
+# group hold-up, no SIGHUP delivery, no shell wait.
+#
+# Why the tight poll: instead of one long `sleep 50` between checks, we
+# loop with `sleep 2` and only refresh sudo every ~240s. That way when
+# chezmoi exits, the keeper notices within 2 seconds (not up to 50).
+CHEZMOI_PID=$PPID
+(
+    (
+        # Inner subshell — gets orphaned to init when the outer subshell
+        # exits a moment later. From here on, it's fully detached.
+        refresh_in=0
+        while kill -0 "$CHEZMOI_PID" 2>/dev/null; do
+            if [ "$refresh_in" -le 0 ]; then
+                sudo -n true 2>/dev/null || exit
+                refresh_in=240   # 4 min — well inside default 5-min cache
+            fi
+            sleep 2
+            refresh_in=$((refresh_in - 2))
+        done
+    ) &
+) </dev/null >/dev/null 2>&1
+# After this line, the outer subshell has exited cleanly. The inner keeper
+# is running detached. Nothing in our process tree is waiting for it.
+
+echo "✓ sudo cached for this apply"

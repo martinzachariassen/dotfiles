@@ -22,7 +22,10 @@
 
 set -uo pipefail
 
-SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi source-path 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
+# Repo root (the git working tree) — NOT chezmoi's source dir, which is the src/
+# subdir since .chezmoiroot. `chezmoi source-path` would return src/; the
+# workingTree template value is the repo root where scripts/ + packages/ live.
+SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi execute-template '{{ .chezmoi.workingTree }}' 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
 # Shared UI engine (colors, glyphs, and the rail-style log helpers:

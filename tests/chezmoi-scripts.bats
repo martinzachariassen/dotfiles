@@ -19,10 +19,23 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SCRIPTS_DIR="$REPO_ROOT/.chezmoiscripts"
+    # chezmoi's effective source is the src/ subdir, named by /.chezmoiroot.
+    SRC_DIR="$REPO_ROOT/src"
+    SCRIPTS_DIR="$SRC_DIR/.chezmoiscripts"
 
     HAS_CHEZMOI=0
     command -v chezmoi >/dev/null 2>&1 && HAS_CHEZMOI=1
+}
+
+# ─── .chezmoiroot: the split that keeps the repo root clean ─────────────────
+
+@test ".chezmoiroot names the src/ source subdir" {
+    # Load-bearing: .chezmoiroot MUST live at the repo root (not under src/) and
+    # point chezmoi at src/. If it's missing or renamed, chezmoi treats the repo
+    # root as the source and tries to deploy scripts/, packages/, tests/… to \$HOME.
+    [ -f "$REPO_ROOT/.chezmoiroot" ]
+    [ "$(tr -d '[:space:]' <"$REPO_ROOT/.chezmoiroot")" = "src" ]
+    [ -d "$SCRIPTS_DIR" ]
 }
 
 # ─── Static: every script meets the basic shape ────────────────────────────
@@ -94,7 +107,7 @@ _setup_stub_chezmoi() {
     STUB_DIR="$BATS_TEST_TMPDIR/chezmoi-stub"
     mkdir -p "$STUB_DIR/home/.config/chezmoi" "$STUB_DIR/dst"
     cat > "$STUB_DIR/home/.config/chezmoi/chezmoi.toml" <<EOF
-sourceDir = "$REPO_ROOT"
+sourceDir = "$SRC_DIR"
 
 [data]
     name           = "CI"
@@ -113,7 +126,7 @@ _render_template() {
     HOME="$STUB_DIR/home" XDG_CONFIG_HOME="$STUB_DIR/home/.config" \
         chezmoi execute-template \
             --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
-            --source="$REPO_ROOT" \
+            --source="$SRC_DIR" \
             --destination="$STUB_DIR/dst" \
             --file "$tmpl"
 }

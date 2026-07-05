@@ -70,9 +70,9 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
     </td>
     <td width="33%" valign="top">
       <h3>🧩 Layered packages</h3>
-      A core <a href="Brewfile">Brewfile</a> plus composable
-      <a href="brewfiles/">profile + module layers</a> (mac-apps, personal, work),
-      chosen in the setup wizard and mapped in <code>.chezmoidata/packages.toml</code>.
+      A core <a href="packages/Brewfile">Brewfile</a> plus composable
+      <a href="packages/">profile + module layers</a> (mac-apps, personal, work),
+      chosen in the setup wizard and mapped in <code>src/.chezmoidata/packages.toml</code>.
     </td>
     <td width="33%" valign="top">
       <h3>✅ CI-guarded</h3>
@@ -90,7 +90,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
 |---|---|
 | 🖥 **Terminal** | Ghostty, Zellij, Starship, Catppuccin Frappé, JetBrainsMono Nerd Font. |
 | 🐚 **Shell** | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases. |
-| ✏️ **Editors** | VS Code via Homebrew (extensions in [`vscode/extensions.txt`](vscode/extensions.txt)), Neovim with LazyVim. |
+| ✏️ **Editors** | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim. |
 | 🔀 **Git** | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere. |
 | 📦 **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
 | 🤖 **Local AI** | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
@@ -164,6 +164,13 @@ bash ~/Developer/personal/dotfiles/scripts/wizard.sh
 > interactive TUI picker that is unreliable under `curl | bash` and some
 > terminals (it can fail to register navigation and just confirm the default).
 > The wizard asks with plain prompts, then feeds chezmoi the answers as flags.
+> The prompts have three tiers, degrading to fit the terminal: **gum** pickers
+> when `gum` is installed (any re-run after the first install) with your current
+> selection pre-checked; a **pure-bash arrow/space picker** when there's no gum
+> yet but the terminal is capable (the first-boot case — it also accepts number
+> keys, so it works even if arrows don't register); and the **numbered menu** on
+> a dumb/non-ANSI terminal. `WIZARD_NO_GUM=1` skips the first tier,
+> `WIZARD_NO_TUI=1` the first two.
 > To set the Mac up **as new** (replay first-time setup too), use `chezreset`.
 
 <details>
@@ -184,7 +191,7 @@ curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI)
 
 ## Daily commands
 
-The whole everyday surface is **two verbs plus a health check**. Both verbs end in the same `chezmoi apply`, which reconciles *real installed state* on every run — so it always installs what the Brewfile declares.
+The whole everyday surface is **two verbs plus a health check**. Both verbs end in the same `chezmoi apply`, which reconciles *real installed state* on every run — so it always installs what the Brewfile declares. It never *uninstalls*, though: `chez` only flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles that removal direction on demand.
 
 | Command | What it does |
 |---|---|
@@ -193,25 +200,29 @@ The whole everyday surface is **two verbs plus a health check**. Both verbs end 
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
 Change your setup — profile, optional modules, or signing — by re-running the
-wizard (chezmoi's `init` prompts reuse your saved answers and only re-ask what
-you change):
+plain-text wizard, which overrides your saved answers:
 
 ```sh
-chezmoi init --prompt   # re-answer profile / signingMode / modules
-chez                    # apply the changes
+chezreset               # re-ask profile / modules / signing, then apply
 ```
+
+> `chezreinit` is a different tool: it runs plain `chezmoi init`, which — via
+> chezmoi's `prompt*Once` functions — keeps every answer you've already given
+> and only asks for setup keys still blank. So it fills in newly-added questions
+> but never lets you re-choose existing ones; reach for `chezreset` for that.
 
 <details>
 <summary>Advanced / occasional commands</summary>
 
 | Command | What it does |
 |---|---|
-| `dotfiles` | Jump to the source repo (with args, points you at `chezmoi init --prompt`). |
-| `chez` | Apply without pulling — the building block `chezup` calls. |
-| `chezreinit` | Pull, re-run `chezmoi init` to pick up new data-model keys, then apply. Use after wizard/data-model changes. |
-| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard, then apply. Confirm-gated; doesn't uninstall packages or delete files. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit`). |
+| `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
+| `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
+| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
-| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection). |
+| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview, then (confirm-gated) `brew bundle cleanup --force` to uninstall everything untracked. |
 
 </details>
 
@@ -225,58 +236,35 @@ chez                    # apply the changes
 
 It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
 
-**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to `chezmoi init --apply`: chezmoi's own `init` prompts (profile, signing mode, optional modules) *are* the setup wizard, and `--apply` runs the hooks. Re-run the wizard anytime with `chezmoi init --prompt`.
-
-## Dev containers
-
-[`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
-that replicates the Mac editing environment inside a container. Copy it into a
-personal project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
-and **Dev Containers: Rebuild Container**.
-
-It is **opt-in, not global** — nothing in the VS Code user settings injects
-extensions or dotfiles into containers automatically. Team projects start from
-their own `devcontainer.json` without any personal configuration bleeding in.
-
-What the template provides:
-
-- The full personal extension set, active by default. Runtime-dependent
-  extensions (Java/Kotlin/Spring, Python, Docker/k8s, SonarQube) are commented
-  out; uncomment the ones that match what the image provides.
-- `setup.sh` (run via `postCreateCommand`) installs the CLI binaries the
-  extensions need but don't ship: `ripgrep` (Todo-Tree), `shfmt`, `hadolint`.
-  A container can't reach back to the Mac's Homebrew binaries, so they go in-image.
-- The two-way cSpell personal dictionary, bind-mounted from the host so "Add to
-  dictionary" writes the dotfiles-tracked file.
-- JDK path overrides that clear the Mac mise paths so `JAVA_HOME` in the
-  container wins for the Java/Kotlin language servers.
-
-**Language runtimes belong to the image, not the editor.** The whole point of a
-dev container is that the `image`/`Dockerfile`/features install Java, Python,
-Node, etc. — so the language extensions attach to whatever the container
-provides, and there's no mise inside. For a **Java/Kotlin** project, swap the
-base `image` for a JDK image (or add a JDK feature); the base already clears the
-host JDK paths from user settings, so the Java/Kotlin language servers pick up
-the container's `JAVA_HOME` instead of the dead macOS mise paths. Same shape for
-Python (interpreter in the image) or Terraform (add the `terraform` binary if
-that project runs `plan`/`apply`).
+**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to the plain-text wizard (`scripts/wizard.sh`), which asks the setup questions (profile, signing mode, optional modules) and feeds them to `chezmoi init --apply` — `--apply` runs the hooks. Re-choose your setup anytime with `chezreset`.
 
 ## Repository layout
 
+The repo root splits cleanly into **what chezmoi deploys** (everything under
+`src/`, its source directory — see [`.chezmoiroot`](.chezmoiroot)) and **the
+tooling that supports it** (everything else at the root, never deployed to
+`$HOME`):
+
 ```
-install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
-Brewfile                # core Homebrew packages (always installed)
-brewfiles/              # profile + module layers (mac-apps, personal, work)
-.chezmoi.toml.tmpl      # chezmoi config + the init-prompt setup wizard
-.chezmoidata/           # static data: module catalog + profile→Brewfile map
-.chezmoiscripts/        # ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
-dot_config/             # → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
+.chezmoiroot            # one line: "src" — points chezmoi at the src/ subdir
+src/                    # ← chezmoi's source dir; everything here deploys to $HOME
+  .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup wizard
+  .chezmoidata/         #   static data: module catalog + profile→Brewfile map
+  .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
+  dot_config/           #   → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
+  dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
+packages/               # what to install: core Brewfile + profile/module layers + editor lists
 scripts/                # chezup.sh, doctor.sh, bootstrap-auth.sh, lib/log.sh…
-templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
+install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
 tests/                  # bats suites
+docs/                   # deeper guides (apply lifecycle…)
 ```
 
-The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`dot_config/zsh/dot_zshrc.tmpl`](dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
+Repo tooling reaches the managed hooks and vice-versa across that boundary via
+chezmoi's `{{ .chezmoi.workingTree }}` (the repo root) — see
+[`docs/lifecycle.md`](docs/lifecycle.md).
+
+The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
 
 ## Development
 

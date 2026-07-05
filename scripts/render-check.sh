@@ -4,6 +4,10 @@
 set -euo pipefail
 
 SOURCE_DIR="${1:-$(pwd)}"
+# chezmoi's effective source is the src/ subdir (via .chezmoiroot). $SOURCE_DIR
+# stays the repo root so .chezmoi.workingTree still resolves to it for the hooks
+# that reach root-level scripts/ + packages/.
+SRC_DIR="$SOURCE_DIR/src"
 PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
@@ -50,7 +54,7 @@ trap 'rm -rf "$tmpdir"' EXIT
 
 mkdir -p "$tmpdir/.config/chezmoi"
 cat >"$tmpdir/.config/chezmoi/chezmoi.toml" <<EOF
-sourceDir = "$SOURCE_DIR"
+sourceDir = "$SRC_DIR"
 
 [data]
     name           = "CI"
@@ -69,7 +73,7 @@ render_output="$tmpdir/chezmoi-render.out"
 if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
     --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
     --destination="$tmpdir" \
-    --source="$SOURCE_DIR" \
+    --source="$SRC_DIR" \
     --no-pager \
     --color=false >"$render_output" 2>&1; then
     cat "$render_output"
@@ -81,13 +85,13 @@ fi
 # is still shown so real render drift remains visible.
 sed '/^chezmoi: warning: config file template has changed, run chezmoi init to regenerate config file$/d' "$render_output"
 
-for template in "$SOURCE_DIR"/.chezmoiscripts/*.sh.tmpl; do
+for template in "$SRC_DIR"/.chezmoiscripts/*.sh.tmpl; do
     [ -f "$template" ] || continue
-    echo "Checking rendered bash syntax: ${template#"$SOURCE_DIR"/}"
+    echo "Checking rendered bash syntax: ${template#"$SRC_DIR"/}"
     HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi execute-template \
         --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
         --destination="$tmpdir" \
-        --source="$SOURCE_DIR" \
+        --source="$SRC_DIR" \
         --file "$template" | bash -n
 done
 
@@ -96,9 +100,9 @@ if command -v zsh >/dev/null 2>&1; then
     HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi execute-template \
         --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
         --destination="$tmpdir" \
-        --source="$SOURCE_DIR" \
-        --file "$SOURCE_DIR/dot_config/zsh/dot_zshrc.tmpl" | zsh -n
-    zsh -n "$SOURCE_DIR/dot_zshenv" "$SOURCE_DIR/dot_config/zsh/dot_zprofile"
+        --source="$SRC_DIR" \
+        --file "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl" | zsh -n
+    zsh -n "$SRC_DIR/dot_zshenv" "$SRC_DIR/dot_config/zsh/dot_zprofile"
 else
     echo "Skipping rendered zsh syntax check: zsh not installed"
 fi

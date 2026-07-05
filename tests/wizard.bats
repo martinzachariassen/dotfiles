@@ -68,3 +68,46 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$n" -gt 0 ]
     [ "$n" = "$m" ]
 }
+
+# gum is progressive enhancement: WIZARD_NO_GUM=1 must force the plain-text path
+# regardless of whether gum is installed (keeps first-boot + tests deterministic).
+@test "use_gum is disabled by WIZARD_NO_GUM" {
+    run bash -c "WIZARD_LIB_ONLY=1 WIZARD_NO_GUM=1 source '$WIZ'; use_gum && echo on || echo off"
+    [ "$output" = "off" ]
+}
+
+# gum's --selected list is comma-delimited, so every module display line fed to
+# the picker MUST be comma-free or pre-selection would split mid-label.
+@test "gum module display lines contain no commas" {
+    run wiz 'for i in "${!MOD_KEYS[@]}"; do mod_display "$i"; done | grep -c , || true'
+    [ "$output" = "0" ]
+}
+
+# Each display line must still start with its exact catalog key, since results
+# are mapped back to keys by matching these lines.
+@test "gum module display lines start with the module key" {
+    run wiz 'for i in "${!MOD_KEYS[@]}"; do
+                 line="$(mod_display "$i")"; key="${line%% *}"
+                 [ "$key" = "${MOD_KEYS[$i]}" ] || { echo "mismatch: $line"; exit 1; }
+             done; echo ok'
+    [ "$status" -eq 0 ]
+    [ "$output" = "ok" ]
+}
+
+# The pure-bash TUI is the middle tier (first-boot, no gum). Its safety net is
+# use_tui: it MUST refuse a dumb/disabled terminal so we fall through to the
+# numbered menu rather than drawing escape codes into a terminal that can't.
+@test "use_tui is disabled by WIZARD_NO_TUI" {
+    run bash -c "export WIZARD_LIB_ONLY=1 WIZARD_NO_TUI=1 TERM=xterm; source '$WIZ'; use_tui && echo on || echo off"
+    [ "$output" = "off" ]
+}
+
+@test "use_tui is disabled on a dumb terminal" {
+    run bash -c "export WIZARD_LIB_ONLY=1 TERM=dumb; source '$WIZ'; use_tui && echo on || echo off"
+    [ "$output" = "off" ]
+}
+
+@test "the bash TUI picker functions are defined" {
+    run wiz 'declare -F _tui_read_key _tui_choose _tui_multiselect >/dev/null && echo ok'
+    [ "$output" = "ok" ]
+}

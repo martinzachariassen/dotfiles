@@ -2,13 +2,24 @@
 
 How `chezmoi apply` (and therefore `install.sh` / `chezup`) turns this repo into
 a configured machine, and the rules the hook scripts follow. This is the doc the
-`.chezmoiscripts/` hooks and `scripts/lib/` engines point back to.
+`src/.chezmoiscripts/` hooks and `scripts/lib/` engines point back to.
+
+## Repo split: `src/` vs. root tooling
+
+`.chezmoiroot` (one line, `src`) makes `src/` chezmoi's **source directory**:
+everything under it deploys to `$HOME`, and everything at the repo root
+(`scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`) is tooling chezmoi
+never sees. Inside a hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so
+reaching root-level tooling (the `scripts/lib/*` engines, `packages/Brewfile*`)
+uses `{{ .chezmoi.workingTree }}` — the git working tree, i.e. the repo root —
+instead. That's the one path idiom the hooks rely on.
 
 ## The stages
 
 `chezmoi apply` renders the managed files into `$HOME`, then runs the scripts in
-`.chezmoiscripts/`. Ordering and re-run behavior come entirely from the filename
-prefix; the two-digit `NN` orders within a bucket (`02` → `02b` → `02c` → …):
+`src/.chezmoiscripts/`. Ordering and re-run behavior come entirely from the
+filename prefix; the two-digit `NN` orders within a bucket (`02` → `02b` → `02c`
+→ …):
 
 | Prefix | When it runs |
 |---|---|
@@ -39,34 +50,41 @@ gated by a fast presence short-circuit so a clean machine is a quick no-op —
 means "make this Mac match the repo" always holds, with no separate fix step.
 
 `run_onchange_after_02c/02e/03/04` mutate state from a fixed manifest (a
-deprecation list, `.pre-commit-config.yaml`, `vscode/extensions.txt`, macOS
-defaults). The action pre-commit or `code` performs is identical regardless of
-apply count, so these re-fire only when their embedded content hash changes.
+deprecation list, `.pre-commit-config.yaml`, `packages/vscode-extensions.txt`,
+macOS defaults). The action pre-commit or `code` performs is identical regardless
+of apply count, so these re-fire only when their embedded content hash changes.
 
 Package convergence uses Homebrew's native `brew bundle` (the `02-brew-bundle`
-hook reads the active file set from `.chezmoidata/packages.toml`, then runs
-`brew bundle --no-upgrade` so it converges *presence*, not freshness). Other
+hook reads the active file set from `src/.chezmoidata/packages.toml`, then runs
+`brew bundle --no-upgrade` so it converges *presence*, not freshness). It only
+ever *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling packages
+the Brewfile no longer lists) is `chezmirror`'s: an apply must never silently
+uninstall, so `chez` just flags untracked packages and `chezmirror` reconciles
+them behind a confirm. Other
 custom logic (e.g. `obsidian-apply.sh`) lives in `scripts/lib/` so it stays
 shellcheck-able and unit-tested; hooks are thin drivers that do render-time
 config, source their lib (if any), and call the entry point.
 
 ## Where each piece lives
 
+Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
+`packages/`) are at the repo root.
+
 | Concern | Source |
 |---|---|
-| Sudo pre-auth | `.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl` |
-| Homebrew install (first run) | `.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` |
-| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `.chezmoidata/packages.toml`) |
+| Sudo pre-auth | `src/.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl` |
+| Homebrew install (first run) | `src/.chezmoiscripts/run_once_before_01-install-homebrew.sh.tmpl` |
+| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `src/.chezmoidata/packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
 | Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
-| VS Code extensions | `run_onchange_after_03-vscode` + `vscode/extensions.txt` |
+| VS Code extensions | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
-| Package tiers | `Brewfile` (core) + `brewfiles/Brewfile.{mac-apps,personal,work}` |
-| Data model + wizard | `.chezmoi.toml.tmpl` (chezmoi `init` prompt data) + `scripts/wizard.sh` (plain-text front-end) |
-| Module catalog + Brewfile map | `.chezmoidata/{modules,packages}.toml` (single source of truth) |
+| Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |
+| Data model + wizard | `src/.chezmoi.toml.tmpl` (chezmoi `init` prompt data) + `scripts/wizard.sh` (plain-text front-end) |
+| Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` (single source of truth) |
 
 ## Bootstrap + look & feel
 

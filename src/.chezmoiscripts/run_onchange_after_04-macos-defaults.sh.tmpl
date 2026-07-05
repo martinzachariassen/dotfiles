@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Applies scripts/macos-defaults.sh whenever that script's contents change.
+#
+# `run_onchange_*` (vs the old `run_once_*`) means chezmoi re-runs this whenever
+# the rendered body below changes. The `hash:` line embeds a sha256 of
+# scripts/macos-defaults.sh, so editing that script — and only editing it —
+# re-triggers this hook on the next apply. A routine apply that doesn't touch
+# the defaults script is a no-op (the hash is unchanged), so you still don't get
+# a sudo prompt on every apply. This closes the old foot-gun where editing the
+# defaults script silently did nothing because `run_once_*` had already recorded
+# a successful run.
+#
+# scripts/macos-defaults.sh  hash: {{ include "../scripts/macos-defaults.sh" | sha256sum }}
+#
+# To re-apply the current defaults without changing the script (e.g. after a
+# macOS update reset something), run the `macos-defaults` zsh alias by hand.
+
+set -euo pipefail
+
+# Skip on non-macOS (chezmoi runs scripts on every platform unless guarded)
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ macOS defaults: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+{{ if not (has "macosDefaults" (dig "modules" (list) .)) -}}
+echo "→ macOS defaults: 'macosDefaults' module not selected, skipping"
+exit 0
+{{ end -}}
+
+# chezmoi runs scripts with stdin closed/non-interactive, so sudo's password
+# prompt inside scripts/macos-defaults.sh hangs in "Waiting for data…" mode. Reopen
+# stdin from the controlling terminal if one exists, so sudo can read the
+# password normally. In CI or other no-tty contexts, skip cleanly with a
+# helpful message rather than hang.
+echo "▶ macOS defaults"
+echo "  System preferences pass (re-runs when the defaults script changes)."
+echo "  Some changes need a reboot."
+
+# scripts/ lives at the repo root, not the source dir (src/) — reach it via
+# .chezmoi.workingTree (the git working tree = repo root).
+# shellcheck source=../../scripts/lib/tty.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
+if ! tty_reattach; then
+    echo "! no terminal available; skipping macOS defaults"
+    echo "  Run later with: macos-defaults"
+    echo "  Or: bash {{ .chezmoi.workingTree }}/scripts/macos-defaults.sh"
+    exit 0
+fi
+
+bash "{{ .chezmoi.workingTree }}/scripts/macos-defaults.sh"
+
+echo "✓ macOS defaults applied"

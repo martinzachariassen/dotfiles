@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# run_onchange_after_99-completion — closing summary at the end of every apply.
+#
+# Why this exists:
+#   The earlier scripts in the apply (brew-bundle, macos-defaults)
+#   produce a lot of output. Without a structured closing summary, you're left
+#   looking at the tail of brew bundle's verbose log with no clear "you're done,
+#   and here's what's available to you now" signal.
+#
+# Naming considerations:
+# - "99-" prefix sorts last numerically among the after-scripts (02, 03, 04, 99).
+# - `onchange_` keeps the summary from running when nothing about this script
+#   changed, so `chezmoi diff` can stay clean after apply.
+
+set -euo pipefail
+
+# ─── Inputs from chezmoi data ────────────────────────────────────────────────
+PROFILE="{{ .profile }}"
+# The repo root (git working tree) — where install.sh + scripts/ live. chezmoi's
+# source dir is the src/ subdir under this, but users think of the repo root as
+# "the dotfiles", so show and reference that.
+SOURCE="{{ .chezmoi.workingTree }}"
+SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
+
+# List the enabled optional modules as a bullet-separated string for compact display.
+EXTRAS=""
+{{ range $m := (dig "modules" (list) .) -}}
+EXTRAS="${EXTRAS}{{ $m }} · "
+{{ end -}}
+EXTRAS="${EXTRAS% · }"
+[ -z "$EXTRAS" ] && EXTRAS="(none enabled)"
+
+# ─── Colors (only if stdout is a real TTY) ───────────────────────────────────
+if [ -t 1 ]; then
+    B=$'\033[1m'; D=$'\033[2m'
+    G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; M=$'\033[35m'
+    R=$'\033[0m'
+else
+    B="";D="";G="";C="";Y="";M="";R=""
+fi
+
+# ─── Output ──────────────────────────────────────────────────────────────────
+cat <<EOF
+
+${C}╭────────────────────────────────────────────────────────────╮${R}
+${C}│${R}  ${G}${B}chezmoi apply complete${R}                                  ${C}│${R}
+${C}╰────────────────────────────────────────────────────────────╯${R}
+
+  ${B}Setup${R}
+    Profile       ${G}${PROFILE}${R}
+    Modules       ${EXTRAS}
+    Signing       ${G}${SIGNING}${R}
+    Source        ${D}${SOURCE}${R}
+
+  ${B}Next moves${R}
+    ${M}1.${R} ${C}exec zsh${R}
+       Reload the managed shell.
+
+    ${M}2.${R} ${C}bash ${SOURCE}/scripts/bootstrap-auth.sh${R}
+       Sign in to gh, optional cloud CLIs, and verify git signing.
+
+    ${M}3.${R} ${C}chezdoctor${R}
+       Run a health check after auth is done.
+
+  ${B}Daily commands${R}
+    ${C}chezup${R}      converge this Mac to the repo (pull, apply, install packages)
+    ${C}chezdoctor${R}  full-stack health check
+    ${D}advanced: chez · chezreinit · chezbump · chezaudit${R}
+
+${D}Walk the wizard again with ${C}bash ${SOURCE}/install.sh${D}.${R}
+EOF
