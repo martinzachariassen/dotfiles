@@ -36,7 +36,7 @@
      .chezmoidata/modules.toml). Keep this list in sync with the [moduleCatalog]
      keys there — tests/data-model.bats enforces the match. Labels for the
      doctor report / summary come from that catalog. */ -}}
-{{- $allModules := list "claudePersona" "cloudAuth" "devcontainer" "jvmStack" "locale" "macApps" "macosDefaults" "obsidian" "theme" -}}
+{{- $allModules := list "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "obsidian" "theme" -}}
 {{- $defaults := list -}}
 {{- if eq $profile "personal" -}}
 {{-   $defaults = list "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "obsidian" "theme" -}}

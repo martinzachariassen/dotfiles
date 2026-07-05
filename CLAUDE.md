@@ -15,8 +15,8 @@ chezmoi's **source directory**: everything under `src/` is managed content that
 deploys to `$HOME` (`dot_config/`, `dot_zshenv`, `private_dot_ssh/`, `Library/`,
 plus the `.chezmoi*` machinery). Everything at the **repo root** is tooling
 chezmoi never sees: `scripts/` (+ `lib/`), `packages/` (Brewfiles + editor
-lists), `tests/`, `docs/`, `templates/`, `install.sh`, `.github/`. So inside a
-hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`; reaching root-level tooling
+lists), `tests/`, `docs/`, `install.sh`, `.github/`. So inside a hook,
+`{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`; reaching root-level tooling
 (`scripts/lib/*`, `packages/Brewfile*`) uses `{{ .chezmoi.workingTree }}` (the
 git working tree = repo root). That `.chezmoi.workingTree` idiom is how the
 boundary is crossed — grep for it when wiring a hook to a root-level file.

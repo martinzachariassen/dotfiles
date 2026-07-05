@@ -1,5 +1,5 @@
 # chezmoi's source dir is this src/ directory (via /.chezmoiroot). All repo
-# tooling — scripts/, packages/, tests/, docs/, templates/, install.sh, the
+# tooling — scripts/, packages/, tests/, docs/, install.sh, the
 # .github/ + dotfiles config — lives at the repo ROOT, one level up and OUTSIDE
 # this source tree, so chezmoi never sees it. That's why this file no longer
 # needs the long exclude list it used to carry: it only handles files that DO

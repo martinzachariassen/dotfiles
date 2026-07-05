@@ -219,40 +219,6 @@ It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), a
 
 **`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to `chezmoi init --apply`: chezmoi's own `init` prompts (profile, signing mode, optional modules) *are* the setup wizard, and `--apply` runs the hooks. Re-run the wizard anytime with `chezmoi init --prompt`.
 
-## Dev containers
-
-[`templates/devcontainer/`](templates/devcontainer) is a copy-me `.devcontainer/`
-that replicates the Mac editing environment inside a container. Copy it into a
-personal project with `cp -R …/dotfiles/templates/devcontainer/.devcontainer .`
-and **Dev Containers: Rebuild Container**.
-
-It is **opt-in, not global** — nothing in the VS Code user settings injects
-extensions or dotfiles into containers automatically. Team projects start from
-their own `devcontainer.json` without any personal configuration bleeding in.
-
-What the template provides:
-
-- The full personal extension set, active by default. Runtime-dependent
-  extensions (Java/Kotlin/Spring, Python, Docker/k8s, SonarQube) are commented
-  out; uncomment the ones that match what the image provides.
-- `setup.sh` (run via `postCreateCommand`) installs the CLI binaries the
-  extensions need but don't ship: `ripgrep` (Todo-Tree), `shfmt`, `hadolint`.
-  A container can't reach back to the Mac's Homebrew binaries, so they go in-image.
-- The two-way cSpell personal dictionary, bind-mounted from the host so "Add to
-  dictionary" writes the dotfiles-tracked file.
-- JDK path overrides that clear the Mac mise paths so `JAVA_HOME` in the
-  container wins for the Java/Kotlin language servers.
-
-**Language runtimes belong to the image, not the editor.** The whole point of a
-dev container is that the `image`/`Dockerfile`/features install Java, Python,
-Node, etc. — so the language extensions attach to whatever the container
-provides, and there's no mise inside. For a **Java/Kotlin** project, swap the
-base `image` for a JDK image (or add a JDK feature); the base already clears the
-host JDK paths from user settings, so the Java/Kotlin language servers pick up
-the container's `JAVA_HOME` instead of the dead macOS mise paths. Same shape for
-Python (interpreter in the image) or Terraform (add the `terraform` binary if
-that project runs `plan`/`apply`).
-
 ## Repository layout
 
 The repo root splits cleanly into **what chezmoi deploys** (everything under
@@ -271,7 +237,6 @@ src/                    # ← chezmoi's source dir; everything here deploys to $
 packages/               # what to install: core Brewfile + profile/module layers + editor lists
 scripts/                # chezup.sh, doctor.sh, bootstrap-auth.sh, lib/log.sh…
 install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
-templates/              # copy-me scaffolds not deployed to $HOME (devcontainer/…)
 tests/                  # bats suites
 docs/                   # deeper guides (apply lifecycle…)
 ```
