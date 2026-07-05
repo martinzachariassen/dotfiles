@@ -1,7 +1,8 @@
 # Repository instructions for GitHub Copilot
 
 A personal, chezmoi-managed macOS (Apple Silicon) dotfiles repo. The rules that
-matter most when proposing changes here:
+matter most when proposing changes here (deeper topic guides live in
+[`docs/`](../docs/README.md)):
 
 ## Layout — the `src/` split
 

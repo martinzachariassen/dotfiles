@@ -35,6 +35,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
 - [Daily commands](#daily-commands)
 - [How it works](#how-it-works)
 - [Repository layout](#repository-layout)
+- [Documentation](#documentation)
 - [Development](#development)
 - [License](#license)
 
@@ -95,7 +96,7 @@ Homebrew apps, [mise](https://mise.jdx.dev)-managed runtimes, and macOS defaults
 | 📦 **Runtimes** | mise for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml`. |
 | 🤖 **Local AI** | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps. |
 | 🧰 **Workstation apps** | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers. |
-| 🍎 **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults. |
+| 🍎 **macOS** | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md). |
 
 ## Quick start
 
@@ -127,25 +128,14 @@ Use the **same installer** — it snapshots any pre-existing legacy dotfiles int
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-It also runs the **deprecation cleanup** so you don't carry forward tools the repo no longer manages. Afterwards, reload and sanity-check:
+It also runs the **[deprecation cleanup](docs/install.md#deprecation-cleanup)** so you don't carry forward tools the repo no longer manages (old `node`/`temurin` casks, devbox, direnv, the `/nix` store). Afterwards, reload and sanity-check:
 
 ```sh
 exec zsh
 chezdoctor      # warns about any leftover devbox/Nix/direnv it couldn't remove
 ```
 
-<details>
-<summary>What the deprecation cleanup does</summary>
-
-- uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`, `temurin@25`, `direnv`) — language runtimes now come from **mise**;
-- removes the old out-of-band `devbox` binary and the leftover `~/.config/direnv` config; and
-- asks **y/N before deleting the old `/nix` store** from the previous devbox stack (it needs sudo and can't be undone — answer `n` to keep it, remove it later with `/nix/nix-installer uninstall`).
-
-On a fresh machine that never had the old stack, the cleanup is a silent no-op.
-
-> **Coming from the devbox/direnv setup?** Runtimes (Java/Node/Python) are now managed by mise: global defaults live in `~/.config/mise/config.toml`, and each project pins its own versions + env vars in a committed `mise.toml` (its `[env]` block replaces `.envrc`).
-
-</details>
+> **Coming from the devbox/direnv setup?** Runtimes are now managed by mise — see [docs/shell.md](docs/shell.md#runtimes-mise) and the [migration note](docs/install.md#coming-from-the-devboxdirenv-setup).
 
 ### Already set up — staying current
 
@@ -154,40 +144,20 @@ chezup       # pull latest repo changes, preview, then apply
 ```
 
 Only changing profile, identity, modules, or signing (no full bootstrap) — the
-plain-text wizard re-asks the questions, then applies for you:
+plain-text [wizard](docs/packages.md#the-wizard) re-asks the questions, then
+applies for you:
 
 ```sh
 bash ~/Developer/personal/dotfiles/scripts/bin/wizard.sh
 ```
 
-> The wizard exists because chezmoi's own `chezmoi init --prompt` renders an
-> interactive TUI picker that is unreliable under `curl | bash` and some
-> terminals (it can fail to register navigation and just confirm the default).
-> The wizard asks with plain prompts, then feeds chezmoi the answers as flags.
-> The prompts have three tiers, degrading to fit the terminal: **gum** pickers
-> when `gum` is installed (any re-run after the first install) with your current
-> selection pre-checked; a **pure-bash arrow/space picker** when there's no gum
-> yet but the terminal is capable (the first-boot case — it also accepts number
-> keys, so it works even if arrows don't register); and the **numbered menu** on
-> a dumb/non-ANSI terminal. `WIZARD_NO_GUM=1` skips the first tier,
-> `WIZARD_NO_TUI=1` the first two.
-> To set the Mac up **as new** (replay first-time setup too), use `chezreset`.
-
-<details>
-<summary>Advanced install flags</summary>
-
-With no extra arguments `install.sh` runs the plain-text wizard
-(`scripts/bin/wizard.sh`), which asks the setup questions and applies. Passing any
-extra arguments **bypasses the wizard** and forwards them straight to
-`chezmoi init --apply` (for scripted/CI use). It also reads two env vars:
-
-```sh
-DOTFILES_REPO=<repo-url> bash install.sh          # point at a fork
-DOTFILES_DIR=<path>      bash install.sh          # clone somewhere else
-curl -fsSL …/install.sh | bash -s -- --promptDefaults   # non-interactive (CI): skip wizard, accept defaults
-```
-
-</details>
+> The wizard replaces chezmoi's own TUI picker, which is unreliable under
+> `curl | bash`. It asks with plain prompts (three tiers that degrade to fit the
+> terminal), then feeds chezmoi the answers as flags. To set the Mac up **as
+> new**, use `chezreset`. Full detail — the prompt tiers and the install flags
+> (`DOTFILES_REPO`, `DOTFILES_DIR`, `--promptDefaults`) — is in
+> [docs/install.md](docs/install.md#advanced-flags) and
+> [docs/packages.md](docs/packages.md#the-wizard).
 
 ## Daily commands
 
@@ -211,32 +181,24 @@ chezreset               # re-ask profile / modules / signing, then apply
 > and only asks for setup keys still blank. So it fills in newly-added questions
 > but never lets you re-choose existing ones; reach for `chezreset` for that.
 
-<details>
-<summary>Advanced / occasional commands</summary>
-
-| Command | What it does |
-|---|---|
-| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit`). |
-| `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
-| `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
-| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
-| `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
-| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
-| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview, then (confirm-gated) `brew bundle cleanup --force` to uninstall everything untracked. |
-
-</details>
+There's also a set of occasional helpers — `chez`, `chezreinit`, `chezbump`,
+`chezaudit`, `chezmirror`, `dotfiles` — documented in
+**[docs/commands.md](docs/commands.md#advanced--occasional-helpers)**.
 
 ## How it works
 
-**`chezup` runs in three phases:**
+`chezup` runs in three phases: **update repo** (`git pull --ff-only`), **review
+pending changes** (`chezmoi status` — stops here if nothing drifted), then
+**apply** (one confirm gate, then `chezmoi apply --force`). It honours `DRY_RUN=1`
+and `YES=1`, and passes trailing args through to `chezmoi apply`.
 
-1. **Update repo** — `git pull --ff-only` in the source dir; reports how many commits arrived.
-2. **Review pending changes** — `chezmoi status` lists the drift between the repo and `$HOME` (`A` add, `M` modify, `D` remove). If nothing drifted, it stops here.
-3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
+`install.sh` is a tiny bootstrap fetched via `curl | bash` **before the repo
+exists on disk**: it installs only the prerequisites (Xcode CLT → Homebrew →
+chezmoi → clone), then hands off to the plain-text wizard, which feeds your
+answers to `chezmoi init --apply`.
 
-It honours `DRY_RUN=1` (print, don't run) and `YES=1` (skip the confirm gate), and passes any trailing arguments through to `chezmoi apply` (e.g. `chezup -v`).
-
-**`install.sh` is a tiny bootstrap** — a hand-written script (it runs via `curl | bash` before the repo exists on disk). It installs only the prerequisites (Xcode CLT, Homebrew, chezmoi, the repo clone), then hands off to the plain-text wizard (`scripts/bin/wizard.sh`), which asks the setup questions (profile, signing mode, optional modules) and feeds them to `chezmoi init --apply` — `--apply` runs the hooks. Re-choose your setup anytime with `chezreset`.
+What `apply` does after that — the hook ordering, the convergence guarantee, and
+where each piece lives — is in **[docs/lifecycle.md](docs/lifecycle.md)**.
 
 ## Repository layout
 
@@ -246,43 +208,41 @@ tooling that supports it** (everything else at the root, never deployed to
 `$HOME`):
 
 ```
-.chezmoiroot            # one line: "src" — points chezmoi at the src/ subdir
-src/                    # ← chezmoi's source dir; everything here deploys to $HOME
-  .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup wizard
-  .chezmoidata/         #   static data: module catalog + profile→Brewfile map
-  .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
-  dot_config/           #   → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
-  dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
-packages/               # what to install: core Brewfile + profile/module layers + editor lists
-scripts/                # tooling, grouped by who runs it:
-  bin/                  #   user-facing verbs — chezup, doctor, bootstrap-auth, wizard, setup-ollama, macos-defaults
-  ci/                   #   CI + pre-commit checks — lint-config, render-check, brew-resolve, brew-check-modules, check-commit-msg
-  lib/                  #   sourced helpers — log, tty, semver, chezmoi-data, obsidian-apply
-install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
-tests/                  # bats suites
-docs/                   # deeper guides (apply lifecycle…)
+src/          # ← chezmoi's source dir; everything here deploys to $HOME
+packages/     # core Brewfile + profile/module layers + editor lists
+scripts/      # tooling grouped by who runs it: bin/ (verbs), ci/ (checks), lib/ (helpers)
+install.sh    # tiny bootstrap; hands off to `chezmoi init --apply`
+tests/        # bats suites
+docs/         # these guides
 ```
 
-Repo tooling reaches the managed hooks and vice-versa across that boundary via
-chezmoi's `{{ .chezmoi.workingTree }}` (the repo root) — see
-[`docs/lifecycle.md`](docs/lifecycle.md).
+The full layout, chezmoi naming conventions, and the `{{ .chezmoi.workingTree }}`
+path idiom are in **[docs/architecture.md](docs/architecture.md)**.
 
-The shell verbs (`chezup`, `chezdoctor`, `dotfiles`, …) are defined in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) and delegate to the scripts in [`scripts/`](scripts).
+## Documentation
+
+Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
+
+| Doc | Covers |
+|---|---|
+| [install.md](docs/install.md) | Bootstrap scenarios, `install.sh` flags, deprecation cleanup. |
+| [commands.md](docs/commands.md) | Every verb — `chezup`, `chezdoctor`, and the occasional helpers. |
+| [packages.md](docs/packages.md) | Package tiers, profiles, the module catalog, and the wizard. |
+| [architecture.md](docs/architecture.md) | The `src/` split, repo layout, and `scripts/` organization. |
+| [lifecycle.md](docs/lifecycle.md) | What `chezmoi apply` does, stage by stage. |
+| [macos.md](docs/macos.md) | Every macOS system setting applied (keyboard, Finder, Dock, screenshots, security). |
+| [development.md](docs/development.md) | Quality gates, the CI matrix, and the bats suites. |
+| [shell.md](docs/shell.md) · [terminal.md](docs/terminal.md) · [editors.md](docs/editors.md) · [ai.md](docs/ai.md) | The configured environment — zsh/CLI/mise/git, Ghostty/Zellij/Starship, VS Code/Neovim, and AI tooling. |
 
 ## Development
 
 ```sh
-# Lint + parse shell
-shellcheck install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
-
-# Run the bats test suites
-bats tests/
-
-# Render every template across the profile × modules matrix (dry-run)
-PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"
+shellcheck install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh   # lint shell
+bats tests/                                                               # unit tests
+pre-commit run --all-files                                               # the full local gate set
 ```
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/modules matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs shellcheck, renders every chezmoi template across the profile/modules matrix, runs the bats suites, lints config, checks spelling, resolves Homebrew names on macOS, and enforces Conventional Commit PR titles. Full detail in **[docs/development.md](docs/development.md)**.
 
 ## License
 

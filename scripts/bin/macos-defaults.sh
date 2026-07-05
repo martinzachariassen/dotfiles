@@ -123,7 +123,9 @@ def_write com.apple.finder FXEnableExtensionChangeWarning -bool false
 def_write com.apple.finder WarnOnEmptyTrash -bool false
 def_write com.apple.finder NewWindowTarget -string "PfHm" # new window opens to ~
 def_write com.apple.finder NewWindowTargetPath -string "file://${HOME}/"
-def_write com.apple.finder QuitMenuItem -bool true # enable Cmd+Q / Finder → Quit Finder
+def_write com.apple.finder QuitMenuItem -bool true          # enable Cmd+Q / Finder → Quit Finder
+def_write com.apple.finder _FXSortFoldersFirst -bool true   # keep folders on top when sorting by name
+def_write com.apple.finder FXRemoveOldTrashItems -bool true # auto-remove trashed items after 30 days
 
 # Stop creating .DS_Store on network and USB volumes
 def_write com.apple.desktopservices DSDontWriteNetworkStores -bool true
@@ -140,12 +142,15 @@ sudo chflags nohidden /Volumes 2>/dev/null || true
 # ═══════════════════════════════════════════════════════════════════════════════
 def_write com.apple.dock tilesize -int 42
 def_write com.apple.dock autohide -bool true
-def_write com.apple.dock autohide-delay -float 0           # no delay before showing
-def_write com.apple.dock autohide-time-modifier -float 0.4 # faster show/hide animation
-def_write com.apple.dock show-recents -bool false          # no recent apps section
-def_write com.apple.dock mineffect -string "scale"         # minimize: scale (faster) instead of genie
-def_write com.apple.dock mru-spaces -bool false            # don't reorder spaces by recent use
-def_write com.apple.dock expose-group-by-app -bool false   # Mission Control: don't group windows by app
+def_write com.apple.dock autohide-delay -float 0              # no delay before showing
+def_write com.apple.dock autohide-time-modifier -float 0.4    # faster show/hide animation
+def_write com.apple.dock show-recents -bool false             # no recent apps section
+def_write com.apple.dock mineffect -string "scale"            # minimize: scale (faster) instead of genie
+def_write com.apple.dock mru-spaces -bool false               # don't reorder spaces by recent use
+def_write com.apple.dock expose-group-by-app -bool false      # Mission Control: don't group windows by app
+def_write com.apple.dock minimize-to-application -bool true   # minimize windows into the app icon, not the Dock's right side
+def_write com.apple.dock showhidden -bool true                # translucent Dock icons for hidden apps (Cmd+H)
+def_write com.apple.dock expose-animation-duration -float 0.1 # faster Mission Control animation
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SCREENSHOTS — save to ~/Pictures/Screenshots, no shadow, PNG
@@ -155,6 +160,13 @@ def_write com.apple.screencapture location -string "${HOME}/Pictures/Screenshots
 def_write com.apple.screencapture type -string "png"
 def_write com.apple.screencapture disable-shadow -bool true
 def_write com.apple.screencapture include-date -bool true
+def_write com.apple.screencapture show-thumbnail -bool false # skip the floating thumbnail — file lands immediately
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WINDOWS & DOCUMENTS (global) — snappier windows, save locally by default
+# ═══════════════════════════════════════════════════════════════════════════════
+def_write NSGlobalDomain NSWindowResizeTime -float 0.001               # near-instant window resize animation
+def_write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false # default Save target is the local disk, not iCloud
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEXTEDIT — plain text default, UTF-8
