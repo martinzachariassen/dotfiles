@@ -27,9 +27,31 @@
         "focus": true
       },
       "openFileInMode": "default"
+    },
+    {
+      "id": "file-this",
+      "name": "File this…",
+      "type": "Macro",
+      "command": true,
+      "macroId": "file-note-macro"
     }
   ],
-  "macros": [],
+  "macros": [
+    {
+      "name": "File note",
+      "id": "file-note-macro",
+      "commands": [
+        {
+          "name": "file-note.js",
+          "type": "UserScript",
+          "id": "file-note-command",
+          "path": "99 Meta/_scripts/file-note.js",
+          "settings": {}
+        }
+      ],
+      "runOnStartup": false
+    }
+  ],
   "inputPrompt": "single-line",
   "devMode": false,
   "templateFolderPath": "99 Meta/_templates",
