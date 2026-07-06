@@ -34,7 +34,11 @@ DEPRECATED_EXTENSIONS=(
     "vscjava.vscode-lombok"
     # Old community Kotlin extension; superseded by jetbrains.kotlin-server.
     "mathiasfrohlich.kotlin"
-    # Meta extension pack; all member extensions are already tracked individually.
+    # Meta extension pack; all member extensions are already tracked
+    # individually. The CLI can't uninstall it (VS Code treats removing a pack as
+    # removing its members, and redhat.java has external dependents — Spring Boot
+    # Tools/Dashboard), so uninstall_deprecated_extensions falls back to removing
+    # it on disk.
     "vscjava.vscode-java-pack"
     # Azure Java migration wizard; not a day-to-day tool.
     "vscjava.migrate-java-to-azure"
@@ -79,6 +83,50 @@ install_marketplace_extensions() {
     done < "$EXTENSIONS_FILE"
 }
 
+# The VS Code CLI refuses to uninstall an extension *pack* whose members have
+# external dependents — e.g. vscjava.vscode-java-pack bundles redhat.java, and
+# Spring Boot Tools/Dashboard depend on redhat.java, so `code
+# --uninstall-extension` errors out. The GUI can drop just the pack; the CLI
+# can't express that. Fall back to removing the extension on disk and pruning
+# VS Code's extensions cache (which VS Code otherwise self-heals on next launch).
+EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
+
+remove_extension_on_disk() {
+    local ext="$1" changed=false dir cache
+
+    # Extension dirs are named "<publisher>.<name>-<version>". nocaseglob guards
+    # against publisher-case drift; nullglob makes a no-match expand to nothing.
+    shopt -s nullglob nocaseglob
+    for dir in "$EXTENSIONS_DIR/$ext"-*; do
+        [ -d "$dir" ] || continue
+        rm -rf "$dir" && changed=true
+    done
+    shopt -u nullglob nocaseglob
+
+    # Drop the stale entry from extensions.json so `code --list-extensions` stops
+    # reporting the pack (otherwise the next apply re-reports a phantom failure).
+    cache="$EXTENSIONS_DIR/extensions.json"
+    if [ -f "$cache" ] && command -v python3 >/dev/null 2>&1; then
+        if python3 - "$cache" "$ext" <<'PY'
+import json, sys
+cache, ext = sys.argv[1], sys.argv[2].lower()
+try:
+    data = json.load(open(cache))
+except Exception:
+    sys.exit(1)
+kept = [e for e in data if e.get("identifier", {}).get("id", "").lower() != ext]
+if len(kept) == len(data):
+    sys.exit(1)  # nothing pruned
+json.dump(kept, open(cache, "w"))
+PY
+        then
+            changed=true
+        fi
+    fi
+
+    [ "$changed" = true ]
+}
+
 uninstall_deprecated_extensions() {
     local installed ext
     installed="$(installed_extensions)"
@@ -89,7 +137,15 @@ uninstall_deprecated_extensions() {
     for ext in "${DEPRECATED_EXTENSIONS[@]}"; do
         if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "→ uninstalling deprecated extension: $ext"
-            code --uninstall-extension "$ext" || echo "  ! failed to uninstall: $ext (continuing)"
+            if code --uninstall-extension "$ext" >/dev/null 2>&1; then
+                continue
+            fi
+            # CLI refused (e.g. a pack member has dependents) — remove on disk.
+            if remove_extension_on_disk "$ext"; then
+                echo "  ↳ CLI declined; removed on disk instead"
+            else
+                echo "  ! failed to uninstall: $ext (continuing)"
+            fi
         fi
     done
 }
