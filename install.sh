@@ -97,7 +97,11 @@ info "Using $(chezmoi --version | head -n 1)."
 if [ -d "$SOURCE_DIR/.git" ]; then
     info "Repo already present at $SOURCE_DIR."
 else
-    info "Cloning $REPO into $SOURCE_DIR…"
+    # Brace-delimit ${SOURCE_DIR}: macOS's system bash 3.2 (what a fresh
+    # `curl | bash` runs, before Homebrew) otherwise absorbs the following
+    # multibyte "…" into the variable name and, under `set -u`, dies with
+    # "unbound variable" — right on the fresh-machine clone path.
+    info "Cloning $REPO into ${SOURCE_DIR}…"
     mkdir -p "$(dirname "$SOURCE_DIR")"
     git clone "$REPO" "$SOURCE_DIR"
 fi
