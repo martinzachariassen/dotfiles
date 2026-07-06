@@ -1,3 +1,23 @@
+```text
+                    'c.          martin@dotfiles
+                 ,xNMM.          ───────────────
+               .OMMMMo           Repo       martinzachariassen/dotfiles
+               OMMM0,            OS         macOS · Apple Silicon
+     .;loddo:' loolloddol;.      Manager    chezmoi — idempotent apply
+   cKMMMMMMMMMMNWMMMMMMMMMM0:    Shell      zsh · XDG · fzf · zoxide · carapace
+ .KMMMMMMMMMMMMMMMMMMMMMMMWd.    Terminal   Ghostty + Zellij
+ XMMMMMMMMMMMMMMMMMMMMMMMX.      Prompt     Starship
+;MMMMMMMMMMMMMMMMMMMMMMMM:       Editors    VS Code · Neovim (LazyVim)
+:MMMMMMMMMMMMMMMMMMMMMMMM:       Runtimes   mise — Java · Node · Python
+.MMMMMMMMMMMMMMMMMMMMMMMMX.      Packages   Homebrew · layered Brewfiles
+ kMMMMMMMMMMMMMMMMMMMMMMMMWd.    Git        1Password SSH signing · delta
+ .XMMMMMMMMMMMMMMMMMMMMMMMMMMk   Theme      Catppuccin Frappé
+  .XMMMMMMMMMMMMMMMMMMMMMMMMK.
+    kMMMMMMMMMMMMMMMMMMMMMMd     Bootstrap  curl -fsSL install.sh | bash
+     ;KMMMMMMMWXXWMMMMMMMk.      Sudo       none · re-runnable anytime
+       .cooc,.    .,coo:.
+```
+
 <div align="center">
 
 # ✦ dotfiles ✦
