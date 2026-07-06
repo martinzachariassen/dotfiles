@@ -279,6 +279,13 @@
         }
     ],
 
+    // Conventional Commits for the GitHub PR "Generate Title/Description" action.
+    "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+        {
+            "text": "The PR title must follow Conventional Commits: `<type>(<scope>): <subject>`. Types: feat, fix, docs, refactor, test, chore, perf, build, ci, style. Subject in imperative mood, lowercase, no trailing period, ≤72 chars. Breaking changes append `!` to the type. The description body should explain the *why*, list any rollout or follow-up notes, and be scannable."
+        }
+    ],
+
     // Global house style for Copilot-generated code — the personal-defaults
     // analog of ~/.config/claude/CLAUDE.md, applied in every workspace. A repo's
     // own .github/copilot-instructions.md stacks on top of this.
