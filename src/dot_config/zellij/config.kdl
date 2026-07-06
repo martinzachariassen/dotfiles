@@ -7,6 +7,7 @@
 theme "catppuccin-frappe"
 
 // ─── Behavior ─────────────────────────────────────────────────────────────
+scrollback_lines     100000             // match Ghostty's buffer; default is 10000
 default_shell        "zsh"
 default_layout       "compact"          // minimal status bar; more screen for content
 mouse_mode           true
