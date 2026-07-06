@@ -38,6 +38,12 @@ export VISUAL=nvim
 # ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
 export SHELL_SESSIONS_DISABLE=1
 
+# ─── True-color advertisement ─────────────────────────────────────────────────
+# Ghostty auto-sets this, but setting it explicitly in .zshenv ensures any
+# tool spawned from a subshell (editors, pagers, scripts) also sees it — without
+# relying on terminal-detection heuristics.
+export COLORTERM=truecolor
+
 # ─── Pager behaviour ──────────────────────────────────────────────────────────
 # Default `less` is "stay open until q", with no on-screen reminder that q is
 # the way out. That makes short diffs feel like you're stuck in vim — chezmoi
