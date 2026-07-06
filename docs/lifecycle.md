@@ -95,3 +95,11 @@ prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands off to
 The wizard asks the setup questions and feeds them to `chezmoi init --apply` —
 `--apply` runs the hooks above. See [packages.md](packages.md#the-wizard) for the
 wizard's three prompt tiers.
+
+The everyday verbs (`chezup`, `chezdoctor`, …) are shell functions that bake
+their helper-script path into `~/.config/zsh/.zshrc` **at apply time**. Because a
+`git pull` never rewrites the live rc, a restructure that moves a script can
+strand a machine that pulled but hasn't re-applied. The functions self-heal via
+`_chez_run`; the one un-fixable case (an rc predating that helper) and its manual
+recovery are in
+[commands.md](commands.md#when-a-command-says-its-script-is-missing).

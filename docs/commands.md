@@ -29,6 +29,40 @@ delegate to the scripts in [`scripts/bin/`](../scripts/bin).
    here.
 3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
 
+## When a command says its script is missing
+
+The verbs are shell functions with the helper-script path **baked into
+`~/.config/zsh/.zshrc` at apply time** (fast — no `chezmoi source-path`
+subprocess per call). A `git pull` only updates the repo on disk; it never
+rewrites the live rc. So if a repo restructure **moves or renames a script**
+(e.g. the `scripts/` → `scripts/bin/` regroup), a machine that pulled but hasn't
+re-applied has a function pointing at a path that no longer exists.
+
+The wrappers self-heal through `_chez_run`: on a missing script they run
+`git pull` + `chezmoi apply` to regenerate the functions with the corrected
+paths, then `exec zsh` to reload — no manual dance. You'll see:
+
+```
+dotfiles: …/scripts/bin/chezup.sh is missing — this shell's config predates a repo change.
+  re-syncing this machine (git pull + chezmoi apply)…
+  synced — reloading your shell. Re-run your command.
+```
+
+**The one case this can't fix automatically:** a `.zshrc` applied *before*
+`_chez_run` itself existed — you can't repair a broken bootstrap from inside the
+broken file. Recover it once by running the script directly (bypassing the stale
+function), then reload:
+
+```sh
+bash ~/Developer/personal/dotfiles/scripts/bin/chezup.sh   # pull + preview + apply
+exec zsh
+```
+
+From then on the self-heal is in your rc and any future script move is automatic.
+The provider-agnostic fallback, if the script path itself differs in your clone,
+is `chezmoi apply && exec zsh` (`chezmoi` is on `PATH` via Homebrew and reads
+`.chezmoiroot` itself).
+
 ## Changing your setup
 
 Change your profile, optional modules, or signing by re-running the plain-text

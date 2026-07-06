@@ -185,6 +185,14 @@ There's also a set of occasional helpers — `chez`, `chezreinit`, `chezbump`,
 `chezaudit`, `chezmirror`, `dotfiles` — documented in
 **[docs/commands.md](docs/commands.md#advanced--occasional-helpers)**.
 
+> **`chezup` says its script is missing?** These verbs bake the helper-script
+> path into your `~/.config/zsh/.zshrc` at apply time, so a repo restructure that
+> moves a script can leave an un-reapplied machine pointing at the old path. The
+> commands now self-heal (pull + apply + reload). A shell whose rc predates that
+> self-heal recovers with one direct run — `bash
+> ~/Developer/personal/dotfiles/scripts/bin/chezup.sh && exec zsh`. Details:
+> **[docs/commands.md](docs/commands.md#when-a-command-says-its-script-is-missing)**.
+
 ## How it works
 
 `chezup` runs in three phases: **update repo** (`git pull --ff-only`), **review
