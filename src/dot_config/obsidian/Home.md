@@ -6,27 +6,25 @@ tags: [home]
 ---
 # Home
 
-> [!tip]+ Quick keys
-> **Capture** `⌘⇧N`  ·  **Daily** `⌘⇧T`  ·  **Weekly** `⌘⇧W`  ·  **Insert template** `⌘⇧I`  ·  **Find** `⌘O`  ·  **Commands** `⌘P`
+> [!tip]+ Daily loop — five keys
+> **Capture** `⌘⇧N`  ·  **File** `⌘⇧M`  ·  **Daily** `⌘⇧T`  ·  **Find** `⌘O`  ·  **Commands** `⌘P`
 >
-> New here? Take the full tour → **[[Vault Guide]]**
+> More: **Weekly** `⌘⇧W` · **Insert template** `⌘⇧I`   —   **[[Vault Guide|📖 Guide]]**  ·  **[[Projects.base|📊 Projects & Areas]]**
 
----
-
-## Inbox to process
-*Captures waiting to be filed. Clear these at your weekly review.*
+## 📥 Inbox to process
+*Open the oldest → `⌘⇧M` files it → it drops off the list. Goal: empty.*
 
 ```dataview
-TABLE WITHOUT ID file.link AS Note, dateformat(file.ctime, "MMM d, HH:mm") AS Captured
+TABLE WITHOUT ID file.link AS Note, dateformat(default(created, file.ctime), "MMM d") AS Captured
 FROM "00 Inbox"
 WHERE !contains(file.name, "_README")
-SORT file.ctime DESC
-LIMIT 15
+SORT default(created, file.ctime) ASC
+LIMIT 50
 ```
 
-## Tasks
+## ✅ Tasks
 
-### Overdue
+**Overdue**
 
 ```tasks
 not done
@@ -35,7 +33,7 @@ sort by due
 limit 15
 ```
 
-### Coming up — next 7 days
+**Next 7 days**
 
 ```tasks
 not done
@@ -45,29 +43,21 @@ sort by due
 limit 20
 ```
 
-## Active projects
-*Open work with an outcome and an end date.*
+## 🚀 Active projects
+*Work with a finish line. Sortable board of projects **and** areas → **[[Projects.base|📊 Projects & Areas]]**.*
 
 ```dataview
-TABLE WITHOUT ID file.link AS Project, domain AS Domain, priority AS Priority, dateformat(file.mtime, "MMM d") AS "Touched"
+TABLE WITHOUT ID file.link AS Project, domain AS Domain, priority AS Priority, dateformat(file.mtime, "MMM d") AS Touched
 FROM "20 Projects"
 WHERE type = "project" AND (status = "active" OR !status) AND !contains(file.name, "_README")
 SORT file.mtime DESC
 LIMIT 15
 ```
 
-## Areas you maintain
-*Ongoing responsibilities — no finish line.*
+---
+### Browse & jump back in
 
-```dataview
-TABLE WITHOUT ID file.link AS Area, domain AS Domain, review AS Review
-FROM "30 Areas"
-WHERE type = "area" AND !contains(file.name, "_README")
-SORT file.name ASC
-LIMIT 15
-```
-
-## Currently reading
+#### 📖 Currently reading
 
 ```dataview
 TABLE WITHOUT ID file.link AS Title, author AS Author, category AS Type
@@ -77,11 +67,11 @@ SORT file.mtime DESC
 LIMIT 10
 ```
 
-## Recently edited
+#### 🕐 Recently edited
 
 ```dataview
 LIST dateformat(file.mtime, "MMM d, HH:mm")
-WHERE !contains(file.folder, "_templates") AND !contains(file.folder, "50 Archive") AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
+WHERE !contains(file.folder, "_templates") AND !contains(file.folder, "50 Archive") AND !contains(file.folder, "00 Inbox") AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
 SORT file.mtime DESC
-LIMIT 15
+LIMIT 12
 ```
