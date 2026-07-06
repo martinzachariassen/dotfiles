@@ -174,10 +174,44 @@ alias ...='cd ../..'
 mkcd() { mkdir -p "$1" && cd "$1" || return; }
 
 # ─── Dotfiles meta-commands ───────────────────────────────────────────────────
+# _chez_run REL [args...] — run a dotfiles helper script named by its path
+# relative to the working tree. The wrappers below bake the working-tree path in
+# at apply time (fast: no `chezmoi source-path` subprocess per call). The failure
+# mode that bites: a later commit MOVES or RENAMES a script, and a machine that
+# pulled the repo but hasn't re-applied still has a .zshrc pointing at the old
+# path — so the very command you'd fix it with (`chezup`) is itself broken.
+# This turns that dead end into a one-time self-heal: on a missing script, pull +
+# `chezmoi apply` to regenerate these functions, then reload the shell so the
+# corrected paths take effect — no "cd into the repo and exec zsh" dance. (It
+# can't repair a .zshrc that predates this helper; from then on it's automatic.)
+_chez_run() {
+    local rel=$1
+    shift
+    # Repo root (git working tree), baked at apply time; source dir is src/.
+    local src={{ .chezmoi.workingTree | quote }}
+    if [[ -f $src/$rel ]]; then
+        bash "$src/$rel" "$@"
+        return
+    fi
+    print -ru2 -- "dotfiles: $src/$rel is missing — this shell's config predates a repo change."
+    if ! command -v chezmoi >/dev/null 2>&1; then
+        print -ru2 -- "  chezmoi isn't on PATH; fix by hand: cd ${(q)src} && git pull && chezmoi apply && exec zsh"
+        return 1
+    fi
+    print -ru2 -- "  re-syncing this machine (git pull + chezmoi apply)…"
+    (cd "$src" && git pull --ff-only) 2>/dev/null
+    chezmoi apply || return 1
+    if [[ -o interactive ]]; then
+        print -ru2 -- "  synced — reloading your shell. Re-run your command."
+        exec zsh
+    fi
+    print -ru2 -- "  synced — open a new shell (or run: exec zsh)."
+}
+
 # Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
 # Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
 # fresh Mac or after wiping a system pref pane back to defaults.
-alias macos-defaults='bash "$HOME/Developer/personal/dotfiles/scripts/bin/macos-defaults.sh"'
+alias macos-defaults='_chez_run scripts/bin/macos-defaults.sh'
 
 # Dotfiles shortcut. With no args it cd's into the source repo. To re-choose your
 # setup (profile, optional modules, signing) from scratch, use the plain-text
@@ -287,21 +321,13 @@ chez() {
 #   DRY_RUN=1   print state-changing commands without running them
 # Extra args go straight to `chezmoi apply` (e.g. `chezup -v`).
 chezup() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
-    local src={{ .chezmoi.workingTree | quote }}
-    bash "$src/scripts/bin/chezup.sh" "$@"
+    _chez_run scripts/bin/chezup.sh "$@"
 }
 
 # Full-stack health check (runs scripts/bin/doctor.sh from the repo root). The other
 # everyday command alongside chezup — run it any time something feels off.
 chezdoctor() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
-    local src={{ .chezmoi.workingTree | quote }}
-    bash "$src/scripts/bin/doctor.sh"
+    _chez_run scripts/bin/doctor.sh
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
@@ -333,6 +359,10 @@ chezreset() {
     # Repo root (git working tree), baked at apply time. chezmoi's source dir is
     # the src/ subdir (.chezmoiroot); scripts/bin/wizard.sh lives at the repo root.
     src={{ .chezmoi.workingTree | quote }}
+    # If our baked wizard path is stale (the script moved since this .zshrc was
+    # applied), self-heal + reload BEFORE the destructive state reset below —
+    # never leave the machine half-reset with no way to finish the wizard.
+    [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "$@"; return; }
     (cd "$src" && git pull --ff-only) || return $?
     if [ -r /dev/tty ]; then
         printf 'chezreset: replay first-time setup (reset run-once state, re-ask the wizard)? [y/N] '

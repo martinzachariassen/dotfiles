@@ -108,6 +108,21 @@ setup() {
     grep -qE '^chezdoctor\(\) \{' "$ZSHRC"
 }
 
+# The script-invoking wrappers route through _chez_run so a moved/renamed helper
+# self-heals (pull + apply + reload) instead of stranding the very command you'd
+# fix it with. If a wrapper regressed to a bare `bash "$src/scripts/..."` call it
+# would reintroduce the stale-path dead end, so pin both the helper and its use.
+@test "zshrc defines the _chez_run self-heal wrapper" {
+    grep -qE '^_chez_run\(\) \{' "$ZSHRC"
+    # It must fall back to re-applying when the baked script path is missing.
+    sed -n '/^_chez_run() {/,/^}/p' "$ZSHRC" | grep -qF 'chezmoi apply'
+}
+
+@test "chezup and chezdoctor route through _chez_run (no stale bare-path calls)" {
+    sed -n '/^chezup() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/chezup.sh'
+    sed -n '/^chezdoctor() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/doctor.sh'
+}
+
 @test "zshrc defines the dotfiles function (control panel)" {
     grep -qE '^dotfiles\(\) \{' "$ZSHRC"
 }
