@@ -230,6 +230,9 @@ dotfiles() {
         echo
         echo "Or just fill in newly-added setup keys (keeps current answers):"
         echo "    chezreinit"
+        echo
+        echo "List every dotfiles command:"
+        echo "    chezhelp"
     fi
 }
 
@@ -395,14 +398,16 @@ chezbump() {
     echo "── brew update + upgrade ─────────────────────────────────────"
     brew update && brew upgrade
     echo
-    echo "── brew bundle cleanup (preview) ──────────────────────────────"
-    echo "  Packages installed locally but not in any Brewfile:"
-    brew bundle cleanup --file="$src/packages/Brewfile" \
-                        --file="$src/packages/Brewfile.mac-apps" \
-                        --file="$src/packages/Brewfile.personal" \
-                        --file="$src/packages/Brewfile.work" 2>/dev/null \
-        || brew bundle cleanup --file="$src/packages/Brewfile"
-    echo "  (re-run with \`brew bundle cleanup --force --file=...\` to actually remove)"
+    echo "── Untracked Homebrew packages (in no Brewfile tier) ──────────"
+    # Same authoritative removal set `chezmirror` acts on (union of all tiers).
+    local removals
+    removals=$(_chez_brew_removals "$src")
+    if [ -n "$removals" ]; then
+        printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
+        echo "  (reconcile with \`chezmirror\` to uninstall — it prompts per package)"
+    else
+        echo "  ✓ none — every installed package is tracked"
+    fi
     if command -v mise >/dev/null 2>&1; then
         echo
         echo "── mise upgrade (global runtimes) ─────────────────────────────"
@@ -429,6 +434,40 @@ _chez_brew_untracked() {
     comm -23 <(brew leaves 2>/dev/null | sort -u) <(printf '%s\n' "$tracked")
 }
 
+# Internal: emit "<kind>\t<name>" (kind = cask | formula) for every Homebrew
+# package installed locally but tracked in NO Brewfile tier — the authoritative
+# removal set (formulae + casks + now-unused deps) that `chezmirror` acts on and
+# `chezbump` previews. Takes the repo root as $1. Pure (no prompting, no
+# uninstall), so it is unit-testable against a stubbed `brew`.
+#
+# `brew bundle cleanup` honours only ONE --file, so the tiers are concatenated
+# and fed on stdin (--file=-); passing several --file reads just the LAST tier
+# and would report almost every installed package as untracked — the whole point
+# of routing every caller through this one helper.
+_chez_brew_removals() {
+    local src=$1
+    cat "$src/packages/Brewfile" \
+        "$src/packages/Brewfile.mac-apps" \
+        "$src/packages/Brewfile.personal" \
+        "$src/packages/Brewfile.work" 2>/dev/null |
+        brew bundle cleanup --file=- 2>/dev/null | awk '
+            /^Would uninstall casks:/    { kind = "cask";    next }
+            /^Would uninstall formulae:/ { kind = "formula"; next }
+            /^Run .brew bundle cleanup/  { kind = "";        next }
+            kind && NF                   { print kind "\t" $0 }
+        '
+}
+
+# Internal: uninstall one package, routing casks through --cask. Split out so the
+# cask-vs-formula dispatch is unit-testable without a TTY.
+_chez_brew_uninstall_one() {
+    if [ "$1" = cask ]; then
+        brew uninstall --cask "$2"
+    else
+        brew uninstall "$2"
+    fi
+}
+
 # Drift detection: report brew packages installed locally but not tracked in
 # any Brewfile. Inverse of `chezmoi diff` — catches what you `brew install`d
 # casually and forgot to add to the repo. Reports only; use `chezmirror` to act.
@@ -453,38 +492,92 @@ chezaudit() {
 # brew-bundle hook; this is its deliberate, confirmed counterpart — NOT wired
 # into `chez`, because a routine apply should never silently uninstall.
 #
-# Destructive: previews first (plain `brew bundle cleanup`), then on confirm runs
-# `--force` to uninstall untracked formulae/casks and prune now-unused deps.
-# Compares against the UNION of all Brewfile tiers, so a package tracked in a
-# profile/module you don't currently use is preserved, not removed.
+# Destructive, so it asks PER PACKAGE (gum when present, plain read otherwise):
+# you approve each uninstall individually rather than one all-or-nothing gate.
+# The untracked set is the UNION of all Brewfile tiers (see _chez_brew_removals),
+# so a package tracked in a profile/module you don't currently use is preserved.
 chezmirror() {
     # Repo root, baked in at apply time (git working tree; source dir is src/).
-    local src={{ .chezmoi.workingTree | quote }} reply
-    local -a files=(
-        --file="$src/packages/Brewfile"
-        --file="$src/packages/Brewfile.mac-apps"
-        --file="$src/packages/Brewfile.personal"
-        --file="$src/packages/Brewfile.work"
-    )
-    echo "── Would uninstall (installed locally, not in any Brewfile) ───"
-    brew bundle cleanup "${files[@]}" 2>/dev/null \
-        || brew bundle cleanup --file="$src/packages/Brewfile"
-    echo
-    if [ ! -r /dev/tty ]; then
-        echo "No TTY — not removing. Re-run interactively to confirm."
+    local src={{ .chezmoi.workingTree | quote }}
+    local parsed
+    parsed=$(_chez_brew_removals "$src")
+
+    if [ -z "$parsed" ]; then
+        echo "  ✓ nothing to remove — every installed package is tracked"
         return 0
     fi
-    printf 'Uninstall the above to mirror the Brewfile? [y/N] '
-    IFS= read -r reply </dev/tty || reply=""
-    case "$reply" in
-        y | Y | yes | YES) ;;
-        *)
-            echo "aborted — nothing removed"
-            return 0
-            ;;
-    esac
-    brew bundle cleanup --force "${files[@]}" 2>/dev/null \
-        || brew bundle cleanup --force --file="$src/packages/Brewfile"
+
+    echo "── Untracked (installed locally, in no Brewfile tier) ────────"
+    printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
+    echo
+
+    # Belt-and-braces: never uninstall without a controlling terminal to confirm
+    # at (CI, cron, a piped shell). `[ -r /dev/tty ]` is unreliable here — the
+    # device's perm bits read rw even with no controlling tty — so actually try
+    # to OPEN it; a failed open is the real "no terminal" signal.
+    if ! { : </dev/tty; } 2>/dev/null; then
+        echo "No TTY — not removing. Re-run interactively to confirm each."
+        return 0
+    fi
+
+    local kind name reply ok removed=0 kept=0
+    while IFS=$'\t' read -r kind name; do
+        [ -n "$name" ] || continue
+        if command -v gum >/dev/null 2>&1; then
+            gum confirm "Uninstall ${kind} ${name}?" && ok=1 || ok=0
+        else
+            printf 'Uninstall %s %s? [y/N] ' "$kind" "$name"
+            IFS= read -r reply </dev/tty || reply=""
+            case "$reply" in y | Y | yes | YES) ok=1 ;; *) ok=0 ;; esac
+        fi
+        if [ "$ok" -eq 1 ]; then
+            _chez_brew_uninstall_one "$kind" "$name" && removed=$((removed + 1)) ||
+                echo "  ! failed (still a dependency?): $name"
+        else
+            kept=$((kept + 1))
+        fi
+    done <<<"$parsed"
+
+    echo
+    echo "  removed $removed · kept $kept"
+    [ "$removed" -gt 0 ] && echo "  Tip: \`brew autoremove\` prunes any now-orphaned dependencies."
+    return 0
+}
+
+# Discoverability: print every dotfiles verb, grouped by how often you reach for
+# it, with a one-line description each. Static text (no subprocesses) so it's
+# instant. Mirrors the command reference in README.md / docs/commands.md — keep
+# the three in sync when adding or renaming a verb.
+chezhelp() {
+    cat <<'EOF'
+
+  ── dotfiles commands ─────────────────────────────────────────────
+  Converge this Mac to the repo. Two verbs day to day; the rest are
+  for setup changes and package drift.
+
+  Everyday
+    chezup           Pull → preview → apply. The command you run most.
+    chezdoctor       Read-only health check (repo, brew, auth, mise, shell).
+
+  Change your setup (re-run the wizard)
+    chezreset        Set up as new: reset run-once state, re-ask wizard, apply.
+    chezreinit       Fill in newly-added setup keys; keeps existing answers.
+
+  Maintenance (packages & drift)
+    chez             Apply without pulling. Flags drift; never uninstalls.
+    chezbump         Upgrade deps: brew upgrade + mise upgrade.
+    chezaudit        List locally-installed packages in no Brewfile (report).
+    chezmirror       Uninstall untracked packages, confirming each.
+    dotfiles         cd into the source repo.
+
+  Under the hood
+    install.sh       Bootstrap a fresh Mac (curl | bash entry point).
+    macos-defaults   (Re-)apply macOS system defaults on their own.
+    chezhelp         Show this list.
+
+  Knobs (chezup / chez):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  Deeper docs:  run `dotfiles`, then see docs/commands.md
+EOF
 }
 
 # ─── Zellij (terminal multiplexer) ────────────────────────────────────────────

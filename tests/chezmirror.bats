@@ -1,0 +1,190 @@
+#!/usr/bin/env bats
+# Behavioural tests for the Brewfile-removal reconciler: chezmirror and the
+# helpers it shares with chezbump (_chez_brew_removals, _chez_brew_uninstall_one).
+#
+# Why this exists:
+#   chezmirror uninstalls Homebrew packages tracked in NO Brewfile tier. The
+#   dangerous, subtle bit is computing that "untracked" set: `brew bundle
+#   cleanup` honours only ONE --file, so the tiers must be concatenated and
+#   piped in via --file=-. Passing several --file reads just the LAST tier and
+#   would report almost the entire toolchain as untracked — one confirmed run
+#   would wipe the machine. These tests pin the union, the parser, the
+#   cask-vs-formula uninstall dispatch, and the no-TTY safety guard by
+#   extracting the REAL functions from the template and running them against a
+#   stubbed `brew`/`gum` — so a regression in the committed source fails here.
+#
+#   The interactive per-package loop needs a controlling terminal, so the two
+#   TTY-dependent tests are inverse-gated: the safety test runs headless (CI),
+#   the confirm-loop test runs only under a real/pseudo tty. Run the loop test
+#   locally with:  script -q /dev/null bats tests/chezmirror.bats
+
+setup() {
+    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    command -v bash >/dev/null 2>&1 || skip "bash not installed"
+
+    # A fake repo whose four Brewfile tiers the helper concatenates. Distinct
+    # markers per tier let us prove the UNION (all four) reaches brew's stdin.
+    FAKE="$(mktemp -d)"
+    mkdir -p "$FAKE/packages"
+    printf 'brew "marker-core"\n' >"$FAKE/packages/Brewfile"
+    printf 'cask "marker-macapps"\n' >"$FAKE/packages/Brewfile.mac-apps"
+    printf 'brew "marker-personal"\n' >"$FAKE/packages/Brewfile.personal"
+    printf 'brew "marker-work"\n' >"$FAKE/packages/Brewfile.work"
+
+    # Stub bin dir (prepended to PATH) + log/queue files the stubs read/write.
+    STUBS="$(mktemp -d)"
+    CANNED="$STUBS/cleanup.out"     # what stub `brew bundle cleanup` prints
+    ARGS_LOG="$STUBS/brew-args.log" # args passed to `brew bundle cleanup`
+    STDIN_LOG="$STUBS/brew-stdin"   # what got piped into `brew bundle cleanup`
+    UNINSTALL_LOG="$STUBS/uninstall.log"
+    GUM_ANSWERS="$STUBS/gum.answers"
+
+    # Representative cleanup output: one cask + two formulae, then the trailer.
+    cat >"$CANNED" <<'EOF'
+Would uninstall casks:
+orphan-app
+Would uninstall formulae:
+bats-core
+orphan-cli
+Run `brew bundle cleanup --force` to make these changes.
+EOF
+
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
+    shift 2
+    printf 'cleanup %s\n' "\$*" >>"$ARGS_LOG"
+    cat >"$STDIN_LOG"          # capture the piped-in union
+    cat "$CANNED" 2>/dev/null  # emit the canned preview
+    exit 0
+fi
+if [ "\$1" = uninstall ]; then
+    shift
+    printf '%s\n' "\$*" >>"$UNINSTALL_LOG"
+    exit 0
+fi
+exit 0
+EOF
+
+    # gum confirm pops the next yes/no from the queue file (yes -> exit 0).
+    cat >"$STUBS/gum" <<EOF
+#!/usr/bin/env bash
+[ "\$1" = confirm ] || exit 0
+ans="\$(head -n1 "$GUM_ANSWERS")"
+tail -n +2 "$GUM_ANSWERS" >"$GUM_ANSWERS.t" && mv "$GUM_ANSWERS.t" "$GUM_ANSWERS"
+[ "\$ans" = yes ]
+EOF
+    chmod +x "$STUBS/brew" "$STUBS/gum"
+}
+
+teardown() {
+    [ -n "${FAKE:-}" ] && rm -rf "$FAKE"
+    [ -n "${STUBS:-}" ] && rm -rf "$STUBS"
+}
+
+# Pull one or more function bodies out of the template, repointing the single
+# `local src={{ .chezmoi.workingTree | quote }}` line at the fake repo. The
+# helpers carry no template directives, so only chezmirror's src line changes.
+extract() {
+    local fn
+    for fn in "$@"; do
+        sed -n "/^${fn}() {/,/^}/p" "$ZSHRC"
+    done | sed "s|^    local src={{.*}}|    local src=\"$FAKE\"|"
+}
+
+# Can this process actually open a controlling terminal? Mirrors the guard the
+# function itself uses, so the TTY-gated tests agree with production behaviour.
+have_tty() { { : </dev/tty; } >/dev/null 2>&1; }
+
+run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" GUM_ANSWERS="$GUM_ANSWERS" \
+        bash -c "$1"
+}
+
+# ─── _chez_brew_removals: the union + parser (the bug lived here) ────────────
+
+@test "_chez_brew_removals parses cleanup output into <kind><TAB><name> rows" {
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf 'cask\torphan-app')" ]
+    [ "${lines[1]}" = "$(printf 'formula\tbats-core')" ]
+    [ "${lines[2]}" = "$(printf 'formula\torphan-cli')" ]
+    [ "${#lines[@]}" -eq 3 ]
+}
+
+@test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    # Every tier's marker must reach brew's stdin — not just the last file's.
+    for m in marker-core marker-macapps marker-personal marker-work; do
+        grep -qF "$m" "$STDIN_LOG" || {
+            echo "missing $m from brew stdin:"
+            cat "$STDIN_LOG"
+            return 1
+        }
+    done
+}
+
+@test "_chez_brew_removals passes a single --file=- (never multiple --file)" {
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$ARGS_LOG")" = "cleanup --file=-" ]
+    # Belt-and-braces: exactly one --file token — the whole point of the fix.
+    [ "$(grep -o -- '--file' "$ARGS_LOG" | wc -l | tr -d ' ')" -eq 1 ]
+}
+
+@test "_chez_brew_removals yields nothing when brew reports no removals" {
+    : >"$CANNED" # brew bundle cleanup prints nothing
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# ─── _chez_brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
+
+@test "_chez_brew_uninstall_one routes casks through --cask, formulae plain" {
+    run_fn "$(extract _chez_brew_uninstall_one)
+        _chez_brew_uninstall_one cask my-app
+        _chez_brew_uninstall_one formula my-cli"
+    [ "$status" -eq 0 ]
+    [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask my-app" ]
+    [ "$(sed -n 2p "$UNINSTALL_LOG")" = "my-cli" ]
+}
+
+# ─── chezmirror: end-to-end behaviour ───────────────────────────────────────
+
+@test "chezmirror reports nothing to remove when every package is tracked" {
+    : >"$CANNED" # nothing untracked
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nothing to remove"* ]]
+    [ ! -s "$UNINSTALL_LOG" ] # never uninstalled anything
+}
+
+@test "chezmirror refuses to uninstall without a controlling terminal (safety)" {
+    have_tty && skip "has a controlling tty; see the confirm-loop test instead"
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No TTY"* ]]
+    # It previewed the untracked set but uninstalled NOTHING.
+    [[ "$output" == *"orphan-app"* ]]
+    [ ! -s "$UNINSTALL_LOG" ]
+}
+
+@test "chezmirror uninstalls only the confirmed packages, one at a time" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # Confirm the cask, decline bats-core, confirm the other formula.
+    printf 'yes\nno\nyes\n' >"$GUM_ANSWERS"
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 0 ]
+    # orphan-app (cask, routed via --cask) and orphan-cli removed; bats-core kept.
+    [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
+    [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
+    [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
+    ! grep -qx "bats-core" "$UNINSTALL_LOG"
+    [[ "$output" == *"removed 2 · kept 1"* ]]
+}

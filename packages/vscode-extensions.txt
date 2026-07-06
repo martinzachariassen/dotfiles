@@ -13,8 +13,6 @@ exiasr.hadolint
 foxundermoon.shell-format
 genuitecllc.codetogether
 github.vscode-pull-request-github
-github.copilot
-github.copilot-chat
 github.vscode-github-actions
 gruntfuggly.todo-tree
 hashicorp.hcl

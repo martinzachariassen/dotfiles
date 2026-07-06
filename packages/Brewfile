@@ -17,6 +17,7 @@
 # (then move feature-specific lines back into the matching packages/Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
+brew "bats-core"               # Bash test framework — runs this repo's tests/*.bats (local + CI)
 brew "chezmoi"                 # this very repo's manager
 brew "gh"                      # GitHub CLI
 brew "git"

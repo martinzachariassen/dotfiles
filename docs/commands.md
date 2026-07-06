@@ -82,13 +82,14 @@ never lets you re-choose existing ones; reach for `chezreset` for that. See
 
 | Command | What it does |
 |---|---|
-| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit`). |
+| `chezhelp` | Print every dotfiles verb, grouped, with a one-line description each. Static text — instant, no subprocesses. The discoverable entry point when you forget a command. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit` / `chezhelp`). |
 | `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
 | `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
 | `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
 | `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
-| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview, then (confirm-gated) `brew bundle cleanup --force` to uninstall everything untracked. |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked packages (union of all tiers), then confirm each uninstall **one at a time** (via `gum` when installed). |
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so it
 > only ever *adds* presence. Freshness is `chezbump`'s job; *removal* is

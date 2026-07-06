@@ -131,10 +131,41 @@ setup() {
     grep -qE '^chez\(\) \{' "$ZSHRC"
 }
 
+# chezhelp is the discoverable command index. Its listing must stay in sync with
+# the actual verbs, so assert it names each user-facing one — a renamed/added
+# verb that forgets to update the help text trips this.
+@test "zshrc defines chezhelp and it lists every verb" {
+    grep -qE '^chezhelp\(\) \{' "$ZSHRC"
+    body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
+    for verb in chezup chezdoctor chezreset chezreinit chez chezbump chezaudit chezmirror dotfiles; do
+        grep -qE "^ +${verb} " <<<"$body" || {
+            echo "chezhelp is missing an entry for: ${verb}"
+            return 1
+        }
+    done
+}
+
+# Wiring only — the behaviour (union, parser, cask/formula dispatch, no-TTY
+# safety) is exercised end-to-end in tests/chezmirror.bats against a stubbed brew.
 @test "zshrc defines the chezmirror function (Brewfile removal reconcile)" {
     grep -qE '^chezmirror\(\) \{' "$ZSHRC"
-    # It must actually enforce removal via brew bundle cleanup --force.
-    grep -qF 'brew bundle cleanup --force' "$ZSHRC"
+    body="$(sed -n '/^chezmirror() {/,/^}/p' "$ZSHRC")"
+    # Removal routes through the shared helpers, and confirms per package (so
+    # each uninstall is individually gated) — never a bulk `cleanup --force`.
+    grep -qF '_chez_brew_removals' <<<"$body"
+    grep -qF '_chez_brew_uninstall_one' <<<"$body"
+    grep -qF 'gum confirm' <<<"$body"
+    ! grep -qF 'brew bundle cleanup --force' <<<"$body"
+
+    # The untracked set is the UNION of every tier, and that union lives in ONE
+    # place (_chez_brew_removals). `brew bundle cleanup` honours only ONE --file,
+    # so the tiers must arrive on stdin (--file=-); passing multiple --file reads
+    # just the last tier and would try to uninstall almost everything. Guard both
+    # the helper's stdin union and against any multi---file regression anywhere.
+    grep -qE '^_chez_brew_removals\(\) \{' "$ZSHRC"
+    helper="$(sed -n '/^_chez_brew_removals() {/,/^}/p' "$ZSHRC")"
+    grep -qF 'brew bundle cleanup --file=-' <<<"$helper"
+    ! grep -qE 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
 }
 
 @test "chez surfaces Brewfile drift but never auto-uninstalls" {
