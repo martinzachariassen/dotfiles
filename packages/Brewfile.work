@@ -8,6 +8,8 @@
 
 # ─── Cloud / Kubernetes / IaC ─────────────────────────────────────────────────
 # Taps stay first: the kubelogin + terraform formulae below resolve from them.
+# Homebrew 6.0 ignores non-official taps until trusted (docs.brew.sh/Tap-Trust);
+# the brew-bundle hook trusts every `tap` declared here before it installs.
 tap "Azure/kubelogin"
 tap "hashicorp/tap"
 brew "azure-cli"                 # global Azure account/subscription CLI

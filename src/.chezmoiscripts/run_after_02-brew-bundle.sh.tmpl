@@ -62,6 +62,21 @@ if [ "$missing" -eq 0 ]; then
     exit 0
 fi
 
+# ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
+# Homebrew 6.0 ignores formulae/casks from non-official taps until they're
+# trusted (docs.brew.sh/Tap-Trust). Declaring a `tap` line in our own Brewfile
+# IS the trust decision — so mirror it into Homebrew's trust store before
+# install, otherwise `brew bundle` silently skips e.g. Azure/kubelogin (kubelogin)
+# and hashicorp/tap (terraform) on a fresh machine. Idempotent: re-trusting an
+# already-trusted tap is a no-op.
+for f in "${FILES[@]}"; do
+    [ -f "$f" ] || continue
+    while IFS= read -r taprepo; do
+        [ -n "$taprepo" ] || continue
+        brew trust --tap "$taprepo" >/dev/null 2>&1 || echo "! could not trust tap: $taprepo"
+    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "$f")
+done
+
 # ─── Install missing entries (continue-on-error; failures summarised) ─────────
 failures=()
 for f in "${FILES[@]}"; do
