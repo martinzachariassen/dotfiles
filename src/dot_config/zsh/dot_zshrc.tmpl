@@ -230,6 +230,9 @@ dotfiles() {
         echo
         echo "Or just fill in newly-added setup keys (keeps current answers):"
         echo "    chezreinit"
+        echo
+        echo "List every dotfiles command:"
+        echo "    chezhelp"
     fi
 }
 
@@ -539,6 +542,42 @@ chezmirror() {
     echo "  removed $removed · kept $kept"
     [ "$removed" -gt 0 ] && echo "  Tip: \`brew autoremove\` prunes any now-orphaned dependencies."
     return 0
+}
+
+# Discoverability: print every dotfiles verb, grouped by how often you reach for
+# it, with a one-line description each. Static text (no subprocesses) so it's
+# instant. Mirrors the command reference in README.md / docs/commands.md — keep
+# the three in sync when adding or renaming a verb.
+chezhelp() {
+    cat <<'EOF'
+
+  ── dotfiles commands ─────────────────────────────────────────────
+  Converge this Mac to the repo. Two verbs day to day; the rest are
+  for setup changes and package drift.
+
+  Everyday
+    chezup           Pull → preview → apply. The command you run most.
+    chezdoctor       Read-only health check (repo, brew, auth, mise, shell).
+
+  Change your setup (re-run the wizard)
+    chezreset        Set up as new: reset run-once state, re-ask wizard, apply.
+    chezreinit       Fill in newly-added setup keys; keeps existing answers.
+
+  Maintenance (packages & drift)
+    chez             Apply without pulling. Flags drift; never uninstalls.
+    chezbump         Upgrade deps: brew upgrade + mise upgrade.
+    chezaudit        List locally-installed packages in no Brewfile (report).
+    chezmirror       Uninstall untracked packages, confirming each.
+    dotfiles         cd into the source repo.
+
+  Under the hood
+    install.sh       Bootstrap a fresh Mac (curl | bash entry point).
+    macos-defaults   (Re-)apply macOS system defaults on their own.
+    chezhelp         Show this list.
+
+  Knobs (chezup / chez):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  Deeper docs:  run `dotfiles`, then see docs/commands.md
+EOF
 }
 
 # ─── Zellij (terminal multiplexer) ────────────────────────────────────────────

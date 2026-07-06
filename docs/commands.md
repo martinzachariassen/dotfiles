@@ -82,7 +82,8 @@ never lets you re-choose existing ones; reach for `chezreset` for that. See
 
 | Command | What it does |
 |---|---|
-| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit`). |
+| `chezhelp` | Print every dotfiles verb, grouped, with a one-line description each. Static text — instant, no subprocesses. The discoverable entry point when you forget a command. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit` / `chezhelp`). |
 | `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
 | `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
 | `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |

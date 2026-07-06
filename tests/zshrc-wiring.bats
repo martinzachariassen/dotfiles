@@ -131,6 +131,20 @@ setup() {
     grep -qE '^chez\(\) \{' "$ZSHRC"
 }
 
+# chezhelp is the discoverable command index. Its listing must stay in sync with
+# the actual verbs, so assert it names each user-facing one — a renamed/added
+# verb that forgets to update the help text trips this.
+@test "zshrc defines chezhelp and it lists every verb" {
+    grep -qE '^chezhelp\(\) \{' "$ZSHRC"
+    body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
+    for verb in chezup chezdoctor chezreset chezreinit chez chezbump chezaudit chezmirror dotfiles; do
+        grep -qE "^ +${verb} " <<<"$body" || {
+            echo "chezhelp is missing an entry for: ${verb}"
+            return 1
+        }
+    done
+}
+
 # Wiring only — the behaviour (union, parser, cask/formula dispatch, no-TTY
 # safety) is exercised end-to-end in tests/chezmirror.bats against a stubbed brew.
 @test "zshrc defines the chezmirror function (Brewfile removal reconcile)" {
