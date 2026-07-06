@@ -254,6 +254,53 @@ obsidian_seed_readmes() {
     fi
 }
 
+# obsidian_seed_scripts VAULT — copy every user script into "99 Meta/_scripts/".
+# These are QuickAdd/Templater helpers (e.g. file-note.js, the "File this…"
+# mover) referenced by path from plugin config. Seed-only, same as templates.
+obsidian_seed_scripts() {
+    local vault="$1" src dst name placed=0
+    local sdir="$vault/99 Meta/_scripts"
+    [ -d "$OB_CONFIG_DIR/scripts" ] || return 0
+    for src in "$OB_CONFIG_DIR/scripts/"*.js; do
+        [ -f "$src" ] || continue
+        name="$(basename "$src")"
+        dst="$sdir/$name"
+        if [ -e "$dst" ]; then
+            continue
+        fi
+        if ob_seed_copy "$src" "$dst" "99 Meta/_scripts/$name"; then
+            printf "  ${GREEN}seed${RESET} 99 Meta/_scripts/%s\n" "$name"
+            placed=$((placed + 1))
+        fi
+    done
+    if [ "$placed" -eq 0 ]; then
+        printf "  %sscripts: every canonical user script already in vault%s\n" "$DIM" "$RESET"
+    fi
+}
+
+# obsidian_seed_bases VAULT — copy every .base file to the vault root. Bases are
+# core Obsidian database views (table/board over notes by property). Linked from
+# Home for at-a-glance oversight. Seed-only, same policy as Home.md.
+obsidian_seed_bases() {
+    local vault="$1" src dst name placed=0
+    [ -d "$OB_CONFIG_DIR/bases" ] || return 0
+    for src in "$OB_CONFIG_DIR/bases/"*.base; do
+        [ -f "$src" ] || continue
+        name="$(basename "$src")"
+        dst="$vault/$name"
+        if [ -e "$dst" ]; then
+            continue
+        fi
+        if ob_seed_copy "$src" "$dst" "$name"; then
+            printf "  ${GREEN}seed${RESET} %s\n" "$name"
+            placed=$((placed + 1))
+        fi
+    done
+    if [ "$placed" -eq 0 ]; then
+        printf "  %sbases: every canonical base already in vault%s\n" "$DIM" "$RESET"
+    fi
+}
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 # obsidian_apply — the full convergence. Returns 0 even when individual fetches
@@ -283,6 +330,8 @@ obsidian_apply() {
     obsidian_install_plugins "$vault"
     obsidian_seed_config "$vault"
     obsidian_seed_templates "$vault"
+    obsidian_seed_scripts "$vault"
+    obsidian_seed_bases "$vault"
     obsidian_seed_readmes "$vault"
     obsidian_seed_home "$vault"
     obsidian_seed_vault_guide "$vault"

@@ -11,6 +11,9 @@
   "quickadd:runQuickAdd": [
     { "modifiers": ["Mod", "Shift"], "key": "N" }
   ],
+  "quickadd:choice:file-this": [
+    { "modifiers": ["Mod", "Shift"], "key": "M" }
+  ],
   "app:toggle-left-sidebar": [
     { "modifiers": ["Mod", "Alt"], "key": "ArrowLeft" }
   ],

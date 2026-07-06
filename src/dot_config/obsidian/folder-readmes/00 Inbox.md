@@ -8,8 +8,10 @@ tags: [meta]
 **Capture first, sort later.** Everything new lands here so you never break
 flow deciding where it goes.
 
-- **Capture:** `⌘⇧N` (or any new note) drops a timestamped note here.
-- **Process:** at your weekly review, move each item to its real home in
-  `20 Projects` / `30 Areas` / `40 Resources` — or `50 Archive` if it's done.
+- **Capture:** `⌘⇧N` (or any new note) drops a **titled** note here — the topic
+  is the filename; the timestamp lives in the note's `created` property.
+- **Process:** hit `⌘⇧M` (**File this…**) on each — pick a bucket and optional
+  topic tags, and it moves the note to `20 Projects` / `30 Areas` /
+  `40 Resources` (or `50 Archive`), setting `domain` / `tags` as it goes.
 
 Goal: an empty inbox after every weekly review. See [[Vault Guide]].

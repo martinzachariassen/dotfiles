@@ -8,11 +8,10 @@
   "obsidian-icon-folder",
   "tag-wrangler",
   "table-editor-obsidian",
-  "calendar",
-  "nldates-obsidian",
-  "obsidian-excalidraw-plugin",
   "homepage",
   "obsidian-linter",
   "omnisearch",
-  "obsidian-auto-link-title"
+  "obsidian-auto-link-title",
+  "code-styler",
+  "obsidian-git"
 ]

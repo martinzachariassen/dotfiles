@@ -10,11 +10,18 @@ Everything you need to work in this vault: where things go, how to create
 them, and which keys to press. Linked from [[Home]] — press `⌘O` and type
 "Vault Guide" to jump back any time.
 
+> [!tip] Your daily loop is 5 keys
+> Everything else in this guide is optional depth. Day to day you only need:
+> **`⌘⇧N`** capture · **`⌘⇧M`** file this note · **`⌘⇧T`** today's note ·
+> **`⌘O`** find anything · **`⌘P`** every other command. Learn these five and
+> the vault runs itself.
+
 > [!tip] The 10-second version
-> **Capture** with `⌘⇧N` → everything lands in `00 Inbox`. **File** it at your
-> weekly review into Projects / Areas / Resources. Create a typed note simply
-> by **making a new note inside the matching folder** — the right template
-> applies itself.
+> **Capture** with `⌘⇧N` → everything lands in `00 Inbox`. **File** it with
+> `⌘⇧M` (**File this…** → pick a bucket) into Projects / Areas / Resources —
+> do a sweep at your weekly review, or whenever the inbox nags. Create a typed
+> note simply by **making a new note inside the matching folder** — the right
+> template applies itself.
 
 ## The PARA layout
 
@@ -38,7 +45,8 @@ pins it to the top of the file list.
 
 | Key | What happens |
 |---|---|
-| `⌘⇧N` | **Capture to inbox** (QuickAdd) — prompts for a title, drops a timestamped note in `00 Inbox/` |
+| `⌘⇧N` | **Capture to inbox** (QuickAdd) — prompts for a title, drops a **titled** note in `00 Inbox/` (the topic is the name; time is kept in `created`) |
+| `⌘⇧M` | **File this…** (QuickAdd) — pops a bucket menu (💼 Work / 🏠 Personal / 📁 Project / 📚 Resource / 🗄 Archive) + an optional topic-tag picker, then moves the note there, sets `domain` / `tags`, and fixes backlinks |
 | `⌘⇧T` | Open **today's daily** note (created from `daily.md` if missing) |
 | `⌘⇧W` | Open **this week's** weekly note |
 | `⌘⇧I` | **Insert a template** into the current note (Templater picker) |
@@ -47,8 +55,7 @@ pins it to the top of the file list.
 | `⌘⌥F` | Search within the file explorer |
 | `⌘⌥←` / `⌘⌥→` | Toggle the left / right sidebar |
 
-Monthly notes have no default key — open one via `⌘P → "Open monthly note"`
-or click a month in the Calendar sidebar.
+Monthly notes have no default key — open one via `⌘P → "Open monthly note"`.
 
 ## Creating notes
 
@@ -79,7 +86,7 @@ type-specific properties.
 
 | Template | How you get it | Sets up |
 |---|---|---|
-| `inbox` | `⌘⇧N`, or new note in `00 Inbox` | Timestamped capture |
+| `inbox` | `⌘⇧N`, or new note in `00 Inbox` | Titled capture (time in `created`) |
 | `daily` | `⌘⇧T` | Day note: prev/next nav, today's tasks, log |
 | `weekly` | `⌘⇧W` | Week note: Mon–Sun range, daily roll-up |
 | `monthly` | `⌘P → Open monthly note` | Month note: rolls up the weeklies |
@@ -120,6 +127,25 @@ target, area`; **reading** → `category, author, url, status, rating,
 started, finished`; **person** → `role, team, company, email, first-met`;
 **area** → `domain, status, review`.
 
+### Two axes for finding things
+
+You don't tag by hand — filing does it. Two complementary properties make any
+note findable, and both fill themselves in at `⌘⇧M`:
+
+- **`domain`** (`work` / `personal`) — the *whose-life* axis. Set automatically
+  when you file to 💼 Work or 🏠 Personal (and prompted for projects/areas).
+  Filter on it in Dataview: `WHERE domain = "work"`.
+- **`tags`** — the *what-it's-about* axis. Pick from the curated list in the
+  **File this…** step (`dev`, `infra`, `career`, `learning`, `reading`,
+  `finance`, `health`, `idea`). They render as chips and drive the **Tag pane**
+  (left sidebar → tag icon) — click `#dev` to see everything dev-related across
+  every folder. Autocomplete still lets you add one by hand in the property field.
+
+To change the tag menu, edit the one-line `TOPICS` list at the top of
+`99 Meta/_scripts/file-note.js` — the picker updates on the next file. Keep it
+short: a tight, reused vocabulary is what makes the tag tree worth browsing; a
+sprawling one is just noise.
+
 ## Icons & colors
 
 - **Folders** are colored by PARA tier (Iconize): Inbox red, Daily blue,
@@ -132,6 +158,10 @@ started, finished`; **person** → `role, team, company, email, first-met`;
 
 ## Where do I put this?
 
+From an open inbox note, `⌘⇧M` (**File this…**) does steps 2–7 for you — pick a
+bucket and it moves the note and fixes any backlinks. This list is the mental
+model behind those buckets:
+
 1. **Half-baked / unsorted?** → `00 Inbox`. Sort it at the weekly review.
 2. **Outcome + finish line?** → `20 Projects` (own subfolder).
 3. **Tend it indefinitely?** → `30 Areas` → `31 Work` / `32 Personal` / `33 Learning`.
@@ -142,29 +172,50 @@ started, finished`; **person** → `role, team, company, email, first-met`;
 
 ## Weekly review
 
-Once a week: open this week's note (`⌘⇧W`), empty `00 Inbox` (file or
-archive each item), glance at **Active projects** on [[Home]], and set next
-week's focus. Monthly, do the same one level up with the monthly note.
+Once a week: open this week's note (`⌘⇧W`), empty `00 Inbox` — work the
+**Inbox to process** list on [[Home]] top-down, hitting `⌘⇧M` on each — glance
+at **Active projects**, and set next week's focus. Monthly, do the same one
+level up with the monthly note.
 
 ## Plugins in play
 
 | Plugin | What it does |
 |---|---|
 | Templater | Dynamic templates (`<%* … %>`) |
-| QuickAdd | `⌘⇧N` capture flow |
+| QuickAdd | `⌘⇧N` capture flow + `⌘⇧M` "File this…" mover |
 | Periodic Notes | Daily / weekly / monthly note lifecycle |
 | Dataview | Live queries powering the [[Home]] dashboard |
 | Tasks | `- [ ]` tasks with due dates; the `tasks` blocks on Home |
 | Homepage | Opens [[Home]] on launch |
-| Calendar | Sidebar calendar — click a date to open its note |
-| NLDates | `@today`, `@tomorrow`, `@next monday` in note bodies |
 | Iconize | Folder + note icons and colors |
 | Style Settings | Catppuccin theme tweak panel |
 | Linter | On-save tidy of frontmatter and markdown |
 | Omnisearch | Full-text fuzzy search across the vault |
-| Excalidraw | Hand-drawn diagrams |
+| Code Styler | Line numbers, language label, and copy button on code fences |
 | Tag Wrangler | Rename / merge tags from the sidebar |
 | Auto Link Title | Paste a URL → it fetches the page title for the link |
+| Obsidian Git | Auto-commits the vault to a private repo — your backup + undo |
+
+Oversight comes from **core Bases** (no plugin): [[Projects.base|Projects &
+Areas]] is a live table/board of open projects, areas, and the inbox — sort or
+group it however you like. Linked from [[Home]].
+
+## On mobile
+
+Capture and filing both work on the phone — they're commands, not desktop
+shortcuts. Add them to the mobile toolbar once: **Settings → Mobile → Manage
+toolbar options** (or the wrench in the toolbar) → add **"QuickAdd: Capture to
+inbox"** and **"QuickAdd: File this…"**. Then capture and file with a tap, no
+keyboard needed. Until you do, both are reachable from the command palette.
+
+## Backups
+
+Your notes are versioned by **Obsidian Git** to a private repo — it commits and
+pushes automatically and pulls on launch, so every note has history and an undo.
+iCloud only *syncs* (a bad delete spreads everywhere); git is what actually lets
+you get a note back. If you edit on two devices, let one finish syncing before
+starting on the other. First-time repo setup is in the dotfiles repo's
+`src/dot_config/obsidian/README.md`.
 
 ## Reseeding from the dotfiles repo
 
