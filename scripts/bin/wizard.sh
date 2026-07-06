@@ -59,6 +59,20 @@ MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 . "$_DIR/../lib/chezmoi-data.sh"
 ui_init_logging
 
+# ─── Ctrl-C quits cleanly ────────────────────────────────────────────────────
+# Every prompt reads with a `read … || fallback` clause, which also swallows an
+# interrupted read: press Ctrl-C mid-question and bash takes the fallback and
+# marches on to the next question instead of quitting. Trap SIGINT/SIGTERM so a
+# Ctrl-C aborts the whole wizard the way it normally would — restore the cursor
+# (gum and the bash TUI picker can leave it hidden), say nothing changed, and
+# exit 130 (128 + SIGINT) so callers see a real interrupt.
+on_interrupt() {
+    printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
+    info "aborted — nothing changed" >/dev/tty 2>/dev/null || true
+    exit 130
+}
+trap on_interrupt INT TERM
+
 [ -f "$TMPL" ] || {
     fail "cannot find $TMPL — run this from inside the dotfiles repo"
     exit 1

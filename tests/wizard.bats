@@ -115,3 +115,16 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     run wiz 'declare -F _tui_read_key _tui_choose _tui_multiselect >/dev/null && echo ok'
     [ "$output" = "ok" ]
 }
+
+# Ctrl-C must abort the whole wizard, not fall through: every prompt reads with a
+# `read … || fallback`, which also swallows an interrupted read. A SIGINT/SIGTERM
+# trap running on_interrupt is what quits cleanly (exit 130), so lock in that it's
+# armed and points at the handler.
+@test "a SIGINT trap is armed to quit cleanly" {
+    run wiz 'declare -F on_interrupt >/dev/null && echo ok'
+    [ "$output" = "ok" ]
+    run wiz 'trap -p INT'
+    [[ "$output" == *on_interrupt* ]]
+    run wiz 'trap -p TERM'
+    [[ "$output" == *on_interrupt* ]]
+}

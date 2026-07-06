@@ -30,6 +30,18 @@ die() {
     exit 1
 }
 
+# Ctrl-C aborts cleanly during the prerequisite steps below (the bounded Xcode
+# wait, Homebrew/chezmoi install, git clone) instead of stopping abruptly with no
+# word. Restore the cursor, say nothing further was applied, and exit 130 (128 +
+# SIGINT). Once we exec the wizard (or chezmoi) it replaces this handler with its
+# own — the wizard installs the same trap, so a Ctrl-C there quits just as cleanly.
+on_interrupt() {
+    printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
+    warn "aborted — nothing further was applied."
+    exit 130
+}
+trap on_interrupt INT TERM
+
 # Put brew on PATH whether it was just installed or is already present but not yet
 # exported in this non-login shell.
 load_brew() {
