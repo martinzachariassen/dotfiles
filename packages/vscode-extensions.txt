@@ -13,6 +13,7 @@ exiasr.hadolint
 foxundermoon.shell-format
 genuitecllc.codetogether
 github.vscode-pull-request-github
+github.copilot
 github.copilot-chat
 github.vscode-github-actions
 gruntfuggly.todo-tree
@@ -43,7 +44,6 @@ vivaxy.vscode-conventional-commits
 vscjava.vscode-gradle
 vscjava.vscode-java-debug
 vscjava.vscode-java-dependency
-vscjava.vscode-java-pack
 vscjava.vscode-java-test
 vscjava.vscode-maven
 vscjava.vscode-spring-boot-dashboard

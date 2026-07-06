@@ -32,6 +32,12 @@ DEPRECATED_EXTENSIONS=(
     # java.jdt.ls.lombokSupport.enabled (default true). The standalone extension
     # ships an old bundled lombok.jar and is being deprecated upstream.
     "vscjava.vscode-lombok"
+    # Old community Kotlin extension; superseded by jetbrains.kotlin-server.
+    "mathiasfrohlich.kotlin"
+    # Meta extension pack; all member extensions are already tracked individually.
+    "vscjava.vscode-java-pack"
+    # Azure Java migration wizard; not a day-to-day tool.
+    "vscjava.migrate-java-to-azure"
 )
 
 if ! command -v code >/dev/null 2>&1; then
