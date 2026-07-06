@@ -77,6 +77,21 @@ for f in "${FILES[@]}"; do
     done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "$f")
 done
 
+# ─── Pre-flight: clear stale partial downloads ───────────────────────────────
+# An interrupted earlier fetch (Ctrl-C, crash, flaky network) can leave a
+# *.incomplete file in Homebrew's download cache. On the next fetch Homebrew
+# tries to remove it and can hit a `dir_s_rmdir - No such file or directory`
+# race — which aborts an otherwise-successful pour, so the package installs but
+# `brew bundle` reports the whole file as failed. `rm -f` is idempotent and
+# ignores the (already-)missing files, making the run quiet and repeatable.
+cache_dir="$(brew --cache 2>/dev/null)/downloads"
+[ -d "$cache_dir" ] && rm -f "$cache_dir"/*.incomplete 2>/dev/null || true
+
+# Skip Homebrew's per-formula post-install cleanup during the bundle: it's the
+# step that raced above, and a single cleanup elsewhere (or `brew cleanup`)
+# reclaims space without turning a good install into a reported failure.
+export HOMEBREW_NO_INSTALL_CLEANUP=1
+
 # ─── Install missing entries (continue-on-error; failures summarised) ─────────
 failures=()
 for f in "${FILES[@]}"; do
