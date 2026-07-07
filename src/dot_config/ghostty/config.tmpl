@@ -53,7 +53,15 @@ shell-integration = zsh
 shell-integration-features = cursor,sudo,title
 
 # ─── Scrollback ───────────────────────────────────────────────────────────────
-scrollback-limit = 100000
+# NOTE: Ghostty measures this in BYTES, not lines (Ghostty's default is
+# 10000000 = 10MB). This is NOT the same unit as Zellij's `scrollback_lines`,
+# which counts lines. A previous value of 100000 (=100KB) silently shrank the
+# buffer ~100x below default and clipped history after only a few screens —
+# especially bad for densely-styled TUI output (Claude Code, etc.) where ANSI
+# escape bytes count against the limit. Buffer is allocated lazily, so a large
+# value costs no memory until actually used. 100MB comfortably holds ~100k
+# lines of heavy output, matching the intent of the Zellij setting.
+scrollback-limit = 100000000
 
 # ─── Keybindings ──────────────────────────────────────────────────────────────
 # Cmd+K clears screen + scrollback (matches iTerm muscle memory)
