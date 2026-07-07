@@ -38,16 +38,20 @@ setup() {
     ARGS_LOG="$STUBS/brew-args.log" # args passed to `brew bundle cleanup`
     STDIN_LOG="$STUBS/brew-stdin"   # what got piped into `brew bundle cleanup`
     UNINSTALL_LOG="$STUBS/uninstall.log"
-    GUM_ANSWERS="$STUBS/gum.answers"
 
-    # Representative cleanup output: one cask + two formulae, then the trailer.
+    # Representative cleanup output: one cask + two formulae, then the cache-
+    # pruning section newer Homebrew appends. The parser MUST stop at
+    # "Would `brew cleanup`:" — otherwise every "Would remove: …/Caches/…" line
+    # leaks in as a bogus "formula" removal (the bug this pins).
     cat >"$CANNED" <<'EOF'
 Would uninstall casks:
 orphan-app
 Would uninstall formulae:
 bats-core
 orphan-cli
-Run `brew bundle cleanup --force` to make these changes.
+Would `brew cleanup`:
+Would remove: /Users/x/Library/Caches/Homebrew/fmt--12.1.0 (282.9KB)
+Would remove: /Users/x/Library/Caches/Homebrew/Cask/claude--2.1.187 (216.0MB)
 EOF
 
     cat >"$STUBS/brew" <<EOF
@@ -67,13 +71,15 @@ fi
 exit 0
 EOF
 
-    # gum confirm pops the next yes/no from the queue file (yes -> exit 0).
-    cat >"$STUBS/gum" <<EOF
+    # Real `gum confirm` (bubbletea) reads keypresses from STDIN. The stub mirrors
+    # that: one answer line per confirm, consumed from stdin. This is what makes
+    # the confirm-loop test able to catch the bug — if chezmirror ever feeds the
+    # package list on stdin again, gum reads packages instead of these answers.
+    cat >"$STUBS/gum" <<'EOF'
 #!/usr/bin/env bash
-[ "\$1" = confirm ] || exit 0
-ans="\$(head -n1 "$GUM_ANSWERS")"
-tail -n +2 "$GUM_ANSWERS" >"$GUM_ANSWERS.t" && mv "$GUM_ANSWERS.t" "$GUM_ANSWERS"
-[ "\$ans" = yes ]
+[ "$1" = confirm ] || exit 0
+IFS= read -r ans || ans=""
+[ "$ans" = yes ]
 EOF
     chmod +x "$STUBS/brew" "$STUBS/gum"
 }
@@ -101,7 +107,7 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
-        UNINSTALL_LOG="$UNINSTALL_LOG" GUM_ANSWERS="$GUM_ANSWERS" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$1"
 }
 
@@ -114,6 +120,16 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     [ "${lines[1]}" = "$(printf 'formula\tbats-core')" ]
     [ "${lines[2]}" = "$(printf 'formula\torphan-cli')" ]
     [ "${#lines[@]}" -eq 3 ]
+}
+
+@test "_chez_brew_removals stops at the cache-prune section (no leaked paths)" {
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    # The "Would `brew cleanup`:" section and its "Would remove: …/Caches/…"
+    # lines must NEVER surface as removals — that's the parser bug regression.
+    ! grep -q 'Would remove' <<<"$output"
+    ! grep -q 'Caches/Homebrew' <<<"$output"
+    ! grep -q 'brew cleanup' <<<"$output"
 }
 
 @test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
@@ -177,9 +193,15 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
 
 @test "chezmirror uninstalls only the confirmed packages, one at a time" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # Confirm the cask, decline bats-core, confirm the other formula.
-    printf 'yes\nno\nyes\n' >"$GUM_ANSWERS"
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    # Answers arrive on STDIN (as real gum reads them): confirm the cask, decline
+    # bats-core, confirm the other formula. This is the bug's regression test —
+    # if chezmirror feeds the package list on stdin again, gum reads packages
+    # instead of these answers and the loop miscounts / drains early.
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nno\nyes'
     [ "$status" -eq 0 ]
     # orphan-app (cask, routed via --cask) and orphan-cli removed; bats-core kept.
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
@@ -187,4 +209,64 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
     ! grep -qx "bats-core" "$UNINSTALL_LOG"
     [[ "$output" == *"removed 2 · kept 1"* ]]
+}
+
+# ─── chezmirror accept-all mode (--all / --yes / YES=1) ─────────────────────
+
+@test "chezmirror --help prints usage and removes nothing" {
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --help"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"usage: chezmirror"* ]]
+    [[ "$output" == *"--all"* ]]
+    [ ! -s "$UNINSTALL_LOG" ] # help path never touches brew
+}
+
+@test "chezmirror rejects an unknown option (exit 2, no uninstall)" {
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --bogus"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown option"* ]]
+    [ ! -s "$UNINSTALL_LOG" ]
+}
+
+@test "chezmirror --all uninstalls the whole set after ONE confirmation" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # A single 'yes' on stdin gates the whole batch; the per-package loop then
+    # runs unattended (no further prompts), so exactly one gum answer is consumed.
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --all" <<<$'yes'
+    [ "$status" -eq 0 ]
+    [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
+    [ "$(sed -n 2p "$UNINSTALL_LOG")" = "bats-core" ]
+    [ "$(sed -n 3p "$UNINSTALL_LOG")" = "orphan-cli" ]
+    [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
+    [[ "$output" == *"removed 3 · kept 0"* ]]
+}
+
+@test "chezmirror --all aborts cleanly when the bulk confirm is declined" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --all" <<<$'no'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aborted"* ]]
+    [ ! -s "$UNINSTALL_LOG" ]
+}
+
+@test "YES=1 chezmirror accepts all with no prompt at all" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # No stdin fed: YES=1 must not read any answer (bulk confirm skipped, per-item
+    # prompts skipped). A stray read would hang; </dev/null proves it never reads.
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
+    [[ "$output" == *"removed 3 · kept 0"* ]]
 }

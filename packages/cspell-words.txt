@@ -1,11 +1,16 @@
+acks
 allopen
+assertj
 cloudsdktool
 fasterxml
 flywaydb
 fwcd
 healthcheck
+hikari
+Hikari
 isready
 livenessstate
+mockk
 pgdata
 readinessstate
 springframework
@@ -13,3 +18,4 @@ stdlib
 temurin
 vscjava
 Xjsr
+zaxxer

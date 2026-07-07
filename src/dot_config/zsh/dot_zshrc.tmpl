@@ -453,6 +453,12 @@ _chez_brew_removals() {
         brew bundle cleanup --file=- 2>/dev/null | awk '
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
+            # End of the uninstall list. Newer Homebrew appends a
+            # "Would `brew cleanup`:" cache-pruning section (dozens of
+            # "Would remove: …/Caches/…" lines); older versions printed a
+            # "Run `brew bundle cleanup --force`…" trailer. Reset on either so
+            # cache paths never leak in as bogus "formula" removals.
+            /^Would .brew cleanup.:/     { kind = "";        next }
             /^Run .brew bundle cleanup/  { kind = "";        next }
             kind && NF                   { print kind "\t" $0 }
         '
@@ -492,13 +498,45 @@ chezaudit() {
 # brew-bundle hook; this is its deliberate, confirmed counterpart — NOT wired
 # into `chez`, because a routine apply should never silently uninstall.
 #
-# Destructive, so it asks PER PACKAGE (gum when present, plain read otherwise):
-# you approve each uninstall individually rather than one all-or-nothing gate.
-# The untracked set is the UNION of all Brewfile tiers (see _chez_brew_removals),
-# so a package tracked in a profile/module you don't currently use is preserved.
+# Destructive, so by default it asks PER PACKAGE (gum when present, plain read
+# otherwise): you approve each uninstall individually rather than one all-or-
+# nothing gate. The untracked set is the UNION of all Brewfile tiers (see
+# _chez_brew_removals), so a package tracked in a profile/module you don't
+# currently use is preserved.
+#
+# Accept-all mode — uninstall the ENTIRE untracked set so installed state mirrors
+# the Brewfiles in one go:
+#   chezmirror --all   (aliases: -a, --yes, -y)   one bulk confirmation, then all
+#   YES=1 chezmirror                               accept-all, skip even that
+#                                                  (same YES=1 knob as chez/chezup)
+# The TTY guard still applies: with no controlling terminal it removes nothing.
 chezmirror() {
     # Repo root, baked in at apply time (git working tree; source dir is src/).
     local src={{ .chezmoi.workingTree | quote }}
+
+    # Accept-all + its bulk-confirm gate. The repo-wide YES=1 knob implies
+    # accept-all AND skips the one confirmation (non-interactive, matching
+    # "YES=1 skip confirm" in chez/chezup); the flags imply accept-all but still
+    # ask once before wiping the whole set.
+    local all=0 bulk_confirm=1 arg
+    [ "${YES:-}" = 1 ] && { all=1; bulk_confirm=0; }
+    for arg in "$@"; do
+        case "$arg" in
+            -a | --all | -y | --yes) all=1 ;;
+            -h | --help)
+                echo "usage: chezmirror [--all|-a | --yes|-y]"
+                echo "  (no flag)   confirm each untracked package individually"
+                echo "  --all, -a   uninstall the whole untracked set after ONE confirmation"
+                echo "  --yes, -y   alias of --all;  YES=1 chezmirror skips that confirmation"
+                return 0
+                ;;
+            *)
+                echo "chezmirror: unknown option: $arg (try --help)" >&2
+                return 2
+                ;;
+        esac
+    done
+
     local parsed
     parsed=$(_chez_brew_removals "$src")
 
@@ -520,10 +558,34 @@ chezmirror() {
         return 0
     fi
 
-    local kind name reply ok removed=0 kept=0
-    while IFS=$'\t' read -r kind name; do
-        [ -n "$name" ] || continue
+    # Accept-all: one gate for the whole batch (skipped under YES=1), then the
+    # loop below skips the per-package prompt.
+    if [ "$all" -eq 1 ] && [ "$bulk_confirm" -eq 1 ]; then
+        local count ok
+        count=$(printf '%s\n' "$parsed" | grep -c .)
         if command -v gum >/dev/null 2>&1; then
+            gum confirm "Uninstall ALL $count untracked package(s)?" && ok=1 || ok=0
+        else
+            local reply
+            printf 'Uninstall ALL %s untracked package(s)? [y/N] ' "$count"
+            IFS= read -r reply </dev/tty || reply=""
+            case "$reply" in y | Y | yes | YES) ok=1 ;; *) ok=0 ;; esac
+        fi
+        [ "$ok" -eq 1 ] || { echo "aborted — nothing removed"; return 0; }
+    fi
+
+    local kind name reply ok removed=0 kept=0
+    # Feed the package list on fd 3, NOT stdin: `gum confirm` (bubbletea) reads
+    # its keypresses from stdin, so if the loop's `read` consumed fd 0 from the
+    # here-string, gum would read the package list instead of the user — silently
+    # auto-answering "no" and draining the list after ~1 item (removed 0, kept N).
+    # Keeping stdin on the terminal lets gum prompt for real; the plain-read
+    # fallback already reads </dev/tty for the same reason.
+    while IFS=$'\t' read -r kind name <&3; do
+        [ -n "$name" ] || continue
+        if [ "$all" -eq 1 ]; then
+            ok=1
+        elif command -v gum >/dev/null 2>&1; then
             gum confirm "Uninstall ${kind} ${name}?" && ok=1 || ok=0
         else
             printf 'Uninstall %s %s? [y/N] ' "$kind" "$name"
@@ -536,7 +598,7 @@ chezmirror() {
         else
             kept=$((kept + 1))
         fi
-    done <<<"$parsed"
+    done 3<<<"$parsed"
 
     echo
     echo "  removed $removed · kept $kept"
@@ -568,6 +630,7 @@ chezhelp() {
     chezbump         Upgrade deps: brew upgrade + mise upgrade.
     chezaudit        List locally-installed packages in no Brewfile (report).
     chezmirror       Uninstall untracked packages, confirming each.
+                       --all/-a  uninstall the whole set after one confirmation.
     dotfiles         cd into the source repo.
 
   Under the hood
@@ -576,6 +639,7 @@ chezhelp() {
     chezhelp         Show this list.
 
   Knobs (chezup / chez):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  YES=1 chezmirror:  accept-all — uninstall every untracked package, no prompts
   Deeper docs:  run `dotfiles`, then see docs/commands.md
 EOF
 }
