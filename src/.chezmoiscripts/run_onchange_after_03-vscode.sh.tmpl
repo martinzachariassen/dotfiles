@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Installs VS Code extensions from the repo manifest when this script or the
-# extension manifest changes.
+# Mirrors this machine's VS Code extensions to the repo manifest: installs every
+# extension the manifest lists and uninstalls any extension not in it, so
+# packages/vscode-extensions.txt is the single source of truth. Re-runs when this
+# script or the manifest changes.
 #
 # Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
 
@@ -18,34 +20,23 @@ if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-# packages/ lives at the repo root, not the source dir (src/) — reach it via
-# .chezmoi.workingTree (the git working tree = repo root).
+# packages/ and scripts/ live at the repo root, not the source dir (src/) —
+# reach them via .chezmoi.workingTree (the git working tree = repo root).
 ROOT="{{ .chezmoi.workingTree }}"
 EXTENSIONS_FILE="$ROOT/packages/vscode-extensions.txt"
-DEPRECATED_EXTENSIONS=(
-    "continue.continue"
-    "fwcd.kotlin"
-    "jetbrains.kotlin"
-    "jetpack-io.devbox"
-    "mkhl.direnv"
-    # Lombok support is now built into redhat.java (since v1.9), controlled by
-    # java.jdt.ls.lombokSupport.enabled (default true). The standalone extension
-    # ships an old bundled lombok.jar and is being deprecated upstream.
-    "vscjava.vscode-lombok"
-    # Old community Kotlin extension; superseded by jetbrains.kotlin-server.
-    "mathiasfrohlich.kotlin"
-    # Meta extension pack; all member extensions are already tracked
-    # individually. The CLI can't uninstall it (VS Code treats removing a pack as
-    # removing its members, and redhat.java has external dependents — Spring Boot
-    # Tools/Dashboard), so uninstall_deprecated_extensions falls back to removing
-    # it on disk.
-    "vscjava.vscode-java-pack"
-    # Azure Java migration wizard; not a day-to-day tool.
-    "vscjava.migrate-java-to-azure"
-)
+EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
+
+# Shared, unit-tested set helpers (vscode_read_manifest / vscode_untracked).
+# shellcheck source=../../scripts/lib/vscode.sh
+. "$ROOT/scripts/lib/vscode.sh"
 
 if ! command -v code >/dev/null 2>&1; then
-    echo "! VS Code CLI not found; extension install skipped"
+    echo "! VS Code CLI not found; extension sync skipped"
+    exit 0
+fi
+
+if [ ! -f "$EXTENSIONS_FILE" ]; then
+    echo "! VS Code extension manifest missing: $EXTENSIONS_FILE"
     exit 0
 fi
 
@@ -53,25 +44,24 @@ installed_extensions() {
     code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
 }
 
-install_marketplace_extensions() {
-    if [ ! -f "$EXTENSIONS_FILE" ]; then
-        echo "! VS Code extension manifest missing: $EXTENSIONS_FILE"
-        return 0
-    fi
-
-    local installed ext line
-    installed="$(installed_extensions)"
-    while IFS= read -r line || [ -n "$line" ]; do
-        ext="${line%%#*}"
-        ext="$(printf '%s' "$ext" | xargs | tr '[:upper:]' '[:lower:]')"
-        [ -n "$ext" ] || continue
-{{ if not (has "locale" (dig "modules" (list) .)) -}}
-        # locale module off: skip the Norwegian dictionary extension.
-        [ "$ext" = "streetsidesoftware.code-spell-checker-norwegian-bokmal" ] && continue
+# The effective manifest is the source of truth for BOTH directions (install and
+# prune). With the locale module off, the Norwegian dictionary is dropped from it
+# so it is neither installed nor left half-managed — the prune step won't see it
+# in the manifest and would otherwise remove a just-installed copy (and vice
+# versa). Keeping the two directions on one set makes the mirror stable.
+{{ if has "locale" (dig "modules" (list) .) -}}
+MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE")"
+{{ else -}}
+MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE" "streetsidesoftware.code-spell-checker-norwegian-bokmal")"
 {{ end -}}
 
+install_marketplace_extensions() {
+    local installed ext
+    installed="$(installed_extensions)"
+    while IFS= read -r ext || [ -n "$ext" ]; do
+        [ -n "$ext" ] || continue
         # -F = literal match (extension IDs contain "."), -x = whole line.
-        # `installed` is already lowercased; `ext` matches that.
+        # `installed` is already lowercased, matching the normalized manifest.
         if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "✓ extension already installed: $ext"
         else
@@ -80,7 +70,9 @@ install_marketplace_extensions() {
             # transient marketplace failure must not abort the extensions after it.
             code --install-extension "$ext" || echo "  ! failed to install: $ext (continuing)"
         fi
-    done < "$EXTENSIONS_FILE"
+    done <<EOF
+$MANIFEST
+EOF
 }
 
 # The VS Code CLI refuses to uninstall an extension *pack* whose members have
@@ -89,8 +81,6 @@ install_marketplace_extensions() {
 # --uninstall-extension` errors out. The GUI can drop just the pack; the CLI
 # can't express that. Fall back to removing the extension on disk and pruning
 # VS Code's extensions cache (which VS Code otherwise self-heals on next launch).
-EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
-
 remove_extension_on_disk() {
     local ext="$1" changed=false dir cache
 
@@ -127,33 +117,36 @@ PY
     [ "$changed" = true ]
 }
 
-uninstall_deprecated_extensions() {
-    local installed ext
+# Enforce the manifest as the source of truth in the REMOVAL direction: uninstall
+# every extension installed locally but listed in no manifest entry. This is what
+# makes the sync a true one-to-one mirror rather than additive-only.
+prune_untracked_extensions() {
+    local installed untracked ext
     installed="$(installed_extensions)"
+    untracked="$(vscode_untracked "$installed" "$MANIFEST")"
+    [ -n "$untracked" ] || return 0
 
-    # DEPRECATED_EXTENSIONS entries are kept lowercase by convention so they
-    # line up with `installed_extensions` (already lowercased). Match literally
-    # with -F so dots in IDs aren't treated as regex any-char.
-    for ext in "${DEPRECATED_EXTENSIONS[@]}"; do
-        if printf '%s\n' "$installed" | grep -qxF "$ext"; then
-            echo "→ uninstalling deprecated extension: $ext"
-            if code --uninstall-extension "$ext" >/dev/null 2>&1; then
-                continue
-            fi
-            # CLI refused (e.g. a pack member has dependents) — remove on disk.
-            if remove_extension_on_disk "$ext"; then
-                echo "  ↳ CLI declined; removed on disk instead"
-            else
-                echo "  ! failed to uninstall: $ext (continuing)"
-            fi
+    while IFS= read -r ext || [ -n "$ext" ]; do
+        [ -n "$ext" ] || continue
+        echo "→ uninstalling untracked extension: $ext"
+        if code --uninstall-extension "$ext" >/dev/null 2>&1; then
+            continue
         fi
-    done
+        # CLI refused (e.g. a pack member has external dependents) — remove on disk.
+        if remove_extension_on_disk "$ext"; then
+            echo "  ↳ CLI declined; removed on disk instead"
+        else
+            echo "  ! failed to uninstall: $ext (continuing)"
+        fi
+    done <<EOF
+$untracked
+EOF
 }
 
 echo "▶ VS Code extensions"
 echo "  Manifest: $EXTENSIONS_FILE"
 
 install_marketplace_extensions
-uninstall_deprecated_extensions
+prune_untracked_extensions
 
-echo "✓ VS Code extensions are managed"
+echo "✓ VS Code extensions mirror the manifest"

@@ -7,7 +7,7 @@ is the overview and quick start; these docs are the detail behind it.
 
 | Doc | Covers |
 |---|---|
-| [install.md](install.md) | Bootstrapping a Mac — the three scenarios, `install.sh` flags, the deprecation cleanup, migrating off the old devbox/direnv stack. |
+| [install.md](install.md) | Bootstrapping a Mac — the three scenarios, `install.sh` flags, the deprecation cleanup, migrating off the old direnv stack. |
 | [commands.md](commands.md) | The everyday verbs (`chezup`, `chezdoctor`) and the full set of occasional helpers (`chezreset`, `chezreinit`, `chezmirror`, …). |
 | [packages.md](packages.md) | Package tiers (core + profile + module Brewfiles), profiles, the optional-module catalog, and the plain-text setup wizard. |
 

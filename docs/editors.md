@@ -19,9 +19,14 @@ extensions are managed by chezmoi.
   language server never breaks on a runtime bump. See
   [shell.md](shell.md#runtimes-mise).
 - **Extensions** — listed in
-  [`packages/vscode-extensions.txt`](../packages/vscode-extensions.txt) and
-  installed by the `run_onchange_after_03-vscode` hook (re-fires only when the
-  list changes — see [lifecycle.md](lifecycle.md)). The set covers the backend
+  [`packages/vscode-extensions.txt`](../packages/vscode-extensions.txt), which is
+  the single source of truth. The `run_onchange_after_03-vscode` hook **mirrors**
+  it onto the machine: it installs every ID the manifest lists and uninstalls any
+  extension not in it (re-fires only when the list changes — see
+  [lifecycle.md](lifecycle.md)). `chezdoctor` reports drift in both directions
+  read-only, and the set logic lives in
+  [`scripts/lib/vscode.sh`](../scripts/lib/vscode.sh) (unit-tested by
+  `tests/vscode.bats`). The set covers the backend
   stack: the Java/Spring pack, Kotlin, Gradle/Maven, plus Terraform, Kubernetes,
   Helm, Docker, Postgres, Python/Ruff, and the shell/YAML/TOML tooling. Several
   extensions are backed by CLIs from the Brewfile (hadolint, shellcheck, shfmt,

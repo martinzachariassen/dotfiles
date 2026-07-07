@@ -82,6 +82,13 @@ if [ -r "$_DOCTOR_DIR/../lib/chezmoi-data.sh" ]; then
     . "$_DOCTOR_DIR/../lib/chezmoi-data.sh"
 fi
 
+# Shared VS Code set helpers (vscode_read_manifest/vscode_untracked/
+# vscode_missing) for the extension-mirror drift check below.
+# shellcheck source=../lib/vscode.sh
+if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/vscode.sh"
+fi
+
 # ─── 1. Source repo present and up to date ────────────────────────────────────
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
@@ -292,6 +299,46 @@ else
     fail "brew not on PATH"
 fi
 
+# ─── 6b. VS Code extension mirror ─────────────────────────────────────────────
+# The manifest (packages/vscode-extensions.txt) is the source of truth: the
+# 03-vscode hook installs what it lists and prunes anything it doesn't. Report
+# both drift directions read-only so `chezdoctor` surfaces what the next apply
+# would reconcile. CI can't run this (no `code` CLI on the runners) — coverage of
+# the underlying set logic lives in tests/vscode.bats.
+section "VS Code extensions"
+if command -v code >/dev/null 2>&1; then
+    vsc_manifest_file="$SOURCE_DIR/packages/vscode-extensions.txt"
+    if [ ! -f "$vsc_manifest_file" ]; then
+        warn "extension manifest missing: packages/vscode-extensions.txt"
+    else
+        # Effective manifest = source of truth minus the Norwegian dictionary when
+        # the locale module is off (mirrors the 03-vscode hook's locale guard), so
+        # doctor reports the same drift the next apply would reconcile.
+        vsc_exclude=()
+        if ! printf '%s' "$(cm_data_json)" | jq -e '(.modules // []) | index("locale")' >/dev/null 2>&1; then
+            vsc_exclude=(streetsidesoftware.code-spell-checker-norwegian-bokmal)
+        fi
+        vsc_installed="$(code --list-extensions 2>/dev/null || true)"
+        vsc_manifest="$(vscode_read_manifest "$vsc_manifest_file" ${vsc_exclude[@]+"${vsc_exclude[@]}"})"
+        vsc_untracked="$(vscode_untracked "$vsc_installed" "$vsc_manifest")"
+        vsc_missing="$(vscode_missing "$vsc_installed" "$vsc_manifest")"
+        if [ -z "$vsc_untracked" ] && [ -z "$vsc_missing" ]; then
+            pass "all extensions match the manifest"
+        else
+            if [ -n "$vsc_missing" ]; then
+                n=$(printf '%s\n' "$vsc_missing" | wc -l | tr -d ' ')
+                warn "$n manifest extension(s) not installed — run: chezmoi apply"
+            fi
+            if [ -n "$vsc_untracked" ]; then
+                n=$(printf '%s\n' "$vsc_untracked" | wc -l | tr -d ' ')
+                warn "$n installed extension(s) not in the manifest — \`chezmoi apply\` will prune them (add to packages/vscode-extensions.txt to keep)"
+            fi
+        fi
+    fi
+else
+    note "VS Code CLI not on PATH — extension check skipped"
+fi
+
 # ─── 7. mise (language runtimes) ──────────────────────────────────────────────
 section "mise (runtimes)"
 if command -v mise >/dev/null 2>&1; then
@@ -324,13 +371,8 @@ if command -v mise >/dev/null 2>&1; then
 else
     fail "mise missing — language runtimes (java, node, …) won't activate. Run: chez"
 fi
-# Legacy guards: catch leftovers from the old devbox + direnv + Nix stack.
-if command -v devbox >/dev/null 2>&1; then
-    warn "legacy \`devbox\` still on PATH — uninstall: rm -f /usr/local/bin/devbox (runtimes now come from mise)"
-fi
-if [ -d /nix ]; then
-    warn "legacy Nix store still at /nix — devbox is gone; uninstall with \`/nix/nix-installer uninstall\` if you want the space back"
-fi
+# Legacy guard: catch a leftover from the old direnv stack (runtimes now come
+# from mise, per-project env from mise's [env]).
 if command -v direnv >/dev/null 2>&1; then
     warn "legacy \`direnv\` still on PATH — no longer used; remove with: brew uninstall direnv && rm -rf ~/.config/direnv"
 fi

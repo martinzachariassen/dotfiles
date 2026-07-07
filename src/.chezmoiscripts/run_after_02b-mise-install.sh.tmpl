@@ -7,8 +7,7 @@
 #   the first shell on a fresh machine would have a global mise config that
 #   points at java/node versions that aren't downloaded yet. Running
 #   `mise install` here eagerly downloads the global toolchain so the first
-#   interactive shell just works — the mise equivalent of the old eager Nix
-#   bootstrap.
+#   interactive shell just works.
 #
 # Why `run_after` (every apply), not `run_onchange`:
 #   This converges real installed state, not the config's text. A runtime can go

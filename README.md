@@ -149,14 +149,14 @@ Use the **same installer** — it snapshots any pre-existing legacy dotfiles int
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-It also runs the **[deprecation cleanup](docs/install.md#deprecation-cleanup)** so you don't carry forward tools the repo no longer manages (old `node`/`temurin` casks, devbox, direnv, the `/nix` store). Afterwards, reload and sanity-check:
+It also runs the **[deprecation cleanup](docs/install.md#deprecation-cleanup)** so you don't carry forward tools the repo no longer manages (old `node`/`temurin` casks, direnv). Afterwards, reload and sanity-check:
 
 ```sh
 exec zsh
-chezdoctor      # warns about any leftover devbox/Nix/direnv it couldn't remove
+chezdoctor      # warns about any leftover direnv it couldn't remove
 ```
 
-> **Coming from the devbox/direnv setup?** Runtimes are now managed by mise — see [docs/shell.md](docs/shell.md#runtimes-mise) and the [migration note](docs/install.md#coming-from-the-devboxdirenv-setup).
+> **Coming from the direnv setup?** Runtimes are now managed by mise — see [docs/shell.md](docs/shell.md#runtimes-mise) and the [migration note](docs/install.md#coming-from-the-direnv-setup).
 
 ### Already set up — staying current
 
