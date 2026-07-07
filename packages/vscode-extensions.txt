@@ -3,6 +3,7 @@ catppuccin.catppuccin-vsc
 adpyke.codesnap
 anthropic.claude-code
 bierner.markdown-mermaid
+bpruitt-goddard.mermaid-markdown-syntax-highlighting
 charliermarsh.ruff
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
@@ -20,6 +21,7 @@ hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
+mermaidchart.vscode-mermaid-chart
 mhutchie.git-graph
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
@@ -48,4 +50,5 @@ vscjava.vscode-spring-boot-dashboard
 vscjava.vscode-spring-initializr
 vscodevim.vim
 vmware.vscode-spring-boot
+vstirbu.vscode-mermaid-preview
 wmaurer.change-case

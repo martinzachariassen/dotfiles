@@ -44,7 +44,7 @@ Afterwards, reload and sanity-check:
 
 ```sh
 exec zsh
-chezdoctor      # warns about any leftover devbox/Nix/direnv it couldn't remove
+chezdoctor      # warns about any leftover direnv it couldn't remove
 ```
 
 ### Already set up
@@ -72,18 +72,14 @@ On an existing Mac the installer runs a cleanup so you don't carry forward tools
 the repo no longer manages. It:
 
 - uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`,
-  `temurin@25`, `direnv`) — language runtimes now come from **mise**;
-- removes the old out-of-band `devbox` binary and the leftover
-  `~/.config/direnv` config; and
-- asks **y/N before deleting the old `/nix` store** from the previous devbox
-  stack (it needs sudo and can't be undone — answer `n` to keep it, remove it
-  later with `/nix/nix-installer uninstall`).
+  `temurin@25`, `direnv`) — language runtimes now come from **mise**; and
+- removes the leftover `~/.config/direnv` config.
 
 On a fresh machine that never had the old stack, the cleanup is a silent no-op.
 It's implemented as the `run_onchange_after_02c-cleanup-deprecated` hook — see
 [lifecycle.md](lifecycle.md).
 
-### Coming from the devbox/direnv setup
+### Coming from the direnv setup
 
 Runtimes (Java/Node/Python) are now managed by **mise**: global defaults live in
 `~/.config/mise/config.toml`, and each project pins its own versions + env vars

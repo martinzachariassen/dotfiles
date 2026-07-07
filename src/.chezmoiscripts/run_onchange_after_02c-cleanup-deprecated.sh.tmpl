@@ -15,8 +15,8 @@
 #     `chezbump` preview + `brew bundle cleanup --force` by hand instead.)
 #   - Every step is guarded by an "is it actually here?" check, so on a fresh
 #     machine that never had the old stack this is a no-op.
-#   - The irreversible, sudo-level bit (the Nix store) is never removed without
-#     an explicit y/N confirmation.
+#   - The irreversible bit (the ~/.codex auth + history dir) is never removed
+#     without an explicit y/N confirmation.
 #
 # Lifecycle:
 #   `run_onchange_*` re-fires only when this script's rendered content changes —
@@ -56,13 +56,10 @@ DEPRECATED_CASKS=(
     "codex"             # OpenAI Codex CLI — repo no longer manages OpenAI tooling
     "chatgpt"           # OpenAI ChatGPT desktop app — same
 )
-# Out-of-band paths (binaries / config dirs) left by the old devbox + direnv
-# stack. Removed without prompting — all cheap and reversible.
+# Out-of-band config dirs left by the old direnv stack. Removed without
+# prompting — cheap and reversible.
 DEPRECATED_PATHS=(
-    "{{ .chezmoi.homeDir }}/.config/direnv"        # direnv global config
-    "{{ .chezmoi.homeDir }}/.local/share/devbox"   # devbox global packages
-    "{{ .chezmoi.homeDir }}/.cache/devbox"         # devbox cache
-    "{{ .chezmoi.homeDir }}/.config/devbox"        # devbox config (if any)
+    "{{ .chezmoi.homeDir }}/.config/direnv" # direnv global config
 )
 
 echo "◆ Cleanup: removing deprecated tools"
@@ -97,21 +94,7 @@ if command -v brew >/dev/null 2>&1; then
     done
 fi
 
-# ─── 2. devbox binary ─────────────────────────────────────────────────────────
-# Installed by the old Jetify curl-installer into /usr/local/bin (often
-# root-owned), so fall back to sudo. The sudo credential is already cached by
-# run_before_00-sudo-cache, so this won't prompt in the normal apply flow.
-if command -v devbox >/dev/null 2>&1; then
-    devbox_path="$(command -v devbox)"
-    echo "→ removing devbox binary: $devbox_path"
-    if rm -f "$devbox_path" 2>/dev/null || sudo rm -f "$devbox_path" 2>/dev/null; then
-        removed_any=true
-    else
-        echo "  ! could not remove $devbox_path — remove it manually"
-    fi
-fi
-
-# ─── 3. Deprecated config/data paths ──────────────────────────────────────────
+# ─── 2. Deprecated config/data paths ──────────────────────────────────────────
 for p in ${DEPRECATED_PATHS[@]+"${DEPRECATED_PATHS[@]}"}; do
     if [ -e "$p" ]; then
         echo "→ removing $p"
@@ -119,10 +102,11 @@ for p in ${DEPRECATED_PATHS[@]+"${DEPRECATED_PATHS[@]}"}; do
     fi
 done
 
-# ─── 4. ~/.codex (auth + history — confirm first) ────────────────────────────
+# ─── 3. ~/.codex (auth + history — confirm first) ────────────────────────────
 # OpenAI Codex CLI state. Holds `auth.json`, session sqlite databases, history,
-# and memories. Confirm before deleting (same pattern as the Nix store below) so
-# we never silently transform auth material.
+# and memories. Confirm before deleting (chezmoi runs scripts with stdin
+# disconnected, so we reopen the controlling TTY) so we never silently transform
+# auth material.
 codex_dir="{{ .chezmoi.homeDir }}/.codex"
 if [ -d "$codex_dir" ]; then
     codex_size="$(du -sh "$codex_dir" 2>/dev/null | cut -f1 || echo '?')"
@@ -146,46 +130,6 @@ if [ -d "$codex_dir" ]; then
             ;;
         *)
             echo "  Skipped. Remove later with: rm -rf $codex_dir"
-            ;;
-    esac
-fi
-
-# ─── 5. Nix store (irreversible — confirm first) ──────────────────────────────
-# The /nix store backed devbox's per-project packages. It needs sudo to remove
-# and can't be undone, so we ask before nuking it rather than doing it silently.
-if [ -d /nix ]; then
-    nix_size="$(du -sh /nix 2>/dev/null | cut -f1 || echo '?')"
-    echo
-    echo "── Nix store cleanup ─────────────────────────────────────────"
-    echo "  Devbox is gone, but its Nix store is still at /nix ($nix_size)."
-    echo "  Removing it is irreversible and requires sudo."
-
-    # Reopen stdin from the controlling TTY — chezmoi runs scripts with stdin
-    # disconnected. If there's no TTY (piped/CI apply), the read fails and we
-    # default to skipping, which is the safe choice. Note: don't redirect the
-    # shell's stderr here — `read -p` writes its prompt to stderr, so swallowing
-    # it globally hides the question and makes the script look hung.
-    exec </dev/tty || true
-    resp=""
-    printf "  Uninstall the Nix store now? [y/N] "
-    read -r resp </dev/tty 2>/dev/null || resp=""
-    case "$resp" in
-        [yY]|[yY][eE][sS])
-            if [ -x /nix/nix-installer ]; then
-                echo "→ running the Determinate Nix uninstaller"
-                if /nix/nix-installer uninstall --no-confirm; then
-                    echo "✓ Nix store removed"
-                    removed_any=true
-                else
-                    echo "  ! uninstall failed — retry manually: /nix/nix-installer uninstall"
-                fi
-            else
-                echo "  ! /nix/nix-installer not found (this may be an upstream multi-user Nix)."
-                echo "    Uninstall per https://nix.dev/manual/nix/latest/installation/uninstall"
-            fi
-            ;;
-        *)
-            echo "  Skipped. Remove later with: /nix/nix-installer uninstall"
             ;;
     esac
 fi

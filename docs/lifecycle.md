@@ -57,7 +57,11 @@ hook reads the active file set from
 ever *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling packages
 the Brewfile no longer lists) is `chezmirror`'s: an apply must never silently
 uninstall, so `chez` just flags untracked packages and `chezmirror` reconciles
-them behind a confirm. Other custom logic (e.g. `obsidian-apply.sh`) lives in
+them behind a confirm. VS Code extensions are the deliberate exception to the
+"never silently uninstall" rule: they carry no data and are trivial to reinstall,
+so `run_onchange_after_03-vscode` mirrors them outright — installing what
+`packages/vscode-extensions.txt` lists and pruning what it doesn't — on apply,
+with `chezdoctor` surfacing the drift read-only. Other custom logic (e.g. `obsidian-apply.sh`) lives in
 `scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin
 drivers that do render-time config, source their lib (if any), and call the entry
 point.
@@ -76,7 +80,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
 | Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
-| VS Code extensions | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` |
+| VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |
