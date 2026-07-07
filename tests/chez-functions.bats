@@ -114,6 +114,33 @@ EOF
     [[ "$output" == *ripgrep* ]]
 }
 
+@test "_chez_brew_untracked treats a tap-qualified leaf as tracked (both sides normalised)" {
+    # Regression: tap formulae surface tap-qualified from `brew leaves`
+    # (hashicorp/tap/terraform) while the Brewfile lists them the same way. The
+    # tracked side was reduced to the bare leaf name but the leaves side was not,
+    # so every tap-installed-and-tracked package was a phantom "untracked" hit.
+    # The Azure entry also proves the tap-prefix case is irrelevant: the Brewfile
+    # capitalises it (Azure/…) while `brew leaves` lowercases it (azure/…) — both
+    # collapse to the bare leaf, so neither should be reported.
+    printf 'brew "hashicorp/tap/terraform"\nbrew "Azure/kubelogin/kubelogin"\n' \
+        >>"$FAKE/packages/Brewfile.work"
+    BREW_LEAVES=$'git\nhashicorp/tap/terraform\nazure/kubelogin/kubelogin' \
+        run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *terraform* ]]
+    [[ "$output" != *kubelogin* ]]
+}
+
+@test "_chez_brew_untracked still flags a tap leaf that is in no Brewfile" {
+    # The normalisation must not swallow genuine drift: an untracked tap formula
+    # is reported by its bare leaf name (not the tap path).
+    BREW_LEAVES=$'git\nhashicorp/tap/packer' \
+        run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *packer* ]]
+    [[ "$output" != *hashicorp* ]]  # reported as the bare leaf, not the tap path
+}
+
 @test "chezaudit reports a clean machine when every leaf is tracked" {
     BREW_LEAVES=$'git' \
         run_zsh "$(extract chezaudit _chez_brew_untracked); chezaudit"
@@ -148,6 +175,16 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"in no Brewfile"* ]]
     [[ "$output" == *"chezmirror"* ]]
+}
+
+@test "chez does not raise a phantom drift notice for a tracked tap leaf" {
+    # End-to-end guard: a tap formula tracked in the Brewfile must not trip the
+    # post-apply "installed locally but in no Brewfile" notice.
+    printf 'brew "hashicorp/tap/terraform"\n' >>"$FAKE/packages/Brewfile.work"
+    CHEZMOI_STATUS="" BREW_LEAVES=$'git\nhashicorp/tap/terraform' \
+        run_zsh "$(extract chez _chez_brew_untracked); chez"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"in no Brewfile"* ]]
 }
 
 @test "chez propagates a failing apply's exit code" {

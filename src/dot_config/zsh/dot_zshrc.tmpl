@@ -423,6 +423,13 @@ chezbump() {
 # `chez` drift notice, `chezaudit`, and `chezmirror`. Note `brew leaves` reports
 # formulae only, so casks never show here — `chezmirror` uses `brew bundle
 # cleanup` for the authoritative removal set (formulae + casks + unused deps).
+#
+# BOTH sides are reduced to the bare leaf name via `awk -F/ '{print $NF}'`:
+# tap formulae surface tap-qualified on the `brew leaves` side (e.g.
+# `hashicorp/tap/terraform`, `azure/kubelogin/kubelogin`) while the Brewfile may
+# list them the same way. Stripping only one side made every tap-installed leaf a
+# phantom "untracked" hit even though it was tracked; normalise both so the
+# comparison is on `terraform` / `kubelogin`, not the tap path.
 _chez_brew_untracked() {
     # Repo root, baked in at apply time (git working tree; source dir is src/).
     local src={{ .chezmoi.workingTree | quote }}
@@ -431,7 +438,8 @@ _chez_brew_untracked() {
         | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
         | awk -F/ '{print $NF}' \
         | sort -u)
-    comm -23 <(brew leaves 2>/dev/null | sort -u) <(printf '%s\n' "$tracked")
+    comm -23 <(brew leaves 2>/dev/null | awk -F/ '{print $NF}' | sort -u) \
+        <(printf '%s\n' "$tracked")
 }
 
 # Internal: emit "<kind>\t<name>" (kind = cask | formula) for every Homebrew
