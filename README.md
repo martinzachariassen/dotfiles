@@ -239,7 +239,7 @@ chezup -v               # trailing args forwarded to `chezmoi apply`
 | **`chez`** | Apply **without pulling** — the building block `chezup` calls. Flags Brewfile drift (installed but untracked); never uninstalls. |
 | **`chezbump`** | Routine dependency upgrade: `brew update && brew upgrade` + `mise upgrade`. |
 | **`chezaudit`** | List Homebrew packages installed locally but **not tracked** in any Brewfile. Reports only — acts on nothing. |
-| **`chezmirror`** | Enforce the Brewfile as truth in the **removal** direction: preview untracked packages (union of all tiers), then confirm **each uninstall one at a time** (via `gum` when installed). |
+| **`chezmirror`** | Enforce the Brewfile as truth in the **removal** direction: preview untracked packages (union of all tiers), then confirm **each uninstall one at a time** (via `gum` when installed). Use `--all` (aliases `-a`, `--yes`, `-y`) to uninstall the whole set after one confirmation, or `YES=1 chezmirror` to accept-all with no prompt. |
 | **`dotfiles`** | Jump to the source repo. With args, points you at `chezreset` / `chezreinit`. |
 
 > **Why `apply` never uninstalls.** An apply must be safe to run at any time, so it only ever
