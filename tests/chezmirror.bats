@@ -68,6 +68,11 @@ if [ "\$1" = uninstall ]; then
     printf '%s\n' "\$*" >>"$UNINSTALL_LOG"
     exit 0
 fi
+if [ "\$1" = untap ]; then
+    shift
+    printf 'untap %s\n' "\$*" >>"$UNINSTALL_LOG"
+    exit 0
+fi
 exit 0
 EOF
 
@@ -132,6 +137,26 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     ! grep -q 'brew cleanup' <<<"$output"
 }
 
+@test "_chez_brew_removals labels the untap section 'tap' without leaking its header" {
+    # Modern `brew bundle cleanup` appends a "Would untap:" section (each entry a
+    # tap name like "supabase/tap") after dropping a tap's last tracked formula.
+    # Neither the header nor its entries may inherit the preceding "formula" kind
+    # — the bug that made chezmirror `brew uninstall "Would untap:"` and a bare
+    # tap name. They must surface as their own "tap" kind for `brew untap`.
+    cat >"$CANNED" <<'EOF'
+Would uninstall formulae:
+orphan-cli
+Would untap:
+acme/formulae
+EOF
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "$(printf 'formula\torphan-cli')" ]
+    [ "${lines[1]}" = "$(printf 'tap\tacme/formulae')" ]
+    [ "${#lines[@]}" -eq 2 ]
+    ! grep -q 'Would untap' <<<"$output" # the header itself must never leak
+}
+
 @test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
@@ -169,6 +194,13 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     [ "$status" -eq 0 ]
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask my-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "my-cli" ]
+}
+
+@test "_chez_brew_uninstall_one routes taps through untap (never uninstall)" {
+    run_fn "$(extract _chez_brew_uninstall_one)
+        _chez_brew_uninstall_one tap acme/formulae"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
 }
 
 # ─── chezmirror: end-to-end behaviour ───────────────────────────────────────
@@ -269,4 +301,22 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
     [[ "$output" == *"removed 3 · kept 0"* ]]
+}
+
+@test "chezmirror untaps an untracked tap end-to-end (Would untap regression)" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # A tap-only preview: pre-fix this fed `brew uninstall "Would untap:"` and a
+    # bare tap name (both errored). Now it must route through `brew untap`.
+    cat >"$CANNED" <<'EOF'
+Would untap:
+acme/formulae
+EOF
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
+    [[ "$output" == *"removed 1 · kept 0"* ]]
 }
