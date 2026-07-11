@@ -1,7 +1,6 @@
 <%*
 const subject = await tp.system.prompt("Meeting subject");
-const filename = `${tp.date.now("YYYY-MM-DD")} ${subject}`;
-await tp.file.rename(filename);
+await tp.file.rename(subject);
 %>---
 type: meeting
 icon: LiCalendarClock
