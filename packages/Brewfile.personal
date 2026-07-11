@@ -7,3 +7,6 @@
 
 # ─── Personal apps ────────────────────────────────────────────────────────────
 
+tap "supabase/tap"
+brew "supabase/tap/supabase"  # Supabase CLI — local dev, migrations, edge functions
+
