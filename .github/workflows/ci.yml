@@ -115,6 +115,65 @@ jobs:
           persist-credentials: false
       - uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2
 
+  # Secret scanning. The contributor rules forbid committing tokens, keys,
+  # credentials, or signing material; this enforces that rather than trusting
+  # it. `gitleaks dir` scans the working tree — the state being proposed — so
+  # it's independent of checkout depth and git history. Installed pinned via
+  # its Go module: ubuntu-latest ships Go (auto-fetching the toolchain gitleaks
+  # needs), so there's no release-asset URL to drift. Run via the resolved
+  # GOPATH/bin path — never $GITHUB_PATH — to avoid a code-execution sink.
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Install gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+      - name: Scan working tree
+        run: |
+          bin="$(go env GOPATH)/bin"
+          "$bin/gitleaks" dir . --redact --no-banner
+
+  # Lint the workflow files themselves. The `shell` job lints *.sh scripts;
+  # this lints the workflow YAML plus the bash embedded in every `run:` step
+  # (actionlint shells out to the runner's preinstalled shellcheck for those).
+  # Pinned via its Go module for the same reason as `secrets`.
+  actionlint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - name: Lint workflows
+        run: |
+          bin="$(go env GOPATH)/bin"
+          "$bin/actionlint" -color
+
+  # Security audit of the workflows (zizmor). Complements Dependabot — which
+  # only bumps pinned actions — by flagging risks Dependabot can't see:
+  # injectable `run:` steps, over-broad token permissions, credential
+  # persistence. The read-only GITHUB_TOKEN lets it verify each action's pin
+  # against its upstream tags. Scoped to workflows/, zizmor's primary surface.
+  zizmor:
+    name: workflow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Audit workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pipx run --spec zizmor==1.27.0 zizmor .github/workflows/
+
   # Conventional Commits PR title (subject 1-72 chars). PR-only.
   pr-title:
     name: PR title

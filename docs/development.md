@@ -14,6 +14,9 @@ in [`scripts/ci/`](../scripts/ci), so local and remote never diverge.
 | Shell parse | `bash -n` / `zsh -n` | ✅ | ✅ |
 | Spelling | `typos` (allowlist in [`.typos.toml`](../.typos.toml)) | ✅ | ✅ |
 | Config validity | `scripts/ci/lint-config.sh` (every JSON/JSONC/TOML output parses) | ✅ | ✅ |
+| Secret scan | `gitleaks dir` (no tokens/keys/credentials in the tree) | ✅ | ✅ |
+| Workflow lint | `actionlint` (workflow YAML + embedded `run:` bash) | ✅ | ✅ |
+| Workflow audit | `zizmor` (workflow security; `--offline` locally, online in CI) | ✅ | ✅ |
 | Render matrix | `scripts/ci/render-check.sh` (`chezmoi apply --dry-run` across profile × modules) | | ✅ |
 | Unit tests | `bats tests/` | | ✅ |
 | Homebrew names | `scripts/ci/brew-resolve.sh` + `brew-check-modules.sh` (macOS runner) | | ✅ |
