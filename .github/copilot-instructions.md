@@ -42,6 +42,8 @@ CI (`.github/workflows/ci.yml`) enforces these, and the pre-commit hooks
 - Spelling: `typos` (allowlist + exclusions in `.typos.toml`).
 - Config validity: every JSON/JSONC/TOML output parses (`scripts/lint-config.sh`).
 - Render: `chezmoi apply --dry-run` across the profile/features matrix.
+- Workflows: `actionlint` (YAML + embedded bash) and `zizmor` (security audit)
+  on everything under `.github/workflows/`.
 - Conventional Commits for every commit **and** PR title (subject ≤ 72 chars).
 - Never commit secrets, tokens, private keys, credentials, or signing material —
-  use placeholders or a secret-manager reference.
+  use placeholders or a secret-manager reference. `gitleaks` scans for this.

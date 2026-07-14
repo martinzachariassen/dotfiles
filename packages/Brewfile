@@ -17,17 +17,20 @@
 # (then move feature-specific lines back into the matching packages/Brewfile.<feature>)
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
+brew "actionlint"              # GitHub Actions workflow linter (pre-commit + CI)
 brew "bats-core"               # Bash test framework — runs this repo's tests/*.bats (local + CI)
 brew "chezmoi"                 # this very repo's manager
 brew "gh"                      # GitHub CLI
 brew "git"
 brew "git-delta"               # syntax-highlighted git diffs
+brew "gitleaks"                # secret scanner (pre-commit + CI)
 brew "gum"                     # interactive shell prompts (backs the wizard's arrow/space pickers)
 brew "jq"                      # JSON
 brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
 brew "pre-commit"              # git hook framework
 brew "tlrc"                    # `tldr <cmd>` — maintained Rust client (old `tldr` formula was disabled upstream)
 brew "typos-cli"               # source-code spell checker (pre-commit hook; CI uses the action)
+brew "zizmor"                  # GitHub Actions security auditor (pre-commit + CI)
 
 # ─── Modern CLI replacements (the shell config aliases these by default) ──────
 brew "bat"                     # cat
