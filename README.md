@@ -14,7 +14,6 @@ Apple Silicon Mac into a fully configured backend workstation, managed by
 [![chezmoi](https://img.shields.io/badge/chezmoi-managed-66ccff?style=flat-square)](https://chezmoi.io)
 [![zsh](https://img.shields.io/badge/shell-zsh-4EAA25?style=flat-square&logo=zsh&logoColor=white)](#what-you-get)
 [![Catppuccin Frappé](https://img.shields.io/badge/Catppuccin-Frapp%C3%A9-f2d5cf?style=flat-square&labelColor=303446)](https://github.com/catppuccin/catppuccin)
-[![Conventional Commits](https://img.shields.io/badge/Conventional_Commits-fe5196?style=flat-square&logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org)
 
 [Quick start](#quick-start) · [What you get](#what-you-get) · [Commands](#commands) · [How it works](#how-it-works) · [Repository layout](#repository-layout) · [Documentation](#documentation)
 
