@@ -237,6 +237,7 @@ chezup -v               # trailing args forwarded to `chezmoi apply`
 | Command | What it does |
 |---|---|
 | **`chez`** | Apply **without pulling** — the building block `chezup` calls. Flags Brewfile drift (installed but untracked); never uninstalls. |
+| **`chezdiff`** | Explain what would change in **plain words** — pending repo → `$HOME` writes and local `$HOME` drift, split into two labelled sections. Read-only (no apply). Pass a path or `-v` for the raw `chezmoi diff`. |
 | **`chezbump`** | Routine dependency upgrade: `brew update && brew upgrade` + `mise upgrade`. |
 | **`chezaudit`** | List Homebrew packages installed locally but **not tracked** in any Brewfile. Reports only — acts on nothing. |
 | **`chezmirror`** | Enforce the Brewfile as truth in the **removal** direction: preview untracked items (union of all tiers — formulae, casks, and orphaned taps), then confirm **each removal one at a time** (via `gum` when installed); taps go through `brew untap`. Use `--all` (aliases `-a`, `--yes`, `-y`) to remove the whole set after one confirmation, or `YES=1 chezmirror` to accept-all with no prompt. |
