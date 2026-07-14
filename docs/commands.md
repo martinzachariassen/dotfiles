@@ -89,7 +89,7 @@ never lets you re-choose existing ones; reach for `chezreset` for that. See
 | `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
 | `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
-| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked packages (union of all tiers), then confirm each uninstall **one at a time** (via `gum` when installed). Pass `--all` (aliases `-a`, `--yes`, `-y`) to uninstall the **whole** set after a single confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (union of all tiers — formulae, casks, and orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after a single confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. |
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so it
 > only ever *adds* presence. Freshness is `chezbump`'s job; *removal* is

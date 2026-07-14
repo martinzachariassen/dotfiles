@@ -442,11 +442,12 @@ _chez_brew_untracked() {
         <(printf '%s\n' "$tracked")
 }
 
-# Internal: emit "<kind>\t<name>" (kind = cask | formula) for every Homebrew
-# package installed locally but tracked in NO Brewfile tier — the authoritative
-# removal set (formulae + casks + now-unused deps) that `chezmirror` acts on and
-# `chezbump` previews. Takes the repo root as $1. Pure (no prompting, no
-# uninstall), so it is unit-testable against a stubbed `brew`.
+# Internal: emit "<kind>\t<name>" (kind = cask | formula | tap) for every
+# Homebrew item installed locally but tracked in NO Brewfile tier — the
+# authoritative removal set (formulae + casks + now-unused deps, plus orphaned
+# taps) that `chezmirror` acts on and `chezbump` previews. Takes the repo root
+# as $1. Pure (no prompting, no uninstall), so it is unit-testable against a
+# stubbed `brew`.
 #
 # `brew bundle cleanup` honours only ONE --file, so the tiers are concatenated
 # and fed on stdin (--file=-); passing several --file reads just the LAST tier
@@ -461,6 +462,12 @@ _chez_brew_removals() {
         brew bundle cleanup --file=- 2>/dev/null | awk '
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
+            # Untracked taps get their own "Would untap:" section (entries are
+            # tap names like "supabase/tap"). Label them "tap" so chezmirror
+            # routes them through `brew untap`, not `brew uninstall` — and,
+            # crucially, so neither the header nor the tap names inherit the
+            # preceding "formula" kind and leak in as bogus formula removals.
+            /^Would untap:/              { kind = "tap";     next }
             # End of the uninstall list. Newer Homebrew appends a
             # "Would `brew cleanup`:" cache-pruning section (dozens of
             # "Would remove: …/Caches/…" lines); older versions printed a
@@ -472,11 +479,14 @@ _chez_brew_removals() {
         '
 }
 
-# Internal: uninstall one package, routing casks through --cask. Split out so the
-# cask-vs-formula dispatch is unit-testable without a TTY.
+# Internal: remove one package, routing casks through --cask and taps through
+# `brew untap` (taps can't be `brew uninstall`ed). Split out so the
+# cask/formula/tap dispatch is unit-testable without a TTY.
 _chez_brew_uninstall_one() {
     if [ "$1" = cask ]; then
         brew uninstall --cask "$2"
+    elif [ "$1" = tap ]; then
+        brew untap "$2"
     else
         brew uninstall "$2"
     fi
