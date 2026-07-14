@@ -137,7 +137,7 @@ setup() {
 @test "zshrc defines chezhelp and it lists every verb" {
     grep -qE '^chezhelp\(\) \{' "$ZSHRC"
     body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
-    for verb in chezup chezdoctor chezreset chezreinit chez chezbump chezaudit chezmirror dotfiles; do
+    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror dotfiles; do
         grep -qE "^ +${verb} " <<<"$body" || {
             echo "chezhelp is missing an entry for: ${verb}"
             return 1

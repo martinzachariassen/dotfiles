@@ -28,13 +28,16 @@ setup() {
 
     STUBS="$(mktemp -d)"
     APPLY_LOG="$STUBS/apply.log"
+    DIFF_LOG="$STUBS/diff.log"
 
     # chezmoi stub: `status` prints CHEZMOI_STATUS (empty = clean); `apply`
-    # records its args and honours CHEZMOI_APPLY_RC.
+    # records its args and honours CHEZMOI_APPLY_RC; `diff` records its args
+    # (chezdiff's raw-passthrough path).
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then printf '%s' "\${CHEZMOI_STATUS:-}"; exit 0; fi
 if [ "\$1" = apply ]; then shift; printf 'apply %s\n' "\$*" >>"$APPLY_LOG"; exit "\${CHEZMOI_APPLY_RC:-0}"; fi
+if [ "\$1" = diff ]; then shift; printf 'diff %s\n' "\$*" >>"$DIFF_LOG"; exit 0; fi
 exit 0
 EOF
     # brew stub: `leaves` prints BREW_LEAVES (chezaudit/chez); `bundle cleanup`
@@ -71,7 +74,7 @@ extract() {
 
 # Run a zsh snippet with the stub PATH and log paths exported.
 run_zsh() {
-    run env PATH="$STUBS:$PATH" APPLY_LOG="$APPLY_LOG" \
+    run env PATH="$STUBS:$PATH" APPLY_LOG="$APPLY_LOG" DIFF_LOG="$DIFF_LOG" \
         BREW_LEAVES="${BREW_LEAVES:-}" BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
         CHEZMOI_STATUS="${CHEZMOI_STATUS:-}" CHEZMOI_APPLY_RC="${CHEZMOI_APPLY_RC:-0}" \
         zsh -c "$1"
@@ -191,6 +194,66 @@ EOF
     CHEZMOI_STATUS="" CHEZMOI_APPLY_RC=3 BREW_LEAVES=$'git' \
         run_zsh "$(extract chez _chez_brew_untracked); chez"
     [ "$status" -eq 3 ]
+}
+
+# ─── chezdiff: read-only drift explainer ────────────────────────────────────
+# The status codes are two columns (left = local $HOME drift, right = repo →
+# $HOME apply). chezdiff splits them into two labelled sections; these tests
+# feed the stub a fixed CHEZMOI_STATUS and assert the plain-language grouping.
+
+@test "chezdiff reports in-sync when the status is empty" {
+    CHEZMOI_STATUS="" run_zsh "$(extract chezdiff); chezdiff"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"in sync"* ]]
+}
+
+@test "chezdiff groups repo → \$HOME changes under the apply section with plain verbs" {
+    # Right column drives the 'what chez would write' list: ' M' → modify,
+    # ' A' → add. No local drift (left column blank) ⇒ no drift section.
+    CHEZMOI_STATUS=$' M .config/zsh/.zshrc\n A .config/foo/bar' \
+        run_zsh "$(extract chezdiff); chezdiff"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Repo → \$HOME"* ]]
+    [[ "$output" == *"modify"* ]]
+    [[ "$output" == *".config/zsh/.zshrc"* ]]
+    [[ "$output" == *"add"* ]]
+    [[ "$output" == *".config/foo/bar"* ]]
+    [[ "$output" != *"Local drift"* ]]  # nothing edited locally
+}
+
+@test "chezdiff surfaces local drift and the re-add hint" {
+    # 'MM' = edited locally (left col) AND repo differs (right col): it must
+    # appear under BOTH sections, and the drift section warns about overwrite.
+    CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
+        run_zsh "$(extract chezdiff); chezdiff"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Repo → \$HOME"* ]]
+    [[ "$output" == *"Local drift"* ]]
+    [[ "$output" == *"edited"* ]]
+    [[ "$output" == *"re-add"* ]]
+}
+
+@test "chezdiff -v hands off to the raw \`chezmoi diff\`" {
+    # Verbose (and any path arg) must bypass the summary entirely and shell out
+    # to `chezmoi diff` — recorded in DIFF_LOG by the stub.
+    CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
+        run_zsh "$(extract chezdiff); chezdiff -v"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Repo → \$HOME"* ]]  # took the passthrough, not the summary
+    grep -q '^diff' "$DIFF_LOG"
+}
+
+@test "chezdiff PATH forwards the path to \`chezmoi diff\`" {
+    run_zsh "$(extract chezdiff); chezdiff ~/.zshrc"
+    [ "$status" -eq 0 ]
+    grep -q 'diff .*\.zshrc' "$DIFF_LOG"
+}
+
+@test "chezdiff --help prints usage without touching chezmoi" {
+    run_zsh "$(extract chezdiff); chezdiff --help"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"usage: chezdiff"* ]]
+    [ ! -s "$DIFF_LOG" ]  # help path shells out to nothing
 }
 
 # ─── dotfiles: the no-arg control panel ─────────────────────────────────────

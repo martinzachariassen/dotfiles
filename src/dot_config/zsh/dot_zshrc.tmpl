@@ -280,12 +280,13 @@ chez() {
         echo
         echo "  Status codes:"
         echo "    A add   M modify   D remove"
-        echo "    left column = source repo → \$HOME, right column = current \$HOME drift"
+        echo "    left column = your \$HOME edits (drift), right column = repo → \$HOME (apply)"
+        echo "    plain-language breakdown: \`chezdiff\`"
         echo
         echo "  Choices:"
         echo "    y + Enter      apply now with \`chezmoi apply --force\`"
         echo "                   this overwrites drift in managed \$HOME files"
-        echo "    n or Enter     abort; inspect first with \`chezmoi diff\`"
+        echo "    n or Enter     abort; inspect first with \`chezdiff\` (plain) or \`chezmoi diff\` (raw)"
         echo
         printf "Apply these managed dotfile changes now? [y/N] "
         read -r response < /dev/tty
@@ -310,6 +311,95 @@ chez() {
         fi
     fi
     return $rc
+}
+
+# Plain-language drift explainer — "what would change, and which way?"
+#
+# `chezmoi diff` prints raw patches and `chezmoi status` prints terse two-letter
+# codes; chezdiff translates that status into a directional, plain-words summary
+# so you can see at a glance what `chez` would do BEFORE you run it. Read-only —
+# it never applies, pulls, or uninstalls (the safe companion to `chez`).
+#
+#   chezdiff              summarise pending changes + local drift (scripts excluded)
+#   chezdiff ~/.zshrc     raw `chezmoi diff` for one path — drill into the content
+#   chezdiff -v           raw `chezmoi diff` for everything
+#
+# `chezmoi status` is two columns, git-status style, and the columns are easy to
+# read backwards — so chezdiff splits them into two labelled sections instead:
+#   left column  = your LOCAL edits to a managed file since chezmoi last wrote it
+#                  (drift — `chez` OVERWRITES these unless you `chezmoi re-add` first)
+#   right column = what `chezmoi apply` would push from the repo INTO $HOME
+#   codes in either column: A add · M modify · D remove
+# Scripts are excluded (as in `chez`): run_* entries stay pending by design.
+chezdiff() {
+    # Any path argument — or -v/--verbose — hands off to the raw `chezmoi diff`.
+    case "${1:-}" in
+        -h | --help)
+            echo "usage: chezdiff [-v|--verbose] [PATH …]"
+            echo "  (no args)   plain-language summary of pending changes + local drift"
+            echo "  PATH        raw \`chezmoi diff\` for a file (e.g. chezdiff ~/.zshrc)"
+            echo "  -v          raw \`chezmoi diff\` for everything"
+            return 0
+            ;;
+        -v | --verbose)
+            shift
+            chezmoi diff "$@"
+            return
+            ;;
+        ?*)
+            chezmoi diff "$@"
+            return
+            ;;
+    esac
+
+    local status_output
+    status_output=$(chezmoi status --exclude scripts 2>&1) || {
+        print -ru2 -- "chezdiff: \`chezmoi status\` failed:"
+        print -ru2 -- "$status_output"
+        return 1
+    }
+    if [ -z "$status_output" ]; then
+        echo "  ✓ in sync — no pending changes, nothing edited locally"
+        echo "    (package drift is tracked separately: chezaudit)"
+        return 0
+    fi
+
+    # One pass, two buckets: the right column feeds "apply would write", the left
+    # column feeds "you edited locally". A file that drifted AND changed upstream
+    # (MM) lands in both — exactly the case where `chez` clobbers a local edit.
+    local pending drift line col1 col2 path
+    pending=""
+    drift=""
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        col1=${line:0:1}
+        col2=${line:1:1}
+        path=${line:3}
+        case "$col2" in
+            A) pending+="    add      ~/$path"$'\n' ;;
+            M) pending+="    modify   ~/$path"$'\n' ;;
+            D) pending+="    remove   ~/$path"$'\n' ;;
+        esac
+        case "$col1" in
+            A) drift+="    added    ~/$path"$'\n' ;;
+            M) drift+="    edited   ~/$path"$'\n' ;;
+            D) drift+="    deleted  ~/$path"$'\n' ;;
+        esac
+    done <<<"$status_output"
+
+    if [ -n "$pending" ]; then
+        echo "── Repo → \$HOME · what \`chez\` would write ───────────────────"
+        printf '%s' "$pending"
+        echo
+    fi
+    if [ -n "$drift" ]; then
+        echo "── Local drift · managed files you edited in \$HOME ───────────"
+        printf '%s' "$drift"
+        echo "  ⚠ \`chez\` overwrites these. Keep an edit instead: chezmoi re-add ~/…"
+        echo
+    fi
+    echo "  See a file's exact lines:  chezdiff ~/path   ·   all:  chezdiff -v"
+    echo "  Apply now:                 chez              ·   packages:  chezaudit"
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
@@ -645,6 +735,7 @@ chezhelp() {
 
   Maintenance (packages & drift)
     chez             Apply without pulling. Flags drift; never uninstalls.
+    chezdiff         Explain pending changes + local drift in plain words (read-only).
     chezbump         Upgrade deps: brew upgrade + mise upgrade.
     chezaudit        List locally-installed packages in no Brewfile (report).
     chezmirror       Uninstall untracked packages, confirming each.
