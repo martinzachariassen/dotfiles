@@ -23,6 +23,11 @@ from pathlib import Path
 # Truncation is marked inline (never silent) so the distiller knows it happened.
 MAX_MSG_CHARS = 2000
 
+# Total budget for digest-input.md. A very heavy day gets trimmed proportionally
+# per project (middle lines of the longest sections dropped, marked inline) so
+# one marathon session can't blow the distiller's context or cost.
+TOTAL_BUDGET_CHARS = 400_000
+
 # Tool calls worth recording as "what we did" — everything else (Read/Grep/Glob/
 # Task/…) is navigation noise and gets dropped.
 ACTION_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
@@ -162,8 +167,8 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     deny = set(args.deny)
 
-    parts: list[str] = [f"# Claude Code conversations — {target}\n"]
     manifest_projects = []
+    project_lines: list[list[str]] = []  # rendered lines per project, pre-budget
 
     for proj_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         slug = proj_dir.name
@@ -182,14 +187,19 @@ def main() -> int:
                     cwd = infer_cwd(tp, slug)
         if not total_kept:
             continue
-        parts.append(f"\n## Project: `{slug}`  (path: {cwd or '?'})\n")
-        parts.extend(rendered)
+        project_lines.append([f"\n## Project: `{slug}`  (path: {cwd or '?'})\n", *rendered])
         manifest_projects.append({
             "slug": slug,
             "cwd": cwd,
             "memory_dir": str(proj_dir / "memory"),
             "records": total_kept,
         })
+
+    truncated = enforce_budget(project_lines, manifest_projects)
+
+    parts: list[str] = [f"# Claude Code conversations — {target}\n"]
+    for lines in project_lines:
+        parts.extend(lines)
 
     input_text = "\n".join(parts)
     (out / "digest-input.md").write_text(input_text)
@@ -198,12 +208,62 @@ def main() -> int:
         "projects": manifest_projects,
         "total_records": sum(p["records"] for p in manifest_projects),
         "input_chars": len(input_text),
+        "truncated": truncated,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
     print(json.dumps({"date": target, "projects": len(manifest_projects),
-                      "records": manifest["total_records"], "chars": len(input_text)}))
+                      "records": manifest["total_records"], "chars": len(input_text),
+                      "truncated": truncated}))
     return 0
+
+
+def enforce_budget(project_lines: list[list[str]], manifest_projects: list[dict]) -> bool:
+    """Shrink each project's rendered lines to its proportional share of
+    TOTAL_BUDGET_CHARS when the day is over budget. Whole lines are kept from
+    the head and tail (recent context usually lives at both ends); the omitted
+    middle is marked inline so the distiller knows. Returns True if trimmed."""
+    sizes = [sum(len(l) + 1 for l in lines) for lines in project_lines]
+    total = sum(sizes)
+    if total <= TOTAL_BUDGET_CHARS:
+        return False
+    for i, (lines, size) in enumerate(zip(project_lines, sizes)):
+        share = max(2000, TOTAL_BUDGET_CHARS * size // total)
+        trimmed, omitted = trim_middle(lines, share)
+        project_lines[i] = trimmed
+        if omitted:
+            manifest_projects[i]["omitted_lines"] = omitted
+    return True
+
+
+def trim_middle(lines: list[str], max_chars: int) -> tuple[list[str], int]:
+    """Keep whole lines alternately from the head and tail until max_chars is
+    spent; replace the omitted middle with an inline marker."""
+    if sum(len(l) + 1 for l in lines) <= max_chars:
+        return lines, 0
+    head: list[str] = []
+    tail: list[str] = []
+    used = 0
+    lo, hi = 0, len(lines) - 1
+    take_head = True
+    while lo <= hi:
+        line = lines[lo] if take_head else lines[hi]
+        cost = len(line) + 1
+        if used + cost > max_chars:
+            break
+        used += cost
+        if take_head:
+            head.append(line)
+            lo += 1
+        else:
+            tail.insert(0, line)
+            hi -= 1
+        take_head = not take_head
+    omitted = hi - lo + 1
+    if omitted <= 0:
+        return lines, 0
+    marker = f"…[{omitted} lines omitted here to fit the input budget]…"
+    return [*head, marker, *tail], omitted
 
 
 def infer_cwd(path: Path, slug: str) -> str:

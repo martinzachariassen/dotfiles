@@ -10,6 +10,7 @@ human-readable digest. Quality over volume — a sharp memory beats a big one.
   (per-project sections; `**Me:**`/`**Claude:**` are turns, `~`/`$`/`→` are actions taken)
 - Global memory dir: `{{GLOBAL_MEMORY_DIR}}`  (loaded in EVERY session)
 - Dated digest to write: `{{DIGEST_FILE}}`
+- Previous day's digest (for continuity): `{{PREV_DIGEST}}` — "(none)" if there isn't one
 - Active projects today (route project-specific facts to each project's memory dir):
 
 {{PROJECT_TABLE}}
@@ -22,6 +23,9 @@ Before writing anything, Read the global `MEMORY.md` and each active project's
 `MEMORY.md` (and any individual fact files they point to that look related to
 today's topics). You are UPDATING a living memory, not appending to a log. If a
 memory dir or its `MEMORY.md` doesn't exist yet, you'll create it in step 3.
+
+Also Read the previous digest (if one is given above) — you'll carry its *Open
+threads* forward in step 4, closing the ones today's work resolved.
 
 ## Step 2 — Extract the signal from {{INPUT_FILE}}
 
@@ -107,6 +111,16 @@ A skimmable note the user reads in the morning. Use this shape:
 - **Added** `<slug>` (<global|project>) — <one line>
 - **Updated** `<slug>` — <what changed>
 - **Superseded/Removed** `<slug>` — <old → new, why>
+
+## Open threads
+- <everything still open after today: threads carried from the previous digest
+  that weren't resolved (keep them alive across days!) plus new deferred work.
+  Write "None." if nothing is open>
+
+## Distiller notes
+- <0–3 lines, ONLY when real: recurring noise in the conversation input worth
+  filtering, prompt friction, a concrete tuning suggestion for this pipeline.
+  Omit the whole section when there's nothing worth flagging>
 ```
 
 If nothing durable happened for a project, still note it briefly under By project.

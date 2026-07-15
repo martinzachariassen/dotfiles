@@ -49,8 +49,14 @@ else
     echo "  ${YELLOW:-}!${RESET:-} could not bootstrap ${label} — load it by hand with 'launchctl bootstrap ${domain} ${plist}'"
 fi
 
-# The job authenticates headlessly from a Keychain token; warn (don't fail) if
-# it's absent so the first 01:00 run doesn't silently abort on missing auth.
+# The job authenticates headlessly from a Keychain token and pushes memory over
+# a machine-local deploy key; warn (don't fail) when either is missing so the
+# first 01:00 run doesn't silently abort. Both are one guided command away.
+setup_cmd="{{ .chezmoi.homeDir }}/.config/claude/scripts/nightly-distill/distill.sh --setup"
 if ! security find-generic-password -s claude-nightly-distill -w >/dev/null 2>&1; then
-    echo "  ${YELLOW:-}!${RESET:-} no 'claude-nightly-distill' Keychain token — run 'claude setup-token' then stash it (see the distiller README)"
+    echo "  ${YELLOW:-}!${RESET:-} no 'claude-nightly-distill' Keychain token — run: ${setup_cmd}"
+fi
+mem_dir="{{ .chezmoi.homeDir }}/.config/claude/projects/{{ .chezmoi.homeDir | replace "/" "-" }}/memory"
+if [ ! -d "${mem_dir}/.git" ]; then
+    echo "  ${YELLOW:-}!${RESET:-} global memory isn't wired to its private repo — run: ${setup_cmd}"
 fi
