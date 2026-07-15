@@ -1,27 +1,115 @@
 #!/usr/bin/env bash
-# Claude Code status line: model + cwd + git branch/status + PR badge on line
-# one, a color-coded context-usage bar with session cost/duration on line two.
+# Claude Code status line.
+#
+# Line 1 (identity):  Model + effort · 📁 dir · 🌿 branch <git state> · PR badge
+# Line 2 (vitals):    truecolor context gauge · tokens · 💰 cost · ±lines · quota · ⏱ time
+#
+# Design notes:
+#   * All JSON is parsed in ONE jq call (fields joined by ASCII US, 0x1f) rather
+#     than a jq per field — jq startup dominates this script's runtime. US is a
+#     non-whitespace separator so empty/absent fields survive the `read` split.
+#   * Git state comes from a single `git status --porcelain=v2 --branch`, cached
+#     per session (session_id is stable for the session and unique across
+#     concurrent ones, unlike a PID) so we don't shell out on every 300ms refresh.
+#   * The context bar uses a green→yellow→red truecolor gradient; on terminals
+#     without 24-bit color it degrades to the nearest supported color.
+#   * Written for bash 3.2 (macOS system bash) — no mapfile / associative arrays.
 set -euo pipefail
 
 input="$(cat)"
 
-MODEL="$(jq -r '.model.display_name' <<<"$input")"
-DIR="$(jq -r '.workspace.current_dir' <<<"$input")"
-SESSION_ID="$(jq -r '.session_id' <<<"$input")"
-COST="$(jq -r '.cost.total_cost_usd // 0' <<<"$input")"
-DURATION_MS="$(jq -r '.cost.total_duration_ms // 0' <<<"$input")"
-PCT="$(jq -r '.context_window.used_percentage // 0' <<<"$input" | cut -d. -f1)"
-PR_NUMBER="$(jq -r '.pr.number // empty' <<<"$input")"
-
-CYAN=$'\033[36m'
+# --- colors (ANSI-C quoted so the escape bytes are literal in the strings) ---
+RESET=$'\033[0m'
+BOLD=$'\033[1m'
+DIM=$'\033[2m'
+RED=$'\033[31m'
 GREEN=$'\033[32m'
 YELLOW=$'\033[33m'
-RED=$'\033[31m'
-RESET=$'\033[0m'
+BLUE=$'\033[34m'
+MAGENTA=$'\033[35m'
+CYAN=$'\033[36m'
+GRAY=$'\033[38;5;240m'
+SEP=" ${DIM}·${RESET} "
 
-# --- git branch/status, cached per session so we don't shell out to git on
-# every debounced refresh (session_id is stable for the session's lifetime
-# and unique across concurrent sessions, unlike a PID). ---
+# --- helpers ---
+
+# Interpolate a green→yellow→red RGB triple for a 0-100 percentage.
+gradient_rgb() {
+    local pct=$1 r g b t
+    if ((pct < 0)); then pct=0; fi
+    if ((pct > 100)); then pct=100; fi
+    if ((pct <= 50)); then
+        t=$((pct * 100 / 50)) # 0..100 across green→yellow
+        r=$((39 + (241 - 39) * t / 100))
+        g=$((174 + (196 - 174) * t / 100))
+        b=$((96 + (15 - 96) * t / 100))
+    else
+        t=$(((pct - 50) * 100 / 50)) # 0..100 across yellow→red
+        r=$((241 + (231 - 241) * t / 100))
+        g=$((196 + (76 - 196) * t / 100))
+        b=$((15 + (60 - 15) * t / 100))
+    fi
+    printf '%d %d %d' "$r" "$g" "$b"
+}
+
+# Compact token count: 1234→1k, 200000→200k, 1000000→1.0M.
+fmt_tokens() {
+    local n=$1
+    if ((n >= 1000000)); then
+        printf '%d.%dM' $((n / 1000000)) $(((n % 1000000) / 100000))
+    elif ((n >= 1000)); then
+        printf '%dk' $((n / 1000))
+    else
+        printf '%d' "$n"
+    fi
+}
+
+# Threshold color for a usage percentage (green <70, yellow <90, red otherwise).
+pct_color() {
+    if (($1 >= 90)); then
+        printf '%s' "$RED"
+    elif (($1 >= 70)); then
+        printf '%s' "$YELLOW"
+    else
+        printf '%s' "$GREEN"
+    fi
+}
+
+# Wrap text in an OSC 8 hyperlink (Cmd/Ctrl-click in supporting terminals).
+osc8() { printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"; }
+
+# --- parse every field in a single jq call ---
+# Numbers are stringified so join() accepts them; absent fields fall back to ""
+# (or 0) and still emit a US separator, keeping the read positions aligned.
+fields="$(jq -r '
+    [ (.model.display_name // "?"),
+      (.workspace.current_dir // ""),
+      (.session_id // ""),
+      (.cost.total_cost_usd // 0 | tostring),
+      (.cost.total_duration_ms // 0 | tostring),
+      (.cost.total_lines_added // 0 | tostring),
+      (.cost.total_lines_removed // 0 | tostring),
+      (.context_window.used_percentage // 0 | tostring),
+      (.context_window.total_input_tokens // 0 | tostring),
+      (.context_window.context_window_size // 0 | tostring),
+      (.effort.level // ""),
+      (.workspace.git_worktree // ""),
+      (.pr.number // "" | tostring),
+      (.pr.url // ""),
+      (.pr.review_state // ""),
+      (.rate_limits.five_hour.used_percentage // "" | tostring),
+      (.rate_limits.seven_day.used_percentage // "" | tostring)
+    ] | join("\u001f")' <<<"$input")"
+
+IFS=$'\037' read -r \
+    MODEL DIR SESSION_ID COST DURATION_MS LINES_ADDED LINES_REMOVED \
+    PCT_RAW USED_TOKENS CTX_SIZE EFFORT WORKTREE \
+    PR_NUMBER PR_URL PR_STATE FIVE_H SEVEN_D <<<"$fields"
+
+PCT=${PCT_RAW%%.*}
+PCT=${PCT:-0}
+
+# --- git state, cached per session ---
 CACHE_FILE="${TMPDIR:-/tmp}/claude-statusline-git-${SESSION_ID}"
 CACHE_MAX_AGE=5
 
@@ -35,51 +123,102 @@ cache_is_stale() {
 
 if cache_is_stale; then
     if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
-        BRANCH="$(git -C "$DIR" branch --show-current 2>/dev/null)"
-        STAGED="$(git -C "$DIR" diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')"
-        MODIFIED="$(git -C "$DIR" diff --numstat 2>/dev/null | wc -l | tr -d ' ')"
-        printf '%s|%s|%s\n' "$BRANCH" "$STAGED" "$MODIFIED" >"$CACHE_FILE"
+        # porcelain=v2 gives branch, ahead/behind, and per-file X/Y status in one
+        # pass; awk tallies staged (index col), modified (worktree col), untracked,
+        # and conflicts, emitting a single pipe-delimited cache line.
+        git -C "$DIR" status --porcelain=v2 --branch 2>/dev/null | awk '
+            /^# branch.head / { head = $3 }
+            /^# branch.ab / { ahead = $3; behind = $4 }
+            /^[12] / {
+                if (substr($2, 1, 1) != ".") staged++
+                if (substr($2, 2, 1) != ".") modified++
+            }
+            /^u / { conflicts++ }
+            /^\? / { untracked++ }
+            END {
+                gsub(/[+-]/, "", ahead); gsub(/[+-]/, "", behind)
+                printf "%s|%d|%d|%d|%d|%d|%d\n", head, staged + 0, modified + 0, \
+                    untracked + 0, ahead + 0, behind + 0, conflicts + 0
+            }' >"$CACHE_FILE" || printf '||||||\n' >"$CACHE_FILE"
     else
-        printf '||\n' >"$CACHE_FILE"
+        printf '||||||\n' >"$CACHE_FILE"
     fi
 fi
-IFS='|' read -r BRANCH STAGED MODIFIED <"$CACHE_FILE"
+IFS='|' read -r BRANCH STAGED MODIFIED UNTRACKED AHEAD BEHIND CONFLICTS <"$CACHE_FILE"
+STAGED=${STAGED:-0} MODIFIED=${MODIFIED:-0} UNTRACKED=${UNTRACKED:-0}
+AHEAD=${AHEAD:-0} BEHIND=${BEHIND:-0} CONFLICTS=${CONFLICTS:-0}
 
-GIT_SEGMENT=""
+# ============================ line 1: identity ============================
+LINE1="${CYAN}${BOLD}${MODEL}${RESET}"
+[[ -n "$EFFORT" ]] && LINE1+=" ${DIM}${EFFORT}${RESET}"
+LINE1+="${SEP}📁 ${BOLD}${DIR##*/}${RESET}"
+
 if [[ -n "$BRANCH" ]]; then
-    GIT_SEGMENT=" | 🌿 ${BRANCH}"
-    ((STAGED > 0)) && GIT_SEGMENT+=" ${GREEN}+${STAGED}${RESET}"
-    ((MODIFIED > 0)) && GIT_SEGMENT+=" ${YELLOW}~${MODIFIED}${RESET}"
+    if ((${#BRANCH} > 30)); then BRANCH="${BRANCH:0:29}…"; fi
+    GIT="🌿 ${MAGENTA}${BRANCH}${RESET}"
+    ((STAGED > 0)) && GIT+=" ${GREEN}+${STAGED}${RESET}"
+    ((MODIFIED > 0)) && GIT+=" ${YELLOW}~${MODIFIED}${RESET}"
+    ((UNTRACKED > 0)) && GIT+=" ${BLUE}?${UNTRACKED}${RESET}"
+    ((CONFLICTS > 0)) && GIT+=" ${RED}✖${CONFLICTS}${RESET}"
+    ((AHEAD > 0)) && GIT+=" ${CYAN}⇡${AHEAD}${RESET}"
+    ((BEHIND > 0)) && GIT+=" ${CYAN}⇣${BEHIND}${RESET}"
+    [[ -n "$WORKTREE" ]] && GIT+=" ${DIM}⑂${WORKTREE}${RESET}"
+    LINE1+="${SEP}${GIT}"
 fi
 
-PR_SEGMENT=""
-[[ -n "$PR_NUMBER" ]] && PR_SEGMENT=" | PR #${PR_NUMBER}"
-
-# --- context usage bar, threshold-colored ---
-if ((PCT >= 90)); then
-    BAR_COLOR="$RED"
-elif ((PCT >= 70)); then
-    BAR_COLOR="$YELLOW"
-else
-    BAR_COLOR="$GREEN"
+if [[ -n "$PR_NUMBER" ]]; then
+    case "$PR_STATE" in
+        approved) PR_BODY="${GREEN}✓ PR #${PR_NUMBER}${RESET}" ;;
+        changes_requested) PR_BODY="${RED}✗ PR #${PR_NUMBER}${RESET}" ;;
+        draft) PR_BODY="${DIM}PR #${PR_NUMBER} (draft)${RESET}" ;;
+        *) PR_BODY="${YELLOW}PR #${PR_NUMBER}${RESET}" ;;
+    esac
+    if [[ -n "$PR_URL" ]]; then PR_BODY="$(osc8 "$PR_URL" "$PR_BODY")"; fi
+    LINE1+="${SEP}${PR_BODY}"
 fi
 
-FILLED=$((PCT / 10))
-EMPTY=$((10 - FILLED))
-BAR=""
+# ============================ line 2: vitals ============================
+BAR_WIDTH=14
+FILLED=$((PCT * BAR_WIDTH / 100))
+if ((FILLED > BAR_WIDTH)); then FILLED=$BAR_WIDTH; fi
+EMPTY=$((BAR_WIDTH - FILLED))
+FILLED_STR="" EMPTY_STR=""
 if ((FILLED > 0)); then
-    printf -v FILL '%*s' "$FILLED" ''
-    BAR="${FILL// /█}"
+    printf -v tmp '%*s' "$FILLED" ''
+    FILLED_STR="${tmp// /█}"
 fi
 if ((EMPTY > 0)); then
-    printf -v PAD '%*s' "$EMPTY" ''
-    BAR="${BAR}${PAD// /░}"
+    printf -v tmp '%*s' "$EMPTY" ''
+    EMPTY_STR="${tmp// /░}"
+fi
+read -r GR GG GB <<<"$(gradient_rgb "$PCT")"
+printf -v BAR_COLOR '\033[38;2;%d;%d;%dm' "$GR" "$GG" "$GB"
+
+LINE2="${BAR_COLOR}${FILLED_STR}${RESET}${GRAY}${EMPTY_STR}${RESET} ${BAR_COLOR}${PCT}%${RESET}"
+if ((CTX_SIZE > 0)); then
+    LINE2+=" ${DIM}$(fmt_tokens "$USED_TOKENS")/$(fmt_tokens "$CTX_SIZE")${RESET}"
 fi
 
-COST_FMT="$(printf '$%.2f' "$COST")"
-DURATION_SEC=$((DURATION_MS / 1000))
-MINS=$((DURATION_SEC / 60))
-SECS=$((DURATION_SEC % 60))
+LINE2+="${SEP}💰 ${YELLOW}$(printf '$%.2f' "$COST")${RESET}"
 
-printf '%s[%s]%s 📁 %s%s%s\n' "$CYAN" "$MODEL" "$RESET" "${DIR##*/}" "$GIT_SEGMENT" "$PR_SEGMENT"
-printf '%s%s%s %s%% | %s | ⏱️ %sm %ss\n' "$BAR_COLOR" "$BAR" "$RESET" "$PCT" "$COST_FMT" "$MINS" "$SECS"
+if ((LINES_ADDED > 0 || LINES_REMOVED > 0)); then
+    LINE2+="${SEP}${GREEN}+${LINES_ADDED}${RESET}${DIM}/${RESET}${RED}-${LINES_REMOVED}${RESET}"
+fi
+
+if [[ -n "$FIVE_H" || -n "$SEVEN_D" ]]; then
+    LINE2+="${SEP}"
+    if [[ -n "$FIVE_H" ]]; then
+        h=${FIVE_H%%.*}
+        LINE2+="5h $(pct_color "${h:-0}")${h:-0}%${RESET}"
+    fi
+    if [[ -n "$SEVEN_D" ]]; then
+        d=${SEVEN_D%%.*}
+        [[ -n "$FIVE_H" ]] && LINE2+=" "
+        LINE2+="7d $(pct_color "${d:-0}")${d:-0}%${RESET}"
+    fi
+fi
+
+DURATION_SEC=$((DURATION_MS / 1000))
+LINE2+="${SEP}⏱ $((DURATION_SEC / 60))m $((DURATION_SEC % 60))s"
+
+printf '%s\n%s\n' "$LINE1" "$LINE2"
