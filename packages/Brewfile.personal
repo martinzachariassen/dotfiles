@@ -7,3 +7,6 @@
 
 # ─── Personal apps ────────────────────────────────────────────────────────────
 
+# ─── Automation ───────────────────────────────────────────────────────────────
+brew "cliclick"                 # CLI mouse/keyboard event emulation (UI scripting)
+
