@@ -31,6 +31,15 @@ environment/secrets rules. Project-level instructions always win over it.
 harness config — model, theme, and a read-only permission allowlist (git status/
 diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
+## The nightly distiller (`nightlyDistill` module)
+
+Every night at 01:00, a launchd job distills the day's Claude Code conversations
+into file-based memory (deduped, self-superseding) and a dated digest in the
+Obsidian vault, with weekly rollups and a monthly memory-gardening pass on top.
+The global memory syncs through a private git repo so what Claude learns about
+you follows between machines. Full detail — pipeline, module wiring, the
+one-command machine setup — in [nightly-distill.md](nightly-distill.md).
+
 ## One persona, two assistants
 
 The **repo's own** contributor rules live in

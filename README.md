@@ -187,6 +187,7 @@ Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
 | [macos.md](docs/macos.md)                | Every macOS system setting applied                                            |
 | [development.md](docs/development.md)    | Quality gates, the CI matrix, and the bats suites                             |
 | [shell.md](docs/shell.md) · [terminal.md](docs/terminal.md) · [editors.md](docs/editors.md) · [ai.md](docs/ai.md) | The configured environment — zsh/CLI/mise/git, Ghostty/Zellij/Starship, VS Code/Neovim, and AI tooling |
+| [nightly-distill.md](docs/nightly-distill.md) | The nightly Claude conversation distiller — memory, digests, and cross-machine sync |
 
 ## Development
 

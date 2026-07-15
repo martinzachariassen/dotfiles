@@ -80,6 +80,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
 | Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
+| Nightly-distill agent (re)load | `run_onchange_after_02f-nightly-distill` (keyed on the plist hash — see [nightly-distill.md](nightly-distill.md)) |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |

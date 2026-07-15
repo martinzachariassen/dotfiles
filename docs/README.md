@@ -28,3 +28,4 @@ is the overview and quick start; these docs are the detail behind it.
 | [terminal.md](terminal.md) | Ghostty, Zellij, Starship, and the Catppuccin Frappé theme. |
 | [editors.md](editors.md) | VS Code (managed settings + extensions) and Neovim (LazyVim). |
 | [ai.md](ai.md) | Local + hosted AI: Ollama, the Claude apps, and the shared Claude/Copilot persona. |
+| [nightly-distill.md](nightly-distill.md) | The 01:00 conversation distiller — memory, digests, weekly rollups, and how it follows you between machines. |

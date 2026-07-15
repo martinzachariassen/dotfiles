@@ -43,6 +43,7 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 | `theme` | Catppuccin Frappé across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
+| `nightlyDistill` | Nightly Claude conversation distiller, launchd @ 01:00 (see [nightly-distill.md](nightly-distill.md)). |
 
 The per-profile default selections the wizard pre-checks are in the
 `[profileDefaults]` table of `modules.toml`. That table **must** mirror the
