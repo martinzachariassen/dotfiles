@@ -52,9 +52,10 @@ The global defaults:
 
 | Tool | Version | Notes |
 |---|---|---|
-| Java | `temurin-25`, `temurin-21` | JVM stack (`jvmStack` module). First is default; 21 stays for older projects. |
+| Java | `temurin-25` | JVM stack (`jvmStack` module). |
 | Node | `lts` | Resolves to the current LTS line at install time. |
-| Python | `3.14` | Major-pinned so patch bumps install cleanly. |
+| Python | `latest` | Tracks the newest stable release on each `mise install`. |
+| Bun | `latest` | Tracks the newest stable release on each `mise install`. |
 | Maven / Gradle | `latest` | `jvmStack` module. Project wrappers (`mvnw`/`gradlew`) still win. |
 
 mise installs to stable paths

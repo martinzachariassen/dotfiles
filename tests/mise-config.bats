@@ -2,9 +2,9 @@
 # Pin the global mise runtime declarations.
 #
 # Why this exists:
-#   The "active development stack" — Java 21 + 25, Node LTS, Python 3.x, Maven,
-#   Gradle — is part of the repo's contract. A silent drop (an accidental delete
-#   while editing config.toml) would break per-project builds on the next fresh
+#   The "active development stack" — Java 25, Node LTS, Python, Maven, Gradle —
+#   is part of the repo's contract. A silent drop (an accidental delete while
+#   editing config.toml) would break per-project builds on the next fresh
 #   apply, but nothing else in CI guards it: render-check only parses templates,
 #   lint-config only checks that the TOML is valid, and the chezmoi-scripts
 #   dynamic check doesn't read this file.
@@ -64,20 +64,18 @@ PY
     [ -n "$tools" ]
 }
 
-# ─── Java: both LTS-relevant Temurin versions must be installed ────────────
+# ─── Java: the current LTS Temurin version must be installed ───────────────
 
 @test "mise declares Java" {
     java="$(_mise_get tools.java)"
     [ -n "$java" ]
 }
 
-@test "mise declares Java with both temurin-21 and temurin-25" {
-    # Java is configured as a list so multiple JDKs install side-by-side and
-    # VS Code's java.configuration.runtimes can pick either. Dropping one
-    # silently breaks projects that still pin to it.
+@test "mise declares Java with temurin-25" {
+    # Java is configured as a list so VS Code's java.configuration.runtimes
+    # can pick it up. Dropping it silently breaks projects that pin to it.
     java="$(_mise_get tools.java)"
     echo "tools.java = $java" >&2
-    echo "$java" | grep -q '"temurin-21"'
     echo "$java" | grep -q '"temurin-25"'
 }
 
@@ -91,20 +89,12 @@ PY
     [ "$node" != 'false' ]
 }
 
-# ─── Python: pinned to a single major.minor line ───────────────────────────
+# ─── Python: must be present ────────────────────────────────────────────────
 
 @test "mise declares Python" {
     python="$(_mise_get tools.python)"
     [ -n "$python" ]
-}
-
-@test "mise's Python version is major.minor pinned (not 'latest' or 'system')" {
-    # The comment in config.toml is explicit: "major-pinned so patch releases
-    # install cleanly while a deliberate major bump stays a code change." A
-    # drift to "latest" would defeat that.
-    python="$(_mise_get tools.python)"
-    echo "tools.python = $python" >&2
-    echo "$python" | grep -qE '^"[0-9]+\.[0-9]+"$'
+    [ "$python" != '""' ]
 }
 
 # ─── JVM build tools: managed by mise, not Homebrew ────────────────────────
