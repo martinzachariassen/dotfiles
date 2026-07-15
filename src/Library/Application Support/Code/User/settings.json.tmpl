@@ -326,10 +326,10 @@
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
-    // Pin the editor's JDKs to mise's stable install paths. mise installs to a
-    // fixed, version-named directory that doesn't move — so these paths are
-    // durable anchors that survive runtime updates. The JDKs come
-    // from the global mise config (java = ["temurin-25", "temurin-21"] in
+    // Pin the editor's JDK to mise's stable install path. mise installs to a
+    // fixed, version-named directory that doesn't move — so this path is a
+    // durable anchor that survives runtime updates. The JDK comes
+    // from the global mise config (java = ["temurin-25"] in
     // dot_config/mise/config.toml); project build versions are still pinned per
     // project via Gradle/Maven toolchains. This file is a chezmoi template so
     // the home dir resolves per machine.
@@ -344,10 +344,6 @@
             "name": "JavaSE-25",
             "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
             "default": true
-        },
-        {
-            "name": "JavaSE-21",
-            "path": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-21/Contents/Home"
         }
     ],
 {{ end -}}
