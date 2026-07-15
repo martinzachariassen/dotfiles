@@ -18,4 +18,6 @@ AGENTS.md
 #     so a config without the key (older render fixtures) still renders. ---
 {{ $modules := dig "modules" (list) . -}}
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
+{{ if not (has "nightlyDistill" $modules) }}.config/claude/scripts/nightly-distill{{ end }}
+{{ if not (has "nightlyDistill" $modules) }}Library/LaunchAgents/com.martin.claude-nightly-distill.plist{{ end }}
 {{ if not (has "obsidian" $modules) }}.config/obsidian{{ end }}

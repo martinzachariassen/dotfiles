@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# run_onchange_after_02f-nightly-distill — (re)load the nightly distiller agent.
+#
+# Why this exists:
+#   The launchd agent is a managed file (src/Library/LaunchAgents/…plist.tmpl),
+#   but dropping the plist into ~/Library/LaunchAgents doesn't register it with
+#   launchd — that's a `launchctl bootstrap`, a per-machine action chezmoi can't
+#   express as a file. Without it, a fresh machine has the plist but the 01:00
+#   job never fires.
+#
+# Why `run_onchange` keyed on the plist:
+#   A reload only matters when the plist itself changes (schedule, env, path).
+#   The plist's hash is embedded below so this re-fires only then (or when this
+#   script changes); bootout+bootstrap is idempotent, so any re-fire is a cheap
+#   reconcile.
+#
+# plist hash: {{ include "Library/LaunchAgents/com.martin.claude-nightly-distill.plist.tmpl" | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ nightly-distill: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+{{ if not (has "nightlyDistill" (dig "modules" (list) .)) -}}
+echo "→ nightly-distill: 'nightlyDistill' module not selected, skipping"
+exit 0
+{{ end -}}
+
+echo "▶ nightly-distill agent"
+
+label="com.martin.claude-nightly-distill"
+plist="{{ .chezmoi.homeDir }}/Library/LaunchAgents/${label}.plist"
+domain="gui/$(id -u)"
+
+if [ ! -f "$plist" ]; then
+    echo "  ! ${plist} missing — skipping (expected chezmoi to have applied it)"
+    exit 0
+fi
+
+# Idempotent reload: drop any existing registration (ignore "not loaded"), then
+# bootstrap the current plist and ensure it's enabled.
+launchctl bootout "$domain/$label" 2>/dev/null || true
+if launchctl bootstrap "$domain" "$plist" 2>/dev/null; then
+    launchctl enable "$domain/$label" 2>/dev/null || true
+    echo "  ${GREEN:-}✓${RESET:-} agent loaded (runs daily @ 01:00)"
+else
+    echo "  ${YELLOW:-}!${RESET:-} could not bootstrap ${label} — load it by hand with 'launchctl bootstrap ${domain} ${plist}'"
+fi
+
+# The job authenticates headlessly from a Keychain token; warn (don't fail) if
+# it's absent so the first 01:00 run doesn't silently abort on missing auth.
+if ! security find-generic-password -s claude-nightly-distill -w >/dev/null 2>&1; then
+    echo "  ${YELLOW:-}!${RESET:-} no 'claude-nightly-distill' Keychain token — run 'claude setup-token' then stash it (see the distiller README)"
+fi

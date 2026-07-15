@@ -1,6 +1,18 @@
 # ~/.ssh/config — managed by chezmoi
 # Mode 0600 enforced via the `private_` prefix.
 
+# Dedicated deploy key for the private `claude-memory` repo, used headlessly by
+# the nightly distiller (launchd @ 01:00) — bypasses the 1Password agent, which
+# isn't available then. Must precede `Host *` so IdentityAgent/IdentityFile here
+# win. The key file itself is machine-local, never committed; setup is in
+# ~/.config/claude/scripts/nightly-distill/README.md.
+Host github-claude-memory
+    HostName github.com
+    User git
+    IdentityAgent none
+    IdentityFile ~/.ssh/claude_memory_ed25519
+    IdentitiesOnly yes
+
 Host *
     # Use 1Password's SSH agent for all keys.
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"

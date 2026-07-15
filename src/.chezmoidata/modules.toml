@@ -15,6 +15,7 @@ macosDefaults = "macOS system defaults (needs sudo)"
 cloudAuth = "Cloud CLIs and auth walkthrough (gh, az, gcloud, op)"
 obsidian = "Obsidian vault seeding and starter content"
 claudePersona = "Claude persona at ~/.config/claude/CLAUDE.md"
+nightlyDistill = "Nightly Claude conversation distiller (launchd @ 01:00)"
 theme = "Catppuccin Frappe across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
@@ -25,6 +26,6 @@ jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
 # has to restate the same lists literally. tests/data-model.bats enforces the
 # match so the two never drift. Keys must be [moduleCatalog] names.
 [profileDefaults]
-personal = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "obsidian", "theme"]
+personal = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "nightlyDistill", "obsidian", "theme"]
 work = ["claudePersona", "cloudAuth", "jvmStack", "macApps", "macosDefaults", "theme"]
 minimal = []
