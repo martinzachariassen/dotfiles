@@ -123,9 +123,13 @@ tags: [project]
 ```
 
 Common fields by type: **project** → `status, domain, priority, started,
-target, area`; **reading** → `category, author, url, status, rating,
+target, area, repo`; **reading** → `category, author, url, status, rating,
 started, finished`; **person** → `role, team, company, email, first-met`;
 **area** → `domain, status, review`.
+
+`repo` — a GitHub/GitLab URL on a project, tech-resource, or dev note; click
+through from the note or the Projects Base to jump straight to the code.
+Optional, not auto-set by any template except `project`.
 
 ### Two axes for finding things
 
@@ -174,8 +178,15 @@ model behind those buckets:
 
 Once a week: open this week's note (`⌘⇧W`), empty `00 Inbox` — work the
 **Inbox to process** list on [[Home]] top-down, hitting `⌘⇧M` on each — glance
-at **Active projects**, and set next week's focus. Monthly, do the same one
-level up with the monthly note.
+at **Active projects** and **Not linked from anywhere**, and set next week's
+focus. Monthly, do the same one level up with the monthly note.
+
+## Diagrams
+
+Excalidraw diagrams live next to what they describe: embed one directly in the
+project/area note via `![[name.excalidraw]]`, or — for a general architecture
+sketch not tied to a single project — file it under
+`40 Resources/41 Tech/Diagrams`.
 
 ## Plugins in play
 
@@ -195,6 +206,9 @@ level up with the monthly note.
 | Tag Wrangler | Rename / merge tags from the sidebar |
 | Auto Link Title | Paste a URL → it fetches the page title for the link |
 | Obsidian Git | Auto-commits the vault to a private repo — your backup + undo |
+| Calendar | Sidebar month view of daily/weekly notes |
+| Natural Language Dates | "next friday" → a real date, in properties or via command |
+| Excalidraw | Freeform diagrams — architecture sketches, flows (see [Diagrams](#diagrams)) |
 
 Oversight comes from **core Bases** (no plugin): [[Projects.base|Projects &
 Areas]] is a live table/board of open projects, areas, and the inbox — sort or

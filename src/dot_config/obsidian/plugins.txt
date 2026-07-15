@@ -21,6 +21,16 @@ obsidian-icon-folder|FlorianWoelki/obsidian-iconize
 tag-wrangler|pjeby/tag-wrangler
 table-editor-obsidian|tgrosinger/advanced-tables-obsidian
 obsidian-style-settings|mgmeyers/obsidian-style-settings
+# Calendar — visual month view of daily/weekly notes; jump to any date.
+# Pinned to 1.5.10 — repo's latest is a 2.0 beta whose manifest id is
+# "calendar-beta", which would mismatch the community-store id "calendar".
+calendar|liamcain/obsidian-calendar-plugin|1.5.10
+# Natural Language Dates — type "next friday" in a date property or via
+# command palette, get a real date. Pairs with Calendar + daily/meeting notes.
+nldates-obsidian|argenos/nldates-obsidian
+# Excalidraw — freeform diagrams (architecture sketches, flows) embedded
+# alongside notes; see vault-guide.md for the Diagrams convention.
+obsidian-excalidraw-plugin|zsviczian/obsidian-excalidraw-plugin
 homepage|mirnovov/obsidian-homepage
 obsidian-linter|platers/obsidian-linter
 omnisearch|scambier/obsidian-omnisearch

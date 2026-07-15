@@ -54,6 +54,17 @@ SORT file.mtime DESC
 LIMIT 15
 ```
 
+## 🔗 Not linked from anywhere
+*Zero inlinks — link it from a project, area, or MOC so it doesn't vanish into search.*
+
+```dataview
+LIST
+FROM "20 Projects" OR "30 Areas" OR "40 Resources"
+WHERE length(file.inlinks) = 0 AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
+SORT file.mtime DESC
+LIMIT 10
+```
+
 ---
 ### Browse & jump back in
 

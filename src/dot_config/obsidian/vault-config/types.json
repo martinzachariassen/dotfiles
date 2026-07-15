@@ -37,6 +37,7 @@
     "email": "text",
     "author": "text",
     "url": "text",
+    "repo": "text",
     "week": "text",
     "range": "text",
     "month": "text",

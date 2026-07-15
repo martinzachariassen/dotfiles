@@ -11,6 +11,7 @@ views:
       - note.domain
       - note.priority
       - note.target
+      - note.repo
   - type: table
     name: Areas
     filters:

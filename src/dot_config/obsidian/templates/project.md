@@ -15,6 +15,7 @@ priority: <% priority %>
 started: <% tp.date.now("YYYY-MM-DD") %>
 target:
 area:
+repo:
 tags: [project]
 related: []
 ---
