@@ -20,5 +20,14 @@
   "effortLevel": "high",
   "theme": "dark-ansi",
   "verbose": false,
-  "model": "sonnet"
+  "model": "sonnet",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.config/claude/statusline.sh",
+    "padding": 1
+  },
+  "spinnerTipsEnabled": false,
+  "attribution": {
+    "commit": ""
+  }
 }
