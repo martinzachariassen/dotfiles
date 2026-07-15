@@ -431,6 +431,14 @@
     "yaml.format.singleQuote": false,
     "yaml.format.bracketSpacing": true,
     "yaml.format.proseWrap": "preserve",
+    "yaml.disableSchemaDetection": [
+        "**/.github/workflows/*.yml",
+        "**/.github/workflows/*.yaml",
+        "**/.gitea/workflows/*.yml",
+        "**/.gitea/workflows/*.yaml",
+        "**/.forgejo/workflows/*.yml",
+        "**/.forgejo/workflows/*.yaml"
+    ],
 
     // XML (LemMinX / redhat.vscode-xml) — keep pom.xml & Spring XML tidy and
     // schema-validated without reflowing hand-laid-out attributes.

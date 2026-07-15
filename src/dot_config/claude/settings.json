@@ -14,6 +14,11 @@
     ],
     "defaultMode": "default"
   },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
+  },
+  "effortLevel": "high",
   "theme": "dark-ansi",
-  "verbose": false
+  "verbose": false,
+  "model": "sonnet"
 }
