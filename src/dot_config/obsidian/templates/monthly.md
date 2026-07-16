@@ -5,7 +5,7 @@ const start = month.clone().startOf('month');
 const end = month.clone().endOf('month');
 %>---
 type: monthly
-icon: LiCalendarDays
+icon: LiCalendar
 iconColor: "#8caaee"
 month: <% title %>
 created: <% tp.date.now("YYYY-MM-DD HH:mm") %>

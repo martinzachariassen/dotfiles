@@ -117,8 +117,9 @@ obsidian_install_theme() {
 #
 # Each line is "<id>|<owner/repo>" or "<id>|<owner/repo>|<tag>". With a tag we
 # fetch from that exact release (download/<tag>); without one we fetch
-# /releases/latest/download. Use a tag when the repo's latest release is a beta
-# whose manifest id differs from the community-store id (e.g. Calendar 2.x).
+# /releases/latest/download. Use a tag when the repo's latest release is
+# unusable as-is — see the templater-obsidian pin in plugins.txt (its latest
+# release bumped minAppVersion past a Catalyst-only build).
 obsidian_install_plugins() {
     local vault="$1" line id repo tag dir base rc=0
     [ -f "$OB_CONFIG_DIR/plugins.txt" ] || return 0
@@ -231,9 +232,9 @@ obsidian_seed_templates() {
     fi
 }
 
-# obsidian_seed_readmes VAULT — seed each PARA folder's "_README.md" from
+# obsidian_seed_readmes VAULT — seed each top-level folder's "_README.md" from
 # folder-readmes/. Source files are named after their target folder verbatim
-# (e.g. "20 Projects.md" → "20 Projects/_README.md"), so no lookup table is
+# (e.g. "10 Areas.md" → "10 Areas/_README.md"), so no lookup table is
 # needed. mkdir -p also lays down the top-level folder structure on a fresh
 # vault. Seed-only: an existing README is left untouched.
 obsidian_seed_readmes() {
@@ -242,7 +243,7 @@ obsidian_seed_readmes() {
     [ -d "$rdir" ] || return 0
     for src in "$rdir/"*.md; do
         [ -f "$src" ] || continue
-        name="$(basename "$src" .md)" # e.g. "20 Projects"
+        name="$(basename "$src" .md)" # e.g. "10 Areas"
         dst="$vault/$name/_README.md"
         if [ -e "$dst" ]; then
             continue

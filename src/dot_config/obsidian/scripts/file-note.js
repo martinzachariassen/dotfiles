@@ -32,7 +32,7 @@ module.exports = async ({ app, quickAddApi }) => {
   // Types this vault has templates for. Esc/none = leave `type` as-is — use
   // that when re-filing an already-typed note across domains, not promoting
   // a fresh inbox capture.
-  const TYPES = ["project", "area", "person", "reading", "note"];
+  const TYPES = ["project", "area", "person", "reading", "meeting", "note"];
 
   // Curated topic tags — keep it short and edit freely. A tight list beats a
   // sprawling one: consistent tags are what make the tag pane worth clicking.

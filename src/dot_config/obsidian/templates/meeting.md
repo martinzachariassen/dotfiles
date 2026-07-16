@@ -8,6 +8,7 @@ await tp.file.move(`${domainFolder}/${subject}`);
 type: meeting
 icon: LiCalendarClock
 iconColor: "#ef9f76"
+aliases: []
 created: <% tp.date.now("YYYY-MM-DD HH:mm") %>
 date: <% tp.date.now("YYYY-MM-DD") %>
 domain: <% domain %>

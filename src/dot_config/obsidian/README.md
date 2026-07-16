@@ -7,8 +7,10 @@ hotkeys, templates.
 
 ## Layout
 
-- `plugins.txt` — `<plugin-id>|<github repo>` per line. Source of truth for
-  which community plugins should be installed.
+- `plugins.txt` — `<plugin-id>|<github owner/repo>[|<release-tag>]` per line
+  (the optional third field pins a release when `/releases/latest` is
+  unusable — see the Templater line). Source of truth for which community
+  plugins should be installed.
 - `theme.txt` — `<theme-name>|<github repo>[|<branch>]` (single line). Theme
   files are fetched from the given branch (default `main`) since theme repos
   don't always publish releases or use the same default branch name.
