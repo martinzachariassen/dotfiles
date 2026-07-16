@@ -33,10 +33,18 @@ for deterministic colors across Ghostty versions. It's applied only when the
 ## Zellij
 
 Config: [`src/dot_config/zellij/config.kdl`](../src/dot_config/zellij/config.kdl).
-The multiplexer (a modern tmux alternative), `default_shell zsh`,
-`compact` layout for a minimal status bar. `copy_on_select` → `pbcopy`, mouse
-mode on, sessions serialized across restarts, pane frames off (rounded when on).
-Each Ghostty tab is an independent Zellij session (`mirror_session false`).
+The multiplexer (a modern tmux alternative), `default_shell zsh`, custom `main`
+layout with a one-line [zjstatus](https://github.com/dj95/zjstatus) bar
+([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl)).
+`copy_on_select` → `pbcopy`, mouse mode on, sessions serialized across
+restarts, rounded pane frames showing pane titles.
+
+Interactive Ghostty shells auto-attach to Zellij; each window gets its own
+session — the project (cwd) name for the first, `-2`/`-3`… suffixes for later
+windows in the same directory, resurrecting exited sessions before minting new
+names. `zj [name]` attaches manually (an explicit name joins even a running
+session), `zjclean` prunes exited ones, and `NO_ZELLIJ=1 zsh` is the escape
+hatch for a bare shell.
 
 Keybinds are Zellij's mode-based defaults — `Ctrl+P` pane mode, `Ctrl+T` tab
 mode, and `Ctrl+G` to lock/unlock Zellij's own bindings when an inner app (vim)
