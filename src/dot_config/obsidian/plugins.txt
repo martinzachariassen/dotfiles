@@ -18,26 +18,14 @@ dataview|blacksmithgu/obsidian-dataview
 quickadd|chhoumann/quickadd
 obsidian-tasks-plugin|obsidian-tasks-group/obsidian-tasks
 obsidian-icon-folder|FlorianWoelki/obsidian-iconize
-tag-wrangler|pjeby/tag-wrangler
-table-editor-obsidian|tgrosinger/advanced-tables-obsidian
 obsidian-style-settings|mgmeyers/obsidian-style-settings
-# Calendar — visual month view of daily/weekly notes; jump to any date.
-# Pinned to 1.5.10 — repo's latest is a 2.0 beta whose manifest id is
-# "calendar-beta", which would mismatch the community-store id "calendar".
-calendar|liamcain/obsidian-calendar-plugin|1.5.10
-# Natural Language Dates — type "next friday" in a date property or via
-# command palette, get a real date. Pairs with Calendar + daily/meeting notes.
-nldates-obsidian|argenos/nldates-obsidian
-# Excalidraw — freeform diagrams (architecture sketches, flows) embedded
-# alongside notes; see vault-guide.md for the Diagrams convention.
-obsidian-excalidraw-plugin|zsviczian/obsidian-excalidraw-plugin
+# Minimal Theme Settings — companion plugin for the Minimal theme; controls
+# color scheme (Catppuccin, via kepano's built-in scheme), light/dark
+# contrast, and other Minimal-specific toggles from its own settings tab.
+obsidian-minimal-settings|kepano/obsidian-minimal-settings
 homepage|mirnovov/obsidian-homepage
 obsidian-linter|platers/obsidian-linter
-omnisearch|scambier/obsidian-omnisearch
 obsidian-auto-link-title|zolrath/obsidian-auto-link-title
 # Code Styler — line numbers, language label, and a copy button on code fences.
 # QoL for Kotlin/tech notes. minAppVersion 0.15.0, no pin needed.
 code-styler|mayurankv/Obsidian-Code-Styler
-# Obsidian Git — versioned backup of vault CONTENT (iCloud is sync, not backup).
-# Auto-commits to a PRIVATE remote you set up once; see README "Vault backup".
-obsidian-git|Vinzent03/obsidian-git

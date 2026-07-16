@@ -8,19 +8,19 @@
     {
       "day": {
         "format": "YYYY-MM-DD",
-        "folder": "10 Daily/YYYY",
+        "folder": "99 Meta/Daily/YYYY",
         "openAtStartup": false,
         "templatePath": "99 Meta/_templates/daily"
       },
       "week": {
         "format": "YYYY-[W]WW",
-        "folder": "10 Daily/YYYY",
+        "folder": "99 Meta/Daily/YYYY",
         "openAtStartup": false,
         "templatePath": "99 Meta/_templates/weekly"
       },
       "month": {
         "format": "YYYY-MM",
-        "folder": "10 Daily/YYYY",
+        "folder": "99 Meta/Daily/YYYY",
         "openAtStartup": false,
         "templatePath": "99 Meta/_templates/monthly"
       },
@@ -45,19 +45,19 @@
     "available": true,
     "format": "YYYY-MM-DD",
     "template": "99 Meta/_templates/daily",
-    "folder": "10 Daily/YYYY"
+    "folder": "99 Meta/Daily/YYYY"
   },
   "weekly": {
     "available": true,
     "format": "YYYY-[W]WW",
     "template": "99 Meta/_templates/weekly",
-    "folder": "10 Daily/YYYY"
+    "folder": "99 Meta/Daily/YYYY"
   },
   "monthly": {
     "available": true,
     "format": "YYYY-MM",
     "template": "99 Meta/_templates/monthly",
-    "folder": "10 Daily/YYYY"
+    "folder": "99 Meta/Daily/YYYY"
   },
   "quarterly": {
     "available": false,

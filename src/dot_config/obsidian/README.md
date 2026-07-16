@@ -9,8 +9,9 @@ hotkeys, templates.
 
 - `plugins.txt` — `<plugin-id>|<github repo>` per line. Source of truth for
   which community plugins should be installed.
-- `theme.txt` — `<theme-name>|<github repo>` (single line). Theme files are
-  fetched directly from `main` since theme repos don't always publish releases.
+- `theme.txt` — `<theme-name>|<github repo>[|<branch>]` (single line). Theme
+  files are fetched from the given branch (default `main`) since theme repos
+  don't always publish releases or use the same default branch name.
 - `vault-config/` — canonical `.obsidian/` overlay. Files here are seeded into
   the vault on first install and never overwritten afterwards (Obsidian's UI
   rewrites them on use; we don't fight that).
@@ -23,9 +24,9 @@ hotkeys, templates.
   `Projects.base`). Seeded into the vault root on first install; linked from
   `Home.md` for at-a-glance project/area oversight.
 - `folder-readmes/` — per-folder `_README.md` files. Each source is named
-  after its target folder verbatim (`20 Projects.md` → `20 Projects/_README.md`),
-  so seeding needs no lookup table and `mkdir -p` lays down the PARA folder
-  structure on a fresh vault.
+  after its target folder verbatim (`10 Areas.md` → `10 Areas/_README.md`),
+  so seeding needs no lookup table and `mkdir -p` lays down the top-level
+  folder structure on a fresh vault.
 - `Home.md` — vault dashboard. Seeded into the vault root on first
   install; the Homepage plugin opens it on launch.
 - `vault-guide.md` — user-facing how-to (PARA layout, hotkeys, where
@@ -56,14 +57,20 @@ To re-seed a file from canonical config, delete it from the vault and re-run
 `chezup`. To pull plugin/theme updates, delete the relevant folder under
 `.obsidian/plugins/` or `.obsidian/themes/` and re-run.
 
-## Vault backup (obsidian-git)
+## Vault backup (obsidian-git, currently not enabled)
 
 This repo manages the vault's *config*, not its *content* — your notes are
 yours and live only in the iCloud vault. iCloud is sync, not backup: a bad
-delete or a corrupt note propagates everywhere with no undo. The `obsidian-git`
-plugin (seeded above, config in `vault-config/plugins/obsidian-git/data.json`)
-versions the content to a **private** remote. One-time setup, run once per
-vault (not per machine — iCloud carries the `.git` dir to your other devices):
+delete or a corrupt note propagates everywhere with no undo. `obsidian-git`
+versions the content to a **private** remote, but it's deliberately left out
+of `plugins.txt`/`community-plugins.json` for now — it's one more moving part
+for a problem you haven't hit yet. To bring it back: add
+`obsidian-git|Vinzent03/obsidian-git` to `plugins.txt` and `"obsidian-git"` to
+`vault-config/community-plugins.json`, then re-create
+`vault-config/plugins/obsidian-git/data.json` (Obsidian Git writes its own
+settings there once configured in-app — seed an empty `{}` and let the plugin
+fill it in). One-time repo setup, run once per vault (not per machine —
+iCloud carries the `.git` dir to your other devices):
 
 ```sh
 # 1. Create an EMPTY private repo first (gh or the web UI):

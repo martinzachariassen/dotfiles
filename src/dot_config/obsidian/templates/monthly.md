@@ -20,7 +20,7 @@ tags: [monthly, review]
 ## Weekly reviews
 
 ```dataview
-LIST FROM "10 Daily"
+LIST FROM "99 Meta/Daily"
 WHERE type = "weekly" AND month = [[<% title %>]]
 SORT week ASC
 ```
@@ -28,7 +28,7 @@ SORT week ASC
 ## Projects touched
 
 ```dataview
-TABLE status, priority, target FROM "20 Projects"
+TABLE status, priority, target FROM "10 Areas"
 WHERE type = "project"
 SORT priority ASC
 ```

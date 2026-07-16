@@ -75,28 +75,31 @@ PY
 # ─── Theme ────────────────────────────────────────────────────────────────────
 
 # obsidian_install_theme VAULT — ensure the configured theme is on disk.
-# theme.txt is "<name>|<owner/repo>"; we fetch manifest.json + theme.css from
-# the repo's default branch (themes don't always publish releases).
+# theme.txt is "<name>|<owner/repo>[|<branch>]"; we fetch manifest.json +
+# theme.css from the given branch, defaulting to "main" (themes don't always
+# publish releases, and don't all use the same default branch name).
 obsidian_install_theme() {
-    local vault="$1" line name repo themedir rc=0
+    local vault="$1" line name repo branch themedir rc=0
     [ -f "$OB_CONFIG_DIR/theme.txt" ] || return 0
     while IFS= read -r line || [ -n "$line" ]; do
         line="${line#"${line%%[![:space:]]*}"}"
         case "$line" in '' | '#'*) continue ;; esac
         name="${line%%|*}"
-        repo="${line##*|}"
+        repo="$(printf '%s' "$line" | cut -d'|' -f2)"
+        branch="$(printf '%s' "$line" | cut -d'|' -f3)"
+        branch="${branch:-main}"
         themedir="$vault/.obsidian/themes/$name"
         if [ -f "$themedir/theme.css" ]; then
             printf "  ${DIM}theme${RESET} %s: ${GREEN}present${RESET}\n" "$name"
             continue
         fi
-        printf "  ${BLUE}theme${RESET} %s: downloading from %s\n" "$name" "$repo"
+        printf "  ${BLUE}theme${RESET} %s: downloading from %s@%s\n" "$name" "$repo" "$branch"
         mkdir -p "$themedir"
         rc=0
         curl -fsSL --retry 2 -o "$themedir/manifest.json" \
-            "https://raw.githubusercontent.com/$repo/main/manifest.json" || rc=$?
+            "https://raw.githubusercontent.com/$repo/$branch/manifest.json" || rc=$?
         curl -fsSL --retry 2 -o "$themedir/theme.css" \
-            "https://raw.githubusercontent.com/$repo/main/theme.css" || rc=$?
+            "https://raw.githubusercontent.com/$repo/$branch/theme.css" || rc=$?
         if [ "$rc" -ne 0 ]; then
             printf "  ${RED}${FAIL_MARK}${RESET} theme %s: download failed (rc=%d)\n" "$name" "$rc"
             OB_FAILURES+=("theme: $name (rc=$rc)")

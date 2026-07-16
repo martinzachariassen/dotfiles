@@ -17,22 +17,6 @@
     {
       "folder": "00 Inbox",
       "template": "99 Meta/_templates/inbox.md"
-    },
-    {
-      "folder": "20 Projects",
-      "template": "99 Meta/_templates/project.md"
-    },
-    {
-      "folder": "30 Areas",
-      "template": "99 Meta/_templates/area.md"
-    },
-    {
-      "folder": "40 Resources/42 People",
-      "template": "99 Meta/_templates/person.md"
-    },
-    {
-      "folder": "40 Resources/43 Reading",
-      "template": "99 Meta/_templates/reading.md"
     }
   ],
   "syntax_highlighting": true,

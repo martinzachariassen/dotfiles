@@ -1,13 +1,14 @@
 // file-note.js — QuickAdd user script: "File this…"
 //
-// Pops a named menu of PARA destinations, an optional curated topic-tag picker,
-// then moves the active note there — setting `domain`/`tags`/`status` and
-// rewriting backlinks (renameFile updates every link that points at the note).
-// Bound to ⌘⇧M via the `quickadd:choice:file-this` command.
+// Pops a domain menu (Work / Personal / Learning / Archive), an optional type
+// picker, and an optional curated topic-tag picker, then moves the active
+// note there — setting `domain`/`type`/`tags`/`status` and rewriting
+// backlinks (renameFile updates every link that points at the note). Bound
+// to ⌘⇧M via the `quickadd:choice:file-this` command.
 //
-// Two axes power findability:
-//   • domain (work | personal) — set automatically by the life-area buckets.
-//   • tags   — chosen from TOPICS below; edit that one line to taste.
+// Filing is purely a domain question now — "what kind of note is this?" is
+// answered by the type picker below (project/area/person/reading/note), not
+// by which bucket you file into.
 //
 // Seeded into the vault at `99 Meta/_scripts/file-note.js` by
 // scripts/lib/obsidian-apply.sh (seed-only, never overwritten).
@@ -19,15 +20,19 @@ module.exports = async ({ app, quickAddApi }) => {
     return;
   }
 
-  // [label, target folder, domain]. Labels name the bucket so filing needs no
-  // recall of the numbered PARA paths. domain is set only for the life-areas.
+  // [label, target folder, domain]. Only 4 buckets — domain is the only
+  // filing question left.
   const DESTS = [
-    ["💼 Work", "30 Areas/31 Work", "work"],
-    ["🏠 Personal", "30 Areas/32 Personal", "personal"],
-    ["📁 Project", "20 Projects", null],
-    ["📚 Resource", "40 Resources", null],
-    ["🗄 Archive", "50 Archive", null],
+    ["💼 Work", "10 Areas/Work", "work"],
+    ["🏠 Personal", "10 Areas/Personal", "personal"],
+    ["🎓 Learning", "10 Areas/Learning", "learning"],
+    ["🗄 Archive", "20 Archive", null],
   ];
+
+  // Types this vault has templates for. Esc/none = leave `type` as-is — use
+  // that when re-filing an already-typed note across domains, not promoting
+  // a fresh inbox capture.
+  const TYPES = ["project", "area", "person", "reading", "note"];
 
   // Curated topic tags — keep it short and edit freely. A tight list beats a
   // sprawling one: consistent tags are what make the tag pane worth clicking.
@@ -40,6 +45,15 @@ module.exports = async ({ app, quickAddApi }) => {
   if (!dest) return; // Esc on the bucket = cancel the whole thing
   const [, folder, domain] = dest;
 
+  let newType = null;
+  if (folder !== "20 Archive") {
+    try {
+      newType = await quickAddApi.suggester(TYPES, TYPES);
+    } catch (e) {
+      newType = null;
+    }
+  }
+
   // Optional topic tags. Esc / none selected = file without touching tags.
   let picked = [];
   try {
@@ -49,13 +63,21 @@ module.exports = async ({ app, quickAddApi }) => {
   }
 
   await app.fileManager.processFrontMatter(file, (fm) => {
+    const wasInbox = (fm.type ?? "inbox") === "inbox";
+
     // Drop the "inbox" tag on the way out; merge in the picked topics.
     const base = (fm.tags ?? []).filter((t) => t !== "inbox");
     const merged = [...new Set([...base, ...picked])];
     if (merged.length) fm.tags = merged;
     else delete fm.tags;
+
     if (domain) fm.domain = domain;
-    fm.status = "filed";
+    if (newType) fm.type = newType;
+
+    // Only stamp status="filed" when promoting a fresh inbox capture — don't
+    // clobber a project/area's own active/paused/done lifecycle status when
+    // just re-filing it across domains.
+    if (wasInbox || newType) fm.status = "filed";
   });
 
   if (!app.vault.getAbstractFileByPath(folder)) {

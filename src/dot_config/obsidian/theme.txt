@@ -1,5 +1,6 @@
-# Theme to install into every vault: <theme-name>|<github owner/repo>
+# Theme to install into every vault: <theme-name>|<github owner/repo>[|<branch>]
 # The theme-name becomes the folder name under .obsidian/themes/ and the
-# cssTheme value in .obsidian/appearance.json. Fetched from the default branch
-# (manifest.json + theme.css) since theme repos don't always publish releases.
-Catppuccin|catppuccin/obsidian
+# cssTheme value in .obsidian/appearance.json. Fetched from the given branch
+# (default: main) since theme repos don't always publish releases.
+# Minimal's default branch is "master", not "main" — pinned explicitly below.
+Minimal|kepano/obsidian-minimal|master

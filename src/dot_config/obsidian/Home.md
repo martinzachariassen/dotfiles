@@ -48,7 +48,7 @@ limit 20
 
 ```dataview
 TABLE WITHOUT ID file.link AS Project, domain AS Domain, priority AS Priority, dateformat(file.mtime, "MMM d") AS Touched
-FROM "20 Projects"
+FROM "10 Areas"
 WHERE type = "project" AND (status = "active" OR !status) AND !contains(file.name, "_README")
 SORT file.mtime DESC
 LIMIT 15
@@ -59,7 +59,7 @@ LIMIT 15
 
 ```dataview
 LIST
-FROM "20 Projects" OR "30 Areas" OR "40 Resources"
+FROM "10 Areas"
 WHERE length(file.inlinks) = 0 AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
 SORT file.mtime DESC
 LIMIT 10
@@ -72,7 +72,7 @@ LIMIT 10
 
 ```dataview
 TABLE WITHOUT ID file.link AS Title, author AS Author, category AS Type
-FROM "40 Resources/43 Reading"
+FROM "10 Areas"
 WHERE type = "reading" AND status = "reading"
 SORT file.mtime DESC
 LIMIT 10
@@ -82,7 +82,7 @@ LIMIT 10
 
 ```dataview
 LIST dateformat(file.mtime, "MMM d, HH:mm")
-WHERE !contains(file.folder, "_templates") AND !contains(file.folder, "50 Archive") AND !contains(file.folder, "00 Inbox") AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
+WHERE !contains(file.folder, "_templates") AND !contains(file.folder, "20 Archive") AND !contains(file.folder, "00 Inbox") AND !contains(file.name, "_README") AND file.name != "Home" AND file.name != "Vault Guide"
 SORT file.mtime DESC
 LIMIT 12
 ```

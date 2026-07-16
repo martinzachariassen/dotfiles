@@ -34,6 +34,146 @@
       "type": "Macro",
       "command": true,
       "macroId": "file-note-macro"
+    },
+    {
+      "id": "new-project",
+      "name": "New project",
+      "type": "Template",
+      "command": true,
+      "templatePath": "99 Meta/_templates/project.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": false,
+        "folders": [],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveNote": false,
+        "chooseFromSubfolders": false
+      },
+      "appendLink": false,
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": true,
+      "openFile": true,
+      "openFileInNewTab": {
+        "enabled": false,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default"
+    },
+    {
+      "id": "new-area",
+      "name": "New area",
+      "type": "Template",
+      "command": true,
+      "templatePath": "99 Meta/_templates/area.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": false,
+        "folders": [],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveNote": false,
+        "chooseFromSubfolders": false
+      },
+      "appendLink": false,
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": true,
+      "openFile": true,
+      "openFileInNewTab": {
+        "enabled": false,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default"
+    },
+    {
+      "id": "new-person",
+      "name": "New person",
+      "type": "Template",
+      "command": true,
+      "templatePath": "99 Meta/_templates/person.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": false,
+        "folders": [],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveNote": false,
+        "chooseFromSubfolders": false
+      },
+      "appendLink": false,
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": true,
+      "openFile": true,
+      "openFileInNewTab": {
+        "enabled": false,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default"
+    },
+    {
+      "id": "new-reading",
+      "name": "New reading item",
+      "type": "Template",
+      "command": true,
+      "templatePath": "99 Meta/_templates/reading.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": false,
+        "folders": [],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveNote": false,
+        "chooseFromSubfolders": false
+      },
+      "appendLink": false,
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": true,
+      "openFile": true,
+      "openFileInNewTab": {
+        "enabled": false,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default"
+    },
+    {
+      "id": "new-meeting",
+      "name": "New meeting",
+      "type": "Template",
+      "command": true,
+      "templatePath": "99 Meta/_templates/meeting.md",
+      "fileNameFormat": {
+        "enabled": false,
+        "format": ""
+      },
+      "folder": {
+        "enabled": false,
+        "folders": [],
+        "chooseWhenCreatingNote": false,
+        "createInSameFolderAsActiveNote": false,
+        "chooseFromSubfolders": false
+      },
+      "appendLink": false,
+      "fileExistsMode": "Increment the file name",
+      "setFileExistsBehavior": true,
+      "openFile": true,
+      "openFileInNewTab": {
+        "enabled": false,
+        "direction": "vertical",
+        "focus": true
+      },
+      "openFileInMode": "default"
     }
   ],
   "macros": [

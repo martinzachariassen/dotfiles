@@ -21,7 +21,7 @@ tags: [weekly, review]
 ## What got done
 
 ```dataview
-LIST FROM "10 Daily"
+LIST FROM "99 Meta/Daily"
 WHERE type = "daily" AND date >= date("<% start.format("YYYY-MM-DD") %>") AND date <= date("<% end.format("YYYY-MM-DD") %>")
 SORT date ASC
 ```

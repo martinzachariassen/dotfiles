@@ -32,57 +32,37 @@
     "iconName": "LiInbox",
     "iconColor": "#e78284"
   },
-  "10 Daily": {
-    "iconName": "LiCalendarDays",
-    "iconColor": "#8caaee"
-  },
-  "10 Daily/2026": {
-    "iconName": "LiCalendar",
-    "iconColor": "#99d1db"
-  },
-  "20 Projects": {
-    "iconName": "LiFolderKanban",
-    "iconColor": "#a6d189"
-  },
-  "30 Areas": {
+  "10 Areas": {
     "iconName": "LiLayers",
     "iconColor": "#81c8be"
   },
-  "30 Areas/31 Work": {
+  "10 Areas/Work": {
     "iconName": "LiBriefcase",
     "iconColor": "#81c8be"
   },
-  "30 Areas/32 Personal": {
+  "10 Areas/Personal": {
     "iconName": "LiHeart",
     "iconColor": "#81c8be"
   },
-  "30 Areas/33 Learning": {
+  "10 Areas/Learning": {
     "iconName": "LiGraduationCap",
     "iconColor": "#81c8be"
   },
-  "40 Resources": {
-    "iconName": "LiLibrary",
-    "iconColor": "#ca9ee6"
-  },
-  "40 Resources/41 Tech": {
-    "iconName": "LiCode",
-    "iconColor": "#ca9ee6"
-  },
-  "40 Resources/42 People": {
-    "iconName": "LiUsers",
-    "iconColor": "#ca9ee6"
-  },
-  "40 Resources/43 Reading": {
-    "iconName": "LiBookOpen",
-    "iconColor": "#ca9ee6"
-  },
-  "50 Archive": {
+  "20 Archive": {
     "iconName": "LiArchive",
     "iconColor": "#737994"
   },
   "99 Meta": {
     "iconName": "LiSettings",
     "iconColor": "#838ba7"
+  },
+  "99 Meta/Daily": {
+    "iconName": "LiCalendarDays",
+    "iconColor": "#8caaee"
+  },
+  "99 Meta/Daily/2026": {
+    "iconName": "LiCalendar",
+    "iconColor": "#99d1db"
   },
   "99 Meta/_templates": {
     "iconName": "LiLayoutTemplate",
