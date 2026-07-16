@@ -9,13 +9,13 @@ theme "catppuccin-frappe"
 // ─── Behavior ─────────────────────────────────────────────────────────────
 scrollback_lines     100000             // match Ghostty's buffer; default is 10000
 default_shell        "zsh"
-default_layout       "main"             // custom layout with zjstatus bar (layouts/main.kdl)
+default_layout       "compact"          // minimal status bar; more screen for content
 mouse_mode           true
 copy_on_select       true
 copy_command         "pbcopy"           // macOS clipboard
 mirror_session       false              // each Ghostty tab = independent zellij session
 session_serialization true               // persist sessions across restarts
-pane_frames          true               // frame titles show pane cwd / Claude Code status
+pane_frames          false              // cleaner look; turn back on if you split panes a lot
 simplified_ui        false
 show_startup_tips    false
 
@@ -23,7 +23,7 @@ show_startup_tips    false
 ui {
     pane_frames {
         rounded_corners   true
-        hide_session_name true            // session already shown in the zjstatus bar
+        hide_session_name false
     }
 }
 
