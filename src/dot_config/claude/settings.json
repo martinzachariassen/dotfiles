@@ -29,5 +29,6 @@
   "spinnerTipsEnabled": false,
   "attribution": {
     "commit": ""
-  }
+  },
+  "remoteControlAtStartup": true
 }
