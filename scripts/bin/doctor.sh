@@ -1,37 +1,15 @@
 #!/usr/bin/env bash
-# doctor.sh — health check for the dotfiles install on this machine.
-#
-# Run anytime (idempotent, read-only):
-#   bash ~/Developer/personal/dotfiles/scripts/bin/doctor.sh
-#   chezdoctor                                 # zsh alias
-#
-# Output convention:
-#   ✓ green = passing
-#   ! yellow = warning (not broken, but worth knowing)
-#   ✗ red   = failing (needs your attention)
-#
-# Exit codes:
-#   0  — everything passes (warnings are still 0)
-#   1  — at least one fail
-#
-# Why a script and not just `chezmoi doctor`:
-#   chezmoi's built-in doctor checks chezmoi's own state. This script checks the
-#   *whole stack* this repo expects — XDG layout, claude config, op
-#   signing, brew bundle drift, auth state — anything that can quietly break and
-#   bite you a week later.
+# doctor.sh — idempotent read-only health check for the whole stack this repo
+# expects (XDG layout, claude config, op signing, brew drift, auth), beyond what
+# `chezmoi doctor` covers. Exit 1 on any fail; warnings stay 0.
 
-# Tilde in the user-facing status strings throughout this script is intentional
-# — those are display messages, not paths passed to commands, so they stay
+# Tildes in status strings are display text, not command paths, so leave them
 # literal. File-level disable must precede the first command below.
 # shellcheck disable=SC2088
 set -uo pipefail
 
 # ─── Color + shared helpers ───────────────────────────────────────────────────
-# Loaded from lib/ (one level up now that this script lives under bin/) so they
-# work even when DOTFILES_DIR is overridden or the script is invoked from another
-# directory. log.sh is a committed sibling; a checkout without it is broken, so
-# fail loudly rather than limp along with degraded output (chezup.sh +
-# bootstrap-auth.sh do the same).
+# log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_DOCTOR_DIR/../lib/log.sh" ]; then
     printf 'doctor: missing %s\n' "$_DOCTOR_DIR/../lib/log.sh" >&2
@@ -46,8 +24,7 @@ ACTION=0
 INFOCOUNT=0
 FAIL=0
 
-# doctor's status lines share the flat printers from log.sh (s_pass/s_warn/…);
-# these thin wrappers add the running tallies the summary prints.
+# Thin wrappers over log.sh printers that also bump the summary tallies.
 pass() {
     s_pass "$1"
     PASS=$((PASS + 1))
@@ -68,28 +45,22 @@ section() { s_section "$1"; }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-# Shared semver helpers (semver_extract / semver_lt) for the chezmoi
-# version-minimum check below. Same script-relative dir resolved above.
 # shellcheck source=../lib/semver.sh
 if [ -r "$_DOCTOR_DIR/../lib/semver.sh" ]; then
     . "$_DOCTOR_DIR/../lib/semver.sh"
 fi
 
-# Shared chezmoi data reader (cm_data_json/cm_data_string/cm_data_bool) for the
-# profile + feature toggles the Homebrew section checks below.
 # shellcheck source=../lib/chezmoi-data.sh
 if [ -r "$_DOCTOR_DIR/../lib/chezmoi-data.sh" ]; then
     . "$_DOCTOR_DIR/../lib/chezmoi-data.sh"
 fi
 
-# Shared VS Code set helpers (vscode_read_manifest/vscode_untracked/
-# vscode_missing) for the extension-mirror drift check below.
 # shellcheck source=../lib/vscode.sh
 if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
     . "$_DOCTOR_DIR/../lib/vscode.sh"
 fi
 
-# ─── 1. Source repo present and up to date ────────────────────────────────────
+# ─── 1. Source repo ───────────────────────────────────────────────────────────
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
     pass "repo at $SOURCE_DIR"
@@ -102,7 +73,6 @@ if [ -d "$SOURCE_DIR/.git" ]; then
             warn "repo behind/ahead of origin — run \`chezup\` to sync"
         fi
     fi
-    # Uncommitted changes in repo
     if (cd "$SOURCE_DIR" && [ -n "$(git status --porcelain 2>/dev/null)" ]); then
         warn "repo has uncommitted changes — run \`cd $SOURCE_DIR && git status\`"
     else
@@ -112,14 +82,10 @@ else
     fail "repo missing at $SOURCE_DIR — re-run install.sh"
 fi
 
-# ─── 2. chezmoi config + minVersion ───────────────────────────────────────────
+# ─── 2. chezmoi ───────────────────────────────────────────────────────────────
 section "chezmoi"
 if command -v chezmoi >/dev/null 2>&1; then
     pass "chezmoi installed: $(chezmoi --version | head -1)"
-    # Compare installed version against the repo's pinned minimum
-    # (.chezmoiversion). chezmoi refuses to read the source if it's too old, but
-    # being far ahead is worth knowing too since template helpers shift between
-    # releases.
     if command -v semver_lt >/dev/null 2>&1 && [ -r "$SOURCE_DIR/src/.chezmoiversion" ]; then
         min_ver="$(semver_extract "$(cat "$SOURCE_DIR/src/.chezmoiversion")")"
         cur_ver="$(semver_extract "$(chezmoi --version 2>/dev/null)")"
@@ -136,8 +102,7 @@ if command -v chezmoi >/dev/null 2>&1; then
     else
         pass "chezmoi doctor clean"
     fi
-    # Drift between source and $HOME. Exclude scripts because run_* entries can
-    # remain pending after a successful apply by design.
+    # Exclude scripts: run_* entries can stay pending after a good apply by design.
     drift=$(chezmoi status --exclude scripts 2>/dev/null | wc -l | tr -d ' ')
     if [ "$drift" = "0" ]; then
         pass "no drift between source and \$HOME"
@@ -148,7 +113,7 @@ else
     fail "chezmoi not installed — re-run install.sh"
 fi
 
-# ─── 3. XDG layout: legacy files must NOT exist ───────────────────────────────
+# ─── 3. XDG layout ────────────────────────────────────────────────────────────
 section "XDG layout"
 for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
     if [ -f "$legacy" ]; then
@@ -157,7 +122,6 @@ for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_p
         pass "no legacy $(basename "$legacy")"
     fi
 done
-# Required ZDOTDIR file
 if [ -f "$HOME/.config/zsh/.zshrc" ]; then
     pass "~/.config/zsh/.zshrc present"
 else
@@ -192,7 +156,6 @@ if [ -x "$SSH_SIGN" ]; then
 else
     fail "op-ssh-sign missing — install 1Password app and enable SSH agent in Settings → Developer"
 fi
-# The signing key configured in git
 gitkey=$(git config --global user.signingkey 2>/dev/null || true)
 if [ -n "$gitkey" ]; then
     pass "git signing key configured"
@@ -240,11 +203,8 @@ fi
 section "Homebrew packages"
 if command -v brew >/dev/null 2>&1; then
     pass "brew installed"
-    # Active Brewfiles come from the single source of truth in
-    # .chezmoidata/packages.toml (core + selected modules + profile) — the same
-    # map the brew hook uses, so doctor never re-encodes the mapping. --no-upgrade
-    # keeps this a presence check (matches convergence semantics: freshness is
-    # `chezbump`'s job, not doctor's).
+    # Resolve active Brewfiles from packages.toml, the same map the brew hook
+    # uses. --no-upgrade keeps this a presence check (freshness is chezbump's job).
     data_json="$(cm_data_json)"
     active_files="$(printf '%s' "$data_json" | jq -r '
         (.modules // []) as $mods
@@ -270,8 +230,7 @@ if command -v brew >/dev/null 2>&1; then
 $active_files
 EOF
     fi
-    # Ollama ships in the mac-apps module and runs as a brew service (models are
-    # pulled manually), so only check it when that module is active.
+    # Ollama ships in the macApps module, so only check it when that's active.
     if printf '%s' "$data_json" | jq -e '(.modules // []) | index("macApps")' >/dev/null 2>&1 &&
         command -v ollama >/dev/null 2>&1; then
         if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
@@ -280,7 +239,7 @@ EOF
             warn "Ollama service not started — run: scripts/bin/setup-ollama.sh"
         fi
     fi
-    # Drift the OTHER way: ad-hoc installs not tracked anywhere.
+    # Drift the other way: ad-hoc installs not in any Brewfile.
     leaves_tmp=$(mktemp)
     brew leaves >"$leaves_tmp" 2>/dev/null || true
     tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.* 2>/dev/null |
@@ -300,20 +259,16 @@ else
 fi
 
 # ─── 6b. VS Code extension mirror ─────────────────────────────────────────────
-# The manifest (packages/vscode-extensions.txt) is the source of truth: the
-# 03-vscode hook installs what it lists and prunes anything it doesn't. Report
-# both drift directions read-only so `chezdoctor` surfaces what the next apply
-# would reconcile. CI can't run this (no `code` CLI on the runners) — coverage of
-# the underlying set logic lives in tests/vscode.bats.
+# Report both drift directions against the manifest (source of truth) so doctor
+# surfaces what the next apply's 03-vscode hook would reconcile.
 section "VS Code extensions"
 if command -v code >/dev/null 2>&1; then
     vsc_manifest_file="$SOURCE_DIR/packages/vscode-extensions.txt"
     if [ ! -f "$vsc_manifest_file" ]; then
         warn "extension manifest missing: packages/vscode-extensions.txt"
     else
-        # Effective manifest = source of truth minus the Norwegian dictionary when
-        # the locale module is off (mirrors the 03-vscode hook's locale guard), so
-        # doctor reports the same drift the next apply would reconcile.
+        # Drop the Norwegian dictionary when the locale module is off, mirroring
+        # the 03-vscode hook's locale guard.
         vsc_exclude=()
         if ! printf '%s' "$(cm_data_json)" | jq -e '(.modules // []) | index("locale")' >/dev/null 2>&1; then
             vsc_exclude=(streetsidesoftware.code-spell-checker-norwegian-bokmal)
@@ -339,12 +294,11 @@ else
     note "VS Code CLI not on PATH — extension check skipped"
 fi
 
-# ─── 7. mise (language runtimes) ──────────────────────────────────────────────
+# ─── 7. mise (runtimes) ───────────────────────────────────────────────────────
 section "mise (runtimes)"
 if command -v mise >/dev/null 2>&1; then
     pass "mise installed: $(mise version 2>/dev/null | head -1)"
-    # Confirm activation is wired into the shell config — without it mise
-    # doesn't set PATH/JAVA_HOME or auto-switch per project.
+    # Without activation in the shell config mise sets no PATH/JAVA_HOME.
     if grep -q 'mise activate zsh' "$HOME/.config/zsh/.zshrc" 2>/dev/null; then
         pass "mise activation present in ~/.config/zsh/.zshrc"
     else
@@ -355,9 +309,7 @@ if command -v mise >/dev/null 2>&1; then
     else
         warn "~/.config/mise/config.toml missing — no global java/node defaults; run: chezmoi apply"
     fi
-    # Verify the global runtimes actually resolved to an installed path. A
-    # missing install means the eager `mise install` (run_onchange_after_02b)
-    # hasn't run yet — first shell would have no java/node.
+    # A missing resolve means the eager `mise install` hook hasn't run yet.
     if mise where java >/dev/null 2>&1; then
         pass "java resolves: $(mise where java 2>/dev/null)"
     else
@@ -371,8 +323,7 @@ if command -v mise >/dev/null 2>&1; then
 else
     fail "mise missing — language runtimes (java, node, …) won't activate. Run: chez"
 fi
-# Legacy guard: catch a leftover from the old direnv stack (runtimes now come
-# from mise, per-project env from mise's [env]).
+# Legacy guard: direnv was replaced by mise.
 if command -v direnv >/dev/null 2>&1; then
     warn "legacy \`direnv\` still on PATH — no longer used; remove with: brew uninstall direnv && rm -rf ~/.config/direnv"
 fi
@@ -397,7 +348,6 @@ fi
 if command -v gcloud >/dev/null 2>&1; then
     if gcloud auth list 2>/dev/null | grep -q '\*'; then
         pass "gcloud authenticated"
-        # GKE plugin (only meaningful if gcloud is logged in)
         if gcloud components list --filter='id=gke-gcloud-auth-plugin' --format='value(state.name)' 2>/dev/null | grep -q Installed; then
             pass "gke-gcloud-auth-plugin installed"
         else
@@ -408,16 +358,10 @@ if command -v gcloud >/dev/null 2>&1; then
     fi
 fi
 if command -v op >/dev/null 2>&1; then
-    # CRITICAL: `op account list` and `op vault list` are interactive when no
-    # accounts are configured — they print a prompt asking if you want to add
-    # one. doctor.sh is supposed to be read-only and non-interactive, so we
-    # explicitly close stdin with </dev/null. Without this, the next prompt
-    # in doctor's flow (or the user's next command) gets ambushed.
-    #
-    # We also check ~/.config/op/config.json first — if it doesn't exist, op
-    # has never been configured and there's nothing to "sign in to". That's
-    # the common state when 1Password desktop SSH integration is the only op
-    # surface in use (which is our setup).
+    # `op account/vault list` prompt interactively with no accounts configured;
+    # </dev/null keeps this read-only check from ambushing the next prompt. Check
+    # config.json first: absent means op was never configured (the common state
+    # when only the desktop SSH integration is used), so there's nothing to check.
     if [ -f "$HOME/.config/op/config.json" ] || [ -f "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/Library/Application Support/1Password/Data/op/config.json" ]; then
         if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             pass "1Password CLI signed in"
@@ -425,17 +369,13 @@ if command -v op >/dev/null 2>&1; then
             note "1Password CLI not signed in — run if you use op directly: eval \$(op signin)"
         fi
     else
-        # No op CLI config at all — that's fine, the SSH agent + git signing
-        # path goes through the desktop app, not via `op` directly. No warn.
         pass "1Password CLI not configured (desktop SSH integration is sufficient for this setup)"
     fi
 fi
 
 # ─── 9. Fonts ─────────────────────────────────────────────────────────────────
 section "Fonts"
-# Glob the install locations directly (avoids `ls | grep`, which mangles
-# non-alphanumeric names). The Caskroom path proves the cask is installed even
-# if the font files live elsewhere.
+# Glob install locations directly (`ls | grep` mangles non-alphanumeric names).
 jetbrains_nerd_font_installed() {
     local f
     for f in "$HOME/Library/Fonts"/JetBrainsMono*Nerd* \
@@ -451,7 +391,7 @@ else
     warn "JetBrainsMono Nerd Font not found — terminal icons will look broken"
 fi
 
-# ─── 10. Privacy permissions hint (can't be checked programmatically) ────────
+# ─── 10. Privacy permissions ──────────────────────────────────────────────────
 section "Privacy permissions (manual check)"
 echo "  ${DIM}macOS won't let scripts inspect Privacy permissions. Verify manually:${RESET}"
 echo "  ${DIM}  System Settings ${ARROW_MARK} Privacy & Security ${ARROW_MARK}${RESET}"

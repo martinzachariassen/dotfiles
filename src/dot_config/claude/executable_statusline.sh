@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
-# Claude Code status line.
-#
-# Line 1 (identity):  Model + effort · 📁 dir · 🌿 branch <git state> · PR badge
-# Line 2 (vitals):    truecolor context gauge · tokens · 💰 cost · ±lines · quota · ⏱ time
-#
-# Design notes:
-#   * All JSON is parsed in ONE jq call (fields joined by ASCII US, 0x1f) rather
-#     than a jq per field — jq startup dominates this script's runtime. US is a
-#     non-whitespace separator so empty/absent fields survive the `read` split.
-#   * Git state comes from a single `git status --porcelain=v2 --branch`, cached
-#     per session (session_id is stable for the session and unique across
-#     concurrent ones, unlike a PID) so we don't shell out on every 300ms refresh.
-#   * The context bar uses a green→yellow→red truecolor gradient; on terminals
-#     without 24-bit color it degrades to the nearest supported color.
-#   * Written for bash 3.2 (macOS system bash) — no mapfile / associative arrays.
+# Claude Code status line. Line 1: model · dir · git · PR. Line 2: context gauge ·
+# tokens · cost · ±lines · quota · time. Written for bash 3.2 (macOS system bash).
 set -euo pipefail
 
 input="$(cat)"
@@ -78,7 +65,7 @@ pct_color() {
 # Wrap text in an OSC 8 hyperlink (Cmd/Ctrl-click in supporting terminals).
 osc8() { printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"; }
 
-# --- parse every field in a single jq call ---
+# --- parse every field in one jq call (jq startup dominates runtime) ---
 # Numbers are stringified so join() accepts them; absent fields fall back to ""
 # (or 0) and still emit a US separator, keeping the read positions aligned.
 fields="$(jq -r '

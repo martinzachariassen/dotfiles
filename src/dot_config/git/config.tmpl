@@ -1,11 +1,6 @@
-{{/* Signing mode: prefer the new .signingMode; fall back to the legacy
-     useOnePassword bool for configs initialised before signingMode existed
-     (missing key -> default true -> "1password"). A signing block is only
-     emitted when a mode is active AND a signing key is set, so key-less users
-     never get a broken config.
-       off       -> no signing
-       ssh-key   -> plain SSH signing (git's default ssh-keygen signer)
-       1password -> SSH signing via the 1Password app's signer */ -}}
+{{/* Signing: prefer .signingMode (off | ssh-key | 1password); fall back to the
+     legacy useOnePassword bool for pre-signingMode configs. Only emit a signing
+     block when a mode is active AND a key is set, so key-less users aren't broken. */ -}}
 {{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
 {{- $signing := and (ne $signingMode "off") .signingKey -}}
 [user]
@@ -19,8 +14,7 @@
     defaultBranch = main
 
 {{ if $signing -}}
-# Commit signing is enabled (signingMode = {{ $signingMode }}, signingKey set).
-# To disable: set signingMode = "off" (or blank signingKey) in
+# Signing on (signingMode = {{ $signingMode }}). Disable: signingMode = "off" in
 # ~/.config/chezmoi/chezmoi.toml, then `chezmoi apply`.
 [commit]
     gpgsign = true
@@ -36,22 +30,18 @@
 [core]
     editor = nvim
     pager = delta
-    # Global ignore lives at ~/.config/git/ignore (XDG)
-    # Built-in filesystem monitor + untracked cache — much faster `git status`
-    # on large repos (no daemon to install; macOS-supported since git 2.37).
+    # Built-in fsmonitor + untracked cache: faster `git status` on large repos.
     fsmonitor = true
     untrackedCache = true
 
 [commit]
-    # Show the full diff in the commit-message editor — review while you write.
     verbose = true
 
 [column]
-    # Multi-column output for `git branch`, `git status`, `git tag`, etc.
     ui = auto
 
 [tag]
-    # Sort tags by semantic version rather than lexically (v1.10 after v1.9).
+    # Semantic-version sort so v1.10 sorts after v1.9, not lexically.
     sort = version:refname
 
 [interactive]
@@ -61,20 +51,13 @@
     navigate = true
     line-numbers = true
     side-by-side = false
-    # Pager wired with the same flags as $LESS in ~/.zshenv:
-    #   F = auto-exit when content fits in one screen
-    #   R = raw ANSI colors so delta's syntax highlighting renders
-    #   K = Ctrl-C quits less (instead of interrupting in-progress search)
-    #   -P… = custom status line showing how to escape, instead of the cryptic ":"
-    # NOT using -X — see the rationale in ~/.zshenv. Without -X, less uses the
-    # alt-screen buffer so content + status line vanish cleanly on exit
-    # instead of cluttering scrollback.
+    # Same -FRK flags as $LESS in ~/.zshenv; deliberately no -X (alt-screen so
+    # output clears on exit instead of cluttering scrollback).
     pager = "less -FRK -P'Press q or Ctrl-C to quit · / search · h for help'"
 
 [diff]
     colorMoved = default
     algorithm = histogram
-    # i/ w/ c/ prefixes (index/worktree/commit) instead of a/ b/ — unambiguous.
     mnemonicPrefix = true
 
 [merge]
@@ -120,6 +103,6 @@
     wip  = !git add -A && git commit -m 'wip' --no-verify
     undo = reset --soft HEAD~1
 
-# URL rewrites — push always goes via SSH, even if cloned via HTTPS
+# Push via SSH even when cloned over HTTPS.
 [url "git@github.com:"]
     pushInsteadOf = https://github.com/

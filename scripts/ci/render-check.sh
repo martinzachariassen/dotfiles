@@ -4,9 +4,8 @@
 set -euo pipefail
 
 SOURCE_DIR="${1:-$(pwd)}"
-# chezmoi's effective source is the src/ subdir (via .chezmoiroot). $SOURCE_DIR
-# stays the repo root so .chezmoi.workingTree still resolves to it for the hooks
-# that reach root-level scripts/ + packages/.
+# $SOURCE_DIR stays the repo root so .chezmoi.workingTree resolves for hooks that
+# reach root-level scripts/ + packages/; chezmoi's source is the src/ subdir.
 SRC_DIR="$SOURCE_DIR/src"
 PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
@@ -36,8 +35,7 @@ case "$USE_ONE_PASSWORD" in
         ;;
 esac
 
-# Build the modules TOML array. Explicit MODULES (comma-separated) wins; else
-# derive from MAC_APPS for back-compat. "none" or empty yields an empty list.
+# Explicit MODULES (comma-separated) wins; else derive from MAC_APPS. "none"/empty → [].
 if [ -z "${MODULES+x}" ]; then
     MODULES=""
     [ "$MAC_APPS" = "true" ] && MODULES="macApps"
@@ -80,9 +78,7 @@ if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
     exit 1
 fi
 
-# The test fixture intentionally supplies a static chezmoi.toml while the repo
-# contains .chezmoi.toml.tmpl. That warning is expected here; any other output
-# is still shown so real render drift remains visible.
+# Drop the expected static-config-vs-.tmpl warning; keep all other output visible.
 sed '/^chezmoi: warning: config file template has changed, run chezmoi init to regenerate config file$/d' "$render_output"
 
 for template in "$SRC_DIR"/.chezmoiscripts/*.sh.tmpl; do

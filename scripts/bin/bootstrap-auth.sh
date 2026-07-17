@@ -1,38 +1,18 @@
 #!/usr/bin/env bash
-# bootstrap-auth.sh - post-install authentication walkthrough.
+# bootstrap-auth.sh - idempotent post-install account/auth walkthrough; each step
+# probes existing state and skips if already signed in.
 #
-# install.sh sets up the *machine*. This sets up the *accounts* - the
-# manual-tail step list that used to live at the end of the README.
-#
-# Idempotent: every step probes existing state first and skips if you're
-# already signed in.
-#
-# Usage:
-#   bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh
-#
-# Environment variables:
-#   SKIP_GH=1       skip gh auth login
-#   SKIP_AZ=1       skip az login
-#   SKIP_AKS=1      skip Azure kubelogin install
-#   SKIP_GCLOUD=1   skip gcloud auth login
-#   SKIP_GKE=1      skip gke-gcloud-auth-plugin install
-#   SKIP_OP=1       skip 1Password GUI/CLI checks
-#   SKIP_SIGNTEST=1 skip git signing config + smoke test
-#   YES=1           run without pause prompts
+# Env: SKIP_GH SKIP_AZ SKIP_AKS SKIP_GCLOUD SKIP_GKE SKIP_OP SKIP_SIGNTEST=1
+#      each skip that step; YES=1 runs without pause prompts.
 
 set -uo pipefail
 
-# Repo root (the git working tree) — NOT chezmoi's source dir, which is the src/
-# subdir since .chezmoiroot. `chezmoi source-path` would return src/; the
-# workingTree template value is the repo root where scripts/ + packages/ live.
+# Repo root, not chezmoi's src/ source dir: workingTree is where scripts/ +
+# packages/ live.
 SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi execute-template '{{ .chezmoi.workingTree }}' 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
-# Shared UI engine (colors, glyphs, and the rail-style log helpers:
-# line_prefix/node_prefix/say/ok/info/warn/fail/dim/hr) from lib/, one level up
-# now that this script lives under bin/. log.sh is a committed sibling of this
-# script; a checkout without it is broken, so fail loudly rather than limp along
-# with degraded output (chezup.sh does the same).
+# log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_UI_DIR/../lib/log.sh" ]; then
     printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/../lib/log.sh" >&2
@@ -42,14 +22,12 @@ fi
 . "$_UI_DIR/../lib/log.sh"
 ui_init_logging
 
-# has_module NAME — true when NAME is in the selected .modules list (chezmoi
-# data). Used to gate the cloud-auth walkthrough on the cloudAuth module.
+# has_module NAME — true when NAME is in the selected .modules list.
 has_module() {
     command -v chezmoi >/dev/null 2>&1 || return 1
     chezmoi data --format=json 2>/dev/null | jq -e --arg m "$1" '(.modules // []) | index($m)' >/dev/null 2>&1
 }
 
-# bootstrap-specific framing on top of the shared log helpers.
 box_line() {
     local text="$1" pre="${2:-}" post="${3:-}" pad
     pad=$((58 - ${#text}))
@@ -104,7 +82,6 @@ if [ "${SKIP_OP:-0}" != "1" ]; then
         warn "Sign in, then enable Settings -> Developer -> SSH agent."
         pause_for_enter "Press Enter after 1Password is signed in and the SSH agent is enabled "
     fi
-    # Verify the SSH agent socket is exported via the standard 1Password path.
     OP_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
     if [ -S "$OP_SOCK" ]; then
         ok "1Password SSH agent socket present"
@@ -138,9 +115,8 @@ if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
         az login || warn "az login was cancelled or failed"
     fi
 
-    # Azure kubelogin (Microsoft's AKS credential plugin). Homebrew core also
-    # has a `kubelogin` formula, but that is int128's generic OIDC plugin, not
-    # the AKS-focused binary Microsoft documents for `az aks`.
+    # Use `az aks install-cli`, not brew's `kubelogin` (int128's generic OIDC
+    # plugin), which is not the AKS binary Microsoft documents.
     if [ "${SKIP_AKS:-0}" != "1" ] && command -v az >/dev/null 2>&1; then
         step "AKS kubelogin" "Required for kubectl against AKS clusters using Microsoft Entra ID."
         if command -v kubelogin >/dev/null 2>&1 && kubelogin --version 2>/dev/null | grep -qi 'git hash:'; then
@@ -163,8 +139,7 @@ if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
         info "running gcloud auth login"
         gcloud auth login || warn "gcloud auth login was cancelled or failed"
     fi
-    # Application-default credentials - separate from the user-account login.
-    # Many SDKs and Terraform providers want this.
+    # ADC is separate from the user-account login; many SDKs and Terraform want it.
     if command -v gcloud >/dev/null 2>&1; then
         if [ -f "$HOME/.config/gcloud/application_default_credentials.json" ]; then
             ok "ADC already configured"
@@ -174,7 +149,7 @@ if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
         fi
     fi
 
-    # GKE plugin (gcloud component, NOT a brew formula).
+    # GKE plugin is a gcloud component, not a brew formula.
     if [ "${SKIP_GKE:-0}" != "1" ] && command -v gcloud >/dev/null 2>&1; then
         step "GKE auth plugin" "Required for kubectl 1.26+ to talk to GKE clusters."
         if gcloud components list --filter='id=gke-gcloud-auth-plugin' \
@@ -193,12 +168,8 @@ if [ "${SKIP_OP:-0}" != "1" ]; then
     if ! command -v op >/dev/null 2>&1; then
         warn "op not installed - skipping (in Brewfile)"
     else
-        # `op account list` and `op vault list` are interactive when no
-        # accounts are configured - they print "No accounts configured..." and
-        # prompt "Do you want to add an account manually now? [Y/n]". We close
-        # stdin with </dev/null so this script never gets ambushed by that.
-        # If you DO want to set up op CLI, the warn-block below gives the
-        # exact commands to run manually.
+        # `op account/vault list` prompt interactively with no accounts
+        # configured; </dev/null keeps this script from being ambushed.
         if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             ok "op CLI already signed in"
         else

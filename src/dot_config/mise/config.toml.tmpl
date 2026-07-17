@@ -1,14 +1,6 @@
-# mise — global config
-# Loaded by mise on every shell that runs `mise activate zsh` (wired in
-# ~/.config/zsh/.zshrc). Source: ~/Developer/personal/dotfiles/dot_config/mise/config.toml
-# (managed via chezmoi). Edit via `chezmoi edit ~/.config/mise/config.toml`.
-#
-# These are the GLOBAL default runtimes — the versions you get in any directory
-# that doesn't pin its own. Per-project versions + env vars go in that project's
-# own mise.toml and override these on `cd`.
+# mise — global default runtimes. Per-project mise.toml files override these on `cd`.
 
 [tools]
-#   ~/.local/share/mise/installs/java/temurin-25/Contents/Home
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
 java = ["temurin-25"]
 {{ end -}}

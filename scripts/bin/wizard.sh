@@ -1,54 +1,17 @@
 #!/usr/bin/env bash
-# wizard.sh — plain-text first-run setup wizard.
-#
-# chezmoi's own promptChoice/promptMultichoice template functions render an
-# interactive TUI picker (the charmbracelet/huh library) that reads /dev/tty in
-# raw mode. That picker is unreliable outside a "perfect" interactive terminal:
-# under `curl | bash`, inside chezreset, or over some SSH/terminal combos it
-# fails to register arrow-key navigation and just confirms the highlighted
-# default. See docs/lifecycle.md.
-#
-# This wizard sidesteps the picker entirely: it asks each question with plain
-# `read` from /dev/tty (numbered menus, typed answers, number-toggle multi-select
-# — all of which work in ANY terminal) and then feeds the answers to chezmoi via
-# its non-interactive flags.
-#
-# Progressive enhancement: when `gum` is installed AND we're on a real terminal,
-# the choice/multi-select/input prompts upgrade to gum's arrow-key + space-toggle
-# pickers (with the current selection pre-checked). gum is the CLI of the SAME
-# charmbracelet engine as chezmoi's flaky embedded picker, so it's used ONLY here
-# — on interactive re-runs, always behind the plain-text fallback below, and never
-# at first-boot (gum isn't installed until Homebrew runs). Force the plain path
-# with WIZARD_NO_GUM=1. The answers still go to chezmoi via the same flags:
-#     chezmoi init --apply --prompt \
-#         --promptString  "<message>=<value>"   (name, email, signing key)
-#         --promptChoice  "<message>=<value>"   (profile, signing mode)
-#         --promptMultichoice "<message>=a/b/c" (modules; items joined with '/')
-# The flag KEY is each prompt's message text, so those messages are extracted
-# from .chezmoi.toml.tmpl at runtime (single source of truth — no drift). The
-# module catalog + per-profile defaults come from .chezmoidata/modules.toml.
-#
-# Kept POSIX-ish and bash-3.2 compatible (no associative arrays): a fresh Mac has
-# only the system bash 3.2 until Homebrew installs a newer one.
-#
-# Usage:   bash scripts/bin/wizard.sh [extra chezmoi-init args...]
-# Env:     DOTFILES_DIR      override the chezmoi source dir (default: repo root)
-#          DRY_RUN=1         print the resulting `chezmoi init` command, don't run
-#          WIZARD_NO_GUM=1   skip the gum picker (use the bash TUI / numbered menu)
-#          WIZARD_NO_TUI=1   skip the bash arrow-key picker too (numbered menu only)
-#          WIZARD_LIB_ONLY=1 source the helpers only; skip the interactive run
-# No TTY (CI/containers): falls back to `chezmoi init --apply --promptDefaults`.
+# wizard.sh — plain-text first-run setup wizard. Sidesteps chezmoi's flaky TUI
+# picker: asks each question with plain `read` (bash-3.2 safe, works in any
+# terminal), upgrades to gum when installed, then hands answers to chezmoi's
+# non-interactive init flags. Prompt messages are read from .chezmoi.toml.tmpl
+# and the module catalog from .chezmoidata/modules.toml so nothing drifts.
 
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# This script lives at scripts/bin/, so the repo root is two levels up.
 ROOT="$(cd "$_DIR/../.." && pwd)"
-# SOURCE_DIR is the repo root; chezmoi descends into src/ itself via .chezmoiroot
-# (so `chezmoi init --source="$SOURCE_DIR"` is correct). The template + module
-# data live under src/, chezmoi's actual source dir.
+# Repo root, not src/: chezmoi descends into src/ itself via .chezmoiroot.
 SOURCE_DIR="${DOTFILES_DIR:-$ROOT}"
 TMPL="$ROOT/src/.chezmoi.toml.tmpl"
 MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
@@ -60,12 +23,9 @@ MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 ui_init_logging
 
 # ─── Ctrl-C quits cleanly ────────────────────────────────────────────────────
-# Every prompt reads with a `read … || fallback` clause, which also swallows an
-# interrupted read: press Ctrl-C mid-question and bash takes the fallback and
-# marches on to the next question instead of quitting. Trap SIGINT/SIGTERM so a
-# Ctrl-C aborts the whole wizard the way it normally would — restore the cursor
-# (gum and the bash TUI picker can leave it hidden), say nothing changed, and
-# exit 130 (128 + SIGINT) so callers see a real interrupt.
+# Prompts read with `read … || fallback`, which swallows an interrupted read and
+# marches on; trap so Ctrl-C aborts. Restore the cursor (pickers can hide it),
+# exit 130 so callers see a real interrupt.
 on_interrupt() {
     printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
     info "aborted — nothing changed" >/dev/tty 2>/dev/null || true
@@ -78,9 +38,8 @@ trap on_interrupt INT TERM
     exit 1
 }
 
-# run_chezmoi — exec `chezmoi init` with the assembled args, or (DRY_RUN) print
-# the exact command it would run and exit, so the wizard's answer-gathering can be
-# exercised in tests without touching $HOME.
+# run_chezmoi — exec `chezmoi init`, or print the command under DRY_RUN so tests
+# can exercise answer-gathering without touching $HOME.
 run_chezmoi() {
     if [ "$DRY_RUN" = "1" ]; then
         printf 'chezmoi init'
@@ -92,8 +51,8 @@ run_chezmoi() {
 }
 
 # ─── Read the wizard's questions from the source of truth ────────────────────
-# prompt_msg KEY — the message string chezmoi shows for a prompt*Once data KEY.
-# It is also the flag key we pass back, so reading it here keeps the two in sync.
+# prompt_msg KEY — the message chezmoi shows for a prompt*Once KEY; also the flag
+# key we pass back, so reading it here keeps the two in sync.
 prompt_msg() {
     sed -nE "s/.*prompt(String|Choice|Multichoice)Once \. \"$1\"[[:space:]]+\"([^\"]*)\".*/\2/p" \
         "$TMPL" | head -n1
@@ -105,12 +64,8 @@ prompt_choices() {
         "$TMPL" | head -n1 | grep -oE '"[^"]+"' | tr -d '"'
 }
 
-# profile_defaults PROFILE — space-separated default module keys for a profile.
-# Defaults are composed, not restated: modules.toml holds a shared `base` plus a
-# per-profile `extra` and an `inherit` flag, so the effective set is
-# (inherit ? base : []) ∪ extra. base and extra are read as raw arrays (tolerating
-# the single- or multi-line forms a TOML formatter may emit) and merged here,
-# base first then extra, de-duplicated.
+# profile_defaults PROFILE — space-separated default module keys. Effective set is
+# (inherit ? base : []) ∪ extra, base first, de-duplicated.
 profile_defaults() {
     local p="$1" inherits base extra out="" seen=" " tok
 
@@ -120,8 +75,8 @@ profile_defaults() {
         f && $1==p {print $3; exit}
     ' "$MODULES_TOML")"
 
-    # grep exits 1 when a profile's array is empty (personal/minimal have none);
-    # swallow that so it doesn't trip the wizard's `set -e` / pipefail.
+    # grep exits 1 on an empty array (personal/minimal have none); swallow it so
+    # pipefail doesn't trip.
     base="$(awk '
         /^\[profileDefaults\]/ {f=1; next}
         /^\[/                  {f=0}
@@ -143,45 +98,29 @@ profile_defaults() {
     printf '%s\n' "$out"
 }
 
-# existing_modules — the modules already chosen (jq-optional; empty without jq).
-# Reads DATA_JSON, set in the runtime section before this is called.
+# existing_modules — modules already chosen (empty without jq). Reads DATA_JSON.
 existing_modules() {
     command -v jq >/dev/null 2>&1 || return 0
     printf '%s' "${DATA_JSON:-}" | jq -r '.modules[]? // empty' 2>/dev/null | tr '\n' ' '
 }
 
 # ─── Prompt helpers (all I/O on /dev/tty; the answer goes to stdout) ──────────
-# Three tiers of interactivity, most→least capable, each gated by a predicate:
-#   1. gum        — installed + on PATH (re-runs after first install)
-#   2. bash TUI   — a capable terminal but no gum (the first-boot case: pure
-#                   bash 3.2 arrow/space picker, works before Homebrew exists)
-#   3. numbered   — anything else (dumb/non-ANSI terminal): type numbers to pick
-# The tiers degrade cleanly: gum → use_gum, TUI → use_tui, else the numbered
-# menus below. So a fresh Mac's very first `install.sh` run still gets arrow/space
-# selection with no dependency, and a terminal that can't do it falls all the way
-# through to the numbered menu.
+# Three tiers, most→least capable: gum (installed) → bash TUI arrow/space picker
+# (capable terminal, works before Homebrew) → numbered menu (dumb terminal).
 
-# use_gum — gum path: installed and not disabled. (The wizard has already
-# guaranteed /dev/tty; first-boot never reaches here with gum, as Homebrew
-# hasn't run yet — that's the bash-TUI tier's job.)
 use_gum() { [ "${WIZARD_NO_GUM:-0}" != "1" ] && command -v gum >/dev/null 2>&1; }
 
-# use_tui — pure-bash arrow/space picker path: an interactive, non-dumb terminal
-# and not disabled. Gated OUT for TERM=dumb / no readable-writable /dev/tty /
-# WIZARD_NO_TUI=1, so a degraded terminal cleanly falls through to the numbered
-# menu. The picker also accepts number keys, so even if a terminal silently
-# swallows arrow escapes the user can still toggle by digit.
+# use_tui — pure-bash arrow/space picker; gated OUT for TERM=dumb / no rw
+# /dev/tty / WIZARD_NO_TUI=1. Also accepts digits if arrow escapes don't register.
 use_tui() {
     [ "${WIZARD_NO_TUI:-0}" != "1" ] || return 1
     [ "${TERM:-dumb}" != "dumb" ] || return 1
     [ -r /dev/tty ] && [ -w /dev/tty ]
 }
 
-# _tui_read_key — read one keypress from /dev/tty; echo a normalized token:
-# UP DOWN SPACE ENTER, a bare digit, or the raw char. Arrow keys arrive as the
-# escape burst ESC [ A/B; we read the 2-byte tail with an integer timeout so a
-# real arrow returns instantly (bytes already buffered) while a lone ESC press
-# doesn't hang. bash-3.2 safe: `read -t` takes integer seconds (no fractional).
+# _tui_read_key — read one keypress; echo UP/DOWN/SPACE/ENTER, a digit, or the
+# raw char. Arrows arrive as ESC [ A/B; the 2-byte tail read has an integer
+# timeout (bash-3.2 `read -t` is whole seconds) so a lone ESC doesn't hang.
 _tui_read_key() {
     local k rest
     IFS= read -rsn1 k </dev/tty || {
@@ -189,7 +128,7 @@ _tui_read_key() {
         return
     }
     case "$k" in
-        '' | $'\n' | $'\r') printf 'ENTER' ;; # Enter: empty under -n1, or CR/LF
+        '' | $'\n' | $'\r') printf 'ENTER' ;;
         ' ') printf 'SPACE' ;;
         $'\x1b')
             IFS= read -rsn2 -t 1 rest </dev/tty || rest=''
@@ -199,9 +138,9 @@ _tui_read_key() {
                 *) printf 'ESC' ;;
             esac
             ;;
-        k | K) printf 'UP' ;; # vi-style, and a fallback if arrows don't register
+        k | K) printf 'UP' ;; # vi-style fallback if arrows don't register
         j | J) printf 'DOWN' ;;
-        *) printf '%s' "$k" ;; # digits and everything else, verbatim
+        *) printf '%s' "$k" ;;
     esac
 }
 
@@ -289,7 +228,6 @@ _tui_multiselect() {
 ask_string() { # message default → echoes answer
     local msg="$1" def="${2:-}" ans
     if use_gum; then
-        # gum input: default pre-filled + editable, arrow/emacs line editing.
         ans="$(gum input --prompt "$msg: " --value "$def")" || ans="$def"
         [ -n "$ans" ] || ans="$def"
         printf '%s' "$ans"
@@ -310,7 +248,6 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
     shift 2
     local opts=("$@") i sel mark
     if use_gum; then
-        # gum choose (single-select): arrows move, enter picks; default pre-highlighted.
         local picked
         local -a ga=(--header "$msg")
         [ -n "$def" ] && ga+=(--selected "$def")
@@ -351,11 +288,9 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
     done
 }
 
-# mod_display INDEX — the "key  label" line shown for a module in the gum picker.
-# gum's --selected takes a COMMA-separated list, and some labels contain commas
-# (jvmStack, cloudAuth), so commas are swapped for '·' here; results are mapped
-# back to keys by exact-line match, not by parsing. Kept a function so a test can
-# assert the comma-free invariant.
+# mod_display INDEX — "key  label" line for the gum picker. Commas in labels are
+# swapped for '·' because gum's --selected is comma-separated; results map back
+# by exact-line match. A function so a test can assert the comma-free invariant.
 mod_display() { # index → display line
     printf '%-13s %s' "${MOD_KEYS[$1]}" "${MOD_LABELS[$1]//,/·}"
 }
@@ -364,7 +299,6 @@ select_modules_gum() { # default-selected keys... → echoes chosen keys (catalo
     local i d chosen
     local -a display=() selected=() gargs
     for i in "${!MOD_KEYS[@]}"; do display[$i]="$(mod_display "$i")"; done
-    # Pre-check the incoming default keys (their display lines).
     for d in "$@"; do
         for i in "${!MOD_KEYS[@]}"; do
             [ "${MOD_KEYS[$i]}" = "$d" ] && selected+=("${display[$i]}")
@@ -379,10 +313,8 @@ select_modules_gum() { # default-selected keys... → echoes chosen keys (catalo
         )"
         gargs+=(--selected "$sel_csv")
     fi
-    # gum reads options from stdin and drives the TUI on the controlling terminal.
     chosen="$(printf '%s\n' "${display[@]}" | gum choose "${gargs[@]}")" || chosen=""
-    # Map chosen lines back to keys, preserving catalog order (exact match; safe
-    # against glob/regex chars in labels).
+    # Map chosen lines back to keys in catalog order (exact match, glob-safe).
     local out=()
     for i in "${!MOD_KEYS[@]}"; do
         if printf '%s\n' "$chosen" | grep -Fxq -- "${display[$i]}"; then
@@ -401,9 +333,8 @@ select_modules() { # default-selected keys... → echoes chosen keys (catalog or
         _tui_multiselect "$@"
         return
     fi
-    # bash 3.2 (macOS default, and all a fresh Mac has before Homebrew) lacks
-    # associative arrays, so track selection in an indexed 0/1 flag array that
-    # runs parallel to MOD_KEYS.
+    # bash 3.2 lacks associative arrays; track selection in a 0/1 flag array
+    # parallel to MOD_KEYS.
     local i j k mark line tok out
     local on=()
     for i in "${!MOD_KEYS[@]}"; do on[$i]=0; done
@@ -436,8 +367,8 @@ select_modules() { # default-selected keys... → echoes chosen keys (catalog or
     for i in "${!MOD_KEYS[@]}"; do
         [ "${on[$i]}" = "1" ] && out+=("${MOD_KEYS[$i]}")
     done
-    # ${out[*]:-} guards the empty case: bash 3.2 under `set -u` errors on a bare
-    # empty-array expansion (minimal profile / everything deselected).
+    # ${out[*]:-} guards the empty case: bash 3.2 under set -u errors on a bare
+    # empty-array expansion.
     printf '%s' "${out[*]:-}"
 }
 
@@ -462,8 +393,7 @@ done < <(awk -F' *= *' '
 [ "${WIZARD_LIB_ONLY:-0}" = "1" ] && return 0
 
 # ─── Non-interactive fallback ────────────────────────────────────────────────
-# No controlling terminal → we can't ask anything. Let chezmoi apply its own
-# template defaults so first-boot automation still converges instead of hanging.
+# No terminal → let chezmoi apply its template defaults so automation converges.
 if [ ! -r /dev/tty ]; then
     warn "no terminal detected — accepting default answers (--promptDefaults)"
     run_chezmoi --apply --promptDefaults --source="$SOURCE_DIR" "$@"
@@ -490,9 +420,8 @@ email="$(ask_string "$(prompt_msg email)" "$def_email")"
 # shellcheck disable=SC2046  # word-splitting of the choice list is intentional
 profile="$(ask_choice "$(prompt_msg profile)" "$def_profile" $(prompt_choices profile))"
 
-# Default module selection: keep the current picks only when the profile is
-# unchanged (a nice re-run); switching profile resets to that profile's defaults
-# so a personal→minimal switch actually starts clean.
+# Keep current picks only when the profile is unchanged; switching profile resets
+# to that profile's defaults so the switch starts clean.
 existing="$(existing_modules)"
 if [ -n "$existing" ] && [ "$profile" = "$def_profile" ]; then
     mod_default="$existing"

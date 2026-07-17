@@ -1,12 +1,10 @@
--- Override LazyVim's default tokyonight with Catppuccin Frappé to match
--- Ghostty / Zellij / Starship / VS Code.
+-- Catppuccin Frappé to match Ghostty / Zellij / Starship / VS Code.
 
 return {
-  -- Add the Catppuccin colorscheme plugin
   {
     "catppuccin/nvim",
     name = "catppuccin",
-    lazy = false,    -- load before any other plugin so the scheme is ready
+    lazy = false,    -- load first so the scheme is ready before other plugins
     priority = 1000,
     opts = {
       flavour = "frappe",
@@ -35,7 +33,6 @@ return {
     },
   },
 
-  -- Tell LazyVim to use it
   {
     "LazyVim/LazyVim",
     opts = {

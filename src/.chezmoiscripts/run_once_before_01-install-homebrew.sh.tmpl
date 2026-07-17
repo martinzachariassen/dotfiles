@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Installs Homebrew if missing. Runs ONCE (before the first apply).
-#
-# Guarded to macOS only — chezmoi runs scripts on every platform unless we tell
-# it not to. Linuxbrew works but lives at a different path and isn't in scope here.
+# Installs Homebrew if missing. Runs once, before the first apply.
 set -euo pipefail
 
 {{ if ne .chezmoi.os "darwin" -}}
@@ -10,8 +7,6 @@ echo "→ Homebrew: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Not numbered in the apply step 1..5 sequence because this only runs on the
-# very first apply (`run_once_before_*`). Subsequent applies skip it silently.
 echo "◆ One-time setup: Homebrew"
 
 if command -v brew >/dev/null 2>&1; then
@@ -27,7 +22,6 @@ NONINTERACTIVE=1 /bin/bash "$installer"
 rm -f "$installer"
 trap - EXIT
 
-# Apple Silicon path
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi

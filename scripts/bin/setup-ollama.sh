@@ -1,28 +1,10 @@
 #!/usr/bin/env bash
-# setup-ollama.sh — start Ollama as a background service. Ollama is installed by
-# the mac-apps Homebrew module (packages/Brewfile.mac-apps).
-#
-# This script does NOT download any models. Models are large and
-# machine-specific, so you pull the ones you want by hand:
-#
-#   ollama pull qwen2.5-coder:14b
-#   ollama run  qwen2.5-coder:14b 'Explain this git error in one paragraph'
-#   ollama list
-#
-# If Ollama runs somewhere other than the local default, set OLLAMA_HOST:
-#
-#   OLLAMA_HOST=http://localhost:11434 ollama list
-#
-# Idempotent: safe to re-run. Starting an already-running service is a no-op.
-#
-# Usage: scripts/bin/setup-ollama.sh
+# setup-ollama.sh — start Ollama as a background service (installed by the
+# mac-apps Homebrew module). Idempotent; does not download models.
 
 set -euo pipefail
 
-# Shared status helpers (s_info/s_pass/s_warn + glyphs). Loaded from lib/ (one
-# level up now that this script lives under bin/), resolved next to this script
-# so it works regardless of the current directory. log.sh is a committed
-# sibling; fail loudly if a checkout is missing it.
+# log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_UI_DIR/../lib/log.sh" ]; then
     printf 'setup-ollama: missing %s\n' "$_UI_DIR/../lib/log.sh" >&2
