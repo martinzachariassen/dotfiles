@@ -33,13 +33,14 @@ diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
 ## One persona, two assistants
 
-The **repo's own** contributor rules live in
-[`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — a single
-source of truth shared by Claude Code and GitHub Copilot for work *in this repo*
-(the `src/` split, chezmoi conventions, quality gates). The root
-[`CLAUDE.md`](../CLAUDE.md) is a thin pointer to it, so both assistants read the
-same rules rather than drifting apart. Keep the two in sync when either changes.
+The **repo's own** contributor rules live in [`../CLAUDE.md`](../CLAUDE.md) — the
+single source of truth for work *in this repo* (the `src/` split, chezmoi
+conventions, quality gates, git/PR policy). Claude Code reads it natively;
+[`.github/copilot-instructions.md`](../.github/copilot-instructions.md) is a thin
+pointer to it, mirroring the non-negotiables inline so GitHub Copilot lands on the
+same rules. Keep that crib in sync if the non-negotiables change.
 
-> Not to be confused: `.github/copilot-instructions.md` is guidance for AI editing
-> **this repo**; `src/dot_config/claude/CLAUDE.md` is the persona deployed to
-> `$HOME` for use across **all** your projects.
+> Two files named `CLAUDE.md`, not to be confused: the root
+> [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this repo**;
+> [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) is the
+> persona deployed to `$HOME` for use across **all** your projects.

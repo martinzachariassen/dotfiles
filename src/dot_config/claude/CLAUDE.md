@@ -62,8 +62,14 @@ These are all my own personal/solo repos — high autonomy is the default:
 ## Code style
 
 These are my deltas from sensible defaults — assume the usual best practices
-(readability over cleverness, comments for *why* not *what*, modern syntax that
-clarifies rather than shows off) without being told.
+(readability over cleverness, modern syntax that clarifies rather than shows off)
+without being told.
+
+- **Comments: keep them to an absolute minimum.** Explain *why*, never *what* —
+  the code already says what. Don't restate the line below a comment, don't narrate
+  obvious steps, and don't leave commented-out code behind. When a comment does earn
+  its place, keep it short and scannable. Prefer a clear name or a small refactor
+  over a comment.
 
 ### Kotlin (primary) & Java
 
