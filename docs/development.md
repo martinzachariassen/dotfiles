@@ -61,7 +61,7 @@ so a rename or a drifted default fails fast:
 | `mise-config.bats` | The rendered mise config. |
 | `wizard.bats` | The wizard's prompt tiers and flag mapping. |
 | `shell-functions.bats` / `zshrc-wiring.bats` | The zsh verbs and their wiring. |
-| `check-commit-msg.bats` / `semver.bats` / `obsidian-apply.bats` | The corresponding `scripts/` helpers. |
+| `check-commit-msg.bats` / `semver.bats` | The corresponding `scripts/` helpers. |
 
 ## Conventions
 

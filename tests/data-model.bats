@@ -7,6 +7,7 @@ setup() {
     TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
     MODULES_DATA="$REPO_ROOT/src/.chezmoidata/modules.toml"
     PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/packages.toml"
+    WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
 }
 
 # The config template is rendered before .chezmoidata loads, so it must list the
@@ -16,7 +17,7 @@ setup() {
     local tmpl_names catalog_names
     tmpl_names="$(grep -F '$allModules := list' "$TMPL" \
         | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)"
-    catalog_names="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&NF>1{print $1}' \
+    catalog_names="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' \
         "$MODULES_DATA" | sort -u)"
     [ -n "$tmpl_names" ]
     [ "$tmpl_names" = "$catalog_names" ]
@@ -25,7 +26,7 @@ setup() {
 # Every profile-default module name must be a real module.
 @test "profile default module sets reference known modules" {
     local known defaults bad
-    known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&NF>1{print $1}' "$MODULES_DATA")"
+    known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
     defaults="$(grep -E '\$defaults = list' "$TMPL" | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)"
     bad=""
     while IFS= read -r m; do
@@ -35,18 +36,18 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in defaults:$bad"; false; }
 }
 
-# scripts/bin/wizard.sh reads its per-profile default module sets from
-# [profileDefaults] in modules.toml; the config template restates the same sets
-# literally (it renders before .chezmoidata loads). They MUST agree per profile,
-# or the wizard and a raw `chezmoi init --prompt` would pre-check different boxes.
+# scripts/bin/wizard.sh composes each profile's default module set from
+# [profileDefaults] in modules.toml (base ∪ extra, gated by inherit); the config
+# template restates the same effective sets literally (it renders before
+# .chezmoidata loads). They MUST agree per profile, or the wizard and a raw
+# `chezmoi init --prompt` would pre-check different boxes. We compare against the
+# wizard's own profile_defaults so the composition rule lives in exactly one place.
 @test "[profileDefaults] mirrors the template's \$defaults per profile" {
     local p tmpl data
     for p in personal work minimal; do
         tmpl="$(sed -nE '/eq [$]profile "'"$p"'"/{n;p;}' "$TMPL" \
             | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tr '\n' ' ')"
-        data="$(awk -F' *= *' -v pr="$p" '
-            /^\[profileDefaults\]/ {f=1; next} /^\[/ {f=0}
-            f && $1==pr {v=$2; gsub(/[][",]/,"",v); print v; exit}' "$MODULES_DATA" \
+        data="$(WIZARD_LIB_ONLY=1 bash -c "source '$WIZ'; profile_defaults '$p'" \
             | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')"
         [ "$tmpl" = "$data" ] || {
             echo "profile $p: template=[$tmpl] data=[$data]"
@@ -55,15 +56,17 @@ setup() {
     done
 }
 
-# Every profileDefaults module name must be a real catalog module.
+# Every module name across the profileDefaults tables (base + per-profile extra)
+# must be a real catalog module. The inherit table holds bare bools, not quoted
+# names, so it contributes nothing to this scan.
 @test "[profileDefaults] entries reference known modules" {
     local known bad m
-    known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&NF>1{print $1}' "$MODULES_DATA")"
+    known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
     bad=""
     while IFS= read -r m; do
         [ -z "$m" ] && continue
         printf '%s\n' "$known" | grep -qx "$m" || bad="$bad $m"
-    done < <(awk -F' *= *' '/^\[profileDefaults\]/{f=1;next} /^\[/{f=0} f{print $2}' "$MODULES_DATA" \
+    done < <(awk '/^\[profileDefaults/{f=1;next} /^\[/{f=0} f' "$MODULES_DATA" \
         | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)
     [ -z "$bad" ] || { echo "unknown modules in profileDefaults:$bad"; false; }
 }

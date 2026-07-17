@@ -106,12 +106,41 @@ prompt_choices() {
 }
 
 # profile_defaults PROFILE — space-separated default module keys for a profile.
+# Defaults are composed, not restated: modules.toml holds a shared `base` plus a
+# per-profile `extra` and an `inherit` flag, so the effective set is
+# (inherit ? base : []) ∪ extra. base and extra are read as raw arrays (tolerating
+# the single- or multi-line forms a TOML formatter may emit) and merged here,
+# base first then extra, de-duplicated.
 profile_defaults() {
-    awk -F' *= *' -v p="$1" '
+    local p="$1" inherits base extra out="" seen=" " tok
+
+    inherits="$(awk -v p="$p" '
+        /^\[profileDefaults\.inherit\]/ {f=1; next}
+        /^\[/                           {f=0}
+        f && $1==p {print $3; exit}
+    ' "$MODULES_TOML")"
+
+    # grep exits 1 when a profile's array is empty (personal/minimal have none);
+    # swallow that so it doesn't trip the wizard's `set -e` / pipefail.
+    base="$(awk '
         /^\[profileDefaults\]/ {f=1; next}
         /^\[/                  {f=0}
-        f && $1==p             {v=$2; gsub(/[][",]/,"",v); print v; exit}
-    ' "$MODULES_TOML"
+        f
+    ' "$MODULES_TOML" | grep -oE '"[a-zA-Z]+"' | tr -d '"' || true)"
+
+    extra="$(awk -v p="$p" '
+        /^\[profileDefaults\.extra\]/ {f=1; next}
+        /^\[/                         {f=0}
+        f { if ($0 ~ "^[ \t]*" p "[ \t]*=") c=1; if (c) { print; if ($0 ~ /\]/) c=0 } }
+    ' "$MODULES_TOML" | grep -oE '"[a-zA-Z]+"' | tr -d '"' || true)"
+
+    [ "$inherits" = "false" ] && base=""
+    for tok in $base $extra; do
+        case "$seen" in *" $tok "*) continue ;; esac
+        out="${out:+$out }$tok"
+        seen="$seen$tok "
+    done
+    printf '%s\n' "$out"
 }
 
 # existing_modules — the modules already chosen (jq-optional; empty without jq).
@@ -419,9 +448,9 @@ while IFS=$'\t' read -r _k _v; do
     MOD_KEYS+=("$_k")
     MOD_LABELS+=("$_v")
 done < <(awk -F' *= *' '
-    /^\[moduleCatalog\]/ {f=1; next}
-    /^\[/               {f=0}
-    f && NF>1           {v=$2; gsub(/"/,"",v); print $1 "\t" v}
+    /^\[moduleCatalog\]/  {f=1; next}
+    /^\[/                 {f=0}
+    f && $1 ~ /^[A-Za-z]/ {v=$2; gsub(/"/,"",v); print $1 "\t" v}
 ' "$MODULES_TOML")
 
 [ "${#MOD_KEYS[@]}" -gt 0 ] || {

@@ -38,12 +38,12 @@ The design rule that shapes the `02*` hooks:
 > state mutated from a **static manifest**, where re-running on unchanged input is
 > just noise (VS Code extensions, macOS defaults).
 
-`run_after_02-brew-bundle`, `run_after_02b-mise-install`, and
-`run_after_02d-obsidian-apply` are `run_after` on purpose: real installed state
-can drift out from under the repo (a package uninstalled by hand, a plugin gone
-missing) while the *text* that describes it stays put. Running every apply — each
-gated by a fast presence short-circuit so a clean machine is a quick no-op —
-means "make this Mac match the repo" always holds, with no separate fix step.
+`run_after_02-brew-bundle` and `run_after_02b-mise-install` are `run_after` on
+purpose: real installed state can drift out from under the repo (a package
+uninstalled by hand, a plugin gone missing) while the *text* that describes it
+stays put. Running every apply — each gated by a fast presence short-circuit so a
+clean machine is a quick no-op — means "make this Mac match the repo" always
+holds, with no separate fix step.
 
 `run_onchange_after_02c/02e/03/04` mutate state from a fixed manifest (a
 deprecation list, `.pre-commit-config.yaml`, `packages/vscode-extensions.txt`,
@@ -61,7 +61,7 @@ them behind a confirm. VS Code extensions are the deliberate exception to the
 "never silently uninstall" rule: they carry no data and are trivial to reinstall,
 so `run_onchange_after_03-vscode` mirrors them outright — installing what
 `packages/vscode-extensions.txt` lists and pruning what it doesn't — on apply,
-with `chezdoctor` surfacing the drift read-only. Other custom logic (e.g. `obsidian-apply.sh`) lives in
+with `chezdoctor` surfacing the drift read-only. Other custom logic lives in
 `scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin
 drivers that do render-time config, source their lib (if any), and call the entry
 point.
@@ -78,7 +78,6 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
-| Obsidian vault seed | `run_after_02d-obsidian-apply` + `scripts/lib/obsidian-apply.sh` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |

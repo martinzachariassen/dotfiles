@@ -54,9 +54,9 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 
 @test "profile_defaults reads [profileDefaults] from modules.toml" {
     run wiz 'profile_defaults personal'
-    [ "$output" = "claudePersona jvmStack locale macApps macosDefaults obsidian theme" ]
+    [ "$output" = "claudePersona jvmStack locale macApps macosDefaults theme" ]
     run wiz 'profile_defaults work'
-    [ "$output" = "claudePersona cloudAuth jvmStack macApps macosDefaults theme" ]
+    [ "$output" = "claudePersona jvmStack locale macApps macosDefaults theme cloudAuth" ]
     run wiz 'profile_defaults minimal'
     [ "$output" = "" ]
 }

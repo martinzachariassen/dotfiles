@@ -10,15 +10,9 @@
 # ─── Productivity & system ────────────────────────────────────────────────────
 cask "google-drive"             # file sync
 cask "jordanbaird-ice@beta"     # menu bar manager
-cask "obsidian"                 # personal knowledge / vault
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
-
-# ─── Fonts (writing) ──────────────────────────────────────────────────────────
-# Code fonts (JetBrains Mono, Fira Code) live in the core Brewfile — they're
-# used by Ghostty. iA Writer Quattro is for prose in Obsidian.
-cask "font-ia-writer-quattro"   # body font for Obsidian writing
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
 cask "google-chrome"            # the only browser most web tooling assumes

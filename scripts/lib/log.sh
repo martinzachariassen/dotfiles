@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # log.sh — tiny, dependency-free terminal logging helpers shared across scripts.
 #
-# Sourced by doctor.sh, bootstrap-auth.sh, setup-ollama.sh, chezup.sh, and the
-# obsidian apply hook. Kept dependency-free so it behaves identically on a fresh
-# machine before any package is installed.
+# Sourced by doctor.sh, bootstrap-auth.sh, setup-ollama.sh, and chezup.sh. Kept
+# dependency-free so it behaves identically on a fresh machine before any package
+# is installed.
 #
 # Four idempotent entry points:
 #   ui_init_colors  — populate BOLD/DIM/GREEN/YELLOW/BLUE/RED/CYAN/RESET
