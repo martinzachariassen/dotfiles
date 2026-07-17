@@ -78,7 +78,7 @@ jobs:
         run: bash scripts/ci/render-check.sh "$PWD"
 
   # bats-core suite in tests/: semver helper, shell functions, mise config,
-  # obsidian-apply, and the static + dynamic checks on every chezmoi hook
+  # and the static + dynamic checks on every chezmoi hook
   # (chezmoi-scripts.bats renders each hook and runs it on Linux to confirm the
   # darwin guard fires before any macOS-only command — hence chezmoi here).
   test:

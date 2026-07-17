@@ -5,8 +5,8 @@
 # needs the long exclude list it used to carry: it only handles files that DO
 # live under src/ but must not deploy to $HOME.
 
-# Docs/readmes carried alongside managed content (e.g. the Obsidian vault's own
-# README) are reference material, not dotfiles — keep them out of $HOME.
+# Docs/readmes carried alongside managed content are reference material, not
+# dotfiles — keep them out of $HOME.
 README.md
 AGENTS.md
 **/AGENTS.md
@@ -18,4 +18,3 @@ AGENTS.md
 #     so a config without the key (older render fixtures) still renders. ---
 {{ $modules := dig "modules" (list) . -}}
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
-{{ if not (has "obsidian" $modules) }}.config/obsidian{{ end }}

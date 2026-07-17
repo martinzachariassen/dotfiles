@@ -72,10 +72,9 @@ the chezmoi hooks reach them across the source/root boundary via
 
 | Lib | Provides | Sourced by |
 |---|---|---|
-| `log.sh` | colors, glyphs, rail + flat status helpers | chezup, bootstrap-auth, setup-ollama, wizard, doctor, macos-defaults, obsidian hook |
+| `log.sh` | colors, glyphs, rail + flat status helpers | chezup, bootstrap-auth, setup-ollama, wizard, doctor, macos-defaults |
 | `chezmoi-data.sh` | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, wizard |
 | `tty.sh` | `tty_reattach` (stdin → controlling terminal) | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
-| `obsidian-apply.sh` | the Obsidian vault seed engine | `run_after_02d-obsidian-apply` |
 | `semver.sh` | `semver_extract` / `semver_lt` | doctor |
 
 The everyday scripts share the tiny logging library `log.sh`:

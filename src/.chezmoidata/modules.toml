@@ -10,21 +10,38 @@
 # note in packages.toml.
 
 [moduleCatalog]
-macApps = "GUI and AI apps (Raycast, Obsidian, Chrome, Claude)"
+macApps = "GUI and AI apps (Raycast, Chrome, Claude)"
 macosDefaults = "macOS system defaults (needs sudo)"
 cloudAuth = "Cloud CLIs and auth walkthrough (gh, az, gcloud, op)"
-obsidian = "Obsidian vault seeding and starter content"
 claudePersona = "Claude persona at ~/.config/claude/CLAUDE.md"
 theme = "Catppuccin Frappe across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
 
-# Per-profile default module selection the wizard (scripts/wizard.sh) pre-checks.
-# This MUST mirror the $defaults blocks in .chezmoi.toml.tmpl — the config
-# template is rendered before .chezmoidata loads, so it can't read this table and
-# has to restate the same lists literally. tests/data-model.bats enforces the
-# match so the two never drift. Keys must be [moduleCatalog] names.
+# Per-profile default module selection the wizard (scripts/bin/wizard.sh)
+# pre-checks. Rather than restate every profile's full list, a profile's
+# effective set is composed:
+#
+#     effective = (inherit ? base : []) ∪ extra
+#
+# so shared modules live once in `base` and each profile only spells out what's
+# different — `work` adds cloudAuth, `minimal` opts out of the base entirely.
+# scripts/bin/wizard.sh's profile_defaults() computes this; templates never see
+# it (the config template renders before .chezmoidata loads, so .chezmoi.toml.tmpl
+# still restates each profile's full effective list literally). The effective set
+# MUST equal the $defaults blocks there — tests/data-model.bats enforces the match
+# so the two never drift. Every name here must be a [moduleCatalog] key.
 [profileDefaults]
-personal = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "obsidian", "theme"]
-work = ["claudePersona", "cloudAuth", "jvmStack", "macApps", "macosDefaults", "theme"]
+base = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
+
+# Whether a profile starts from `base`. minimal is the deliberately-empty base.
+[profileDefaults.inherit]
+personal = true
+work = true
+minimal = false
+
+# Per-profile additions layered on top of the inherited base.
+[profileDefaults.extra]
+personal = []
+work = ["cloudAuth"]
 minimal = []

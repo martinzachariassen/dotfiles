@@ -35,10 +35,9 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 
 | Module | What it adds |
 |---|---|
-| `macApps` | GUI and AI apps (Raycast, Obsidian, Chrome, Claude, Ollama). |
+| `macApps` | GUI and AI apps (Raycast, Chrome, Claude, Ollama). |
 | `macosDefaults` | macOS system defaults (needs sudo) — see [macos.md](macos.md). |
 | `cloudAuth` | Cloud CLIs and auth walkthrough (gh, az, gcloud, op). |
-| `obsidian` | Obsidian vault seeding and starter content. |
 | `claudePersona` | Claude global defaults at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |
 | `theme` | Catppuccin Frappé across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |

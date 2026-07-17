@@ -1,7 +1,6 @@
 #!/usr/bin/env bats
 # Tests for scripts/lib/log.sh — the dependency-free terminal UI helpers shared
-# by doctor.sh, chezup.sh, bootstrap-auth.sh, setup-ollama.sh, and the obsidian
-# apply hook.
+# by doctor.sh, chezup.sh, bootstrap-auth.sh, and setup-ollama.sh.
 #
 # Why this exists:
 #   log.sh runs on a FRESH machine before any package is installed, so its two
