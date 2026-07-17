@@ -1,24 +1,19 @@
-# ~/.config/zsh/.zprofile — login shell setup
-# Found via ZDOTDIR. Runs once at login, before .zshrc.
+# ~/.config/zsh/.zprofile — login shell setup, runs once before .zshrc.
 
-# Homebrew (Apple Silicon path). Keep login startup pure shell; running
-# `brew shellenv` here adds an external process to every `/bin/zsh -l`.
+# Set vars inline rather than `brew shellenv` to keep an external process out of
+# every `/bin/zsh -l`.
 if [ -d /opt/homebrew ]; then
     export HOMEBREW_PREFIX="/opt/homebrew"
     export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
     export HOMEBREW_REPOSITORY="/opt/homebrew"
 
-    # `typeset -U path` (set in ~/.zshenv) keeps the array deduped, so an
-    # unconditional prepend is safe across nested shells — no adjacency guard
-    # needed. Assigning `path` updates the tied, already-exported PATH.
+    # `typeset -U path` (~/.zshenv) dedups, so an unconditional prepend is safe.
     path=(/opt/homebrew/bin /opt/homebrew/sbin $path)
 
     export MANPATH="/opt/homebrew/share/man${MANPATH+:$MANPATH}:"
     export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
 fi
 
-# Keep ~/.local/bin ahead of everything (user-installed tools, pipx, cargo, this
-# repo's scripts). Set HERE — not in ~/.zshenv — because macOS's /etc/zprofile
-# runs `path_helper` between .zshenv and this file, and would otherwise sink it
-# below /usr/bin. Login shells run this once; subshells inherit the export.
+# Set here, not .zshenv: /etc/zprofile's path_helper runs in between and would
+# otherwise sink ~/.local/bin below /usr/bin.
 path=("$HOME/.local/bin" $path)

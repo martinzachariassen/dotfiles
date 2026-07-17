@@ -1,9 +1,9 @@
 # Development
 
-Everything at the repo root is tooling chezmoi never deploys. Changes here are
-guarded by the same quality gates twice: **pre-commit** runs them locally before
-a commit lands, and **CI** re-runs them on every push. Both call the same scripts
-in [`scripts/ci/`](../scripts/ci), so local and remote never diverge.
+Everything at the repo root is tooling chezmoi never deploys. Changes here run
+the same quality gates twice: **pre-commit** locally before a commit lands, and
+**CI** on every push. Both call the same scripts in
+[`scripts/ci/`](../scripts/ci), so local and remote never diverge.
 
 ## Quality gates
 
@@ -50,8 +50,8 @@ pre-commit run --all-files
 
 ## Tests
 
-The [`tests/`](../tests) bats suites cover the data model and the shell surface
-so a rename or a drifted default fails fast:
+The [`tests/`](../tests) bats suites cover the data model and shell surface so a
+rename or drifted default fails fast:
 
 | Suite | Guards |
 |---|---|
@@ -74,5 +74,5 @@ so a rename or a drifted default fails fast:
   [shell.md](shell.md).
 - The full contributor rules are in [`../CLAUDE.md`](../CLAUDE.md), the single
   source of truth for this repo. Claude Code reads it natively;
-  [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) is a thin
-  pointer to it for GitHub Copilot.
+  [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) is a
+  thin pointer to it for GitHub Copilot.

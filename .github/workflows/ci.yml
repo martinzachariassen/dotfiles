@@ -115,13 +115,9 @@ jobs:
           persist-credentials: false
       - uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2
 
-  # Secret scanning. The contributor rules forbid committing tokens, keys,
-  # credentials, or signing material; this enforces that rather than trusting
-  # it. `gitleaks dir` scans the working tree — the state being proposed — so
-  # it's independent of checkout depth and git history. Installed pinned via
-  # its Go module: ubuntu-latest ships Go (auto-fetching the toolchain gitleaks
-  # needs), so there's no release-asset URL to drift. Run via the resolved
-  # GOPATH/bin path — never $GITHUB_PATH — to avoid a code-execution sink.
+  # Secret scanning. `gitleaks dir` scans the working tree, so it's independent of
+  # checkout depth. Pinned via its Go module (no release-asset URL to drift) and run
+  # via the resolved GOPATH/bin path, never $GITHUB_PATH, to avoid a code-exec sink.
   secrets:
     name: secret scan
     runs-on: ubuntu-latest
@@ -156,11 +152,9 @@ jobs:
           bin="$(go env GOPATH)/bin"
           "$bin/actionlint" -color
 
-  # Security audit of the workflows (zizmor). Complements Dependabot — which
-  # only bumps pinned actions — by flagging risks Dependabot can't see:
-  # injectable `run:` steps, over-broad token permissions, credential
-  # persistence. The read-only GITHUB_TOKEN lets it verify each action's pin
-  # against its upstream tags. Scoped to workflows/, zizmor's primary surface.
+  # Workflow security audit (zizmor): flags risks Dependabot can't — injectable
+  # `run:` steps, over-broad permissions, credential persistence. The read-only
+  # GITHUB_TOKEN lets it verify each action's pin against upstream tags.
   zizmor:
     name: workflow audit
     runs-on: ubuntu-latest

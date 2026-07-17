@@ -1,30 +1,17 @@
-# Static package catalog — the SINGLE source of truth for which Brewfiles apply.
-#
-# chezmoi merges every .chezmoidata/* file into the template data root before
-# rendering, so templates and scripts read the same map:
-#   - render-time (hooks):  {{ .brewfiles.core }}, {{ .brewfiles.byModule.macApps }}
-#   - runtime (scripts):    chezmoi data --format=json | jq '.brewfiles'
-#
-# This replaces the profile+feature -> Brewfile mapping that V1 duplicated across
-# the brew-bundle hook, scripts/lib/active-modules.sh, and scripts/doctor.sh.
-#
-# Paths are relative to the repo root (the git working tree), NOT chezmoi's
-# source dir (src/) — the Brewfiles live in packages/ at the root. The
-# brew-bundle hook joins these with {{ .chezmoi.workingTree }} accordingly.
-#
-# NOTE: .chezmoidata files are plain data and CANNOT be templated. Keep them in a
-# key namespace (`brewfiles`, `moduleCatalog`) disjoint from prompted answers
-# (`profile`, `modules`, ...) so there is never a merge/precedence collision.
+# Package catalog — single source of truth for which Brewfiles apply. Merged into
+# the template data root, so hooks read `{{ .brewfiles.core }}` and scripts read it
+# via `chezmoi data`. Paths are relative to the repo root (git working tree), not
+# chezmoi's src/ — hooks join them with {{ .chezmoi.workingTree }}.
+# .chezmoidata files can't be templated; keep the `brewfiles` namespace disjoint
+# from prompted answers so merges never collide.
 
 [brewfiles]
-# Always installed, on every machine.
 core = "packages/Brewfile"
 
-# Installed when the named module is selected (see .chezmoidata/modules.toml).
+# Installed when the named module is selected (see modules.toml).
 [brewfiles.byModule]
 macApps = "packages/Brewfile.mac-apps"
 
-# Installed for the active profile only.
 [brewfiles.byProfile]
 personal = "packages/Brewfile.personal"
 work = "packages/Brewfile.work"

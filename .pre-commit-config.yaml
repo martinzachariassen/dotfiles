@@ -1,22 +1,14 @@
-# Pre-commit hooks that mirror the CI jobs in .github/workflows/ci.yml.
-# Catches problems locally before they reach CI.
-#
+# Pre-commit hooks mirroring the CI jobs in .github/workflows/ci.yml. All use
+# language: system so they run the brew/mise-installed binaries, not managed copies.
 # Activate: pre-commit install --install-hooks
-# Run manually: pre-commit run --all-files
-#
-# All hooks use language: system — they shell out to Homebrew-installed
-# binaries rather than pre-commit's own managed copies, keeping tooling
-# sourced from brew/mise as the rest of this repo expects.
 minimum_pre_commit_version: "3.5.0"
 default_install_hook_types: [pre-commit, commit-msg]
 
-# Run every hook even after one fails, so a single commit surfaces all problems.
 fail_fast: false
 
 repos:
   - repo: local
     hooks:
-      # Shell scripts — mirrors the `shell scripts` CI job
       - id: shellcheck
         name: shellcheck (severity=error)
         entry: shellcheck --severity=error --shell=bash
@@ -43,32 +35,24 @@ repos:
         language: system
         files: '^src/(dot_zshenv|dot_config/zsh/dot_zprofile)$'
 
-      # Spelling — mirrors the `typos` CI job; exclusions/allowlist in _typos.toml.
       - id: typos
         name: typos
         entry: typos
         language: system
         pass_filenames: false
 
-      # Config files — mirrors the `config files` CI job. Validates that every
-      # JSON/TOML in the source tree parses (the script scans the tree itself).
       - id: lint-config
         name: lint-config (JSON/TOML)
         entry: bash scripts/ci/lint-config.sh
         language: system
         pass_filenames: false
 
-      # Secret scanning — mirrors the `secret scan` CI job. Scans the working
-      # tree so a token/key/credential can't be committed in the first place.
       - id: gitleaks
         name: gitleaks (secret scan)
         entry: gitleaks dir . --redact --no-banner
         language: system
         pass_filenames: false
 
-      # Workflow lint — mirrors the `workflow lint` CI job. Gated to workflow /
-      # composite-action files; actionlint auto-discovers every workflow, so no
-      # filenames are passed.
       - id: actionlint
         name: actionlint (workflow lint)
         entry: actionlint
@@ -76,8 +60,7 @@ repos:
         pass_filenames: false
         files: '^\.github/(workflows|actions)/.*\.ya?ml$'
 
-      # Workflow audit — mirrors the `workflow audit` CI job. Runs offline
-      # locally (no token, fast); CI runs it online to also verify action pins.
+      # Offline locally (fast); CI runs it online to also verify action pins.
       - id: zizmor
         name: zizmor (workflow audit)
         entry: zizmor --offline .github/workflows/
@@ -85,8 +68,7 @@ repos:
         pass_filenames: false
         files: '^\.github/workflows/.*\.ya?ml$'
 
-      # Commit message — enforces Conventional Commits for direct-to-main commits,
-      # which bypass CI's PR-title check.
+      # Enforces Conventional Commits for direct-to-main commits (CI only checks PR titles).
       - id: conventional-commit
         name: Conventional Commits subject
         stages: [commit-msg]

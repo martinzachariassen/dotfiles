@@ -1,21 +1,18 @@
-// Zellij config — managed by chezmoi
-// Edit via: chezmoi edit ~/.config/zellij/config.kdl
-// Reference: https://zellij.dev/documentation/configuration
+// Zellij config — managed by chezmoi. https://zellij.dev/documentation/configuration
 
 // ─── Theme ────────────────────────────────────────────────────────────────
-// Catppuccin Frappe ships with Zellij 0.40+
 theme "catppuccin-frappe"
 
 // ─── Behavior ─────────────────────────────────────────────────────────────
-scrollback_lines     100000             // match Ghostty's buffer; default is 10000
+scrollback_lines     100000             // match Ghostty's buffer
 default_shell        "zsh"
-default_layout       "main"             // custom layout with zjstatus bar (layouts/main.kdl)
+default_layout       "main"             // layouts/main.kdl (zjstatus bar)
 mouse_mode           true
 copy_on_select       true
-copy_command         "pbcopy"           // macOS clipboard
-mirror_session       false              // each Ghostty tab = independent zellij session
-session_serialization true               // persist sessions across restarts
-pane_frames          true               // frame titles show pane cwd / Claude Code status
+copy_command         "pbcopy"
+mirror_session       false              // each Ghostty tab = independent session
+session_serialization true
+pane_frames          true
 simplified_ui        false
 show_startup_tips    false
 
@@ -23,14 +20,9 @@ show_startup_tips    false
 ui {
     pane_frames {
         rounded_corners   true
-        hide_session_name true            // session already shown in the zjstatus bar
+        hide_session_name true            // already shown in the zjstatus bar
     }
 }
 
-// ─── Keybinds ─────────────────────────────────────────────────────────────
-// Zellij uses mode-based keybinds by default — Ctrl+P for pane mode, Ctrl+T
-// for tab mode, etc. The defaults are sane; if you want to customize, see
-// `zellij setup --dump-config` for the full bindings list and override here.
-//
-// One thing worth knowing: Ctrl+G locks/unlocks Zellij's own keybinds, useful
-// if you're inside vim/an app that wants the same key chord.
+// Keybinds are Zellij's mode-based defaults; Ctrl+G locks/unlocks them when an
+// app wants the same chord. Customize via `zellij setup --dump-config`.

@@ -1,13 +1,7 @@
-# Optional-module catalog — the one place the module list + human labels live.
-#
-# Selected at `chezmoi init` via a single promptMultichoiceOnce in
-# .chezmoi.toml.tmpl; the chosen names land in `.modules` (a list). Templates gate
-# on membership with sprig `has`, e.g. {{ if has "theme" .modules }}...{{ end }}.
-# Prompts, the doctor report, and the apply summary all read these labels so the
-# list is never restated.
-#
-# Keep this namespace (`moduleCatalog`) disjoint from prompted answers — see the
-# note in packages.toml.
+# Optional-module catalog — the single source for module names + labels. Selected
+# at `chezmoi init`; chosen names land in `.modules` and templates gate with
+# `{{ if has "theme" .modules }}`. Keep the `moduleCatalog` namespace disjoint
+# from prompted answers (see packages.toml).
 
 [moduleCatalog]
 macApps = "GUI and AI apps (Raycast, Chrome, Claude)"
@@ -18,23 +12,14 @@ theme = "Catppuccin Frappe across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
 
-# Per-profile default module selection the wizard (scripts/bin/wizard.sh)
-# pre-checks. Rather than restate every profile's full list, a profile's
-# effective set is composed:
-#
-#     effective = (inherit ? base : []) ∪ extra
-#
-# so shared modules live once in `base` and each profile only spells out what's
-# different — `work` adds cloudAuth, `minimal` opts out of the base entirely.
-# scripts/bin/wizard.sh's profile_defaults() computes this; templates never see
-# it (the config template renders before .chezmoidata loads, so .chezmoi.toml.tmpl
-# still restates each profile's full effective list literally). The effective set
-# MUST equal the $defaults blocks there — tests/data-model.bats enforces the match
-# so the two never drift. Every name here must be a [moduleCatalog] key.
+# Wizard's per-profile pre-checks, composed as: effective = (inherit ? base : []) ∪ extra.
+# .chezmoi.toml.tmpl restates each profile's effective list literally (it renders
+# before .chezmoidata loads); tests/data-model.bats enforces the two match. Every
+# name must be a [moduleCatalog] key.
 [profileDefaults]
 base = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
 
-# Whether a profile starts from `base`. minimal is the deliberately-empty base.
+# Whether a profile starts from `base`; minimal is the deliberately-empty one.
 [profileDefaults.inherit]
 personal = true
 work = true

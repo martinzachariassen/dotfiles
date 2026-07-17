@@ -1,11 +1,9 @@
-# ~/.ssh/config — managed by chezmoi
-# Mode 0600 enforced via the `private_` prefix.
+# ~/.ssh/config — managed by chezmoi (mode 0600 via the `private_` prefix).
 
 Host *
-    # Use 1Password's SSH agent for all keys.
+    # 1Password SSH agent for all keys.
     IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
-    # Sensible defaults
     AddKeysToAgent yes
     UseKeychain yes
     ServerAliveInterval 60

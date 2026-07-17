@@ -1,14 +1,13 @@
 # macOS defaults
 
-Every system setting this repo changes, grouped by domain. It's applied by
+Every system setting this repo changes, grouped by domain. Applied by
 [`scripts/bin/macos-defaults.sh`](../scripts/bin/macos-defaults.sh) — the single
 source of truth — when the `macosDefaults` module is selected. This doc mirrors
-that script so you can see the whole picture without reading bash; if the two
-ever disagree, the script wins.
+the script; if the two disagree, the script wins.
 
-Each `defaults write` in the script is annotated inline, so **to change a
-setting, edit the script** and comment out or adjust the line. See
-[applying & reverting](#applying--reverting) below.
+Each `defaults write` is annotated inline, so **to change a setting, edit the
+script** and comment out or adjust the line. See
+[applying & reverting](#applying--reverting).
 
 ## Keyboard & input
 
@@ -117,25 +116,24 @@ enable.
 
 ## Touch ID for sudo (Sonoma 14+)
 
-On macOS 14+, the script enables Touch ID authentication for `sudo` by appending
-`auth sufficient pam_tid.so` to `/etc/pam.d/sudo_local` — the Apple-blessed,
-**upgrade-stable** file introduced in Sonoma (editing the older
-`/etc/pam.d/sudo` got reverted on every OS update). It's idempotent (skips if the
-line is already there) and skipped cleanly on pre-Sonoma.
+On macOS 14+, the script enables Touch ID for `sudo` by appending
+`auth sufficient pam_tid.so` to `/etc/pam.d/sudo_local` — the **upgrade-stable**
+file introduced in Sonoma (editing the older `/etc/pam.d/sudo` got reverted on
+every OS update). Idempotent (skips if the line is present) and skipped cleanly
+on pre-Sonoma.
 
 ## Applying & reverting
 
 **How it runs.** The `run_onchange_after_04-macos-defaults` hook (see
-[lifecycle.md](lifecycle.md)) applies the script only when the
-`macosDefaults` module is selected **and** its *contents change* — the hook
-embeds a sha256 of the script, so a routine `chezmoi apply` that didn't touch it
-is a no-op and you get no sudo prompt. Edit the script and the next apply
-re-runs it.
+[lifecycle.md](lifecycle.md)) applies the script only when the `macosDefaults`
+module is selected **and** its *contents change* — the hook embeds a sha256 of
+the script, so a routine `chezmoi apply` that didn't touch it is a no-op with no
+sudo prompt. Edit the script and the next apply re-runs it.
 
-**Idempotent + fast.** The script's `def_write` helper reads each key first and
-only writes when the value differs, tracking which domains actually changed. At
-the end it restarts **only** the affected apps (Finder, Dock, SystemUIServer),
-so an unchanged run touches nothing.
+**Idempotent + fast.** The `def_write` helper reads each key first and writes
+only when the value differs, tracking which domains changed. It then restarts
+**only** the affected apps (Finder, Dock, SystemUIServer), so an unchanged run
+touches nothing.
 
 **Apply by hand** (e.g. after a macOS update reset something) without editing the
 script:
@@ -146,7 +144,7 @@ macos-defaults          # the zsh alias → scripts/bin/macos-defaults.sh
 
 **Revert a setting.** There's no automatic undo — comment the line out in the
 script (documents intent, but won't reset an already-applied value), then reset
-the live value yourself, e.g.:
+the live value yourself:
 
 ```sh
 defaults delete com.apple.dock tilesize        # back to the macOS default

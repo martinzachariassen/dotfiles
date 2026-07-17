@@ -1,10 +1,6 @@
 version: 2
 
-# Keep the third-party GitHub Actions used in ci.yml current. Dependabot opens a
-# PR per outdated `uses:` pin; the repo's own CI (and the Conventional-Commit PR
-# title check) gate the bump before it can merge. Local composite actions
-# (./.github/actions/*) and the `curl get.chezmoi.io` installer aren't version
-# pins, so there's nothing here for them to bump.
+# Keep third-party GitHub Actions pins current; CI gates each bump before merge.
 updates:
   - package-ecosystem: github-actions
     directory: "/"

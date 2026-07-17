@@ -1,11 +1,5 @@
-# Brewfile.mac-apps — Mac-only quality-of-life GUI apps + AI tooling.
-#
-# Installed when `features.macApps = true` in chezmoi data.
-#
-# Pure preference stack — none of these are required by the shell config or
-# scripts. Skip the toggle if you prefer to install your own picks. Each line
-# is also fine to comment out individually. Entries are sorted alphabetically
-# within each section.
+# Brewfile.mac-apps — GUI apps + AI tooling, installed when the macApps module is
+# selected. Pure preference; nothing here is required by the shell config.
 
 # ─── Productivity & system ────────────────────────────────────────────────────
 cask "google-drive"             # file sync
@@ -27,8 +21,7 @@ cask "bruno"                    # offline API client (Postman alternative)
 cask "intellij-idea"            # JetBrains IDE
 
 # ─── AI tooling + apps ────────────────────────────────────────────────────────
-# Ollama runs models locally. It's installed here but pulls no models — start it
-# with `scripts/bin/setup-ollama.sh`, then `ollama pull <model>` for the ones you want.
+# ollama installs but pulls no models — see scripts/bin/setup-ollama.sh.
 brew "ollama"                   # local model runner/server
 cask "claude"                   # Anthropic Claude desktop app
 cask "claude-code"              # Anthropic Claude Code CLI

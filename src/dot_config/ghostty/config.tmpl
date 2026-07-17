@@ -1,15 +1,9 @@
-# Ghostty config — managed by chezmoi
-# Edit via: chezmoi edit ~/.config/ghostty/config
-# Reference: https://ghostty.org/docs/config/reference
-#
-# IMPORTANT: Ghostty does NOT support inline comments. Every comment must be
-# on its own line — putting `# foo` after a value will be parsed as part of
-# the value and produce a "Configuration Error" on launch.
+# Ghostty config — managed by chezmoi. https://ghostty.org/docs/config/reference
+# Ghostty has NO inline comments: `# foo` after a value is parsed as part of the
+# value and errors on launch. Every comment must be on its own line.
 
 # ─── Theme ────────────────────────────────────────────────────────────────────
-# Custom theme file at ~/.config/ghostty/themes/catppuccin-frappe (also managed
-# by chezmoi). Using a local theme rather than relying on a built-in name gives
-# us deterministic colors regardless of Ghostty version.
+# Local theme file (chezmoi-managed) for version-independent colors.
 {{ if has "theme" (dig "modules" (list) .) -}}
 theme = catppuccin-frappe
 {{ end -}}
@@ -17,7 +11,6 @@ theme = catppuccin-frappe
 # ─── Font ─────────────────────────────────────────────────────────────────────
 font-family = JetBrainsMono Nerd Font
 font-size = 13
-# JetBrainsMono ligatures
 font-feature = calt
 font-feature = liga
 
@@ -40,35 +33,21 @@ cursor-style = bar
 cursor-style-blink = true
 
 # ─── Mouse / clipboard ────────────────────────────────────────────────────────
-# Hide the pointer while typing; it reappears on mouse move.
 mouse-hide-while-typing = true
-# Selecting text copies straight to the system clipboard — matches Zellij's
-# copy_on_select so the behavior is consistent inside and outside a session.
+# Match Zellij's copy_on_select for consistent behavior in and out of a session.
 copy-on-select = clipboard
 
 # ─── Shell integration ────────────────────────────────────────────────────────
-# Ghostty injects its zsh integration automatically; nothing extra in .zshrc
-# beyond what we already have. Enables proper title-setting, jump-between-prompts, etc.
 shell-integration = zsh
 shell-integration-features = cursor,sudo,title
 
 # ─── Scrollback ───────────────────────────────────────────────────────────────
-# NOTE: Ghostty measures this in BYTES, not lines (Ghostty's default is
-# 10000000 = 10MB). This is NOT the same unit as Zellij's `scrollback_lines`,
-# which counts lines. A previous value of 100000 (=100KB) silently shrank the
-# buffer ~100x below default and clipped history after only a few screens —
-# especially bad for densely-styled TUI output (Claude Code, etc.) where ANSI
-# escape bytes count against the limit. Buffer is allocated lazily, so a large
-# value costs no memory until actually used. 100MB comfortably holds ~100k
-# lines of heavy output, matching the intent of the Zellij setting.
+# Measured in BYTES, not lines (default 10MB); allocated lazily. 100MB ≈ 100k
+# lines of heavily-styled output where ANSI escapes count against the limit.
 scrollback-limit = 100000000
 
 # ─── Keybindings ──────────────────────────────────────────────────────────────
-# Cmd+K clears screen + scrollback (matches iTerm muscle memory)
 keybind = cmd+k=clear_screen
-# Cmd+Enter toggles fullscreen
 keybind = cmd+enter=toggle_fullscreen
-# Cmd+Shift+. toggles the inspector (useful for debugging colors/keys)
 keybind = cmd+shift+period=inspector:toggle
-
-# Cmd+T / Cmd+W / Cmd+1..9 / Cmd+Shift+[ / Cmd+Shift+] for tabs are all defaults.
+# Tab bindings (Cmd+T/W/1..9, Cmd+Shift+[ ]) are Ghostty defaults.

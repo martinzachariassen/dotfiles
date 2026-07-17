@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
 # run_after_02b-mise-install — materialize mise's global toolchain.
 #
-# Why this exists:
-#   `mise activate` (wired into ~/.config/zsh/.zshrc) puts tools on PATH and
-#   sets JAVA_HOME, but it does NOT install missing versions on its own. So
-#   the first shell on a fresh machine would have a global mise config that
-#   points at java/node versions that aren't downloaded yet. Running
-#   `mise install` here eagerly downloads the global toolchain so the first
-#   interactive shell just works.
-#
-# Why `run_after` (every apply), not `run_onchange`:
-#   This converges real installed state, not the config's text. A runtime can go
-#   missing while ~/.config/mise/config.toml stays put (manual uninstall, a
-#   half-finished apply). Running every apply — gated by a fast `mise ls
-#   --missing` short-circuit so a clean machine is a no-op — guarantees the
-#   global toolchain matches the config. This mirrors run_after_02-brew-bundle's
-#   convergence guarantee (see docs/lifecycle.md).
-#   mise itself is installed by the brew-bundle step (02), and the target-state
-#   config (~/.config/mise/config.toml) is written before any run_after script,
-#   so both are in place by now.
+# `mise activate` puts tools on PATH but doesn't install missing versions, so
+# eagerly download the global toolchain here for the first interactive shell.
+# run_after (every apply), not run_onchange: converges real installed state (a
+# runtime can go missing while config.toml stays put), gated by a fast
+# `mise ls --missing` short-circuit. mise + its config are in place by now (02).
 
 set -euo pipefail
 
@@ -27,9 +14,8 @@ echo "→ mise: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Ensure Homebrew's bin dir is on PATH when apply runs outside a login shell
-# (launchd, cron, a bare `chezmoi apply`). Mirrors run_after_02-brew-bundle so
-# the `command -v mise` check below finds the binary the bundle step installed.
+# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
+# `command -v mise` check below finds the bundle-installed binary.
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -37,18 +23,13 @@ fi
 echo "▶ mise runtimes"
 
 if ! command -v mise >/dev/null 2>&1; then
-    # brew-bundle (02) installs mise; if it's missing here the bundle step
-    # failed or hasn't run. Don't fail the whole apply — the next shell will
-    # have mise on PATH once brew bundle succeeds, and re-running `chezup` will
-    # re-run this script.
+    # Missing here means brew-bundle (02) failed or hasn't run; don't fail the apply.
     echo "! mise not on PATH yet — skipping global install."
     echo "  Re-run \`chezup\` after brew bundle finishes to install runtimes."
     exit 0
 fi
 
-# Fast path: nothing missing ⇒ a routine apply is a quiet no-op. `mise ls
-# --missing` lists configured-but-not-installed tools; empty output means the
-# global toolchain already matches the config.
+# Fast path: no missing tools ⇒ routine apply is a quiet no-op.
 if [ -z "$(cd "$HOME" && mise ls --missing 2>/dev/null)" ]; then
     echo "  ✓ global runtimes already installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
     exit 0
@@ -57,10 +38,8 @@ fi
 echo "→ Installing global runtimes from ~/.config/mise/config.toml"
 echo "  (java + node; downloads only what's missing, idempotent)"
 
-# `mise install` with no args installs every tool pinned in the resolved
-# config — here just the global config.toml. Already-installed versions are
-# skipped, so re-runs are cheap. Don't fail the apply on a transient network
-# error; the tools install lazily on first `mise install`/use otherwise.
+# Installs every tool pinned in the global config; already-installed versions are
+# skipped. Don't fail the apply on a transient network error.
 if (cd "$HOME" && mise install); then
     echo "✓ mise runtimes installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
 else

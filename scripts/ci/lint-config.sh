@@ -1,35 +1,18 @@
 #!/usr/bin/env bash
-# Validate that every JSON and TOML config file in the source tree parses
-# cleanly. Catches stray commas, missing quotes, unbalanced braces, and other
-# hand-edit damage before a `chezmoi apply` writes them into $HOME.
-#
-# Scope:
-#   *.toml          — strict TOML, via Python tomllib (3.11+).
-#   *.json          — strict JSON, via `python3 -m json.tool`.
-#   VS Code configs — JSONC (line + block comments, trailing commas allowed);
-#   + devcontainer.json validated by a small strip-then-load pass.
-#
-# Templates (*.json.tmpl, *.toml.tmpl) are NOT validated here — the chezmoi
-# render-check job already proves them parseable as templates, and the rendered
-# settings.json.tmpl is JSONC-validated by render-check.sh after `chezmoi
-# execute-template`.
-#
-# Run from the repo root, or pass the source dir as $1.
-#   bash scripts/ci/lint-config.sh
+# lint-config.sh — parse every JSON/TOML config in the source tree before a
+# `chezmoi apply` writes them into $HOME. Templates (*.tmpl) are covered by
+# render-check instead. Run from repo root, or pass the source dir as $1.
 
 set -euo pipefail
 
 SOURCE_DIR="${1:-$(pwd)}"
 cd "$SOURCE_DIR"
 
-# VS Code's settings.json + keybindings.json are JSONC, not strict JSON.
-# Under src/ since the chezmoi-managed tree moved there (.chezmoiroot).
 VSCODE_DIR='./src/Library/Application Support/Code/User'
 
 errors=0
 
-# JSONC, not strict JSON: the VS Code user dir, plus any devcontainer.json
-# (the dev-container spec allows comments + trailing commas).
+# JSONC, not strict JSON: the VS Code user dir plus any devcontainer.json.
 is_jsonc() {
     case "$1" in
         "${VSCODE_DIR}/"* | */devcontainer.json) return 0 ;;
@@ -54,7 +37,7 @@ path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
     src = fh.read()
 
-# Strip // line and /* */ block comments while respecting string boundaries.
+# Strip // and /* */ comments, respecting string boundaries.
 def strip(s):
     out, i, n = [], 0, len(s)
     while i < n:
@@ -81,7 +64,7 @@ def strip(s):
     return "".join(out)
 
 src = strip(src)
-# Allow trailing commas before } or ] (VS Code tolerates these).
+# VS Code tolerates trailing commas before } or ].
 src = re.sub(r",(\s*[\]}])", r"\1", src)
 try:
     json.loads(src)
@@ -113,30 +96,28 @@ run() {
     "$@" || errors=$((errors + 1))
 }
 
-# Walk git's view of the tree (cached + untracked, honouring --exclude-standard)
-# so gitignored locals like .claude/settings.local.json never get linted, while
-# still catching new files in a working dir. Files are prefixed with `./` to
-# match the find-style paths the rest of the script (and VSCODE_DIR) uses.
+# git's view (cached + untracked, --exclude-standard) so gitignored locals stay
+# unlinted while new working-dir files are caught. `./` prefix matches VSCODE_DIR.
 list_paths() {
     local pattern="$1"
     git ls-files -co --exclude-standard -- "$pattern" | sed 's|^|./|' | sort
 }
 
-# ─── Strict JSON (everywhere except the VS Code JSONC dir) ────────────────────
+# ─── Strict JSON ──────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     is_jsonc "$f" && continue
     echo "JSON   $f"
     run validate_strict_json "$f"
 done < <(list_paths '*.json')
 
-# ─── JSONC (VS Code config dir + devcontainer.json) ───────────────────────────
+# ─── JSONC ────────────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     is_jsonc "$f" || continue
     echo "JSONC  $f"
     run validate_jsonc "$f"
 done < <(list_paths '*.json')
 
-# ─── Strict TOML (everywhere) ────────────────────────────────────────────────
+# ─── Strict TOML ──────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     echo "TOML   $f"
     run validate_toml "$f"

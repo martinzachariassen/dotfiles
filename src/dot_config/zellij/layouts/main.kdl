@@ -1,9 +1,6 @@
-// Zellij layout "main" — default panes + zjstatus one-line status bar (bottom).
-// Referenced from config.kdl via `default_layout "main"`.
-//
-// zjstatus is pinned by release URL; bump the version here deliberately.
-// Fallback known-good pin: v0.23.0 (built against zellij-tile 0.44.1).
-// First load needs network + a one-time plugin permission approval in Zellij.
+// Zellij layout "main" — default panes + zjstatus one-line status bar.
+// zjstatus is pinned by release URL; bump deliberately (fallback pin: v0.23.0).
+// First load needs network + a one-time plugin-permission approval in Zellij.
 layout {
     default_tab_template {
         children
@@ -47,8 +44,8 @@ layout {
         }
     }
 
-    // Swap layouts mirrored from Zellij 0.44.3's built-in default.swap.kdl so
-    // Alt+[ / Alt+] auto-arrangement keeps working with the custom bar.
+    // Mirrored from Zellij's built-in default.swap.kdl so Alt+[ / Alt+]
+    // auto-arrangement keeps working with the custom bar.
     swap_tiled_layout name="vertical" {
         tab max_panes=5 {
             pane split_direction="vertical" {

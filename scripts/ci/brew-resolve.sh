@@ -19,10 +19,8 @@ resolve() {
         brew search "$flag" "$name" 2>/dev/null | grep -Fxq "$name"
 }
 
-# check_deprecation KIND NAME — flag packages Homebrew has disabled (won't
-# install → hard fail, sets missing=1) or deprecated (still installs → warning so
-# a swap can be planned before upstream disables it, as happened with `tldr`).
-# Best-effort: needs jq + a JSON payload, silently skips if either is absent.
+# check_deprecation KIND NAME — disabled → hard fail (missing=1); deprecated →
+# warning. Best-effort: needs jq + JSON, silently skips if either is absent.
 check_deprecation() {
     local kind="$1" name="$2" flag json node disabled deprecated
     command -v jq >/dev/null 2>&1 || return 0

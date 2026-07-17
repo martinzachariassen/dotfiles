@@ -1,6 +1,6 @@
 # Architecture & repository layout
 
-The repo root splits cleanly into **what chezmoi deploys** and **the tooling that
+The repo root splits into **what chezmoi deploys** and **the tooling that
 supports it**. Understand that split and everything else falls out of it.
 
 ## The `src/` split
@@ -18,8 +18,8 @@ Two rules follow:
    `chezmoi re-add ~/.X`.
 2. **Inside a hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`.** So reaching
    root-level tooling (the `scripts/lib/*` engines, `packages/Brewfile*`) uses
-   `{{ .chezmoi.workingTree }}` — the git working tree, i.e. the repo root —
-   instead. That's the one path idiom the hooks rely on.
+   `{{ .chezmoi.workingTree }}` — the git working tree, i.e. the repo root. That's
+   the one path idiom the hooks rely on.
 
 ## chezmoi naming conventions
 
@@ -52,8 +52,7 @@ docs/                   # these guides
 
 ## How `scripts/` is organized
 
-Grouped by *who invokes each script*, so the entry points are obvious at a
-glance:
+Grouped by *who invokes each script*, so the entry points are obvious:
 
 - **[`scripts/bin/`](../scripts/bin)** — user-facing verbs run by hand or via the
   zsh functions: `chezup`, `doctor`, `bootstrap-auth`, `wizard`, `setup-ollama`,

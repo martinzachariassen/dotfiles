@@ -1,19 +1,11 @@
-// Custom VS Code keybindings — chezmoi-managed (see docs/mapping.md).
-//
-// Vim normal/insert/visual-mode leader maps live in settings.json (vscodevim
-// owns those). This file is for editor-chrome chords that vim doesn't cover.
-// Everything here is chosen to NOT clobber a macOS default binding — add your
-// own below and `chezmoi re-add` to capture them back into the repo.
+// Custom VS Code keybindings — chezmoi-managed. Editor-chrome chords vim doesn't
+// cover (vim leader maps live in settings.json); chosen to not clobber macOS defaults.
 [
-    // ---- Editor group / pane management ----
-    // Move the focused editor into the next / previous editor group.
+    // Editor group / pane management
     { "key": "cmd+ctrl+right", "command": "workbench.action.moveEditorToNextGroup" },
     { "key": "cmd+ctrl+left", "command": "workbench.action.moveEditorToPreviousGroup" },
-
-    // Maximize / restore the focused editor group — temporary single-pane focus.
     { "key": "cmd+ctrl+up", "command": "workbench.action.toggleMaximizeEditorGroup" },
 
-    // ---- Terminal ----
-    // Split a new integrated terminal beside the current one.
+    // Terminal
     { "key": "cmd+ctrl+t", "command": "workbench.action.terminal.split", "when": "terminalFocus" }
 ]
