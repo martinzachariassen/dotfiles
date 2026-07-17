@@ -11,6 +11,7 @@ core = "packages/Brewfile"
 # Installed when the named module is selected (see modules.toml).
 [brewfiles.byModule]
 macApps = "packages/Brewfile.mac-apps"
+appleDev = "packages/Brewfile.apple-dev"
 
 [brewfiles.byProfile]
 personal = "packages/Brewfile.personal"

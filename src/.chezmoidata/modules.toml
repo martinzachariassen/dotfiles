@@ -11,6 +11,7 @@ claudePersona = "Claude persona at ~/.config/claude/CLAUDE.md"
 theme = "Catppuccin Frappe across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
+appleDev = "Swift/iOS dev (SwiftLint, SwiftFormat, xcbeautify, xcodes, fastlane)"
 
 # Wizard's per-profile pre-checks, composed as: effective = (inherit ? base : []) ∪ extra.
 # .chezmoi.toml.tmpl restates each profile's effective list literally (it renders
@@ -27,6 +28,6 @@ minimal = false
 
 # Per-profile additions layered on top of the inherited base.
 [profileDefaults.extra]
-personal = []
+personal = ["appleDev"]
 work = ["cloudAuth"]
 minimal = []

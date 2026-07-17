@@ -24,6 +24,27 @@ Icon?
 mise.local.toml
 .mise.local.toml
 
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# CocoaPods (only when used)
+Pods/
+
+# fastlane artifacts
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+
 # Common secret files
 .env
 .env.*
