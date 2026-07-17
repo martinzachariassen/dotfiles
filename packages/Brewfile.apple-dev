@@ -1,0 +1,26 @@
+# Swift / iOS development tooling — installed when the `appleDev` module is selected.
+# Xcode itself is managed with `xcodes` (see below), not the App Store.
+
+tap "xcodesorg/made"
+tap "peripheryapp/periphery"
+
+# Core: lint, format, readable xcodebuild output, Xcode version management
+brew "swiftlint"
+brew "swiftformat"
+brew "xcbeautify"
+brew "xcodesorg/made/xcodes"
+brew "aria2" # parallel downloads for `xcodes install`
+
+# Automation & analysis
+brew "fastlane"
+brew "peripheryapp/periphery/periphery" # dead-code detection
+brew "ios-deploy"                       # install/run on a device from the CLI
+
+# Project generation & codegen (adopt per-project)
+brew "xcodegen" # .xcodeproj from a YAML spec — kills merge conflicts
+brew "swiftgen" # type-safe assets/strings/colors
+brew "sourcery" # Swift meta-programming / boilerplate
+
+# Apps
+cask "sf-symbols" # SF Symbols browser
+cask "proxyman"   # network/API debugging

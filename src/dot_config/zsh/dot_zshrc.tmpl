@@ -110,6 +110,13 @@ command -v kubectl >/dev/null && {
     alias klf='kubectl logs -f'
 }
 
+{{ if has "appleDev" (dig "modules" (list) .) -}}
+# ─── Swift / iOS ──────────────────────────────────────────────────────────────
+alias xcderived='rm -rf ~/Library/Developer/Xcode/DerivedData'  # nuke stale build cache
+alias simulator='open -a Simulator'
+command -v xcbeautify >/dev/null && alias xcb='xcbeautify'
+
+{{ end -}}
 # ─── Quality-of-life ──────────────────────────────────────────────────────────
 alias g='git'
 alias gs='git status -sb'

@@ -20,10 +20,10 @@
 {{/* Rendered BEFORE .chezmoidata loads, so module names are listed literally here.
      Keep in sync with [moduleCatalog] in modules.toml — tests/data-model.bats
      enforces the match. */ -}}
-{{- $allModules := list "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
+{{- $allModules := list "appleDev" "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
 {{- $defaults := list -}}
 {{- if eq $profile "personal" -}}
-{{-   $defaults = list "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
+{{-   $defaults = list "appleDev" "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
 {{- else if eq $profile "work" -}}
 {{-   $defaults = list "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
 {{- end -}}
