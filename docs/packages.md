@@ -14,7 +14,7 @@ is the core file plus whatever your profile and modules add:
 |---|---|---|
 | **Core** | [`Brewfile`](../packages/Brewfile) | Always. The smallest set that makes the documented shell experience work. |
 | **Profile** | `Brewfile.personal` / `Brewfile.work` | Your profile matches. `work` adds the cloud/Kubernetes/IaC CLIs (az, gcloud, kubectl, kubectx, kubelogin, terraform, helm, minikube) and work apps (M365, Teams, Slack). |
-| **Module** | `Brewfile.mac-apps` | The matching module is selected (`macApps` → GUI + AI apps). |
+| **Module** | `Brewfile.mac-apps`, `Brewfile.apple-dev` | The matching module is selected (`macApps` → GUI + AI apps; `appleDev` → Swift/iOS toolchain). |
 
 The profile→file and module→file mappings live in
 [`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml) — the single
@@ -42,6 +42,7 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 | `theme` | Catppuccin Frappé across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
+| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcodes, xcbeautify, fastlane, SF Symbols). On by default for `personal`. |
 
 The per-profile defaults the wizard pre-checks live in the `[profileDefaults]`
 table of `modules.toml`. That table **must** mirror the `$defaults` blocks in
