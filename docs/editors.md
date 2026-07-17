@@ -26,9 +26,9 @@ extensions are managed by chezmoi.
   [lifecycle.md](lifecycle.md)). `chezdoctor` reports drift in both directions
   read-only, and the set logic lives in
   [`scripts/lib/vscode.sh`](../scripts/lib/vscode.sh) (unit-tested by
-  `tests/vscode.bats`). The set covers the backend
-  stack: the Java/Spring pack, Kotlin, Gradle/Maven, plus Terraform, Kubernetes,
-  Helm, Docker, Postgres, Python/Ruff, and the shell/YAML/TOML tooling. Several
+  `tests/vscode.bats`). The set covers the language toolchain: the Java/Spring pack,
+  Kotlin, Gradle/Maven, plus Terraform, Kubernetes, Helm, Docker, Postgres,
+  Python/Ruff, and the shell/YAML/TOML tooling. Several
   extensions are backed by CLIs from the Brewfile (hadolint, shellcheck, shfmt,
   helm, minikube) so they use the pinned binary instead of downloading their own.
 

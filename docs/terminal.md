@@ -54,7 +54,7 @@ wants the same chord. Dump the full set with `zellij setup --dump-config`.
 
 Config: [`src/dot_config/starship.toml`](../src/dot_config/starship.toml), palette
 `catppuccin_frappe`. A two-line prompt: context on line 1, prompt character on
-line 2. Modules are scoped to backend + cloud work and self-disable when
+line 2. Modules are scoped to development and cloud tooling and self-disable when
 irrelevant — directory, git branch/status, language versions
 (Java/Kotlin/Node/Python), Terraform, Docker context, Kubernetes, Azure, gcloud,
 and command duration.

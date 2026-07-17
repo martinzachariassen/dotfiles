@@ -1,8 +1,8 @@
 # AI tooling
 
-Both local and hosted AI, plus one shared persona that keeps every assistant on
-the same page. Most of this rides on the `macApps` and `claudePersona` modules —
-see [packages.md](packages.md#optional-modules).
+Both local and hosted AI, plus one shared set of global defaults that keeps every
+assistant on the same page. Most of this rides on the `macApps` and `claudePersona`
+modules — see [packages.md](packages.md#optional-modules).
 
 ## Apps & local models (`macApps` module)
 
@@ -17,29 +17,31 @@ Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
   `anthropic.claude-code` VS Code extension is in the
   [extension list](../packages/vscode-extensions.txt) too.
 
-## The shared persona (`claudePersona` module)
+## The global defaults (`claudePersona` module)
 
-The persona at
+The file at
 [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) →
-`~/.config/claude/CLAUDE.md` is the cross-project working agreement Claude Code
-loads for **every** project on the machine: stack (Kotlin/Java + Spring Boot),
-communication style, operating posture, code conventions, and the
-environment/secrets rules. Project-level instructions always win over it.
+`~/.config/claude/CLAUDE.md` is the **project-agnostic** working agreement Claude
+Code loads for **every** project on the machine: git/Conventional-Commit
+conventions, code style, communication, verification posture, and the secrets
+rules. It carries **no stack or machine specifics** — those live in each project's
+own `CLAUDE.md`. Project-level instructions always win over it.
 
 `~/.config/claude/settings.json`
 ([source](../src/dot_config/claude/settings.json)) carries the Claude Code
 harness config — model, theme, and a read-only permission allowlist (git status/
 diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
-## One persona, two assistants
+## One rulebook, two assistants
 
-The **repo's own** contributor rules live in
-[`.github/copilot-instructions.md`](../.github/copilot-instructions.md) — a single
-source of truth shared by Claude Code and GitHub Copilot for work *in this repo*
-(the `src/` split, chezmoi conventions, quality gates). The root
-[`CLAUDE.md`](../CLAUDE.md) is a thin pointer to it, so both assistants read the
-same rules rather than drifting apart. Keep the two in sync when either changes.
+The **repo's own** contributor rules live in [`../CLAUDE.md`](../CLAUDE.md) — the
+single source of truth for work *in this repo* (the `src/` split, chezmoi
+conventions, quality gates, git/PR policy). Claude Code reads it natively;
+[`.github/copilot-instructions.md`](../.github/copilot-instructions.md) is a thin
+pointer to it, mirroring the non-negotiables inline so GitHub Copilot lands on the
+same rules. Keep that crib in sync if the non-negotiables change.
 
-> Not to be confused: `.github/copilot-instructions.md` is guidance for AI editing
-> **this repo**; `src/dot_config/claude/CLAUDE.md` is the persona deployed to
-> `$HOME` for use across **all** your projects.
+> Two files named `CLAUDE.md`, not to be confused: the root
+> [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this repo**;
+> [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) is the
+> global defaults deployed to `$HOME` for use across **all** projects.

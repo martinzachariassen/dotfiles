@@ -72,6 +72,7 @@ so a rename or a drifted default fails fast:
 - Keep shell config plain zsh (no oh-my-zsh/prezto/zinit) and no language-runtime
   managers — runtimes are mise's job, global CLIs come from Homebrew. See
   [shell.md](shell.md).
-- The full contributor rules are in
-  [`.github/copilot-instructions.md`](../.github/copilot-instructions.md), the
-  single source of truth shared by Claude Code and GitHub Copilot.
+- The full contributor rules are in [`../CLAUDE.md`](../CLAUDE.md), the single
+  source of truth for this repo. Claude Code reads it natively;
+  [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) is a thin
+  pointer to it for GitHub Copilot.
