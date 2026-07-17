@@ -1,7 +1,7 @@
 # Documentation
 
 Deeper guides for this dotfiles repo, split by topic. The [root README](../README.md)
-is the overview and quick start; these docs are the detail behind it.
+is the overview and quick start; these are the detail behind it.
 
 ## Setup & workflow
 

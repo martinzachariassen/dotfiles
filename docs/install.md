@@ -3,12 +3,10 @@
 One installer covers every machine. `install.sh` is a tiny hand-written
 bootstrap fetched via `curl | bash` **before this repo exists on disk**, so it
 installs only the prerequisites — Xcode Command Line Tools, Homebrew, chezmoi,
-and the repo clone — then hands off to the plain-text setup wizard
+and the repo clone — then hands off to the setup wizard
 ([`scripts/bin/wizard.sh`](../scripts/bin/wizard.sh)), which asks the setup
 questions and runs `chezmoi init --apply`. See [lifecycle.md](lifecycle.md) for
-what `apply` then does.
-
-Every step is idempotent and safe to re-run.
+what `apply` does. Every step is idempotent and safe to re-run.
 
 ## Scenarios
 
@@ -33,8 +31,8 @@ sudo shutdown -r now                                             # reboot to fin
 ### Existing Mac with an older setup
 
 Use the **same installer**. It snapshots any pre-existing legacy dotfiles into a
-timestamped backup before taking over (skip with `SKIP_BACKUP=1`), then
-converges the machine and runs the [deprecation cleanup](#deprecation-cleanup):
+timestamped backup before taking over (skip with `SKIP_BACKUP=1`), converges the
+machine, and runs the [deprecation cleanup](#deprecation-cleanup):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
@@ -53,9 +51,9 @@ Just stay current with [`chezup`](commands.md#everyday) — no installer needed.
 
 ## Advanced flags
 
-With no extra arguments `install.sh` runs the wizard. Passing **any** extra
-arguments bypasses the wizard and forwards them straight to
-`chezmoi init --apply` (for scripted/CI use). It also reads two env vars:
+With no arguments `install.sh` runs the wizard. **Any** extra arguments bypass
+the wizard and forward straight to `chezmoi init --apply` (for scripted/CI use).
+It also reads two env vars:
 
 ```sh
 DOTFILES_REPO=<repo-url> bash install.sh                  # point at a fork
@@ -72,11 +70,11 @@ On an existing Mac the installer runs a cleanup so you don't carry forward tools
 the repo no longer manages. It:
 
 - uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`,
-  `temurin@25`, `direnv`) — language runtimes now come from **mise**; and
+  `temurin@25`, `direnv`) — runtimes now come from **mise**; and
 - removes the leftover `~/.config/direnv` config.
 
-On a fresh machine that never had the old stack, the cleanup is a silent no-op.
-It's implemented as the `run_onchange_after_02c-cleanup-deprecated` hook — see
+On a fresh machine that never had the old stack, it's a silent no-op. Implemented
+as the `run_onchange_after_02c-cleanup-deprecated` hook — see
 [lifecycle.md](lifecycle.md).
 
 ### Coming from the direnv setup

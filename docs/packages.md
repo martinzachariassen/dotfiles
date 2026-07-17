@@ -3,7 +3,7 @@
 What gets installed is chosen by two answers you give the [wizard](#the-wizard):
 your **profile** and your **optional modules**. Both feed a single data model in
 [`src/.chezmoidata/`](../src/.chezmoidata) that the apply hooks and the doctor
-report all read, so the mapping is never restated in more than one place.
+report read, so the mapping is never restated in more than one place.
 
 ## Package tiers
 
@@ -17,10 +17,10 @@ is the core file plus whatever your profile and modules add:
 | **Module** | `Brewfile.mac-apps` | The matching module is selected (`macApps` → GUI + AI apps). |
 
 The profile→file and module→file mappings live in
-[`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml) — the
-single source of truth. The `run_after_02-brew-bundle` hook reads the active set
-from there and runs `brew bundle --no-upgrade`, so it converges *presence*, not
-freshness. See [lifecycle.md](lifecycle.md#where-each-piece-lives).
+[`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml) — the single
+source of truth. The `run_after_02-brew-bundle` hook reads the active set and runs
+`brew bundle --no-upgrade`, converging *presence*, not freshness. See
+[lifecycle.md](lifecycle.md#where-each-piece-lives).
 
 ## Profiles
 
@@ -43,12 +43,11 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
 
-The per-profile default selections the wizard pre-checks are in the
-`[profileDefaults]` table of `modules.toml`. That table **must** mirror the
-`$defaults` blocks in [`.chezmoi.toml.tmpl`](../src/.chezmoi.toml.tmpl) — the
-config template renders before `.chezmoidata` loads, so it can't read the table
-and has to restate the lists literally. `tests/data-model.bats` enforces the
-match so the two never drift.
+The per-profile defaults the wizard pre-checks live in the `[profileDefaults]`
+table of `modules.toml`. That table **must** mirror the `$defaults` blocks in
+[`.chezmoi.toml.tmpl`](../src/.chezmoi.toml.tmpl) — the config template renders
+before `.chezmoidata` loads, so it can't read the table and restates the lists
+literally. `tests/data-model.bats` enforces the match so the two never drift.
 
 ## The wizard
 
@@ -63,7 +62,7 @@ question with plain `read` from `/dev/tty` and passes the answers to
 `chezmoi init --apply` via its `--promptString/-Choice/-Multichoice` flags — no
 TUI.
 
-The prompts have three tiers, degrading to fit the terminal:
+The prompts degrade across three tiers to fit the terminal:
 
 - **gum** pickers when `gum` is installed (any re-run after the first install),
   with your current selection pre-checked;
@@ -76,8 +75,7 @@ The prompts have three tiers, degrading to fit the terminal:
 
 `bash scripts/bin/wizard.sh` (or `chezreset`) is the "change the setup" path;
 `chezreset` also replays first-time setup. See
-[commands.md](commands.md#changing-your-setup) for how the reset/reinit verbs
-differ.
+[commands.md](commands.md#changing-your-setup) for how reset/reinit differ.
 
 ## Adding a package
 
@@ -87,6 +85,6 @@ differ.
   new module, add the catalog entry to `modules.toml`, its Brewfile mapping to
   `packages.toml`, and mirror the default into `.chezmoi.toml.tmpl`.
 
-CI resolves every Homebrew name on macOS (`scripts/ci/brew-resolve.sh`) and
-checks module wiring (`brew-check-modules.sh`), so a typo'd formula or an
-unmapped module fails the build. See [development.md](development.md).
+CI resolves every Homebrew name on macOS (`scripts/ci/brew-resolve.sh`) and checks
+module wiring (`brew-check-modules.sh`), so a typo'd formula or unmapped module
+fails the build. See [development.md](development.md).
