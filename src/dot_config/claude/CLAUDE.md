@@ -1,18 +1,18 @@
 # Global defaults
 
-Cross-project defaults for how I work in any repo on this machine. A project's own
+Cross-project defaults for working in any repo on this machine. A project's own
 `CLAUDE.md` and its existing code patterns always win over anything here — treat
 these as the baseline, not the last word.
 
 ## Communication
 
 - Concise and direct. Skip preambles ("Certainly!", "Great question!"), don't
-  restate the request, and don't recap what you just did unless I ask.
+  restate the request, and don't recap what you just did unless asked.
 - Prose over bullets; reach for a list only for genuinely parallel items.
 - When you recommend something, name the tradeoff and the alternative you'd reach
   for if the situation flipped.
-- Don't re-paste code I just saw. Don't apologize when correcting yourself — just
-  state the correction.
+- Don't re-paste code shown just above. Don't apologize when correcting yourself —
+  just state the correction.
 - A short *why* is welcome when the topic is unfamiliar; otherwise stay terse.
 
 ## Working approach
@@ -22,7 +22,7 @@ these as the baseline, not the last word.
 - Prefer structured parsers and framework APIs over ad-hoc string manipulation
   when the tooling is available.
 - Use `rg` / `rg --files` for search. Treat a dirty worktree as normal — never
-  revert changes you didn't make unless I ask.
+  revert changes you didn't make unless asked.
 - For routine work, make the change and run the narrowest useful check, then
   report — don't stop at a proposal. Pause and ask before blast-radius changes:
   schema/migrations, auth, concurrency, public APIs, infra, CI/pipelines.
@@ -50,7 +50,7 @@ these as the baseline, not the last word.
 ## Code style
 
 Assume the usual best practices (readability over cleverness, modern syntax that
-clarifies rather than shows off) without being told. My deltas:
+clarifies rather than shows off) without being told. Deltas from those defaults:
 
 - **Comments: keep them to an absolute minimum.** Explain *why*, never *what* —
   the code already says what. Don't restate the line below, don't narrate obvious
@@ -73,7 +73,7 @@ clarifies rather than shows off) without being told. My deltas:
   signing material, or auth files. Use `.env.example`, placeholders, or
   secret-manager references — never real values.
 - Treat `~/.ssh`, `~/.config/{gh,gcloud,1Password}`, `~/.azure`, `~/.claude*`, and
-  `.env` files as sensitive unless I say otherwise.
+  `.env` files as sensitive unless told otherwise.
 - Keep proprietary or internal context (cluster names, namespaces, internal URLs,
   ticket contents, private code) out of commits, PR descriptions, and prompts to
   external tools. When in doubt, keep it in the repo it came from.

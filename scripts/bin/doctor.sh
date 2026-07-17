@@ -179,7 +179,7 @@ else
     fail "CLAUDE_CONFIG_DIR is '${ccdir:-unset}' (expected ~/.config/claude) — run: chezmoi apply"
 fi
 if [ -f "$HOME/.config/claude/CLAUDE.md" ]; then
-    pass "~/.config/claude/CLAUDE.md present (base + active profile)"
+    pass "~/.config/claude/CLAUDE.md present"
 else
     fail "~/.config/claude/CLAUDE.md missing — run: chezmoi apply"
 fi
