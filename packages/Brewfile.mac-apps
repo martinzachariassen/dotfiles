@@ -13,6 +13,7 @@ cask "jordanbaird-ice@beta"     # menu bar manager
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
 cask "stats"                    # menu bar resource monitor
+casl "siyuan"                   # local-first note-taking / knowledge base
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
 cask "google-chrome"            # the only browser most web tooling assumes
