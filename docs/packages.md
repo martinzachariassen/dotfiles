@@ -39,7 +39,7 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 | `macosDefaults` | macOS system defaults (needs sudo) — see [macos.md](macos.md). |
 | `cloudAuth` | Cloud CLIs and auth walkthrough (gh, az, gcloud, op). |
 | `obsidian` | Obsidian vault seeding and starter content. |
-| `claudePersona` | Claude persona at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |
+| `claudePersona` | Claude global defaults at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |
 | `theme` | Catppuccin Frappé across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |

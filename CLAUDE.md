@@ -1,11 +1,12 @@
 # CLAUDE.md
 
-Guidance for AI assistants and contributors working in this repo — a personal,
-chezmoi-managed macOS (Apple Silicon) dotfiles setup. Read this before proposing
-changes; deeper topic guides live in [`docs/`](docs/README.md).
+How to work in this repo — a personal, chezmoi-managed macOS (Apple Silicon)
+dotfiles setup. Read this before proposing changes; deeper topic guides live in
+[`docs/`](docs/README.md).
 
-> The maintainer's cross-project preferences layer in from a global config
-> outside this repo and always yield to the rules here.
+> General working defaults (git, code style, communication) come from the global
+> agent config outside this repo. This file covers what's specific to the dotfiles,
+> and its rules win where they overlap.
 
 ## Layout — the `src/` split
 
@@ -58,13 +59,11 @@ never uninstalls packages.
 
 ## Git & PRs
 
-- **Always open a PR; never push directly to `main`** — CI must get a chance to run.
-- [Conventional Commits](https://www.conventionalcommits.org) for every commit
-  **and** the PR title: `<type>(<scope>): <subject>`, imperative, ≤ 72 chars.
-  Types: `feat, fix, docs, refactor, test, chore, perf, build, ci, style`. Breaking
-  changes append `!` and add a `BREAKING CHANGE:` footer.
-- PR description = what changed, *why*, and any rollout/follow-up. Follow the
-  [PR template](.github/pull_request_template.md).
+- **Always open a PR; never push directly to `main`** — CI must get a chance to
+  run. This overrides the general "act and commit" autonomy from the global config.
+- Conventional Commits for every commit *and* PR title
+  (`<type>(<scope>): <subject>`, ≤ 72 chars) — full format lives in the global
+  agent config. Fill in the [PR template](.github/pull_request_template.md).
 
 ## Quality gates
 
@@ -87,5 +86,5 @@ bash scripts/ci/lint-config.sh "$PWD"  # every JSON/JSONC/TOML output parses
 
 - Bash: `shfmt -i 4 -ci` formatting, `shellcheck`-clean at `--severity=error`.
   Prefer idempotent, detect-then-act logic so re-runs are cheap.
-- Keep comments to the necessary minimum and explain **why, not what**.
-- Match the surrounding file's conventions over any general preference.
+- Keep comments minimal and explain *why, not what*; match each file's existing
+  conventions.

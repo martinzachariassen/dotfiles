@@ -27,4 +27,4 @@ is the overview and quick start; these docs are the detail behind it.
 | [shell.md](shell.md) | zsh (XDG layout), modern CLI replacements, fzf/zoxide/carapace, mise runtimes, and git. |
 | [terminal.md](terminal.md) | Ghostty, Zellij, Starship, and the Catppuccin Frappé theme. |
 | [editors.md](editors.md) | VS Code (managed settings + extensions) and Neovim (LazyVim). |
-| [ai.md](ai.md) | Local + hosted AI: Ollama, the Claude apps, and the shared Claude/Copilot persona. |
+| [ai.md](ai.md) | Local + hosted AI: Ollama, the Claude apps, and the shared Claude/Copilot defaults. |

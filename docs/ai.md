@@ -1,8 +1,8 @@
 # AI tooling
 
-Both local and hosted AI, plus one shared persona that keeps every assistant on
-the same page. Most of this rides on the `macApps` and `claudePersona` modules —
-see [packages.md](packages.md#optional-modules).
+Both local and hosted AI, plus one shared set of global defaults that keeps every
+assistant on the same page. Most of this rides on the `macApps` and `claudePersona`
+modules — see [packages.md](packages.md#optional-modules).
 
 ## Apps & local models (`macApps` module)
 
@@ -17,21 +17,22 @@ Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
   `anthropic.claude-code` VS Code extension is in the
   [extension list](../packages/vscode-extensions.txt) too.
 
-## The shared persona (`claudePersona` module)
+## The global defaults (`claudePersona` module)
 
-The persona at
+The file at
 [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) →
-`~/.config/claude/CLAUDE.md` is the cross-project working agreement Claude Code
-loads for **every** project on the machine: stack (Kotlin/Java + Spring Boot),
-communication style, operating posture, code conventions, and the
-environment/secrets rules. Project-level instructions always win over it.
+`~/.config/claude/CLAUDE.md` is the **project-agnostic** working agreement Claude
+Code loads for **every** project on the machine: git/Conventional-Commit
+conventions, code style, communication, verification posture, and the secrets
+rules. It carries **no stack or machine specifics** — those live in each project's
+own `CLAUDE.md`. Project-level instructions always win over it.
 
 `~/.config/claude/settings.json`
 ([source](../src/dot_config/claude/settings.json)) carries the Claude Code
 harness config — model, theme, and a read-only permission allowlist (git status/
 diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
-## One persona, two assistants
+## One rulebook, two assistants
 
 The **repo's own** contributor rules live in [`../CLAUDE.md`](../CLAUDE.md) — the
 single source of truth for work *in this repo* (the `src/` split, chezmoi
@@ -43,4 +44,4 @@ same rules. Keep that crib in sync if the non-negotiables change.
 > Two files named `CLAUDE.md`, not to be confused: the root
 > [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this repo**;
 > [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) is the
-> persona deployed to `$HOME` for use across **all** your projects.
+> global defaults deployed to `$HOME` for use across **all** your projects.
