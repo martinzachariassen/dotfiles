@@ -44,4 +44,4 @@ same rules. Keep that crib in sync if the non-negotiables change.
 > Two files named `CLAUDE.md`, not to be confused: the root
 > [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this repo**;
 > [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) is the
-> global defaults deployed to `$HOME` for use across **all** your projects.
+> global defaults deployed to `$HOME` for use across **all** projects.
