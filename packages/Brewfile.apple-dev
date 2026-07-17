@@ -2,25 +2,23 @@
 # Xcode itself is managed with `xcodes` (see below), not the App Store.
 
 tap "xcodesorg/made"
-tap "peripheryapp/periphery"
 
-# Core: lint, format, readable xcodebuild output, Xcode version management
-brew "swiftlint"
-brew "swiftformat"
-brew "xcbeautify"
+# Core: lint, format, Xcode version management, SF Symbols browser
+brew "swiftlint"   # Xcode has no linter — wire in as a Run Script build phase
+brew "swiftformat" # style enforcement; build phase or pre-commit hook
 brew "xcodesorg/made/xcodes"
-brew "aria2" # parallel downloads for `xcodes install`
+brew "aria2"     # parallel downloads for `xcodes install`
+cask "sf-symbols" # browse the SF Symbols you use in SwiftUI
 
-# Automation & analysis
-brew "fastlane"
-brew "peripheryapp/periphery/periphery" # dead-code detection
-brew "ios-deploy"                       # install/run on a device from the CLI
+# CI / terminal builds — kicks in once you build outside Xcode or ship
+brew "xcbeautify" # readable `xcodebuild` output
+brew "fastlane"   # App Store build/sign/upload automation
 
-# Project generation & codegen (adopt per-project)
-brew "xcodegen" # .xcodeproj from a YAML spec — kills merge conflicts
-brew "swiftgen" # type-safe assets/strings/colors
-brew "sourcery" # Swift meta-programming / boilerplate
-
-# Apps
-cask "sf-symbols" # SF Symbols browser
-cask "proxyman"   # network/API debugging
+# Optional — uncomment per project when the need actually shows up.
+# tap "peripheryapp/periphery"
+# brew "peripheryapp/periphery/periphery" # dead-code detection
+# brew "ios-deploy"                       # install/run on a device from the CLI
+# brew "xcodegen"                         # .xcodeproj from a YAML spec — kills merge conflicts
+# brew "swiftgen"                         # type-safe assets/strings/colors
+# brew "sourcery"                         # Swift meta-programming / boilerplate
+# cask "proxyman"                         # network/API debugging
