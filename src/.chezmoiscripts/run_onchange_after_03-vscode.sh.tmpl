@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Mirrors this machine's VS Code extensions to the repo manifest: installs every
-# extension the manifest lists and uninstalls any extension not in it, so
-# packages/vscode-extensions.txt is the single source of truth. Re-runs when this
-# script or the manifest changes.
+# Mirror VS Code extensions to packages/vscode-extensions.txt (installs listed,
+# uninstalls untracked). Re-runs when this script or the manifest changes.
 #
 # Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
 
@@ -13,20 +11,17 @@ echo "→ VS Code: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Ensure Homebrew's bin dir is on PATH when apply runs outside a login shell
-# (launchd, cron, a bare `chezmoi apply`). Mirrors run_after_02-brew-bundle so
-# the `command -v code` check below finds the binary the bundle installed.
+# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
+# `command -v code` check below finds the bundle-installed binary.
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-# packages/ and scripts/ live at the repo root, not the source dir (src/) —
-# reach them via .chezmoi.workingTree (the git working tree = repo root).
+# packages/ and scripts/ live at the repo root — reach them via .chezmoi.workingTree.
 ROOT="{{ .chezmoi.workingTree }}"
 EXTENSIONS_FILE="$ROOT/packages/vscode-extensions.txt"
 EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
 
-# Shared, unit-tested set helpers (vscode_read_manifest / vscode_untracked).
 # shellcheck source=../../scripts/lib/vscode.sh
 . "$ROOT/scripts/lib/vscode.sh"
 
@@ -44,11 +39,8 @@ installed_extensions() {
     code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
 }
 
-# The effective manifest is the source of truth for BOTH directions (install and
-# prune). With the locale module off, the Norwegian dictionary is dropped from it
-# so it is neither installed nor left half-managed — the prune step won't see it
-# in the manifest and would otherwise remove a just-installed copy (and vice
-# versa). Keeping the two directions on one set makes the mirror stable.
+# One manifest drives both install and prune. With the locale module off, drop the
+# Norwegian dictionary from it so the two directions stay consistent.
 {{ if has "locale" (dig "modules" (list) .) -}}
 MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE")"
 {{ else -}}
@@ -60,14 +52,11 @@ install_marketplace_extensions() {
     installed="$(installed_extensions)"
     while IFS= read -r ext || [ -n "$ext" ]; do
         [ -n "$ext" ] || continue
-        # -F = literal match (extension IDs contain "."), -x = whole line.
-        # `installed` is already lowercased, matching the normalized manifest.
         if printf '%s\n' "$installed" | grep -qxF "$ext"; then
             echo "✓ extension already installed: $ext"
         else
             echo "→ installing extension: $ext"
-            # Continue-on-error: a yanked ID, version-incompatible extension, or a
-            # transient marketplace failure must not abort the extensions after it.
+            # Continue-on-error: one bad ID mustn't abort the rest.
             code --install-extension "$ext" || echo "  ! failed to install: $ext (continuing)"
         fi
     done <<EOF
@@ -75,17 +64,13 @@ $MANIFEST
 EOF
 }
 
-# The VS Code CLI refuses to uninstall an extension *pack* whose members have
-# external dependents — e.g. vscjava.vscode-java-pack bundles redhat.java, and
-# Spring Boot Tools/Dashboard depend on redhat.java, so `code
-# --uninstall-extension` errors out. The GUI can drop just the pack; the CLI
-# can't express that. Fall back to removing the extension on disk and pruning
-# VS Code's extensions cache (which VS Code otherwise self-heals on next launch).
+# The CLI refuses to uninstall an extension *pack* whose members have external
+# dependents (e.g. vscjava.vscode-java-pack bundles redhat.java). Fall back to
+# removing it on disk and pruning VS Code's extensions cache.
 remove_extension_on_disk() {
     local ext="$1" changed=false dir cache
 
-    # Extension dirs are named "<publisher>.<name>-<version>". nocaseglob guards
-    # against publisher-case drift; nullglob makes a no-match expand to nothing.
+    # nocaseglob guards publisher-case drift; nullglob makes a no-match expand to nothing.
     shopt -s nullglob nocaseglob
     for dir in "$EXTENSIONS_DIR/$ext"-*; do
         [ -d "$dir" ] || continue
@@ -93,8 +78,7 @@ remove_extension_on_disk() {
     done
     shopt -u nullglob nocaseglob
 
-    # Drop the stale entry from extensions.json so `code --list-extensions` stops
-    # reporting the pack (otherwise the next apply re-reports a phantom failure).
+    # Drop the stale entry so `code --list-extensions` stops reporting a phantom failure.
     cache="$EXTENSIONS_DIR/extensions.json"
     if [ -f "$cache" ] && command -v python3 >/dev/null 2>&1; then
         if python3 - "$cache" "$ext" <<'PY'
@@ -117,9 +101,7 @@ PY
     [ "$changed" = true ]
 }
 
-# Enforce the manifest as the source of truth in the REMOVAL direction: uninstall
-# every extension installed locally but listed in no manifest entry. This is what
-# makes the sync a true one-to-one mirror rather than additive-only.
+# Uninstall every locally-installed extension absent from the manifest.
 prune_untracked_extensions() {
     local installed untracked ext
     installed="$(installed_extensions)"

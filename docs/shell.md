@@ -2,8 +2,8 @@
 
 The command-line environment: plain zsh in an XDG layout, modern CLI
 replacements wired into aliases, fuzzy-finding, mise-managed runtimes, and git.
-No framework (oh-my-zsh/prezto/zinit) — the config is
-[`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl),
+No framework (oh-my-zsh/prezto/zinit) — the config in
+[`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl) is
 extended directly.
 
 ## zsh
@@ -13,8 +13,8 @@ extended directly.
 that. The `.zshrc` is organised into labelled sections: shell options, history,
 completion, key bindings, tool integrations, aliases, and the dotfiles verbs.
 
-Everything is guarded — `command -v <tool> >/dev/null && …` — so a fresh box
-starts cleanly *before* every package is installed, then lights up as Homebrew
+Every integration is guarded — `command -v <tool> >/dev/null && …` — so a fresh
+box starts cleanly *before* packages are installed, then lights up as Homebrew
 fills in. That's the rule for any new integration here.
 
 Tool integrations, in order: **fzf** (Ctrl-R history, Ctrl-T files, `**<Tab>`
@@ -48,7 +48,7 @@ and apply in any directory that doesn't pin its own; per-project versions + env
 vars go in that project's committed `mise.toml` (its `[env]` block, not direnv)
 and override the globals on `cd`.
 
-The global defaults:
+The defaults:
 
 | Tool | Version | Notes |
 |---|---|---|
@@ -69,8 +69,8 @@ Config: [`src/dot_config/git/config.tmpl`](../src/dot_config/git/config.tmpl)
 (XDG — global ignore at `~/.config/git/ignore`). Highlights:
 
 - **Signing** — templated on your `signingMode` answer: `1password` (SSH signing
-  via `op-ssh-sign`), `ssh-key` (plain SSH signing), or `off`. A signing block is
-  only emitted when a mode is active *and* a `signingKey` is set, so key-less
+  via `op-ssh-sign`), `ssh-key` (plain SSH signing), or `off`. The signing block
+  is emitted only when a mode is active *and* a `signingKey` is set, so key-less
   users never get a broken config. `bootstrap-auth.sh` finishes the 1Password
   wiring; see [install.md](install.md).
 - **delta** as pager and diff filter (line numbers, navigate, custom status

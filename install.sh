@@ -1,22 +1,9 @@
 #!/usr/bin/env bash
-# install.sh — one-shot bootstrap for a fresh macOS (Apple Silicon) machine.
+# install.sh — bootstrap a fresh macOS (Apple Silicon) machine, then hand off to
+# `chezmoi init --apply`. Idempotent; safe to re-run.
 #
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
-#
-# It installs only the prerequisites that must exist before chezmoi can take
-# over — Xcode Command Line Tools, Homebrew, chezmoi, and this repo — then hands
-# off to `chezmoi init --apply`, which runs the setup wizard (the prompts in
-# .chezmoi.toml.tmpl) and applies everything else. Every step is a no-op once
-# satisfied, so the script is safe to re-run.
-#
-# Environment:
-#   DOTFILES_REPO=<url>   upstream repo   (default: this repo)
-#   DOTFILES_DIR=<path>   local source    (default: ~/Developer/personal/dotfiles)
-#
-# Any extra arguments are forwarded to `chezmoi init`, e.g.:
-#   ... | bash -s -- --promptDefaults   # non-interactive: accept all defaults
-#   ... | bash -s -- --prompt           # re-ask every setup question
+# Env: DOTFILES_REPO=<url>, DOTFILES_DIR=<path>. Extra args forward to chezmoi
+# init, e.g. `... | bash -s -- --promptDefaults`.
 
 set -euo pipefail
 
@@ -30,11 +17,8 @@ die() {
     exit 1
 }
 
-# Ctrl-C aborts cleanly during the prerequisite steps below (the bounded Xcode
-# wait, Homebrew/chezmoi install, git clone) instead of stopping abruptly with no
-# word. Restore the cursor, say nothing further was applied, and exit 130 (128 +
-# SIGINT). Once we exec the wizard (or chezmoi) it replaces this handler with its
-# own — the wizard installs the same trap, so a Ctrl-C there quits just as cleanly.
+# Clean Ctrl-C during the prerequisite steps; the wizard/chezmoi exec replaces
+# this handler with its own.
 on_interrupt() {
     printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
     warn "aborted — nothing further was applied."
@@ -42,8 +26,7 @@ on_interrupt() {
 }
 trap on_interrupt INT TERM
 
-# Put brew on PATH whether it was just installed or is already present but not yet
-# exported in this non-login shell.
+# Put brew on PATH whether just installed or present but not yet exported.
 load_brew() {
     command -v brew >/dev/null 2>&1 && return 0
     local candidate
@@ -65,7 +48,7 @@ load_brew() {
 if ! xcode-select -p >/dev/null 2>&1; then
     info "Installing Xcode Command Line Tools — accept Apple's dialog when it opens."
     xcode-select --install 2>/dev/null || true
-    # Wait (bounded, ~30 min) for the GUI installer to finish.
+    # Bounded wait (~30 min) for the GUI installer.
     for _ in $(seq 1 360); do
         xcode-select -p >/dev/null 2>&1 && break
         sleep 5
@@ -97,26 +80,17 @@ info "Using $(chezmoi --version | head -n 1)."
 if [ -d "$SOURCE_DIR/.git" ]; then
     info "Repo already present at $SOURCE_DIR."
 else
-    # Brace-delimit ${SOURCE_DIR}: macOS's system bash 3.2 (what a fresh
-    # `curl | bash` runs, before Homebrew) otherwise absorbs the following
-    # multibyte "…" into the variable name and, under `set -u`, dies with
-    # "unbound variable" — right on the fresh-machine clone path.
+    # Brace-delimit ${SOURCE_DIR}: system bash 3.2 otherwise absorbs the trailing
+    # multibyte "…" into the var name and dies under `set -u`.
     info "Cloning $REPO into ${SOURCE_DIR}…"
     mkdir -p "$(dirname "$SOURCE_DIR")"
     git clone "$REPO" "$SOURCE_DIR"
 fi
 
 # --- 5. Hand off to the setup wizard -------------------------------------
-# The normal path is the plain-text wizard (scripts/bin/wizard.sh): it asks the
-# setup questions with plain `read` from /dev/tty and then applies. We use it
-# instead of chezmoi's own promptChoice/promptMultichoice TUI because that TUI
-# reads /dev/tty in raw mode and is unreliable under `curl | bash` (it fails to
-# register navigation and just confirms the default). The wizard reads /dev/tty
-# directly, so it works even though our stdin here is the consumed curl pipe, and
-# it falls back to chezmoi's defaults when there is no terminal at all.
-#
-# Advanced/scripted callers who pass their own chezmoi flags (e.g.
-# `... | bash -s -- --promptDefaults`) skip the wizard and go straight to chezmoi.
+# The plain-text wizard reads /dev/tty directly, so it works under `curl | bash`
+# where chezmoi's raw-mode promptChoice TUI is unreliable. Callers passing their
+# own chezmoi flags skip the wizard and go straight to chezmoi.
 if [ "$#" -eq 0 ]; then
     info "Starting the setup wizard, then applying."
     exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"

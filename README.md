@@ -26,24 +26,19 @@ A personal, single-machine setup: terminal, shell, editors, Homebrew apps,
 in one repo. Bootstrap once with `curl | bash`, then keep the machine matching
 the repo with a single verb — `chezup`.
 
-- **One-command bootstrap** — [`install.sh`](install.sh) takes a fresh (or
-  legacy) Mac from zero: Xcode Command Line Tools → Homebrew → this repo →
-  every package → macOS defaults.
-- **Convergent by design** — `chezmoi apply` reconciles *real installed state*
-  on every run. "Make this Mac match the repo" always works; every step is
-  idempotent and safe to re-run.
-- **Additive by contract** — an apply only ever installs what the Brewfiles
-  declare, never uninstalls. Removal is [`chezmirror`](#commands)'s job, behind
-  a per-package confirm.
-- **No `sudo` lifestyle** — everything runs as your normal user. Homebrew and
-  the macOS defaults ask for your password themselves, only when they actually
-  need it.
+- **One-command bootstrap** — [`install.sh`](install.sh) takes a fresh or legacy
+  Mac from zero: Xcode CLT → Homebrew → this repo → every package → macOS defaults.
+- **Convergent** — `chezmoi apply` reconciles *real installed state* on every
+  run; every step is idempotent and safe to re-run.
+- **Additive by contract** — an apply only installs what the Brewfiles declare,
+  never uninstalls. Removal is [`chezmirror`](#commands)'s job, behind a per-package confirm.
+- **No `sudo` lifestyle** — everything runs as your normal user; Homebrew and the
+  macOS defaults ask for your password only when they need it.
 - **Layered packages** — a core [Brewfile](packages/Brewfile) plus composable
   profile and module layers ([mac-apps, personal, work](packages/)), chosen in a
   plain-text wizard and mapped in `src/.chezmoidata/packages.toml`.
-- **Boring, verifiable CI** — every push lints shell, renders the full chezmoi
-  template matrix, runs the [bats suites](tests/), and enforces Conventional
-  Commits.
+- **Verifiable CI** — every push lints shell, renders the full chezmoi template
+  matrix, runs the [bats suites](tests/), and enforces Conventional Commits.
 
 ## Quick start
 
@@ -51,11 +46,10 @@ the repo with a single verb — `chezup`.
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-One command works for both a brand-new Mac and an existing one: the installer
-snapshots any pre-existing legacy dotfiles into a timestamped backup before
-taking over (skip with `SKIP_BACKUP=1`) and runs a
-[deprecation cleanup](docs/install.md#deprecation-cleanup) so old tooling isn't
-carried forward. When the wizard finishes, sign in and reload:
+Works on both a fresh and an existing Mac: the installer snapshots any legacy
+dotfiles into a timestamped backup before taking over (skip with `SKIP_BACKUP=1`)
+and runs a [deprecation cleanup](docs/install.md#deprecation-cleanup) so old
+tooling isn't carried forward. When the wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                                  # skip if disabled

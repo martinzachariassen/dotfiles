@@ -1,13 +1,13 @@
 # Apply lifecycle
 
 How `chezmoi apply` (and therefore `install.sh` / `chezup`) turns this repo into
-a configured machine, and the rules the hook scripts follow. This is the doc the
-`src/.chezmoiscripts/` hooks and `scripts/lib/` engines point back to.
+a configured machine, and the rules the hook scripts follow. The
+`src/.chezmoiscripts/` hooks and `scripts/lib/` engines point back to this doc.
 
-For the repo split, naming conventions, and how `scripts/` is laid out, see
-[architecture.md](architecture.md) — the one path idiom worth repeating here is
-that inside a hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level
-tooling (`scripts/lib/*`, `packages/Brewfile*`) is reached via
+For the repo split, naming conventions, and `scripts/` layout, see
+[architecture.md](architecture.md). The one path idiom worth repeating: inside a
+hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level tooling
+(`scripts/lib/*`, `packages/Brewfile*`) is reached via
 `{{ .chezmoi.workingTree }}` (the git working tree = repo root).
 
 ## The stages
@@ -15,7 +15,7 @@ tooling (`scripts/lib/*`, `packages/Brewfile*`) is reached via
 `chezmoi apply` renders the managed files into `$HOME`, then runs the scripts in
 [`src/.chezmoiscripts/`](../src/.chezmoiscripts). Ordering and re-run behavior
 come entirely from the filename prefix; the two-digit `NN` orders within a bucket
-(`02` → `02b` → `02c` → …):
+(`02` → `02b` → `02c` → …).
 
 | Prefix | When it runs |
 |---|---|
@@ -40,31 +40,29 @@ The design rule that shapes the `02*` hooks:
 
 `run_after_02-brew-bundle` and `run_after_02b-mise-install` are `run_after` on
 purpose: real installed state can drift out from under the repo (a package
-uninstalled by hand, a plugin gone missing) while the *text* that describes it
-stays put. Running every apply — each gated by a fast presence short-circuit so a
-clean machine is a quick no-op — means "make this Mac match the repo" always
-holds, with no separate fix step.
+uninstalled by hand, a plugin gone missing) while the *text* describing it stays
+put. Running every apply — each gated by a fast presence short-circuit, so a
+clean machine is a quick no-op — keeps "make this Mac match the repo" always true,
+with no separate fix step.
 
 `run_onchange_after_02c/02e/03/04` mutate state from a fixed manifest (a
 deprecation list, `.pre-commit-config.yaml`, `packages/vscode-extensions.txt`,
 macOS defaults). The action pre-commit or `code` performs is identical regardless
 of apply count, so these re-fire only when their embedded content hash changes.
 
-Package convergence uses Homebrew's native `brew bundle` (the `02-brew-bundle`
+Package convergence uses Homebrew's native `brew bundle`: the `02-brew-bundle`
 hook reads the active file set from
 [`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml), then runs
-`brew bundle --no-upgrade` so it converges *presence*, not freshness). It only
-ever *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling packages
-the Brewfile no longer lists) is `chezmirror`'s: an apply must never silently
-uninstall, so `chez` just flags untracked packages and `chezmirror` reconciles
-them behind a confirm. VS Code extensions are the deliberate exception to the
-"never silently uninstall" rule: they carry no data and are trivial to reinstall,
-so `run_onchange_after_03-vscode` mirrors them outright — installing what
-`packages/vscode-extensions.txt` lists and pruning what it doesn't — on apply,
-with `chezdoctor` surfacing the drift read-only. Other custom logic lives in
-`scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin
-drivers that do render-time config, source their lib (if any), and call the entry
-point.
+`brew bundle --no-upgrade` to converge *presence*, not freshness. It only *adds*
+— freshness is `chezbump`'s job, and *removal* (uninstalling packages the Brewfile
+no longer lists) is `chezmirror`'s: an apply must never silently uninstall, so
+`chez` flags untracked packages and `chezmirror` reconciles them behind a confirm.
+VS Code extensions are the deliberate exception: they carry no data and are
+trivial to reinstall, so `run_onchange_after_03-vscode` mirrors them outright —
+installing what `packages/vscode-extensions.txt` lists and pruning what it doesn't
+— with `chezdoctor` surfacing the drift read-only. Other custom logic lives in
+`scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin drivers
+that do render-time config, source their lib (if any), and call the entry point.
 
 ## Where each piece lives
 
@@ -95,9 +93,9 @@ plain scripts — see [install.md](install.md) and [commands.md](commands.md).
 this repo exists on disk**, so it can't source anything. It installs only the
 prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands off to
 `scripts/bin/wizard.sh` (repo now on disk, so it *can* source `scripts/lib/*`).
-The wizard asks the setup questions and feeds them to `chezmoi init --apply` —
-`--apply` runs the hooks above. See [packages.md](packages.md#the-wizard) for the
-wizard's three prompt tiers.
+The wizard asks the setup questions and feeds them to `chezmoi init --apply`,
+whose `--apply` runs the hooks above. See [packages.md](packages.md#the-wizard)
+for the wizard's three prompt tiers.
 
 The everyday verbs (`chezup`, `chezdoctor`, …) are shell functions that bake
 their helper-script path into `~/.config/zsh/.zshrc` **at apply time**. Because a

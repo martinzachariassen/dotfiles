@@ -18,8 +18,7 @@
     "workbench.enableExperiments": false,
     "workbench.list.smoothScrolling": true,
 
-    // Cap open tabs per group so the editor never sprawls; least-recently-used
-    // non-dirty tabs auto-close once the limit is hit.
+    // Cap open tabs per group; LRU non-dirty tabs auto-close past the limit.
     "workbench.editor.limit.enabled": true,
     "workbench.editor.limit.value": 10,
     "workbench.editor.limit.perEditorGroup": true,
@@ -54,13 +53,10 @@
         "source.organizeImports": "explicit"
     },
 
-    // One default formatter so save-formatting is deterministic and never shows
-    // a "select a formatter" prompt. LSP-owned languages (Java, Kotlin, YAML,
-    // XML, Terraform, …) override this in LANGUAGE-SPECIFIC below.
+    // Default formatter so save never prompts; LSP languages override below.
     "editor.defaultFormatter": "esbenp.prettier-vscode",
 
-    // Prettier fallbacks used only when a repo has no .prettierrc — pin a
-    // project-level .prettierrc when the team needs the same width/wrap rules.
+    // Fallbacks only when a repo has no .prettierrc.
     "prettier.printWidth": 100,
     "prettier.proseWrap": "preserve",
 
@@ -100,9 +96,7 @@
         "**/build": true
     },
 
-    // Collapse derived/companion files under their parent in the Explorer so the
-    // tree shows intent, not noise (lockfiles under manifests, maps/.d.ts under
-    // sources, .class under .java, etc.). Toggle nests with the arrow.
+    // Nest derived/companion files under their parent to cut Explorer noise.
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.expand": false,
     "explorer.fileNesting.patterns": {
@@ -136,9 +130,8 @@
 
     "search.followSymlinks": false,
 
-    // Todo-Tree's marketplace VSIX (gruntfuggly.todo-tree 0.0.226) ships without
-    // its bundled `vscode-ripgrep/bin/rg`, so the extension fails on activation
-    // with "Failed to find vscode-ripgrep". Point it at the Homebrew rg instead.
+    // todo-tree's VSIX ships without its bundled rg and fails on activation;
+    // point it at the Homebrew rg.
     "todo-tree.ripgrep.ripgrep": "/opt/homebrew/bin/rg",
 
     // =========================================================
@@ -156,15 +149,11 @@
     "git.rebaseWhenSync": true,
     "git.mergeEditor": true,
     "gitlens.currentLine.enabled": false,
-    // Disable VS Code's built-in inline blame decoration shown at the end of the
-    // current line (default-on; often mistaken for a GitLens annotation).
+    // Turn off VS Code's built-in inline blame (default-on, looks like GitLens).
     "git.blame.editorDecoration.enabled": false,
     "git.blame.statusBarItem.enabled": false,
-    // Remove the "You, N hours ago | 1 author" CodeLens GitLens inserts above
-    // code blocks (and between lines in YAML/config files).
     "gitlens.codeLens.enabled": false,
 
-    // SCM view as a tree, and diffs that respect whitespace + flag moved code.
     "scm.defaultViewMode": "tree",
     "diffEditor.ignoreTrimWhitespace": false,
     "diffEditor.experimental.showMoves": true,
@@ -187,11 +176,8 @@
     // PROJECT ENVIRONMENT
     // =========================================================
 
-    // mise provides per-project runtimes + env. The extension reflects the
-    // active mise tools into the integrated terminal and is mise-toml aware.
-    // Auto-configuration of OTHER extensions is left OFF: this settings file is
-    // chezmoi-managed, so the Java SDK paths below are the single source of
-    // truth — we don't want the extension writing into it and causing drift.
+    // Off so the extension doesn't write JDK paths into this chezmoi-managed file
+    // (the paths below are the single source of truth).
     "mise.configureExtensionsAutomatically": false,
 
     // =========================================================
@@ -286,8 +272,7 @@
         }
     ],
 
-    // Global house style for Copilot-generated code, applied in every workspace.
-    // A repo's own .github/copilot-instructions.md stacks on top of this.
+    // Global house style; a repo's .github/copilot-instructions.md stacks on top.
     "github.copilot.chat.codeGeneration.instructions": [
         {
             "text": "Readability over cleverness; modern syntax that clarifies rather than shows off. Follow existing project patterns over these defaults."
@@ -306,22 +291,13 @@
     // BACKEND / INFRA
     // =========================================================
 
-    // Auto-sync the classpath when build files change (no manual prompt).
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
-    // Pin the editor's JDK to mise's stable install path. mise installs to a
-    // fixed, version-named directory that doesn't move — so this path is a
-    // durable anchor that survives runtime updates. The JDK comes
-    // from the global mise config (java = ["temurin-25"] in
-    // dot_config/mise/config.toml); project build versions are still pinned per
-    // project via Gradle/Maven toolchains. This file is a chezmoi template so
-    // the home dir resolves per machine.
-    //
-    // JDT.LS itself runs on Java 25 — picks up newer language-server features
-    // and matches the default project JDK so Lombok/javac plugins line up.
+    // Pin the editor JDK to mise's version-named install path (a durable anchor
+    // across runtime updates); project build versions stay pinned per project.
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
     "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
@@ -338,14 +314,11 @@
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
     "java.import.gradle.wrapper.enabled": true,
 
-    // Pull down library sources/decompiled output so go-to-definition lands on
-    // real code instead of stubs.
+    // Fetch sources so go-to-definition lands on real code, not stubs.
     "java.maven.downloadSources": true,
     "java.eclipse.downloadSources": true,
     "java.references.includeDecompiledSources": true,
 
-    // Faster authoring: fill best-guess args, richer signature help, and
-    // static-import favorites for the common test/assertion libraries.
     "java.completion.guessMethodArguments": "auto",
     "java.signatureHelp.description.enabled": true,
     "java.completion.favoriteStaticMembers": [
@@ -358,44 +331,27 @@
         "org.hamcrest.Matchers.*"
     ],
 
-    // Code-generation defaults for generated equals/hashCode/getters.
     "java.codeGeneration.hashCodeEquals.useJava7Objects": true,
     "java.codeGeneration.useBlocks": true,
     "java.codeGeneration.generateComments": false,
 
-    // Safe, unambiguous cleanups applied on save.
     "java.cleanup.actionsOnSave": [
         "addOverride",
         "instanceofPatternMatch",
         "switchExpression"
     ],
 
-    // Lombok handled by redhat.java's built-in support (since v1.9), not the
-    // deprecated vscjava.vscode-lombok extension. JDT.LS prefers the project's
-    // own Lombok jar from the classpath and falls back to the bundled one —
-    // so projects that pin a recent Lombok (1.18.40+ for JDK 25, 1.18.46+ for
-    // JDK 26) get accurate parsing of @-annotated sources automatically.
+    // Lombok via redhat.java's built-in support, not the deprecated extension.
     "java.jdt.ls.lombokSupport.enabled": true,
 
-    // SonarLint: lint quality/bugs without phoning home.
     "sonarlint.disableTelemetry": true,
 
     "spring-boot.ls.problem.application-properties.enabled": true,
     "spring-boot.ls.problem.application-yaml.enabled": true,
 
-    // JetBrains Kotlin LSP — server-side configuration. The extension is Alpha
-    // and JVM-only (no Multiplatform, no Android). Settings live under the
-    // `intellij.*` namespace because the underlying server is IntelliJ's
-    // language-engine repackaged as an LSP.
-    //
-    //   intellij.dev.serverPort = -1  → use the server bundled in the
-    //     extension's VSIX (`unpack-server.mjs`). Any other port would expect
-    //     a locally-run dev server — only useful if you're hacking on the LSP.
-    //   intellij.buildTool = null      → auto-detect (gradle | maven). Leave
-    //     unset so per-project shape wins.
-    //   intellij.jdkForSymbolResolution → JDK whose stdlib symbols the server
-    //     resolves against. Anchored to the same mise temurin-25 path used by
-    //     JDT.LS above so Java + Kotlin agree on what `java.*` looks like.
+    // JetBrains Kotlin LSP (Alpha, JVM-only). `intellij.*` because the server is
+    // IntelliJ's engine repackaged. serverPort -1 → use the VSIX-bundled server;
+    // jdkForSymbolResolution → same mise temurin-25 path as JDT.LS.
     "intellij.dev.serverPort": -1,
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
     "intellij.jdkForSymbolResolution": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
@@ -422,8 +378,7 @@
         "**/.forgejo/workflows/*.yaml"
     ],
 
-    // XML (LemMinX / redhat.vscode-xml) — keep pom.xml & Spring XML tidy and
-    // schema-validated without reflowing hand-laid-out attributes.
+    // Format/validate XML without reflowing hand-laid-out attributes.
     "xml.format.enabled": true,
     "xml.format.maxLineWidth": 120,
     "xml.format.splitAttributes": "preserve",
@@ -431,21 +386,14 @@
     "xml.format.joinContentLines": false,
     "xml.validation.enabled": true,
 
-    // shfmt flags for the shell-format extension (4-space indent, indent switch
-    // cases) — mirrors the repo .editorconfig.
+    // Mirrors the repo .editorconfig (4-space indent, indent switch cases).
     "shellformat.flag": "-i 4 -ci",
 
     "cSpell.language": "{{ if has "locale" (dig "modules" (list) .) }}en-US,nb{{ else }}en-US{{ end }}",
 
-    // Personal dictionary as a chezmoi-managed plain-text file. Words added
-    // via "Add Words to personal" in the spell-checker quick-fix get appended
-    // to ~/.config/cspell/personal.txt, which is a symlink into this dotfiles
-    // repo (packages/cspell-words.txt). So new words show up in
-    // `git status`, are committed alongside the rest of the config, and sync
-    // across machines on the next chezmoi apply — no settings.json edit, no
-    // `chezmoi re-add` step. addWords: true exposes this dictionary as a
-    // target in the lightbulb menu; scope: user keeps it available in every
-    // project.
+    // ~/.config/cspell/personal.txt is a symlink into this repo
+    // (packages/cspell-words.txt), so words added via the quick-fix land in
+    // `git status` and sync on the next apply — no settings edit, no re-add.
     "cSpell.customDictionaries": {
         "personal": {
             "name": "personal",
@@ -521,11 +469,8 @@
         "editor.detectIndentation": false
     },
 
-    // JetBrains Kotlin LSP (extension ID jetbrains.kotlin-server) — Alpha as of
-    // KotlinConf 2026. Ships the IntelliJ-backed language server bundled inside
-    // the extension (the kotlin-lsp Homebrew cask is for *non*-VS Code clients
-    // like nvim/Emacs). The formatter is the same publisher.extension ID, not
-    // "jetbrains.kotlin" — that was the older extension we deprecated.
+    // Formatter is jetbrains.kotlin-server (the current extension), not the
+    // deprecated jetbrains.kotlin.
     "[kotlin]": {
         "editor.defaultFormatter": "jetbrains.kotlin-server",
         "editor.tabSize": 4,

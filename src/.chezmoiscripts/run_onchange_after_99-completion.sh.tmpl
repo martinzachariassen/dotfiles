@@ -1,28 +1,15 @@
 #!/usr/bin/env bash
-# run_onchange_after_99-completion — closing summary at the end of every apply.
-#
-# Why this exists:
-#   The earlier scripts in the apply (brew-bundle, macos-defaults)
-#   produce a lot of output. Without a structured closing summary, you're left
-#   looking at the tail of brew bundle's verbose log with no clear "you're done,
-#   and here's what's available to you now" signal.
-#
-# Naming considerations:
-# - "99-" prefix sorts last numerically among the after-scripts (02, 03, 04, 99).
-# - `onchange_` keeps the summary from running when nothing about this script
-#   changed, so `chezmoi diff` can stay clean after apply.
+# run_onchange_after_99-completion — closing summary at the end of an apply.
+# "99-" sorts last; onchange keeps `chezmoi diff` clean between runs.
 
 set -euo pipefail
 
 # ─── Inputs from chezmoi data ────────────────────────────────────────────────
 PROFILE="{{ .profile }}"
-# The repo root (git working tree) — where install.sh + scripts/ live. chezmoi's
-# source dir is the src/ subdir under this, but users think of the repo root as
-# "the dotfiles", so show and reference that.
+# Repo root (git working tree) — what users think of as "the dotfiles".
 SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
 
-# List the enabled optional modules as a bullet-separated string for compact display.
 EXTRAS=""
 {{ range $m := (dig "modules" (list) .) -}}
 EXTRAS="${EXTRAS}{{ $m }} · "

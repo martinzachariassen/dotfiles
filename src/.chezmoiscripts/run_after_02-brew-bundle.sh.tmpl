@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 # run_after_02-brew-bundle — converge Homebrew to the active Brewfiles.
 #
-# Runs on EVERY apply (run_after, not run_onchange) so the machine's real
-# installed state is reconciled with what the Brewfiles declare. Convergence
-# guarantees PRESENCE, not freshness: --no-upgrade means a merely-outdated
-# package doesn't trip the check, so a clean machine short-circuits instead of
-# turning every apply into an upgrade run (freshness is `chezbump`'s job).
-#
-# The active file set is derived from the single source of truth in
-# .chezmoidata/packages.toml (core + selected modules + profile). This uses
-# Homebrew's native `brew bundle`, so there is no bespoke install engine.
+# run_after (every apply), not run_onchange, so real installed state is
+# reconciled. --no-upgrade guarantees presence not freshness, so a clean machine
+# short-circuits instead of upgrading every apply (freshness is `chezbump`'s job).
+# The active file set comes from .chezmoidata/packages.toml (core + modules + profile).
 
 set -uo pipefail
 
@@ -18,19 +13,16 @@ echo "→ Homebrew packages: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Reattach stdin to the controlling terminal so casks that invoke sudo
-# (docker-desktop, 1password) can read the password. run_before_00-sudo-cache
-# does the upfront pre-auth; this is the belt-and-braces complement.
-# scripts/ + packages/ live at the repo root, not under the source dir (src/),
-# so reach them via .chezmoi.workingTree (the git working tree = repo root).
+# Reattach stdin so casks that invoke sudo can read the password (belt-and-braces
+# to run_before_00-sudo-cache's pre-auth). scripts/ + packages/ live at the repo
+# root — reach them via .chezmoi.workingTree.
 # shellcheck source=../../scripts/lib/tty.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 tty_reattach || echo "! no terminal available; casks needing sudo may ask later"
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-# Active Brewfiles, resolved from .chezmoidata/packages.toml at render time:
-# core (always) + each selected module's file + the profile's file (if any).
+# Active Brewfiles resolved at render time: core + selected modules + profile.
 {{ $modules := dig "modules" (list) . -}}
 FILES=(
     "{{ .chezmoi.workingTree }}/{{ .brewfiles.core }}"
@@ -47,7 +39,7 @@ FILES=(
 
 echo "▶ Homebrew packages (profile: {{ .profile }})"
 
-# ─── Fast path: presence-only check (--no-upgrade), skip when nothing missing ──
+# ─── Fast path: presence-only check ───────────────────────────────────────────
 missing=0
 for f in "${FILES[@]}"; do
     [ -f "$f" ] || continue
@@ -63,12 +55,9 @@ if [ "$missing" -eq 0 ]; then
 fi
 
 # ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
-# Homebrew 6.0 ignores formulae/casks from non-official taps until they're
-# trusted (docs.brew.sh/Tap-Trust). Declaring a `tap` line in our own Brewfile
-# IS the trust decision — so mirror it into Homebrew's trust store before
-# install, otherwise `brew bundle` silently skips e.g. Azure/kubelogin (kubelogin)
-# and hashicorp/tap (terraform) on a fresh machine. Idempotent: re-trusting an
-# already-trusted tap is a no-op.
+# Homebrew 6.0 ignores non-official taps until trusted (docs.brew.sh/Tap-Trust);
+# a `tap` line in our Brewfile is the trust decision, so mirror it into the trust
+# store before install or `brew bundle` silently skips those formulae. Idempotent.
 for f in "${FILES[@]}"; do
     [ -f "$f" ] || continue
     while IFS= read -r taprepo; do
@@ -78,21 +67,16 @@ for f in "${FILES[@]}"; do
 done
 
 # ─── Pre-flight: clear stale partial downloads ───────────────────────────────
-# An interrupted earlier fetch (Ctrl-C, crash, flaky network) can leave a
-# *.incomplete file in Homebrew's download cache. On the next fetch Homebrew
-# tries to remove it and can hit a `dir_s_rmdir - No such file or directory`
-# race — which aborts an otherwise-successful pour, so the package installs but
-# `brew bundle` reports the whole file as failed. `rm -f` is idempotent and
-# ignores the (already-)missing files, making the run quiet and repeatable.
+# A leftover *.incomplete from an interrupted fetch can trigger a `dir_s_rmdir`
+# race that aborts an otherwise-successful pour, making `brew bundle` report the
+# file as failed. `rm -f` is idempotent.
 cache_dir="$(brew --cache 2>/dev/null)/downloads"
 [ -d "$cache_dir" ] && rm -f "$cache_dir"/*.incomplete 2>/dev/null || true
 
-# Skip Homebrew's per-formula post-install cleanup during the bundle: it's the
-# step that raced above, and a single cleanup elsewhere (or `brew cleanup`)
-# reclaims space without turning a good install into a reported failure.
+# Skip per-formula post-install cleanup — it's the step that raced above.
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 
-# ─── Install missing entries (continue-on-error; failures summarised) ─────────
+# ─── Install missing entries (continue-on-error) ──────────────────────────────
 failures=()
 for f in "${FILES[@]}"; do
     if [ ! -f "$f" ]; then
@@ -103,8 +87,7 @@ for f in "${FILES[@]}"; do
     brew bundle install --no-upgrade --file="$f" || failures+=("$(basename "$f")")
 done
 
-# brew installs sometimes leave group/other-write bits on share dirs that land
-# on zsh's $fpath, which makes compinit warn at every startup. Strip them.
+# Strip group/other-write bits brew leaves on $fpath dirs, which make compinit warn.
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
 
 if [ "${#failures[@]}" -gt 0 ]; then

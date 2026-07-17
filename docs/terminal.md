@@ -12,13 +12,12 @@ subtle background blur/opacity, `bar` cursor, 100k scrollback.
 
 Behaviour worth knowing:
 
-- `copy-on-select = clipboard` — selecting text copies straight to the system
-  clipboard, matching Zellij's `copy_on_select` so it's consistent inside and
-  outside a session.
+- `copy-on-select = clipboard` — selecting text copies to the system clipboard,
+  matching Zellij's `copy_on_select` so it's consistent inside and outside a
+  session.
 - `macos-option-as-alt = false` — keeps Option free for macOS Unicode/dead-key
   input such as `å`.
-- `shell-integration = zsh` is injected automatically; nothing extra needed in
-  `.zshrc`.
+- `shell-integration = zsh` is injected automatically; nothing extra in `.zshrc`.
 - Keybinds: `Cmd+K` clear, `Cmd+Enter` fullscreen, `Cmd+Shift+.` inspector; tab
   bindings are Ghostty defaults.
 
@@ -27,17 +26,17 @@ Behaviour worth knowing:
 
 The theme is a **local** file
 (`src/dot_config/ghostty/themes/catppuccin-frappe`) rather than a built-in name,
-for deterministic colors across Ghostty versions. It's applied only when the
-`theme` module is selected.
+for deterministic colors across Ghostty versions. Applied only when the `theme`
+module is selected.
 
 ## Zellij
 
 Config: [`src/dot_config/zellij/config.kdl`](../src/dot_config/zellij/config.kdl).
-The multiplexer (a modern tmux alternative), `default_shell zsh`, custom `main`
-layout with a one-line [zjstatus](https://github.com/dj95/zjstatus) bar
-([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl)).
-`copy_on_select` → `pbcopy`, mouse mode on, sessions serialized across
-restarts, rounded pane frames showing pane titles.
+A modern tmux alternative: `default_shell zsh`, custom `main` layout with a
+one-line [zjstatus](https://github.com/dj95/zjstatus) bar
+([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl)),
+`copy_on_select` → `pbcopy`, mouse mode on, sessions serialized across restarts,
+rounded pane frames showing pane titles.
 
 Interactive Ghostty shells auto-attach to Zellij; each window gets its own
 session — the project (cwd) name for the first, `-2`/`-3`… suffixes for later
@@ -54,7 +53,7 @@ wants the same chord. Dump the full set with `zellij setup --dump-config`.
 
 Config: [`src/dot_config/starship.toml`](../src/dot_config/starship.toml), palette
 `catppuccin_frappe`. A two-line prompt: context on line 1, prompt character on
-line 2. Modules are scoped to development and cloud tooling and self-disable when
+line 2. Modules cover development and cloud tooling and self-disable when
 irrelevant — directory, git branch/status, language versions
 (Java/Kotlin/Node/Python), Terraform, Docker context, Kubernetes, Azure, gcloud,
 and command duration.

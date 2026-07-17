@@ -1,20 +1,13 @@
-# chezmoi's source dir is this src/ directory (via /.chezmoiroot). All repo
-# tooling — scripts/, packages/, tests/, docs/, install.sh, the
-# .github/ + dotfiles config — lives at the repo ROOT, one level up and OUTSIDE
-# this source tree, so chezmoi never sees it. That's why this file no longer
-# needs the long exclude list it used to carry: it only handles files that DO
-# live under src/ but must not deploy to $HOME.
+# Repo tooling (scripts/, packages/, tests/, …) lives at the repo root, outside
+# this src/ source tree, so chezmoi never sees it. This file only excludes files
+# that DO live under src/ but must not deploy to $HOME.
 
-# Docs/readmes carried alongside managed content are reference material, not
-# dotfiles — keep them out of $HOME.
+# Docs carried alongside managed content — keep out of $HOME.
 README.md
 AGENTS.md
 **/AGENTS.md
 .DS_Store
 
-# --- Optional personal content, gated by the selected modules
-#     (.chezmoidata/modules.toml). When a module is not selected, its files are
-#     ignored and never deployed to $HOME. dig defaults modules to an empty list
-#     so a config without the key (older render fixtures) still renders. ---
+# Optional per-module content: when a module isn't selected its files are ignored.
 {{ $modules := dig "modules" (list) . -}}
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}

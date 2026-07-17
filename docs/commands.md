@@ -1,10 +1,10 @@
 # Commands
 
-The whole everyday surface is **two verbs plus a health check**. Both verbs end
-in the same `chezmoi apply`, which reconciles *real installed state* on every
-run — so it always installs what the Brewfile declares. It never *uninstalls*,
-though: `chez` only flags packages you have but the Brewfile doesn't, and
-`chezmirror` reconciles that removal direction on demand.
+The everyday surface is **two verbs plus a health check**. Both verbs end in the
+same `chezmoi apply`, which reconciles *real installed state* on every run, so it
+always installs what the Brewfile declares. It never *uninstalls*: `chez` only
+flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles
+that removal direction on demand.
 
 The verbs are defined in
 [`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl) and
@@ -24,23 +24,22 @@ delegate to the scripts in [`scripts/bin/`](../scripts/bin).
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many
    commits arrived.
-2. **Review pending changes** — `chezmoi status` lists the drift between the repo
-   and `$HOME` (`A` add, `M` modify, `D` remove). If nothing drifted, it stops
-   here.
+2. **Review pending changes** — `chezmoi status` lists the drift between repo and
+   `$HOME` (`A` add, `M` modify, `D` remove). Stops here if nothing drifted.
 3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
 
 ## When a command says its script is missing
 
 The verbs are shell functions with the helper-script path **baked into
 `~/.config/zsh/.zshrc` at apply time** (fast — no `chezmoi source-path`
-subprocess per call). A `git pull` only updates the repo on disk; it never
-rewrites the live rc. So if a repo restructure **moves or renames a script**
-(e.g. the `scripts/` → `scripts/bin/` regroup), a machine that pulled but hasn't
-re-applied has a function pointing at a path that no longer exists.
+subprocess per call). A `git pull` updates the repo on disk but never rewrites
+the live rc. So if a repo restructure **moves or renames a script** (e.g. the
+`scripts/` → `scripts/bin/` regroup), a machine that pulled but hasn't re-applied
+has a function pointing at a path that no longer exists.
 
 The wrappers self-heal through `_chez_run`: on a missing script they run
-`git pull` + `chezmoi apply` to regenerate the functions with the corrected
-paths, then `exec zsh` to reload — no manual dance. You'll see:
+`git pull` + `chezmoi apply` to regenerate the functions with corrected paths,
+then `exec zsh` to reload. You'll see:
 
 ```
 dotfiles: …/scripts/bin/chezup.sh is missing — this shell's config predates a repo change.
@@ -59,7 +58,7 @@ exec zsh
 ```
 
 From then on the self-heal is in your rc and any future script move is automatic.
-The provider-agnostic fallback, if the script path itself differs in your clone,
+If the script path itself differs in your clone, the provider-agnostic fallback
 is `chezmoi apply && exec zsh` (`chezmoi` is on `PATH` via Homebrew and reads
 `.chezmoiroot` itself).
 
@@ -72,27 +71,26 @@ wizard, which overrides your saved answers:
 chezreset               # re-ask profile / modules / signing, then apply
 ```
 
-`chezreinit` is a different tool: it runs plain `chezmoi init`, which — via
-chezmoi's `prompt*Once` functions — keeps every answer you've already given and
-only asks for setup keys still blank. So it fills in newly-added questions but
-never lets you re-choose existing ones; reach for `chezreset` for that. See
-[packages.md](packages.md#the-wizard) for how the wizard itself works.
+`chezreinit` is different: it runs plain `chezmoi init`, which — via chezmoi's
+`prompt*Once` functions — keeps every answer you've given and only asks for setup
+keys still blank. So it fills in newly-added questions but never lets you
+re-choose existing ones; reach for `chezreset` for that. See
+[packages.md](packages.md#the-wizard) for how the wizard works.
 
 ## Advanced / occasional helpers
 
 | Command | What it does |
 |---|---|
-| `chezhelp` | Print every dotfiles verb, grouped, with a one-line description each. Static text — instant, no subprocesses. The discoverable entry point when you forget a command. |
+| `chezhelp` | Print every dotfiles verb, grouped, one line each. Static text — instant, no subprocesses. The entry point when you forget a command. |
 | `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit` / `chezhelp`). |
 | `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
-| `chezdiff` | Plain-language drift explainer: translates `chezmoi status` into two labelled sections — what `chez` would push (repo → `$HOME`) and managed files you edited locally (`$HOME` drift). Read-only. `chezdiff PATH` or `chezdiff -v` drops to the raw `chezmoi diff`. |
+| `chezdiff` | Plain-language drift explainer: translates `chezmoi status` into two labelled sections — what `chez` would push (repo → `$HOME`) and managed files you edited locally (`$HOME` drift). Read-only. `chezdiff PATH` or `chezdiff -v` drops to raw `chezmoi diff`. |
 | `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly-added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
 | `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
-| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (drift detection; reports only). |
-| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (union of all tiers — formulae, casks, and orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after a single confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. |
+| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (reports only). |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (all tiers — formulae, casks, orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after one confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. |
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so it
-> only ever *adds* presence. Freshness is `chezbump`'s job; *removal* is
-> `chezmirror`'s, always behind a confirm. See
-> [lifecycle.md](lifecycle.md#convergence-guarantee).
+> only *adds* presence. Freshness is `chezbump`'s job; *removal* is `chezmirror`'s,
+> always behind a confirm. See [lifecycle.md](lifecycle.md#convergence-guarantee).

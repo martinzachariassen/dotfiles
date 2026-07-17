@@ -1,54 +1,39 @@
-# ~/.config/zsh/.zshrc — interactive shell configuration
-# Found via ZDOTDIR (set in ~/.zshenv). Edit via `chezmoi edit ~/.config/zsh/.zshrc`.
-#
-# This file is rendered by chezmoi from `dot_zshrc.tmpl`. Profile-conditional
-# blocks (search for `chezmoi.profile`) only render based on the profile you
-# chose at `chezmoi init` time. Current profile: {{ .profile }}
+# ~/.config/zsh/.zshrc — interactive shell. Rendered from dot_zshrc.tmpl; edit via
+# `chezmoi edit ~/.config/zsh/.zshrc`. Profile: {{ .profile }}
 
 # ─── Shell options ────────────────────────────────────────────────────────────
-setopt INTERACTIVE_COMMENTS    # allow # comments in interactive shells (bash-style)
-setopt AUTO_CD                  # `dirname` alone = `cd dirname`
-setopt AUTO_PUSHD               # `cd` pushes onto the dir stack
-setopt PUSHD_IGNORE_DUPS        # no duplicates in dir stack
-setopt CORRECT                  # offer command corrections on typos
-setopt EXTENDED_GLOB            # enable ^, ~, (#...) glob operators
+setopt INTERACTIVE_COMMENTS
+setopt AUTO_CD
+setopt AUTO_PUSHD
+setopt PUSHD_IGNORE_DUPS
+setopt CORRECT
+setopt EXTENDED_GLOB
 
 # ─── Tooling ──────────────────────────────────────────────────────────────────
-# mise: language runtime manager + per-project env. `mise activate` puts the
-# active tools on PATH, sets JAVA_HOME, and auto-switches when you `cd` into a
-# project that pins its own versions. Global defaults (java, node) live in
-# ~/.config/mise/config.toml; per-project runtimes + env vars come from each
-# project's own `mise.toml` (its `[env]` section replaces what direnv used to
-# do). No `.envrc`, no per-project `allow` step.
 command -v mise >/dev/null && eval "$(mise activate zsh)"
 
 # ─── History ──────────────────────────────────────────────────────────────────
-# IMPORTANT: macOS's /etc/zshrc runs AFTER ~/.zshenv but BEFORE this file and
-# does:  HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history
-# That clobbers what we set in ~/.zshenv. So we re-set it here (interactively),
-# which wins because this is the last shell rc to run.
+# macOS /etc/zshrc runs after ~/.zshenv and resets HISTFILE; re-set it here (last
+# rc to run) so our XDG path wins.
 export HISTFILE="$XDG_STATE_HOME/zsh/history"
 [ -d "${HISTFILE%/*}" ] || mkdir -p "${HISTFILE%/*}"
 HISTSIZE=50000
 SAVEHIST=50000
-setopt EXTENDED_HISTORY        # save timestamp + duration
-setopt HIST_EXPIRE_DUPS_FIRST  # drop dupes first when trimming
-setopt HIST_IGNORE_DUPS        # don't store consecutive dupes
-setopt HIST_IGNORE_SPACE       # don't store lines starting with space (private)
-setopt HIST_REDUCE_BLANKS      # trim superfluous whitespace before storing
-setopt HIST_SAVE_NO_DUPS       # don't write a dupe to the history file
-setopt HIST_FIND_NO_DUPS       # skip earlier dupes when searching history
-setopt HIST_VERIFY             # show !! expansions before running
-setopt SHARE_HISTORY           # share across sessions
+setopt EXTENDED_HISTORY
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_REDUCE_BLANKS
+setopt HIST_SAVE_NO_DUPS
+setopt HIST_FIND_NO_DUPS
+setopt HIST_VERIFY
+setopt SHARE_HISTORY
 
 # ─── Completion ───────────────────────────────────────────────────────────────
-# Move zcompdump out of $HOME too
 ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump"
 [ -d "${ZSH_COMPDUMP%/*}" ] || mkdir -p "${ZSH_COMPDUMP%/*}"
 
-# Homebrew completions — must be on fpath BEFORE compinit. Formulae install
-# their own completions into site-functions; zsh-completions is the extra
-# community completion pack.
+# Homebrew completions must be on fpath before compinit.
 if [ -d /opt/homebrew/share/zsh/site-functions ]; then
     fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 fi
@@ -57,55 +42,40 @@ if [ -d /opt/homebrew/share/zsh-completions ]; then
 fi
 
 autoload -Uz compinit
-# Always skip the per-shell security check (`-C`). It's the right tradeoff:
-#   - Permissions on /opt/homebrew/share are tightened at install time and after
-#     every `brew bundle` (.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl
-#     runs `chmod -R go-w /opt/homebrew/share`), so the check has nothing to find.
-#   - Without `-C`, zsh prompts on every new shell whenever it does find anything,
-#     which is hostile UX for a known-good system.
-# If you ever want to audit, run `compaudit` manually.
+# -C skips the per-shell security audit; brew perms are tightened at install time
+# and after every `brew bundle`, so it has nothing to find. Audit via `compaudit`.
 compinit -C -d "$ZSH_COMPDUMP"
 zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'  # case-insensitive
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
 # ─── Key bindings ─────────────────────────────────────────────────────────────
-# Force the emacs keymap. zsh otherwise INFERS the keymap from $EDITOR/$VISUAL:
-# because we set those to `nvim` (see ~/.zshenv), it would silently pick the vi
-# keymap, where Ctrl-A/E/W/U/K and friends are `self-insert` (they just type the
-# key). This also makes Ctrl-E (end-of-line) accept the zsh-autosuggestions
-# type-ahead. Set this before the bindkeys below so they apply on top of emacs.
+# Force emacs keymap; zsh would otherwise infer vi from $EDITOR=nvim.
 bindkey -e
 
-# Make ↑/↓ do prefix-aware history search: type `git ` then ↑ cycles only the
-# history lines that start with what's already on the line, leaving the cursor
-# at end-of-line. Complements zsh-autosuggestions (type-ahead) — different gesture.
+# ↑/↓ prefix-aware history search, cursor left at end-of-line.
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
-# Bind both the terminfo codes (application cursor mode, what zle sees in most
-# terminals) and the literal ^[[ sequences, so it works regardless of mode.
+# Bind terminfo codes and literal ^[[ sequences so it works in either cursor mode.
 [ -n "${terminfo[kcuu1]}" ] && bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
 [ -n "${terminfo[kcud1]}" ] && bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
 bindkey '^[[A' up-line-or-beginning-search
 bindkey '^[[B' down-line-or-beginning-search
 
-# ─── fzf — fuzzy finder shell integration (Ctrl-R, Ctrl-T, **<Tab>) ───────────
-# Use `fd` as the underlying file walker — much faster than the default `find`,
-# respects .gitignore so node_modules/build dirs stay out of results.
+# ─── fzf ──────────────────────────────────────────────────────────────────────
+# Use fd as the walker: faster than find, respects .gitignore.
 if command -v fd >/dev/null; then
     export FZF_DEFAULT_COMMAND='fd --type f --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
 fi
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
-
-# fzf 0.48+ ships its own zsh integration; older versions used `$(brew --prefix)/opt/fzf/install`.
 command -v fzf >/dev/null && eval "$(fzf --zsh 2>/dev/null)"
 
-# ─── zoxide — smarter cd based on directory frecency ─────────────────────────
+# ─── zoxide ───────────────────────────────────────────────────────────────────
 command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
 
-# ─── carapace — richer completions for CLI tools ─────────────────────────────
+# ─── carapace ─────────────────────────────────────────────────────────────────
 if command -v carapace >/dev/null; then
     export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense'
     zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
@@ -113,46 +83,27 @@ if command -v carapace >/dev/null; then
 fi
 
 # ─── Starship prompt ──────────────────────────────────────────────────────────
-# Replaces zsh's default prompt. Config at ~/.config/starship.toml.
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
-# ─── Modern CLI replacements (installed via Brewfile) ─────────────────────────
-# Only alias if the tool is present, so the shell still works on a fresh box.
+# ─── Modern CLI replacements ──────────────────────────────────────────────────
+# Alias only if present so a fresh box still works.
 command -v eza >/dev/null && {
     alias ls='eza --group-directories-first'
     alias ll='eza -lah --group-directories-first --git --time-style=long-iso'
-    # `tree` is eza's tree view (no separate `tree` binary installed). For the
-    # rare scripted case that needs classic tree output, use eza's flags or
-    # `\tree`-style alternatives explicitly.
     alias tree='eza --tree --level=3 --group-directories-first'
 }
-# Intentional: aliasing `cat` to bat. Use `command cat` (or `\cat`) if you need
-# the bare GNU/BSD cat behavior — e.g. when piping into something that doesn't
-# expect ANSI color codes or when behavior parity with scripts matters.
 command -v bat >/dev/null && alias cat='bat --paging=never --style=plain'
-# Intentionally NOT aliasing `find` to `fd`. Unlike cat/ls, fd is not a drop-in:
-# its flags and default semantics differ enough that muscle-memory invocations
-# (`find . -name x -exec …`) silently misbehave under fd. Use `fd` directly when
-# you want it; `find` keeps the standard behavior scripts and snippets expect.
+# `find` is deliberately NOT aliased to fd — fd isn't a drop-in and silently
+# misbehaves for muscle-memory `find … -exec` invocations.
 
 # ─── Tool shortcuts ───────────────────────────────────────────────────────────
-# Single/double-letter aliases for tools I run constantly. Some commands are
-# expected to come from a project's mise environment rather than global brew.
-alias n='nvim'                  # editor
-alias lg='lazygit'              # git TUI — the daily-driver for staging/blame/branch ops
+alias n='nvim'
+alias lg='lazygit'
 alias d='docker'
 alias dc='docker compose'
-# terraform ships only in the work profile (Brewfile.work), so guard the alias —
-# on a personal machine the binary isn't present.
-command -v terraform >/dev/null && alias tf='terraform'
-
-# Maven / Gradle wrappers. Run from a project root; falls through to the
-# project-local `./mvnw` or `./gradlew` so the project's pinned version wins.
+command -v terraform >/dev/null && alias tf='terraform'  # work profile only
 alias mw='./mvnw'
 alias gw='./gradlew'
-
-# Kubernetes shortcuts. Tab-completion still works on these via
-# zsh-completions' kubectl plugin (it knows about the `k` alias).
 command -v kubectl >/dev/null && {
     alias k='kubectl'
     alias kgp='kubectl get pods'
@@ -166,28 +117,17 @@ alias gd='git diff'
 alias gl='git log --oneline --graph --decorate -20'
 alias ..='cd ..'
 alias ...='cd ../..'
-# Note: `mkdir` is NOT aliased to `mkdir -p`. The error from `mkdir foo` when
-# foo exists is occasionally useful as a guard in scripts you paste interactively.
-# Type `mkdir -p` explicitly when you want it.
 
-# Make a directory (with parents) and immediately cd into it.
 mkcd() { mkdir -p "$1" && cd "$1" || return; }
 
 # ─── Dotfiles meta-commands ───────────────────────────────────────────────────
-# _chez_run REL [args...] — run a dotfiles helper script named by its path
-# relative to the working tree. The wrappers below bake the working-tree path in
-# at apply time (fast: no `chezmoi source-path` subprocess per call). The failure
-# mode that bites: a later commit MOVES or RENAMES a script, and a machine that
-# pulled the repo but hasn't re-applied still has a .zshrc pointing at the old
-# path — so the very command you'd fix it with (`chezup`) is itself broken.
-# This turns that dead end into a one-time self-heal: on a missing script, pull +
-# `chezmoi apply` to regenerate these functions, then reload the shell so the
-# corrected paths take effect — no "cd into the repo and exec zsh" dance. (It
-# can't repair a .zshrc that predates this helper; from then on it's automatic.)
+# _chez_run REL [args...] — run a repo helper by working-tree-relative path (baked
+# in at apply time). If the script is missing — repo moved it but this shell's
+# config predates the change — self-heal: pull + apply to regenerate these
+# functions, then reload so the corrected paths take effect.
 _chez_run() {
     local rel=$1
     shift
-    # Repo root (git working tree), baked at apply time; source dir is src/.
     local src={{ .chezmoi.workingTree | quote }}
     if [[ -f $src/$rel ]]; then
         bash "$src/$rel" "$@"
@@ -208,19 +148,11 @@ _chez_run() {
     print -ru2 -- "  synced — open a new shell (or run: exec zsh)."
 }
 
-# Re-apply macOS system defaults (keyboard repeat, Finder/Dock prefs, etc).
-# Intentionally NOT auto-run by `chezmoi apply` — invoke this when setting up a
-# fresh Mac or after wiping a system pref pane back to defaults.
+# Not auto-run by `chezmoi apply` — invoke on a fresh Mac or after resetting a pref pane.
 alias macos-defaults='_chez_run scripts/bin/macos-defaults.sh'
 
-# Dotfiles shortcut. With no args it cd's into the source repo. To re-choose your
-# setup (profile, optional modules, signing) from scratch, use the plain-text
-# wizard via `chezreset` — not `chezmoi init --prompt`, which forces chezmoi's
-# fragile TUI picker.
+# No args: cd into the source repo. With args: point at the setup verbs.
 dotfiles() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
     if [ "$#" -eq 0 ]; then
         cd "$src" || return
@@ -236,37 +168,9 @@ dotfiles() {
     fi
 }
 
-# Smart `chezmoi apply` wrapper. Use this instead of `chezmoi apply -v`.
-#
-# Why this exists:
-#   Plain `chezmoi apply` shows a per-file confirmation prompt
-#   (`diff/overwrite/skip/quit`) when a managed file in $HOME has drifted.
-#   That prompt reads single keypresses and collides with later sudo prompts
-#   from scripts. (Now also defused by `[apply] force = true` in chezmoi.toml,
-#   but the upfront-status preview here is still valuable.)
-#
-# This wrapper:
-#   1. Runs `chezmoi status --exclude scripts` upfront to summarise pending
-#      file changes.
-#   2. Asks ONCE for confirmation if anything is pending.
-#   3. Runs `chezmoi apply --force` (no `-v`) so the apply is QUIET — the
-#      per-file content diffs that `-v` prints don't spam the terminal.
-#      Your own scripts (brew-bundle, sudo-cache, completion summary) still
-#      produce their normal output; only chezmoi's own per-file content
-#      dumps are suppressed.
-#
-# Need the per-file diffs for debugging? Pass -v explicitly:
-#   chez -v
-#   chezmoi apply -v --force
-#
-# Sudo pre-auth is handled by .chezmoiscripts/run_before_00-sudo-cache, which
-# runs at the start of every `chezmoi apply` regardless of caller. Script
-# entries are intentionally excluded from the prompt below because run_*
-# scripts can remain pending after a successful apply by design.
-#
-# `--force` overwrites any local edits to managed files. The status preview
-# tells you what would be clobbered before you approve. To preserve specific
-# local edits, run `chezmoi re-add ~/.X` first to capture them into source.
+# Quiet `chezmoi apply --force` with a single upfront confirm when managed files
+# in $HOME have drifted (plain apply's per-file prompt collides with later sudo
+# prompts). Pass -v for the per-file content diffs.
 chez() {
     local status_output response
     status_output=$(chezmoi status --exclude scripts 2>&1)
@@ -297,10 +201,8 @@ chez() {
     fi
     chezmoi apply --force "$@"
     local rc=$?
-    # Brewfile drift notice (removal direction only). The apply already INSTALLED
-    # anything the Brewfile lists that was missing; here we merely FLAG packages
-    # present locally but tracked in no Brewfile, so `chez` never silently
-    # uninstalls. `chezmirror` reconciles on demand. Cheap: `brew leaves` + grep.
+    # Flag packages present locally but in no Brewfile so `chez` never silently
+    # uninstalls; `chezmirror` reconciles on demand.
     if command -v brew >/dev/null 2>&1; then
         local untracked
         untracked=$(_chez_brew_untracked)
@@ -313,26 +215,9 @@ chez() {
     return $rc
 }
 
-# Plain-language drift explainer — "what would change, and which way?"
-#
-# `chezmoi diff` prints raw patches and `chezmoi status` prints terse two-letter
-# codes; chezdiff translates that status into a directional, plain-words summary
-# so you can see at a glance what `chez` would do BEFORE you run it. Read-only —
-# it never applies, pulls, or uninstalls (the safe companion to `chez`).
-#
-#   chezdiff              summarise pending changes + local drift (scripts excluded)
-#   chezdiff ~/.zshrc     raw `chezmoi diff` for one path — drill into the content
-#   chezdiff -v           raw `chezmoi diff` for everything
-#
-# `chezmoi status` is two columns, git-status style, and the columns are easy to
-# read backwards — so chezdiff splits them into two labelled sections instead:
-#   left column  = your LOCAL edits to a managed file since chezmoi last wrote it
-#                  (drift — `chez` OVERWRITES these unless you `chezmoi re-add` first)
-#   right column = what `chezmoi apply` would push from the repo INTO $HOME
-#   codes in either column: A add · M modify · D remove
-# Scripts are excluded (as in `chez`): run_* entries stay pending by design.
+# Plain-language, read-only drift explainer: translates `chezmoi status`'s two-letter
+# codes into a directional summary of what `chez` would do. Never applies or pulls.
 chezdiff() {
-    # Any path argument — or -v/--verbose — hands off to the raw `chezmoi diff`.
     case "${1:-}" in
         -h | --help)
             echo "usage: chezdiff [-v|--verbose] [PATH …]"
@@ -364,9 +249,8 @@ chezdiff() {
         return 0
     fi
 
-    # One pass, two buckets: the right column feeds "apply would write", the left
-    # column feeds "you edited locally". A file that drifted AND changed upstream
-    # (MM) lands in both — exactly the case where `chez` clobbers a local edit.
+    # right column → "apply would write", left column → "you edited locally". A file
+    # that drifted AND changed upstream (MM) lands in both.
     local pending drift line col1 col2 path
     pending=""
     drift=""
@@ -403,36 +287,22 @@ chezdiff() {
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
-# Converge THIS Mac to the repo — the everyday command: pull + preview + apply
-# (scripts/bin/chezup.sh; see docs/lifecycle.md).
-# Because the brew + mise apply scripts reconcile real installed state on EVERY
-# apply (run_after, not hash-gated), this also guarantees packages match the
-# Brewfile — no separate "fix" step. The fresh-machine equivalent is install.sh.
-#
-# Environment passthrough:
-#   YES=1       skip the confirm gate
-#   DRY_RUN=1   print state-changing commands without running them
-# Extra args go straight to `chezmoi apply` (e.g. `chezup -v`).
+# Converge this Mac to the repo: pull + preview + apply. Brew/mise apply scripts
+# reconcile real installed state on every apply, so packages match too.
+# Knobs: YES=1 skip confirm · DRY_RUN=1 print without running. Extra args → apply.
 chezup() {
     _chez_run scripts/bin/chezup.sh "$@"
 }
 
-# Full-stack health check (runs scripts/bin/doctor.sh from the repo root). The other
-# everyday command alongside chezup — run it any time something feels off.
+# Read-only full-stack health check.
 chezdoctor() {
     _chez_run scripts/bin/doctor.sh
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
-# Fill in NEWLY-ADDED setup keys only — the "the wizard grew a new question and
-# I want to answer it" workflow. It does NOT re-ask questions you've already
-# answered: chezmoi's prompt*Once functions read your persisted answers and only
-# prompt for fields still blank. To RE-CHOOSE profile / modules / signing from
-# scratch, use `chezreset` instead. Idempotent; safe to run any time.
+# Fill in newly-added setup keys only; keeps answers you've already given (chezmoi's
+# prompt*Once reads persisted answers). To re-choose everything, use `chezreset`.
 chezreinit() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
     (cd "$src" && git pull --ff-only) || return $?
     echo "chezreinit: filling in any new/unanswered setup keys only."
@@ -440,20 +310,13 @@ chezreinit() {
     chezmoi init && chez "$@"
 }
 
-# Set this Mac up "as new": replay first-time setup. Resets chezmoi's persistent
-# state so the `run_once_*` (and `run_onchange_*`) hooks fire again, re-asks the
-# FULL wizard (profile, modules, signing), then applies + converges everything.
-# This is the closest thing to a brand-new machine short of an OS reinstall — it
-# does NOT uninstall packages or delete files; apply reconciles them in place.
-# Guarded by a confirm prompt because it re-runs first-time setup. Extra args
-# pass to apply.
+# Set this Mac up "as new": reset chezmoi's persistent state so run_once_* /
+# run_onchange_* hooks re-fire, re-ask the full wizard, then apply. Does NOT
+# uninstall packages or delete files. Confirm-gated.
 chezreset() {
     local src reply
-    # Repo root (git working tree), baked at apply time. chezmoi's source dir is
-    # the src/ subdir (.chezmoiroot); scripts/bin/wizard.sh lives at the repo root.
     src={{ .chezmoi.workingTree | quote }}
-    # If our baked wizard path is stale (the script moved since this .zshrc was
-    # applied), self-heal + reload BEFORE the destructive state reset below —
+    # Self-heal a stale wizard path BEFORE the destructive state reset below —
     # never leave the machine half-reset with no way to finish the wizard.
     [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "$@"; return; }
     (cd "$src" && git pull --ff-only) || return $?
@@ -468,28 +331,18 @@ chezreset() {
                 ;;
         esac
     fi
-    # `state reset --force` wipes the whole persistent-state DB (entryState +
-    # scriptState + caches). Version-safe: it doesn't depend on a bucket name,
-    # and it makes both run_once_* and run_onchange_* hooks re-fire.
     chezmoi state reset --force || return $?
-    # Re-ask via the plain-text wizard, not chezmoi's fragile TUI picker.
     bash "$src/scripts/bin/wizard.sh" "$@"
 }
 
-# Routine dependency bump: update brew + mise global runtimes.
-# Per-project runtimes live in each project's own mise.toml and travel with
-# the project's repo — not bumped here.
-# Doesn't auto-commit — you review the diff and commit yourself.
+# Routine dependency bump: brew + mise global runtimes. Per-project runtimes travel
+# with their own repos. Doesn't auto-commit — review the diff yourself.
 chezbump() {
-    # Repo root, baked in at apply time. chezmoi's source dir is the src/ subdir
-    # (via .chezmoiroot); the working tree is the repo root, where scripts/ and
-    # packages/ live. Rendered literal — no per-call `chezmoi source-path` subprocess.
     local src={{ .chezmoi.workingTree | quote }}
     echo "── brew update + upgrade ─────────────────────────────────────"
     brew update && brew upgrade
     echo
     echo "── Untracked Homebrew packages (in no Brewfile tier) ──────────"
-    # Same authoritative removal set `chezmirror` acts on (union of all tiers).
     local removals
     removals=$(_chez_brew_removals "$src")
     if [ -n "$removals" ]; then
@@ -507,21 +360,11 @@ chezbump() {
     echo "Now: cd $src && git diff   to review, then commit."
 }
 
-# Internal: names of top-level brew packages (`brew leaves`) installed locally
-# but listed in NO Brewfile tier. One name per line; empty when in sync. Fast
-# (no network): `brew leaves` diffed against the tracked set. Shared by the
-# `chez` drift notice, `chezaudit`, and `chezmirror`. Note `brew leaves` reports
-# formulae only, so casks never show here — `chezmirror` uses `brew bundle
-# cleanup` for the authoritative removal set (formulae + casks + unused deps).
-#
-# BOTH sides are reduced to the bare leaf name via `awk -F/ '{print $NF}'`:
-# tap formulae surface tap-qualified on the `brew leaves` side (e.g.
-# `hashicorp/tap/terraform`, `azure/kubelogin/kubelogin`) while the Brewfile may
-# list them the same way. Stripping only one side made every tap-installed leaf a
-# phantom "untracked" hit even though it was tracked; normalise both so the
-# comparison is on `terraform` / `kubelogin`, not the tap path.
+# Internal: names of `brew leaves` formulae installed locally but in no Brewfile
+# tier (one per line, empty when in sync). Both sides are reduced to the bare leaf
+# name so tap-qualified formulae (hashicorp/tap/terraform) don't read as untracked.
+# Formulae only — casks come via `brew bundle cleanup` in _chez_brew_removals.
 _chez_brew_untracked() {
-    # Repo root, baked in at apply time (git working tree; source dir is src/).
     local src={{ .chezmoi.workingTree | quote }}
     local tracked
     tracked=$(grep -h '^\(brew\|cask\) ' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null \
@@ -532,17 +375,12 @@ _chez_brew_untracked() {
         <(printf '%s\n' "$tracked")
 }
 
-# Internal: emit "<kind>\t<name>" (kind = cask | formula | tap) for every
-# Homebrew item installed locally but tracked in NO Brewfile tier — the
-# authoritative removal set (formulae + casks + now-unused deps, plus orphaned
-# taps) that `chezmirror` acts on and `chezbump` previews. Takes the repo root
-# as $1. Pure (no prompting, no uninstall), so it is unit-testable against a
-# stubbed `brew`.
+# Internal: emit "<kind>\t<name>" (cask | formula | tap) for every Homebrew item in
+# no Brewfile tier — the authoritative removal set chezmirror acts on. Takes repo
+# root as $1; pure, so it's unit-testable against a stubbed `brew`.
 #
-# `brew bundle cleanup` honours only ONE --file, so the tiers are concatenated
-# and fed on stdin (--file=-); passing several --file reads just the LAST tier
-# and would report almost every installed package as untracked — the whole point
-# of routing every caller through this one helper.
+# `brew bundle cleanup` honours only ONE --file, so tiers are concatenated onto
+# stdin (--file=-); passing several --file would read just the last tier.
 _chez_brew_removals() {
     local src=$1
     cat "$src/packages/Brewfile" \
@@ -552,26 +390,17 @@ _chez_brew_removals() {
         brew bundle cleanup --file=- 2>/dev/null | awk '
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
-            # Untracked taps get their own "Would untap:" section (entries are
-            # tap names like "supabase/tap"). Label them "tap" so chezmirror
-            # routes them through `brew untap`, not `brew uninstall` — and,
-            # crucially, so neither the header nor the tap names inherit the
-            # preceding "formula" kind and leak in as bogus formula removals.
             /^Would untap:/              { kind = "tap";     next }
-            # End of the uninstall list. Newer Homebrew appends a
-            # "Would `brew cleanup`:" cache-pruning section (dozens of
-            # "Would remove: …/Caches/…" lines); older versions printed a
-            # "Run `brew bundle cleanup --force`…" trailer. Reset on either so
-            # cache paths never leak in as bogus "formula" removals.
+            # Reset on the cache-pruning / trailer sections so their paths never
+            # leak in as bogus "formula" removals.
             /^Would .brew cleanup.:/     { kind = "";        next }
             /^Run .brew bundle cleanup/  { kind = "";        next }
             kind && NF                   { print kind "\t" $0 }
         '
 }
 
-# Internal: remove one package, routing casks through --cask and taps through
-# `brew untap` (taps can't be `brew uninstall`ed). Split out so the
-# cask/formula/tap dispatch is unit-testable without a TTY.
+# Internal: remove one package, routing casks and taps to the right subcommand.
+# Split out so the dispatch is unit-testable without a TTY.
 _chez_brew_uninstall_one() {
     if [ "$1" = cask ]; then
         brew uninstall --cask "$2"
@@ -582,9 +411,8 @@ _chez_brew_uninstall_one() {
     fi
 }
 
-# Drift detection: report brew packages installed locally but not tracked in
-# any Brewfile. Inverse of `chezmoi diff` — catches what you `brew install`d
-# casually and forgot to add to the repo. Reports only; use `chezmirror` to act.
+# Report brew packages installed locally but tracked in no Brewfile. Reports only;
+# use `chezmirror` to act.
 chezaudit() {
     local untracked
     untracked=$(_chez_brew_untracked)
@@ -600,32 +428,13 @@ chezaudit() {
     fi
 }
 
-# Enforce the Brewfile as the source of truth in the REMOVAL direction:
-# uninstall Homebrew packages listed in no Brewfile. The additive direction
-# (installing what the Brewfiles list) already runs on every `chez` via the
-# brew-bundle hook; this is its deliberate, confirmed counterpart — NOT wired
-# into `chez`, because a routine apply should never silently uninstall.
-#
-# Destructive, so by default it asks PER PACKAGE (gum when present, plain read
-# otherwise): you approve each uninstall individually rather than one all-or-
-# nothing gate. The untracked set is the UNION of all Brewfile tiers (see
-# _chez_brew_removals), so a package tracked in a profile/module you don't
-# currently use is preserved.
-#
-# Accept-all mode — uninstall the ENTIRE untracked set so installed state mirrors
-# the Brewfiles in one go:
-#   chezmirror --all   (aliases: -a, --yes, -y)   one bulk confirmation, then all
-#   YES=1 chezmirror                               accept-all, skip even that
-#                                                  (same YES=1 knob as chez/chezup)
-# The TTY guard still applies: with no controlling terminal it removes nothing.
+# Enforce the Brewfile in the REMOVAL direction: uninstall packages in no Brewfile
+# tier. Deliberately NOT wired into `chez` (a routine apply should never silently
+# uninstall). Asks per package by default; --all/-a does one bulk confirm; YES=1
+# skips even that. No controlling terminal ⇒ removes nothing.
 chezmirror() {
-    # Repo root, baked in at apply time (git working tree; source dir is src/).
     local src={{ .chezmoi.workingTree | quote }}
 
-    # Accept-all + its bulk-confirm gate. The repo-wide YES=1 knob implies
-    # accept-all AND skips the one confirmation (non-interactive, matching
-    # "YES=1 skip confirm" in chez/chezup); the flags imply accept-all but still
-    # ask once before wiping the whole set.
     local all=0 bulk_confirm=1 arg
     [ "${YES:-}" = 1 ] && { all=1; bulk_confirm=0; }
     for arg in "$@"; do
@@ -657,17 +466,13 @@ chezmirror() {
     printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
     echo
 
-    # Belt-and-braces: never uninstall without a controlling terminal to confirm
-    # at (CI, cron, a piped shell). `[ -r /dev/tty ]` is unreliable here — the
-    # device's perm bits read rw even with no controlling tty — so actually try
-    # to OPEN it; a failed open is the real "no terminal" signal.
+    # `[ -r /dev/tty ]` is unreliable (perm bits read rw with no controlling tty),
+    # so actually try to open it — a failed open is the real "no terminal" signal.
     if ! { : </dev/tty; } 2>/dev/null; then
         echo "No TTY — not removing. Re-run interactively to confirm each."
         return 0
     fi
 
-    # Accept-all: one gate for the whole batch (skipped under YES=1), then the
-    # loop below skips the per-package prompt.
     if [ "$all" -eq 1 ] && [ "$bulk_confirm" -eq 1 ]; then
         local count ok
         count=$(printf '%s\n' "$parsed" | grep -c .)
@@ -683,12 +488,8 @@ chezmirror() {
     fi
 
     local kind name reply ok removed=0 kept=0
-    # Feed the package list on fd 3, NOT stdin: `gum confirm` (bubbletea) reads
-    # its keypresses from stdin, so if the loop's `read` consumed fd 0 from the
-    # here-string, gum would read the package list instead of the user — silently
-    # auto-answering "no" and draining the list after ~1 item (removed 0, kept N).
-    # Keeping stdin on the terminal lets gum prompt for real; the plain-read
-    # fallback already reads </dev/tty for the same reason.
+    # Feed the list on fd 3, NOT stdin: `gum confirm` reads keypresses from stdin,
+    # so a here-string on fd 0 would make gum auto-answer "no" and drain the list.
     while IFS=$'\t' read -r kind name <&3; do
         [ -n "$name" ] || continue
         if [ "$all" -eq 1 ]; then
@@ -714,10 +515,8 @@ chezmirror() {
     return 0
 }
 
-# Discoverability: print every dotfiles verb, grouped by how often you reach for
-# it, with a one-line description each. Static text (no subprocesses) so it's
-# instant. Mirrors the command reference in README.md / docs/commands.md — keep
-# the three in sync when adding or renaming a verb.
+# Print every dotfiles verb, grouped by frequency. Static text (no subprocesses).
+# Mirrors README.md / docs/commands.md — keep the three in sync.
 chezhelp() {
     cat <<'EOF'
 
@@ -753,21 +552,13 @@ chezhelp() {
 EOF
 }
 
-# ─── Zellij (terminal multiplexer) ────────────────────────────────────────────
-# One Ghostty window = one Zellij session. The first window in a project gets
-# the project name; later windows in the same directory get "-2", "-3"… so two
-# windows never attach to the same session as co-clients (which mirrors
-# keystrokes between them). EXITED sessions are resurrected before a new
-# suffix is minted; running sessions count as occupied even if detached —
-# zellij can't cheaply report attached clients, so we trade an occasional
-# extra session for never mirroring. Two windows spawned in the same instant
-# could race to the same free name; human-paced window opening makes that
-# negligible.
+# ─── Zellij ───────────────────────────────────────────────────────────────────
+# One Ghostty window = one Zellij session. First window in a project gets the
+# project name; later windows in the same dir get "-2", "-3"… so two windows never
+# co-attach to one session (which mirrors keystrokes). Exited sessions are
+# resurrected before a new suffix is minted; running-but-detached counts as busy.
 
-# Session name from arg or cwd basename. $HOME maps to "home" (a Ghostty tab
-# opened at ~ shouldn't create a session called "martin"). Zellij only forbids
-# empty, ".", ".." and "/" in names; we also fold spaces and lowercase for
-# predictable `zellij attach <name>` typing.
+# Session name from arg or cwd basename. $HOME → "home"; fold spaces and lowercase.
 _zj_session_name() {
     local name="${1:-}"
     if [[ -z "$name" ]]; then
@@ -782,12 +573,11 @@ _zj_session_name() {
     print -r -- "${(L)name:-home}"
 }
 
-# First free session name for base $1: "<base>", else "<base>-2", "<base>-3"…
-# EXITED sessions count as free (`attach -c` resurrects them).
+# First free session name for base $1: "<base>", else "<base>-2"… Exited sessions
+# count as free (`attach -c` resurrects them).
 _zj_pick_session() {
     local base="$1" out line name
     local -A running=()
-    # No sessions at all ⇒ non-zero exit + message; treat as empty list.
     out="$(command zellij list-sessions --no-formatting 2>/dev/null)" || out=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
@@ -802,10 +592,8 @@ _zj_pick_session() {
     print -r -- "$candidate"
 }
 
-# zj [name]  — no arg: attach to the first FREE session for cwd (new window ⇒
-#              new session). With a name: attach even if running — joining an
-#              existing session on purpose is the point of naming it.
-# zj -l      — list sessions.
+# zj [name]  no arg: attach to first free session for cwd. With a name: attach even
+#            if running (joining a named session on purpose). zj -l lists.
 zj() {
     if [[ "${1:-}" == "-l" || "${1:-}" == "--list" ]]; then
         zellij list-sessions
@@ -817,67 +605,50 @@ zj() {
         zellij attach -c "$(_zj_pick_session "$(_zj_session_name)")"
     fi
 }
-# Housekeeping: dead sessions accumulate with session_serialization on.
 alias zjclean='zellij delete-all-sessions -y'
 
 if [[ -n "$ZELLIJ" ]]; then
-    # Inside a pane Ghostty's shell integration is NOT injected, so set the
-    # OSC 2 title ourselves: short path at the prompt (same format Ghostty
-    # uses), the running command during execution. Zellij turns this into the
-    # pane-frame title; Claude Code overwrites it with its own status while
-    # running, and precmd only fires after it exits — no fighting.
+    # Inside a pane Ghostty's shell integration isn't injected, so set the OSC 2
+    # title ourselves: short path at the prompt, running command during execution.
     _zj_title_precmd()  { print -n "\e]2;${(%):-%(4~|…/%3~|%~)}\a"; }
     _zj_title_preexec() { print -rn -- $'\e]2;'"${1//[[:cntrl:]]}"$'\a'; }
-    # Tab name follows cwd. Renames the focused tab — chpwd fires in the pane
-    # you're typing in, so that's the right one; with several panes in one tab
-    # the last cd wins, and manual renames get overwritten by the next cd.
     _zj_rename_tab() { command zellij action rename-tab "${PWD:A:t}" 2>/dev/null; }
     autoload -Uz add-zsh-hook
     add-zsh-hook precmd  _zj_title_precmd
     add-zsh-hook preexec _zj_title_preexec
     add-zsh-hook chpwd   _zj_rename_tab
-    # Name the tab after this pane's starting directory (fixes "Tab #1").
     _zj_rename_tab
 elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION" \
         && -t 1 ]] && command -v zellij >/dev/null; then
-    # Auto-attach only in Ghostty — IntelliJ/VS Code terminals stay bare.
-    # Plain call (not exec): detaching or killing the session drops you back
-    # to a working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
+    # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to a
+    # working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
     zellij attach -c "$(_zj_pick_session "$(_zj_session_name)")"
 fi
 
 {{ if eq .profile "work" -}}
-# ─── Work-only shell config (rendered because profile = {{ .profile }}) ───────
-# Edit by changing the `{{`{{`}} if eq .profile "work" ... block in
-# dot_config/zsh/dot_zshrc.tmpl, then `chezmoi apply -v`.
-
-# Add work-only env vars, aliases, or hooks below as needed:
+# ─── Work-only shell config ───────────────────────────────────────────────────
 # export CORP_VPN_PROFILE="default"
 # alias k="kubectl --context=work-prod"
 {{ end -}}
 
 {{ if eq .profile "personal" -}}
-# ─── Personal-only shell config (rendered because profile = {{ .profile }}) ───
-# Add personal-only env vars, aliases, or hooks below as needed:
+# ─── Personal-only shell config ───────────────────────────────────────────────
 # alias music='open -a "Spotify"'
 {{ end -}}
 
 # ─── Local overrides (not versioned) ──────────────────────────────────────────
 [ -f "$ZDOTDIR/.zshrc.local" ] && source "$ZDOTDIR/.zshrc.local"
 
-# ─── zsh-autosuggestions (brew) — fish-like type-ahead from history ───────────
-# As you type, suggests the most recent matching command from history in dim
-# text. Press → (or End, or Ctrl-E) to accept, Ctrl-→ to accept one word.
+# ─── zsh-autosuggestions ──────────────────────────────────────────────────────
 if [ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 {{ if has "theme" (dig "modules" (list) .) -}}
-    # Catppuccin Frappé `overlay0` — readable but unmistakably suggestion-grey
+    # Catppuccin Frappé overlay0 — readable but unmistakably suggestion-grey.
     ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#737994'
 {{ end -}}
 fi
 
-# ─── zsh-syntax-highlighting (brew) — MUST be sourced LAST ────────────────────
-# Required to be the final addition per upstream docs.
+# ─── zsh-syntax-highlighting — MUST be sourced LAST (upstream requirement) ─────
 if [ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]; then
     source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi

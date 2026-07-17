@@ -1,83 +1,42 @@
-# ~/.zshenv — read by every zsh invocation (interactive, login, scripts) BEFORE any
-# other rc file. Only file that MUST stay in $HOME, because zsh reads it before
-# environment variables are set.
-#
-# Keep this minimal. Only env vars universally needed go here.
-# Interactive shell config (aliases, completions, history opts) lives in
-# $ZDOTDIR/.zshrc — see ~/.config/zsh/.zshrc.
+# ~/.zshenv — read by every zsh invocation before any other rc file. Must stay in
+# $HOME. Keep minimal: universal env vars only; interactive config is in $ZDOTDIR/.zshrc.
 
-# ─── Tell zsh where to find the rest of its config ────────────────────────────
+# ─── Config location ──────────────────────────────────────────────────────────
 export ZDOTDIR="$HOME/.config/zsh"
 
 # ─── XDG Base Directory paths ─────────────────────────────────────────────────
-# These are the spec defaults; setting explicitly so XDG-aware tools agree.
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_CACHE_HOME="$HOME/.cache"
 
 # ─── Redirect tool dirs out of $HOME into XDG paths ───────────────────────────
-export GRADLE_USER_HOME="$XDG_CONFIG_HOME/gradle"   # was ~/.gradle
-export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"       # was ~/.npm
-export HISTFILE="$XDG_STATE_HOME/zsh/history"       # was ~/.zsh_history
-# git auto-detects ~/.config/git/{config,ignore} — no env var needed.
+export GRADLE_USER_HOME="$XDG_CONFIG_HOME/gradle"
+export NPM_CONFIG_CACHE="$XDG_CACHE_HOME/npm"
+export HISTFILE="$XDG_STATE_HOME/zsh/history"
 
-# Claude Code reads its config dir from $CLAUDE_CONFIG_DIR (default: ~/.claude).
-# Point it at the XDG location so ~/.config/claude/CLAUDE.md is the user memory.
-# Set in .zshenv (not .zshrc) so every zsh invocation — including non-interactive
-# scripts and editor/IDE-spawned subshells — sees it.
+# Set in .zshenv (not .zshrc) so non-interactive and IDE subshells see it too.
 export CLAUDE_CONFIG_DIR="$XDG_CONFIG_HOME/claude"
 
 # ─── Editor ───────────────────────────────────────────────────────────────────
-# git has its own core.editor, but everything else (kubectl edit, crontab -e,
-# gh, fzf binds, `git rebase -i` when core.editor is unset, etc.) falls back to
-# $VISUAL/$EDITOR — otherwise vi/nano. Set both so the whole system agrees.
+# Everything without its own editor setting falls back to $VISUAL/$EDITOR.
 export EDITOR=nvim
 export VISUAL=nvim
 
-# ─── Disable Apple Terminal session-save (we use Ghostty; .zsh_sessions is clutter) ─
+# Ghostty only; disables Apple Terminal's .zsh_sessions clutter.
 export SHELL_SESSIONS_DISABLE=1
 
-# ─── True-color advertisement ─────────────────────────────────────────────────
-# Ghostty auto-sets this, but setting it explicitly in .zshenv ensures any
-# tool spawned from a subshell (editors, pagers, scripts) also sees it — without
-# relying on terminal-detection heuristics.
+# Set explicitly so subshells advertise truecolor without detection heuristics.
 export COLORTERM=truecolor
 
 # ─── Pager behaviour ──────────────────────────────────────────────────────────
-# Default `less` is "stay open until q", with no on-screen reminder that q is
-# the way out. That makes short diffs feel like you're stuck in vim — chezmoi
-# diff, git log, git diff, etc. all hit this.
-#
-#   F = quit-if-one-screen   short output auto-exits, no key needed
-#   R = raw ANSI colors      delta's syntax highlighting comes through
-#   K = quit on interrupt    Ctrl-C exits less (instead of just interrupting
-#                            an in-progress search)
-#   -P… = custom prompt      Replaces the cryptic default ":" / "(END)" status
-#                            line with a visible reminder of how to escape.
-#
-# NOT using -X (no-terminal-init): with -X, less prints content + status line
-# to your normal terminal stream, which means the "Press q…" prompt sticks
-# around in your scrollback as a stale artifact every time less auto-quits.
-# Without -X, less uses the alternate-screen buffer — content and prompt
-# vanish cleanly on exit, leaving your terminal as it was before. To re-view a
-# diff, just re-run the command.
-#
-# Three ways to escape any pager: q · Ctrl-C · (short content auto-exits).
-# The -P prompt runs to the end of the option string, so its spaces need no
-# inner quoting — and less does NOT strip quotes from $LESS, so any quotes here
-# would print literally in the status line. The outer single-quotes already keep
-# the whole value one shell word; that's all that's needed.
+# -FRK: quit-if-one-screen, raw ANSI (delta colors), Ctrl-C quits. Deliberately
+# no -X so less uses the alt-screen buffer and clears cleanly on exit. less
+# doesn't strip quotes from $LESS, so the -P prompt is left unquoted.
 export LESS='-FRK -PPress q or Ctrl-C to quit · / search · h for help'
-
-# Keep less's search history out of $HOME (~/.lesshst). Redirect to XDG state;
-# use "-" instead if you'd rather not persist search history at all.
 export LESSHISTFILE="$XDG_STATE_HOME/less/history"
 
 # ─── PATH ─────────────────────────────────────────────────────────────────────
-# Dedup PATH/fpath (keep first occurrence) for every zsh invocation, so nested
-# shells and re-sourcing never accumulate duplicates. The actual prepends
-# (~/.local/bin, Homebrew) live in ~/.config/zsh/.zprofile — they must run AFTER
-# macOS's /etc/zprofile invokes `path_helper`, which otherwise rebuilds PATH with
-# /etc/paths first and would sink anything prepended here below /usr/bin.
+# Dedup for every invocation. Actual prepends live in .zprofile — they must run
+# after /etc/zprofile's path_helper, which would otherwise sink them below /usr/bin.
 typeset -U path fpath PATH

@@ -1,12 +1,8 @@
-# Starship prompt — managed by chezmoi
-# Reference: https://starship.rs/config/
-# Edit via: chezmoi edit ~/.config/starship.toml
+# Starship prompt — managed by chezmoi. https://starship.rs/config/
 
 palette = "catppuccin_frappe"
 
-# Two-line prompt: context info on line 1, prompt char on line 2.
-# Only show modules relevant to backend dev and cloud context. Modules disable
-# themselves when irrelevant.
+# Two-line prompt: context on line 1, prompt char on line 2.
 format = """
 $directory\
 $git_branch$git_status\
@@ -77,9 +73,6 @@ style   = "yellow"
 format  = 'via [${symbol}${pyenv_prefix}(${version} )(\($virtualenv\) )]($style)'
 
 # ── Tooling context ───────────────────────────────────────────────────────────
-# Both modules are self-scoping: terraform only shows when a .tf file / .terraform
-# dir is present, docker_context only when a Dockerfile/compose file exists AND
-# the active context isn't the default — so neither clutters unrelated dirs.
 [terraform]
 symbol = "󱁢 "
 style  = "mauve"
@@ -96,8 +89,7 @@ symbol     = "⎈ "
 style      = "teal"
 disabled   = false
 format     = '[$symbol$context( ($namespace))]($style) '
-# Don't blast the prompt with the cluster name in every dir — only show when
-# you're actually working in a project that touches k8s.
+# Only surface in dirs that actually touch k8s, not everywhere.
 detect_files     = ["k8s.yaml", "k8s.yml", "kustomization.yaml", "Chart.yaml", "skaffold.yaml"]
 detect_folders   = ["k8s", "kubernetes", "manifests", "charts"]
 
@@ -114,7 +106,6 @@ format   = '[($symbol$account)(@$domain)( \($project\)) ]($style)'
 detect_env_vars = ["CLOUDSDK_CORE_ACCOUNT", "GOOGLE_CLOUD_PROJECT"]
 disabled = false
 
-# AWS module disabled — not part of my cloud stack.
 [aws]
 disabled = true
 
@@ -125,7 +116,6 @@ format           = "took [$duration](peach) "
 show_milliseconds = false
 
 # ── Modules turned off ────────────────────────────────────────────────────────
-# Cleaner prompt — re-enable any of these by deleting the `disabled = true` line.
 [battery]
 disabled = true
 
