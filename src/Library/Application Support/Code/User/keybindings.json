@@ -7,5 +7,17 @@
     { "key": "cmd+ctrl+up", "command": "workbench.action.toggleMaximizeEditorGroup" },
 
     // Terminal
-    { "key": "cmd+ctrl+t", "command": "workbench.action.terminal.split", "when": "terminalFocus" }
+    { "key": "cmd+ctrl+t", "command": "workbench.action.terminal.split", "when": "terminalFocus" },
+
+    // Swift/iOS (Sweetpad) — Xcode-style build loop. Scoped to Swift files so
+    // cmd+r doesn't hijack Java/Kotlin/TS work; drop the `when` for global.
+    // cmd+ctrl+r (not cmd+.) stops, since cmd+. is the Quick Fix chord.
+    { "key": "cmd+r", "command": "sweetpad.build.launch", "when": "editorLangId == swift" },
+    {
+        "key": "cmd+shift+r",
+        "command": "runCommands",
+        "args": { "commands": ["sweetpad.build.clean", "sweetpad.build.launch"] },
+        "when": "editorLangId == swift"
+    },
+    { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" }
 ]
