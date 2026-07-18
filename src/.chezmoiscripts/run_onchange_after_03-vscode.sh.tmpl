@@ -39,13 +39,17 @@ installed_extensions() {
     code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
 }
 
-# One manifest drives both install and prune. With the locale module off, drop the
-# Norwegian dictionary from it so the two directions stay consistent.
-{{ if has "locale" (dig "modules" (list) .) -}}
-MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE")"
-{{ else -}}
-MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE" "streetsidesoftware.code-spell-checker-norwegian-bokmal")"
+# One manifest drives both install and prune. Entries owned by an optional module
+# are excluded when that module is off, so install and prune stay consistent
+# instead of fighting each other every apply.
+EXCLUDES=()
+{{ if not (has "locale" (dig "modules" (list) .)) -}}
+EXCLUDES+=("streetsidesoftware.code-spell-checker-norwegian-bokmal") # locale module
 {{ end -}}
+{{ if not (has "appleDev" (dig "modules" (list) .)) -}}
+EXCLUDES+=("swiftlang.swift-vscode" "sweetpad.sweetpad" "vadimcn.vscode-lldb") # appleDev module
+{{ end -}}
+MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE" ${EXCLUDES[@]+"${EXCLUDES[@]}"})"
 
 install_marketplace_extensions() {
     local installed ext

@@ -516,6 +516,20 @@
         }
     },
 
+    // Swift/iOS (appleDev module). Official Swift extension drives SourceKit-LSP;
+    // Sweetpad wraps xcodebuild/simulator/debug and formats via Homebrew swiftformat
+    // — the same binary a build phase or pre-commit hook calls. See docs/editors.md.
+{{ if has "appleDev" (dig "modules" (list) .) -}}
+    "[swift]": {
+        "editor.defaultFormatter": "sweetpad.sweetpad",
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
+    },
+    "swift.backgroundIndexing": true,
+    "sweetpad.format.path": "/opt/homebrew/bin/swiftformat",
+    "sweetpad.build.xcbeautifyEnabled": true,
+{{ end -}}
+
     // =========================================================
     // PERFORMANCE
     // =========================================================

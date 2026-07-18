@@ -28,7 +28,31 @@ extensions are managed by chezmoi.
   pack, Kotlin, Gradle/Maven, plus Terraform, Kubernetes, Helm, Docker, Postgres,
   Python/Ruff, and shell/YAML/TOML tooling. Several extensions are backed by CLIs
   from the Brewfile (hadolint, shellcheck, shfmt, helm, minikube) so they use the
-  pinned binary instead of downloading their own.
+  pinned binary instead of downloading their own. A few entries are **module-gated**
+  in the hook — excluded from install *and* prune when the module is off: the
+  Norwegian dictionary (`locale`), and the Swift/iOS extensions (`appleDev`, below).
+
+### Swift / iOS in VS Code (`appleDev`)
+
+The goal is to keep VS Code as the daily driver and drop into Xcode only when
+something genuinely needs it (Interface Builder, asset catalogs, signing UI). Three
+gated extensions plus one Homebrew tool make that work:
+
+- **`swiftlang.swift-vscode`** — the official Swift extension; drives SourceKit-LSP
+  for completion, diagnostics, and jump-to-def. SourceKit-LSP itself ships inside
+  Xcode and follows `xcode-select`, so keep an Xcode selected via `xcodes`.
+- **`sweetpad.sweetpad`** — the Xcode-replacement half: build/run/debug on the
+  Simulator, a destination picker, and `xcbeautify`'d output. It shells out to
+  `xcodebuild` and formats through Homebrew **swiftformat** (`[swift]` formatter).
+- **`vadimcn.vscode-lldb`** (CodeLLDB) — the debugger Sweetpad drives for
+  breakpoints and stepping.
+- **`xcode-build-server`** (Brewfile) — the missing bridge for
+  `.xcodeproj`/`.xcworkspace` projects: it writes `buildServer.json` so
+  SourceKit-LSP knows how each file compiles. Plain SwiftPM packages don't need it;
+  app projects do. Run Sweetpad's *“Generate Build Server Config”* once per project.
+
+Shell shortcuts (`xcb`, `xcderived`, `simulator`) come with the same module — see
+[shell.md](shell.md). None of this touches the `work`/`minimal` profiles.
 
 ## Neovim
 

@@ -1,4 +1,7 @@
 # Marketplace extensions installed by .chezmoiscripts/run_onchange_after_03-vscode.sh.tmpl.
+# A few entries are module-gated in that hook (excluded from install/prune when the
+# module is off): the Norwegian dictionary (locale); swiftlang.swift-vscode,
+# sweetpad.sweetpad, vadimcn.vscode-lldb (appleDev).
 catppuccin.catppuccin-vsc
 adpyke.codesnap
 anthropic.claude-code
@@ -36,10 +39,13 @@ redhat.vscode-yaml
 sonarsource.sonarlint-vscode
 streetsidesoftware.code-spell-checker
 streetsidesoftware.code-spell-checker-norwegian-bokmal
+sweetpad.sweetpad
+swiftlang.swift-vscode
 tamasfe.even-better-toml
 tim-koehler.helm-intellisense
 timonwong.shellcheck
 usernamehw.errorlens
+vadimcn.vscode-lldb
 vivaxy.vscode-conventional-commits
 vscjava.vscode-gradle
 vscjava.vscode-java-debug
