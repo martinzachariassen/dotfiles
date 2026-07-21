@@ -2,6 +2,7 @@ acks
 allopen
 assertj
 cloudsdktool
+Efla
 fasterxml
 flywaydb
 fwcd
@@ -16,6 +17,8 @@ readinessstate
 springframework
 stdlib
 temurin
+uitest
 vscjava
 Xjsr
+Zachariassen
 zaxxer

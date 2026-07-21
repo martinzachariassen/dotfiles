@@ -11,3 +11,5 @@ AGENTS.md
 # Optional per-module content: when a module isn't selected its files are ignored.
 {{ $modules := dig "modules" (list) . -}}
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
+{{ if not (has "appleDev" $modules) }}.swiftformat
+.config/swiftlint{{ end }}

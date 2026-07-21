@@ -1,0 +1,23 @@
+# ~/.swiftformat — global SwiftFormat defaults (appleDev module).
+#
+# Homebrew ships Nick Lockwood's swiftformat, not Apple's swift-format. SwiftFormat
+# walks up the directory tree from each file, so this file applies to any Swift
+# project under $HOME that has no closer .swiftformat — and any project's own
+# .swiftformat overrides it wholesale. The VS Code SwiftFormat extension (vknabel)
+# and any CLI/pre-commit run invoke this same binary, so editor and command line
+# stay in lockstep.
+
+--swiftversion 6.0            # per-project .swift-version file overrides this
+
+--indent 4                    # matches editor.tabSize in the VS Code [swift] block
+--maxwidth 120                # wrap long lines — kept in sync with SwiftLint line_length
+
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+
+--commas inline
+--self init-only              # keep an explicit self only where the compiler needs it
+--stripunusedargs closure-only
+--importgrouping testable-bottom
