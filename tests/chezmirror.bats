@@ -170,6 +170,23 @@ EOF
     done
 }
 
+@test "_chez_brew_removals sweeps in a newly-added tier (apple-dev glob regression)" {
+    # The original bug: the helper hardcoded four tier filenames and silently
+    # ignored a fifth one added later (Brewfile.apple-dev), so every package
+    # tracked ONLY there read as untracked and got queued for uninstall. The tier
+    # set must be the `Brewfile.*` glob, so ANY new tier is honoured with no code
+    # change. Drop a fifth tier the hardcoded list never knew about and prove its
+    # contents reach brew's stdin.
+    printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    grep -qF marker-appledev "$STDIN_LOG" || {
+        echo "the apple-dev tier never reached brew stdin (glob regressed):"
+        cat "$STDIN_LOG"
+        return 1
+    }
+}
+
 @test "_chez_brew_removals passes a single --file=- (never multiple --file)" {
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
@@ -301,6 +318,98 @@ EOF
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
     [[ "$output" == *"removed 3 · kept 0"* ]]
+}
+
+@test "chezmirror removes an interdependent set despite deps-first order (retry passes)" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # `brew bundle cleanup` lists a dependency BEFORE its dependent, so a one-shot
+    # uninstall of that order fails ("still required by …") on the dep — the exact
+    # symptom chezmirror showed. Model it: `libpng` refuses until `cairo` is gone,
+    # and CANNED lists libpng first. The retry-in-passes loop must still clear both.
+    cat >"$CANNED" <<'EOF'
+Would uninstall formulae:
+libpng
+cairo
+EOF
+    # Stateful stub: uninstalling libpng fails while cairo is still installed.
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
+    cat >/dev/null            # drain the piped-in union
+    cat "$CANNED" 2>/dev/null # emit the canned preview
+    exit 0
+fi
+if [ "\$1" = uninstall ]; then
+    shift
+    if [ "\$*" = libpng ] && ! grep -qx cairo "$UNINSTALL_LOG" 2>/dev/null; then
+        echo "Error: Refusing to uninstall libpng because it is required by cairo" >&2
+        exit 1
+    fi
+    printf '%s\n' "\$*" >>"$UNINSTALL_LOG"
+    exit 0
+fi
+exit 0
+EOF
+    chmod +x "$STUBS/brew"
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    # Both removed, cairo first (it unblocked libpng), nothing left stuck. NOTE:
+    # `[[ … ]]` does NOT fail a bats test as a non-final line (bash set -e skips
+    # it), so every assertion here is a set -e-guarding simple command — `[ … ]`
+    # or `grep`. A no-op `[[ … ]]` would let a regression pass silently.
+    [ "$(sed -n 1p "$UNINSTALL_LOG")" = "cairo" ]
+    [ "$(sed -n 2p "$UNINSTALL_LOG")" = "libpng" ]
+    [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
+    grep -qF "removed 2 · kept 0" <<<"$output"
+    [ "$(grep -cF "still installed" <<<"$output")" -eq 0 ] # nothing left stuck
+}
+
+@test "chezmirror reports a package it can never remove instead of erroring out" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    # `libpng` can never be uninstalled (something outside the Brewfiles still needs
+    # it); `zlib` removes fine. The retry loop must remove zlib, give up on libpng
+    # after a no-progress pass (no infinite loop), report it once under "still
+    # installed", count it as neither removed nor kept, and still exit 0.
+    cat >"$CANNED" <<'EOF'
+Would uninstall formulae:
+libpng
+zlib
+EOF
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
+    cat >/dev/null
+    cat "$CANNED" 2>/dev/null
+    exit 0
+fi
+if [ "\$1" = uninstall ]; then
+    shift
+    [ "\$*" = libpng ] && {
+        echo "Error: Refusing to uninstall libpng because it is required" >&2
+        exit 1
+    }
+    printf '%s\n' "\$*" >>"$UNINSTALL_LOG"
+    exit 0
+fi
+exit 0
+EOF
+    chmod +x "$STUBS/brew"
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    [ "$(cat "$UNINSTALL_LOG")" = "zlib" ]     # only zlib actually left
+    # Guard with `grep`, not `[[ … ]]` — a non-final `[[ … ]]` never fails a bats
+    # test (set -e skips it), so it would rubber-stamp the old "! failed" wording.
+    grep -qF "still installed" <<<"$output"     # the stuck pkg is reported cleanly
+    grep -qF "libpng" <<<"$output"              # …by name
+    grep -qF "removed 1 · kept 0" <<<"$output"  # stuck ≠ kept (kept is declined only)
 }
 
 @test "chezmirror untaps an untracked tap end-to-end (Would untap regression)" {
