@@ -40,10 +40,14 @@ rounded pane frames showing pane titles.
 
 Interactive Ghostty shells auto-attach to Zellij; each window gets its own
 session — the project (cwd) name for the first, `-2`/`-3`… suffixes for later
-windows in the same directory, resurrecting exited sessions before minting new
-names. `zj [name]` attaches manually (an explicit name joins even a running
-session), `zjclean` prunes exited ones, and `NO_ZELLIJ=1 zsh` is the escape
-hatch for a bare shell.
+windows in the same directory. A new window always lands in a *fresh* session:
+exited sessions are pruned on startup and never silently resurrected, so a new
+tab is always clean and two windows never co-attach (which would mirror
+keystrokes). `zj [name]` attaches manually (an explicit name joins or resurrects
+a session on purpose), `zjclean` prunes exited ones, and `NO_ZELLIJ=1 zsh` is the
+escape hatch for a bare shell. Ghostty's own `window-save-state = default` (not
+`always`) keeps a relaunch from restoring every tab and multiplying detached
+sessions — Zellij owns persistence.
 
 Keybinds are Zellij's mode-based defaults — `Ctrl+P` pane mode, `Ctrl+T` tab
 mode, and `Ctrl+G` to lock/unlock Zellij's own bindings when an inner app (vim)
