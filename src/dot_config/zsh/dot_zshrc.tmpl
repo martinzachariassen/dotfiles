@@ -386,14 +386,14 @@ _chez_brew_untracked() {
 # no Brewfile tier — the authoritative removal set chezmirror acts on. Takes repo
 # root as $1; pure, so it's unit-testable against a stubbed `brew`.
 #
+# The tier set is the `Brewfile.*` glob — NOT a hardcoded list — so a newly added
+# tier (e.g. Brewfile.apple-dev) is honoured automatically; hardcoding once made
+# chezmirror flag every apple-dev package as untracked. Matches _chez_brew_untracked.
 # `brew bundle cleanup` honours only ONE --file, so tiers are concatenated onto
 # stdin (--file=-); passing several --file would read just the last tier.
 _chez_brew_removals() {
     local src=$1
-    cat "$src/packages/Brewfile" \
-        "$src/packages/Brewfile.mac-apps" \
-        "$src/packages/Brewfile.personal" \
-        "$src/packages/Brewfile.work" 2>/dev/null |
+    cat "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null |
         brew bundle cleanup --file=- 2>/dev/null | awk '
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
@@ -494,9 +494,11 @@ chezmirror() {
         [ "$ok" -eq 1 ] || { echo "aborted — nothing removed"; return 0; }
     fi
 
-    local kind name reply ok removed=0 kept=0
-    # Feed the list on fd 3, NOT stdin: `gum confirm` reads keypresses from stdin,
-    # so a here-string on fd 0 would make gum auto-answer "no" and drain the list.
+    # Phase 1 — decide. Confirm each package (unless accept-all) and collect the
+    # approved set; nothing is uninstalled yet. Feed the list on fd 3, NOT stdin:
+    # `gum confirm` reads keypresses from stdin, so a here-string on fd 0 would
+    # make gum auto-answer "no" and drain the list.
+    local kind name reply ok kept=0 approved=""
     while IFS=$'\t' read -r kind name <&3; do
         [ -n "$name" ] || continue
         if [ "$all" -eq 1 ]; then
@@ -509,12 +511,41 @@ chezmirror() {
             case "$reply" in y | Y | yes | YES) ok=1 ;; *) ok=0 ;; esac
         fi
         if [ "$ok" -eq 1 ]; then
-            _chez_brew_uninstall_one "$kind" "$name" && removed=$((removed + 1)) ||
-                echo "  ! failed (still a dependency?): $name"
+            approved+="${kind}"$'\t'"${name}"$'\n'
         else
             kept=$((kept + 1))
         fi
     done 3<<<"$parsed"
+
+    # Phase 2 — remove, retrying in passes. `brew bundle cleanup` lists deps BEFORE
+    # their dependents, so a one-shot pass fails on every shared dep ("still a
+    # dependency"). Keep looping until a whole pass removes nothing: each pass frees
+    # the leaves, unblocking the deps beneath them next time. Suppress brew's stderr
+    # so the transient "refusing to uninstall" noise doesn't leak — whatever is
+    # still stuck after no pass makes progress is reported once, cleanly.
+    # List on fd 3 again, keeping brew's stdin on the terminal — a here-string on
+    # fd 0 would become brew's stdin and, if it ever read a line, drain the pass.
+    local removed=0 pending=$approved progressed leftover
+    while [ -n "$pending" ]; do
+        progressed=0 leftover=""
+        while IFS=$'\t' read -r kind name <&3; do
+            [ -n "$name" ] || continue
+            if _chez_brew_uninstall_one "$kind" "$name" 2>/dev/null; then
+                removed=$((removed + 1))
+                progressed=1
+            else
+                leftover+="${kind}"$'\t'"${name}"$'\n'
+            fi
+        done 3<<<"$pending"
+        pending=$leftover
+        [ "$progressed" -eq 1 ] || break
+    done
+
+    if [ -n "$pending" ]; then
+        echo
+        echo "  ! still installed — a package outside your Brewfiles still needs these:"
+        printf '%s' "$pending" | awk -F'\t' 'NF { printf "      %-8s %s\n", $1, $2 }'
+    fi
 
     echo
     echo "  removed $removed · kept $kept"
