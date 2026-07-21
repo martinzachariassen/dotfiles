@@ -562,8 +562,9 @@ EOF
 # ─── Zellij ───────────────────────────────────────────────────────────────────
 # One Ghostty window = one Zellij session. First window in a project gets the
 # project name; later windows in the same dir get "-2", "-3"… so two windows never
-# co-attach to one session (which mirrors keystrokes). Exited sessions are
-# resurrected before a new suffix is minted; running-but-detached counts as busy.
+# co-attach to one session (which mirrors keystrokes). A new window always lands in
+# a *fresh* session — exited sessions are pruned, never silently resurrected — so a
+# new tab is always clean. Deliberate resurrection/join is `zj <name>`.
 
 # Session name from arg or cwd basename. $HOME → "home"; fold spaces and lowercase.
 _zj_session_name() {
@@ -580,27 +581,31 @@ _zj_session_name() {
     print -r -- "${(L)name:-home}"
 }
 
-# First free session name for base $1: "<base>", else "<base>-2"… Exited sessions
-# count as free (`attach -c` resurrects them).
+# First unused session name for base $1: "<base>", else "<base>-2"… Every existing
+# session counts as taken — running OR exited — so `attach -c` always creates a
+# brand-new session and never resurrects a stale one.
 _zj_pick_session() {
     local base="$1" out line name
-    local -A running=()
+    local -A taken=()
     out="$(command zellij list-sessions --no-formatting 2>/dev/null)" || out=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         name="${line%% \[Created*}"
-        [[ "$line" == *"(EXITED"* ]] && continue
-        running[$name]=1
+        taken[$name]=1
     done <<< "$out"
     local candidate="$base" n=2
-    while (( ${+running[$candidate]} )); do
+    while (( ${+taken[$candidate]} )); do
         candidate="${base}-$((n++))"
     done
     print -r -- "$candidate"
 }
 
-# zj [name]  no arg: attach to first free session for cwd. With a name: attach even
-#            if running (joining a named session on purpose). zj -l lists.
+# Drop exited/serialized sessions so the graveyard can't accumulate (and so a
+# fresh window keeps low suffixes). Non-force ⇒ only ever touches dead sessions.
+_zj_prune() { command zellij delete-all-sessions -y >/dev/null 2>&1; }
+
+# zj [name]  no arg: attach to a fresh session for cwd. With a name: attach even
+#            if running (joining/resurrecting a named session on purpose). zj -l lists.
 zj() {
     if [[ "${1:-}" == "-l" || "${1:-}" == "--list" ]]; then
         zellij list-sessions
@@ -629,6 +634,7 @@ elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION
         && -t 1 ]] && command -v zellij >/dev/null; then
     # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to a
     # working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
+    _zj_prune
     zellij attach -c "$(_zj_pick_session "$(_zj_session_name)")"
 fi
 

@@ -86,13 +86,13 @@ home [Created 2m ago] (current)
     [ "$output" = "dotfiles-2" ]
 }
 
-@test "_zj_pick_session resurrects an EXITED base session" {
+@test "_zj_pick_session skips an EXITED base session (never resurrects)" {
     sessions='dotfiles [Created 1m ago] (EXITED - attach to resurrect)
 home [Created 2m ago] (current)
 '
     run run_pick_session "$sessions" dotfiles
     [ "$status" -eq 0 ]
-    [ "$output" = "dotfiles" ]
+    [ "$output" = "dotfiles-2" ]
 }
 
 @test "_zj_pick_session walks past occupied suffixes" {
@@ -104,13 +104,13 @@ dotfiles-2 [Created 30s ago]
     [ "$output" = "dotfiles-3" ]
 }
 
-@test "_zj_pick_session reuses an EXITED suffix before minting a new one" {
+@test "_zj_pick_session skips an EXITED suffix instead of reusing it" {
     sessions='dotfiles [Created 1m ago]
 dotfiles-2 [Created 30s ago] (EXITED - attach to resurrect)
 '
     run run_pick_session "$sessions" dotfiles
     [ "$status" -eq 0 ]
-    [ "$output" = "dotfiles-2" ]
+    [ "$output" = "dotfiles-3" ]
 }
 
 @test "_zj_pick_session leaves an unrelated base name untouched" {
