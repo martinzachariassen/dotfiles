@@ -19,5 +19,11 @@
         "args": { "commands": ["sweetpad.build.clean", "sweetpad.build.launch"] },
         "when": "editorLangId == swift"
     },
-    { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" }
+    { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" },
+
+    // SwiftLint autocorrect on demand. It's deliberately off the save cycle
+    // (swiftlint --fix rewrites the file on disk and would race the save), so this
+    // is how you apply fixable lint violations. Formatting is separate: SwiftFormat
+    // runs on save. Scoped to Swift; no-ops if the SwiftLint extension isn't installed.
+    { "key": "cmd+ctrl+l", "command": "swiftlint.fixDocument", "when": "editorLangId == swift" }
 ]

@@ -517,17 +517,32 @@
     },
 
     // Swift/iOS (appleDev module). Official Swift extension drives SourceKit-LSP;
-    // Sweetpad wraps xcodebuild/simulator/debug and formats via Homebrew swiftformat
-    // — the same binary a build phase or pre-commit hook calls. See docs/editors.md.
+    // Sweetpad wraps xcodebuild/simulator/debug. Formatting is the SwiftFormat
+    // extension (vknabel): it pipes the buffer through Homebrew swiftformat and
+    // returns text edits, so — unlike a disk-editing CLI — it never races VS Code's
+    // save and can't trigger the "content is newer" conflict. SwiftLint surfaces the
+    // Homebrew swiftlint binary as inline diagnostics only; its --fix rewrites the
+    // file on disk, so it's kept off the save cycle (run it on demand via the
+    // keybinding, or through pre-commit). See docs/editors.md.
 {{ if has "appleDev" (dig "modules" (list) .) -}}
     "[swift]": {
-        "editor.defaultFormatter": "sweetpad.sweetpad",
+        "editor.defaultFormatter": "vknabel.vscode-swiftformat",
         "editor.tabSize": 4,
-        "editor.detectIndentation": false
+        "editor.detectIndentation": false,
+        // No on-save code actions: swiftlint --fix would edit the file on disk and
+        // race the save. Empty object overrides the global source.organizeImports.
+        "editor.codeActionsOnSave": {}
     },
     "swift.backgroundIndexing": true,
-    "sweetpad.format.path": "/opt/homebrew/bin/swiftformat",
+    // SwiftFormat feeds the file via stdin and resolves .swiftformat by ascending
+    // from it (~/.swiftformat is the global fallback), so nothing is written to disk.
+    "swiftformat.path": "/opt/homebrew/bin/swiftformat",
     "sweetpad.build.xcbeautifyEnabled": true,
+    "swiftlint.path": "/opt/homebrew/bin/swiftlint",
+    // SwiftLint doesn't ascend to $HOME, so point the extension at the global
+    // config as a fallback. A project's own .swiftlint.yml is listed first and
+    // wins; the home file (deployed by chezmoi) applies everywhere else.
+    "swiftlint.configSearchPaths": [".swiftlint.yml", "{{ .chezmoi.homeDir }}/.config/swiftlint/config.yml"],
 {{ end -}}
 
     // =========================================================

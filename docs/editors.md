@@ -35,21 +35,61 @@ extensions are managed by chezmoi.
 ### Swift / iOS in VS Code (`appleDev`)
 
 The goal is to keep VS Code as the daily driver and drop into Xcode only when
-something genuinely needs it (Interface Builder, asset catalogs, signing UI). Three
-gated extensions plus one Homebrew tool make that work:
+something genuinely needs it (Interface Builder, asset catalogs, signing UI). Five
+gated extensions plus two Homebrew tools make that work:
 
 - **`swiftlang.swift-vscode`** — the official Swift extension; drives SourceKit-LSP
   for completion, diagnostics, and jump-to-def. SourceKit-LSP itself ships inside
   Xcode and follows `xcode-select`, so keep an Xcode selected via `xcodes`.
 - **`sweetpad.sweetpad`** — the Xcode-replacement half: build/run/debug on the
   Simulator, a destination picker, and `xcbeautify`'d output. It shells out to
-  `xcodebuild` and formats through Homebrew **swiftformat** (`[swift]` formatter).
+  `xcodebuild`. It is *not* wired up as the `[swift]` formatter: Sweetpad formats
+  by invoking `swiftformat` in place on disk, which races VS Code's save and
+  produces the "content of the file is newer" conflict (worse under
+  `files.autoSave: afterDelay`). Formatting is delegated to the SwiftFormat
+  extension instead (below); Sweetpad keeps build/run/debug only.
+- **`vknabel.vscode-swiftformat`** — the `[swift]` formatter. Runs the *same*
+  Homebrew **swiftformat** binary (`swiftformat.path`) and the *same* `~/.swiftformat`
+  config, but pipes the buffer through stdin and returns text edits for VS Code to
+  apply to the in-memory document — no on-disk write, so format-on-save never races
+  the save. This is the fix for the save-conflict prompt the disk-editing formatters
+  caused.
 - **`vadimcn.vscode-lldb`** (CodeLLDB) — the debugger Sweetpad drives for
   breakpoints and stepping.
+- **`vknabel.vscode-swiftlint`** — surfaces Homebrew **swiftlint** as inline
+  diagnostics (`swiftlint.path`), reusing the same binary a build phase or
+  pre-commit hook would call. SourceKit-LSP itself doesn't lint. Autocorrect is
+  **off the save cycle**: `swiftlint --fix` rewrites the file on disk (`source.fixAll`
+  invokes `source.fixAll.swiftlint`, which spawns the CLI against the file path), the
+  same save-conflict mechanism as the disk-editing formatter — so `[swift]` sets
+  `editor.codeActionsOnSave: {}`. Apply fixable violations on demand with
+  `cmd+ctrl+l` (bound to `swiftlint.fixDocument`) or via pre-commit; SwiftFormat
+  already covers most autocorrectable style on save. Note: the extension is archived
+  upstream (unmaintained) as of writing; if it ever breaks against a newer VS
+  Code/Swift toolchain there's no active fork to fall back to yet.
 - **`xcode-build-server`** (Brewfile) — the missing bridge for
   `.xcodeproj`/`.xcworkspace` projects: it writes `buildServer.json` so
   SourceKit-LSP knows how each file compiles. Plain SwiftPM packages don't need it;
   app projects do. Run Sweetpad's *“Generate Build Server Config”* once per project.
+
+The extensions run the binaries; two committed config files supply the *rules*,
+deployed to `$HOME` and gated on `appleDev`:
+
+- [`src/dot_swiftformat`](../src/dot_swiftformat) → `~/.swiftformat`. SwiftFormat
+  ascends the directory tree from each file, so this applies to every Swift project
+  under `$HOME` without a closer `.swiftformat`, and a project's own file overrides
+  it. The key line is `--maxwidth 120`: SwiftFormat's default is *no* wrapping, so
+  long lines were never reformatted even though SwiftLint flagged them.
+- [`src/dot_config/swiftlint/config.yml`](../src/dot_config/swiftlint/config.yml) →
+  `~/.config/swiftlint/config.yml`. SwiftLint *doesn't* ascend to `$HOME`, so the
+  VS Code extension wires it in via `swiftlint.configSearchPaths` — project
+  `.swiftlint.yml` first, this file as the fallback. `line_length` is pinned to 120
+  to match SwiftFormat, so the linter and formatter agree on where a line is too
+  long instead of one flagging what the other won't fix.
+
+Line length is the one rule the two must agree on: SwiftLint only *warns* about it
+(it can't autocorrect line length), while SwiftFormat is what actually wraps — so
+both are set to 120.
 
 Shell shortcuts (`xcb`, `xcderived`, `simulator`) come with the same module — see
 [shell.md](shell.md). None of this touches the `work`/`minimal` profiles.
