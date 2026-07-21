@@ -120,3 +120,50 @@ dotfiles-2 [Created 30s ago] (EXITED - attach to resurrect)
     [ "$status" -eq 0 ]
     [ "$output" = "fresh" ]
 }
+
+# Run _zj_session_name (no arg) with cwd $1 and a stub `git` whose
+# rev-parse --show-toplevel prints $2 (empty ⇒ stub exits 1, i.e. "not a repo").
+run_session_name() {
+    local stub_dir="$BATS_TEST_TMPDIR/bin"
+    mkdir -p "$stub_dir"
+    if [ -n "$2" ]; then
+        printf '#!/bin/sh\nprintf %%s "$STUB_TOPLEVEL"\n' > "$stub_dir/git"
+    else
+        printf '#!/bin/sh\nexit 1\n' > "$stub_dir/git"
+    fi
+    chmod +x "$stub_dir/git"
+    STUB_TOPLEVEL="$2" PATH="$stub_dir:$PATH" \
+        zsh -c "cd '$1'; $(extract_fn_block _zj_session_name); _zj_session_name"
+}
+
+@test "_zj_session_name definition exists in the template" {
+    run extract_fn_block _zj_session_name
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"_zj_session_name() {"* ]]
+}
+
+@test "_zj_session_name uses the git repo root name from any subdir" {
+    mkdir -p "$BATS_TEST_TMPDIR/Proj/sub/dir"
+    run run_session_name "$BATS_TEST_TMPDIR/Proj/sub/dir" "$BATS_TEST_TMPDIR/Proj"
+    [ "$status" -eq 0 ]
+    [ "$output" = "proj" ]
+}
+
+@test "_zj_session_name falls back to \$HOME → home outside a repo" {
+    run run_session_name "$HOME" ""
+    [ "$status" -eq 0 ]
+    [ "$output" = "home" ]
+}
+
+@test "_zj_session_name falls back to cwd basename outside a repo" {
+    mkdir -p "$BATS_TEST_TMPDIR/Some Dir"
+    run run_session_name "$BATS_TEST_TMPDIR/Some Dir" ""
+    [ "$status" -eq 0 ]
+    [ "$output" = "some-dir" ]
+}
+
+@test "_zj_session_name honors an explicit argument over the repo root" {
+    run zsh -c "$(extract_fn_block _zj_session_name); _zj_session_name 'My Name'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "my-name" ]
+}

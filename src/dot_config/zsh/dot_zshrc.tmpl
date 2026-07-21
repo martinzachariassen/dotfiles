@@ -592,16 +592,22 @@ EOF
 
 # ─── Zellij ───────────────────────────────────────────────────────────────────
 # One Ghostty window = one Zellij session. First window in a project gets the
-# project name; later windows in the same dir get "-2", "-3"… so two windows never
-# co-attach to one session (which mirrors keystrokes). A new window always lands in
-# a *fresh* session — exited sessions are pruned, never silently resurrected — so a
-# new tab is always clean. Deliberate resurrection/join is `zj <name>`.
+# project name; later windows in the same project get "-2", "-3"… so two windows
+# never co-attach to one session (which mirrors keystrokes). A new window always
+# lands in a *fresh* session, and closing a window reaps its session (see the
+# TRAPHUP below), so the "-N" suffix stays low instead of climbing all day.
+# Deliberate resurrection/join is `zj <name>`.
 
-# Session name from arg or cwd basename. $HOME → "home"; fold spaces and lowercase.
+# Session name from arg, else the git repo root name so every window inside a
+# project shares one base regardless of which subdir it opened in. Outside a repo:
+# cwd basename ($HOME → "home"). Folds slashes/spaces and lowercases.
 _zj_session_name() {
     local name="${1:-}"
     if [[ -z "$name" ]]; then
-        if [[ "$PWD" == "$HOME" ]]; then
+        local root
+        if root="$(command git rev-parse --show-toplevel 2>/dev/null)" && [[ -n "$root" ]]; then
+            name="${root:t}"
+        elif [[ "$PWD" == "$HOME" ]]; then
             name="home"
         else
             name="${PWD:A:t}"
@@ -666,7 +672,13 @@ elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION
     # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to a
     # working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
     _zj_prune
-    zellij attach -c "$(_zj_pick_session "$(_zj_session_name)")"
+    _ZJ_SESSION="$(_zj_pick_session "$(_zj_session_name)")"
+    # Closing the window (PTY hangup → SIGHUP) reaps this window's own session, so
+    # detached daemons can't pile up and inflate the "-N" suffix. A manual detach
+    # returns from attach normally (no HUP) and is left alone — resurrect it later
+    # with `zj <name>`. Only ever touches the one session this window created.
+    TRAPHUP() { command zellij kill-session "$_ZJ_SESSION" >/dev/null 2>&1 }
+    zellij attach -c "$_ZJ_SESSION"
 fi
 
 {{ if eq .profile "work" -}}
