@@ -19,6 +19,11 @@ window-padding-y = 12
 window-padding-balance = true
 # `default`, not `always`: Zellij owns tab persistence; restoring here would just multiply detached sessions.
 window-save-state = default
+# New tabs/splits inherit the current tab's working directory (Ghostty default).
+# Outside Zellij this works via shell OSC 7; inside a Zellij session Zellij never
+# forwards the pane cwd to Ghostty (zellij#3811), so the .zshrc auto-attach bridges
+# it — a fresh tab reopens the last-active pane's directory before attaching.
+window-inherit-working-directory = true
 background-blur-radius = 20
 background-opacity = 0.97
 
