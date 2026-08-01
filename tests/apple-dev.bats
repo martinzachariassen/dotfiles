@@ -166,5 +166,5 @@ PY
 
 @test "swiftformat --maxwidth and swiftlint line_length are both 120" {
     grep -qE '^--maxwidth[[:space:]]+120\b' "$SRC_DIR/dot_swiftformat"
-    grep -qE '^[[:space:]]*warning:[[:space:]]*120\b' "$SRC_DIR/dot_config/swiftlint/config.yml"
+    grep -qE '^[[:space:]]*warning:[[:space:]]*120\b' "$SRC_DIR/exact_dot_config/swiftlint/config.yml"
 }

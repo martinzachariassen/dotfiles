@@ -16,9 +16,9 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    ZSHRC="$REPO_ROOT/src/exact_dot_config/zsh/dot_zshrc.tmpl"
     ZSHENV="$REPO_ROOT/src/dot_zshenv"
-    ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
+    ZPROFILE="$REPO_ROOT/src/exact_dot_config/zsh/dot_zprofile"
 }
 
 # ─── ~/.zshenv: must stay in $HOME (zsh reads it before ZDOTDIR is set) ────
@@ -137,7 +137,7 @@ setup() {
 @test "zshrc defines chezhelp and it lists every verb" {
     grep -qE '^chezhelp\(\) \{' "$ZSHRC"
     body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
-    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror dotfiles; do
+    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror chezclean dotfiles; do
         grep -qE "^ +${verb} " <<<"$body" || {
             echo "chezhelp is missing an entry for: ${verb}"
             return 1
@@ -166,6 +166,15 @@ setup() {
     helper="$(sed -n '/^_chez_brew_removals() {/,/^}/p' "$ZSHRC")"
     grep -qF 'brew bundle cleanup --file=-' <<<"$helper"
     ! grep -qE 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
+}
+
+# Wiring only — the candidate computation, keep-list filtering, confirm gate and
+# no-TTY safety are exercised end-to-end in tests/chezclean.bats against a stubbed
+# chezmoi. Here we just pin that the verb exists and routes through _chez_run (so a
+# moved clean.sh self-heals) rather than a stale bare-path call.
+@test "zshrc defines the chezclean function routed through _chez_run" {
+    grep -qE '^chezclean\(\) \{' "$ZSHRC"
+    sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/clean.sh'
 }
 
 @test "chez surfaces Brewfile drift but never auto-uninstalls" {

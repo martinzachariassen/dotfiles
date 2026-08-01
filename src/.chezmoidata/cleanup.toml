@@ -1,0 +1,64 @@
+# Cleanup catalog — single source of truth for the HOME-mirror keep-lists and the
+# set of dropped tooling to remove. Merged into the template data root, so the
+# keep-list renders into `.chezmoiignore` ({{ .cleanup.keepConfig }}) and the hooks
+# / scripts read the same lists via `chezmoi data`. Keeping the two in one place
+# stops the auto-prune (exact_ ~/.config) and the confirm-gated `chezclean` verb
+# from ever drifting apart.
+#
+# .chezmoidata files can't be templated; keep the `cleanup` namespace disjoint from
+# prompted answers (see packages.toml / modules.toml) so merges never collide.
+
+[cleanup]
+# ~/.config top-level entries to PRESERVE. `.chezmoiignore` turns each into an
+# ignore rule, which protects it from removal even though ~/.config is exact_.
+# Every entry here is untracked-but-critical: auth material, chezmoi's own state,
+# or live tool state we deliberately don't manage. `chezmoi` MUST stay first — it
+# is chezmoi's own config+state dir; removing it breaks chezmoi itself.
+keepConfig = [
+    "chezmoi",        # chezmoi's own config + boltdb state — never remove
+    "op",             # 1Password CLI auth — also drives git commit signing
+    "gh",             # GitHub CLI auth
+    "gcloud",         # gcloud CLI auth/state (cloudAuth)
+    "github-copilot", # Copilot auth
+    "carapace",       # completion cache (sourced in .zshrc)
+    "lazygit",        # lazygit state
+    "homebrew",       # Homebrew state
+    "gradle",         # Gradle user config
+    "jgit",           # jgit config
+    "kafkactl",       # kafkactl config (work)
+    "obsidian",       # Obsidian config
+    "raycast",        # Raycast config
+    "rest-client",    # rest-client state
+    "siyuan",         # SiYuan config
+    ".wrangler",      # Cloudflare Wrangler state
+    "cagent",         # cagent state
+]
+
+# Top-level ~/.* entries `chezclean` must NEVER offer to remove. Everything else
+# under ~ that starts with "." and isn't chezmoi-managed becomes a removal
+# candidate the user confirms. Keep a dir here once you've decided it stays, so
+# chezclean stops surfacing it. (User-data dirs like Documents/Developer don't
+# start with "." and are out of scope structurally.)
+keepHome = [
+    ".storecode",         # work security tool — installed by its own script (see 05-storecode)
+    ".ssh",               # chezmoi-managed dir + private keys
+    ".config",            # governed by exact_ + keepConfig, not by chezclean
+    ".cache",             # XDG cache
+    ".local",             # XDG data/state/bin
+    ".docker",            # chezmoi-managed daemon.json + runtime
+    ".cups",              # macOS printing
+    ".CFUserTextEncoding", # macOS locale marker
+    ".ctsystem",          # macOS
+    ".zshenv",            # chezmoi-managed
+    ".Trash",             # macOS trash — emptying is a separate, manual action
+]
+
+# Dropped tooling to remove everywhere, driven into 02c-cleanup-deprecated.
+# Paths are relative to $HOME. Symlinks are listed separately because the presence
+# check differs (a dangling symlink fails `-e`, so 02c also tests `-L`).
+deprecatedPaths = [
+    ".local/state/nix", # Nix state dir — Nix/Devbox no longer used
+]
+deprecatedSymlinks = [
+    ".nix-profile", # dangling Nix profile symlink
+]

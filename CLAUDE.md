@@ -34,6 +34,19 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 - Feature gating is data-driven: modules in `src/.chezmoidata/modules.toml`,
   packages in `src/.chezmoidata/packages.toml`. Templates gate with
   `{{ if has "theme" .modules }}`.
+- **HOME is mirrored to the repo.** `~/.config` is an `exact_` dir
+  (`src/exact_dot_config/`), so an apply prunes untracked *top-level* `~/.config/X`;
+  the keep-list in `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`, rendered
+  into `.chezmoiignore`) spares auth/state dirs (`op`, `gh`, `gcloud`, `chezmoi`).
+  The top level of `$HOME` is reconciled on demand by `chezclean`
+  (`scripts/bin/clean.sh`) against `cleanup.keepHome`. Adding a tool = track it
+  (`chezmoi add`) or add it to the keep-list; both lists live in one file so they
+  can't drift. Full model in [docs/lifecycle.md](docs/lifecycle.md).
+- **storecode is the work-only exception.** It's installed by its own hook
+  (`run_onchange_after_05-storecode`, work profile only) via an installer set in
+  `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and
+  `~/.storecode` is permanently on `cleanup.keepHome`. Don't add it to a Brewfile
+  or offer it for cleanup.
 
 ## Making a change
 

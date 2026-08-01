@@ -80,7 +80,7 @@ deployed to `$HOME` and gated on `appleDev`:
   under `$HOME` without a closer `.swiftformat`, and a project's own file overrides
   it. The key line is `--maxwidth 120`: SwiftFormat's default is *no* wrapping, so
   long lines were never reformatted even though SwiftLint flagged them.
-- [`src/dot_config/swiftlint/config.yml`](../src/dot_config/swiftlint/config.yml) →
+- [`src/exact_dot_config/swiftlint/config.yml`](../src/exact_dot_config/swiftlint/config.yml) →
   `~/.config/swiftlint/config.yml`. SwiftLint *doesn't* ascend to `$HOME`, so the
   VS Code extension wires it in via `swiftlint.configSearchPaths` — project
   `.swiftlint.yml` first, this file as the fallback. `line_length` is pinned to 120
@@ -97,10 +97,10 @@ Shell shortcuts (`xcb`, `xcderived`, `simulator`) come with the same module — 
 ## Neovim
 
 LazyVim, bootstrapped from
-[`src/dot_config/nvim/init.lua`](../src/dot_config/nvim/init.lua) →
+[`src/exact_dot_config/nvim/init.lua`](../src/exact_dot_config/nvim/init.lua) →
 `lua/config/lazy.lua`, with `lazy-lock.json` committed for reproducible plugin
 versions. The only preset override is the colorscheme
-([`lua/plugins/colorscheme.lua`](../src/dot_config/nvim/lua/plugins/colorscheme.lua)):
+([`lua/plugins/colorscheme.lua`](../src/exact_dot_config/nvim/lua/plugins/colorscheme.lua)):
 Catppuccin Frappé replacing LazyVim's default tokyonight, with integrations for
 cmp, gitsigns, treesitter, telescope, and LSP (undercurl diagnostics).
 

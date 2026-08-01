@@ -7,7 +7,7 @@ flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles
 that removal direction on demand.
 
 The verbs are defined in
-[`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl) and
+[`src/exact_dot_config/zsh/dot_zshrc.tmpl`](../src/exact_dot_config/zsh/dot_zshrc.tmpl) and
 delegate to the scripts in [`scripts/bin/`](../scripts/bin).
 
 ## Everyday
@@ -90,7 +90,15 @@ re-choose existing ones; reach for `chezreset` for that. See
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
 | `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (reports only). |
 | `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (all tiers — formulae, casks, orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after one confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. |
+| `chezclean` | The **file** analogue of `chezmirror`: mirror the top level of `$HOME` to what chezmoi manages. Lists the untracked `~/.*` entries — every top-level dotfile/dir/symlink that chezmoi neither manages nor the keep-list (`cleanup.keepHome` in [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml)) spares — then removes only what you confirm **one at a time** (via `gum` when installed). Pass `--all` (`-a`/`--yes`/`-y`) to remove the whole set after one confirmation, or `YES=1 chezclean` to accept-all; both need a TTY. `DRY_RUN=1` (or `-n`/`--dry-run`) previews and works headless. **Safe by construction:** only names beginning with `.` are ever considered (so `~/Library`, `~/Documents`, … are structurally out of scope), it never descends into a directory, and it removes nothing without a controlling terminal. Keep an entry for good by adding it to `cleanup.keepHome`. |
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so it
 > only *adds* presence. Freshness is `chezbump`'s job; *removal* is `chezmirror`'s,
 > always behind a confirm. See [lifecycle.md](lifecycle.md#convergence-guarantee).
+
+> **The `~/.config` exception.** `~/.config` *is* mirrored automatically: its
+> source dir is `exact_`, so an apply prunes untracked top-level entries there
+> (keep-list: `cleanup.keepConfig`). That's bounded and previewed — every removal
+> is a `D` line in `chezup`/`chezdiff` first. `chezclean` covers the top level of
+> `$HOME`, which can't be `exact_`. See
+> [lifecycle.md](lifecycle.md#mirroring-config-to-the-repo).

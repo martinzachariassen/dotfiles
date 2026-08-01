@@ -33,7 +33,7 @@ brew "zoxide"                  # smarter cd based on directory frecency
 brew "mise"                    # owns language runtimes (java, node, python, …)
 
 # ─── Editor (terminal) ────────────────────────────────────────────────────────
-brew "neovim"                  # init.lua in dot_config/nvim ships LazyVim presets
+brew "neovim"                  # init.lua in exact_dot_config/nvim ships LazyVim presets
 
 # ─── Shell ────────────────────────────────────────────────────────────────────
 brew "starship"                # cross-shell prompt
@@ -49,7 +49,7 @@ cask "docker-desktop"          # if you'd rather use colima/podman, swap this li
 cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
 cask "visual-studio-code"      # VS Code app; settings/extensions managed by chezmoi
 
-# JDKs come from mise, not Homebrew — see dot_config/mise/config.toml.
+# JDKs come from mise, not Homebrew — see exact_dot_config/mise/config.toml.
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
 cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this

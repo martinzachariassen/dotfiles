@@ -20,7 +20,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    ZSHRC="$REPO_ROOT/src/exact_dot_config/zsh/dot_zshrc.tmpl"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
     # A fake repo whose four Brewfile tiers the helper concatenates. Distinct

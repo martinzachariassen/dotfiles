@@ -90,7 +90,7 @@ chezup    # pull latest → preview the drift → apply
 ## Commands
 
 Every `chez*` verb is a zsh function defined in
-[`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl),
+[`src/exact_dot_config/zsh/dot_zshrc.tmpl`](src/exact_dot_config/zsh/dot_zshrc.tmpl),
 delegating to a script in [`scripts/bin/`](scripts/bin). Only two of them
 matter day to day — the rest are there when you change your setup or manage
 package drift. Forget one? `chezhelp` prints the whole list in your terminal.
@@ -117,12 +117,23 @@ package drift. Forget one? `chezhelp` prints the whole list in your terminal.
 | `chezbump`  | Routine dependency upgrade: `brew update && brew upgrade` + `mise upgrade`.                                         |
 | `chezaudit` | List Homebrew packages installed locally but **not tracked** in any Brewfile. Reports only.                         |
 | `chezmirror`| Enforce the Brewfile as truth in the **removal** direction — preview untracked items, then confirm each removal (`--all` / `YES=1` to batch). |
+| `chezclean` | The **file** analogue of `chezmirror`: mirror the top level of `$HOME` — list untracked `~/.*` entries (minus a keep-list), then confirm each removal (`--all` / `YES=1` to batch, `DRY_RUN=1` to preview). |
 
 > [!IMPORTANT]
 > **An apply never uninstalls.** It must be safe to run at any time, so it only
 > ever *adds* presence. Freshness is `chezbump`'s job; *removal* is
 > `chezmirror`'s, always behind a confirm. Full rationale in
 > [docs/lifecycle.md](docs/lifecycle.md#convergence-guarantee).
+
+> [!NOTE]
+> **`~/.config` is a mirror of the repo.** Its source dir is `exact_`, so an apply
+> prunes any top-level `~/.config/X` the repo doesn't track — keeping every Mac's
+> config under control instead of an ever-growing pile. A keep-list
+> ([`src/.chezmoidata/cleanup.toml`](src/.chezmoidata/cleanup.toml)) spares
+> auth/state dirs (`op`, `gh`, `gcloud`, chezmoi's own state, …), and every pending
+> removal shows as a `D` line in `chezup`/`chezdiff` first — never silent. The top
+> level of `$HOME` is reconciled the same way but confirm-gated, via `chezclean`.
+> See [docs/lifecycle.md](docs/lifecycle.md#mirroring-config-to-the-repo).
 
 `chezup` honours `DRY_RUN=1` (print every step, run nothing) and `YES=1` (skip
 the confirm gate), and forwards trailing args to `chezmoi apply`. If a verb

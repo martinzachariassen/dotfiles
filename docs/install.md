@@ -70,12 +70,32 @@ On an existing Mac the installer runs a cleanup so you don't carry forward tools
 the repo no longer manages. It:
 
 - uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`,
-  `temurin@25`, `direnv`) — runtimes now come from **mise**; and
-- removes the leftover `~/.config/direnv` config.
+  `temurin@25`, `direnv`) — runtimes now come from **mise**;
+- removes deprecated tool state listed in
+  [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml)
+  (`cleanup.deprecatedPaths` / `cleanup.deprecatedSymlinks`) — currently the
+  leftover Nix remnants: the empty `~/.local/state/nix` and the dangling
+  `~/.nix-profile` symlink; and
+- lets the [`~/.config` mirror](lifecycle.md#mirroring-config-to-the-repo) drop
+  anything else the repo no longer tracks (e.g. the old `~/.config/direnv`),
+  previewed as a `D` line before it happens.
 
-On a fresh machine that never had the old stack, it's a silent no-op. Implemented
-as the `run_onchange_after_02c-cleanup-deprecated` hook — see
+On a fresh machine that never had the old stack, it's a silent no-op. The brew +
+deprecated-state step is the `run_onchange_after_02c-cleanup-deprecated` hook — see
 [lifecycle.md](lifecycle.md).
+
+## Work-profile security tooling (storecode)
+
+On the **work** profile the apply also ensures `storecode` — an internal security
+tool that guards shell commands — is installed. It ships via its **own** installer
+(not Homebrew), so it's never a Brewfile entry and `chezaudit`/`chezmirror` never
+flag it; `~/.storecode` is on the cleanup keep-list (`cleanup.keepHome`) so
+`chezclean` never offers to remove it. The installer command is data-driven in
+[`src/.chezmoidata/storecode.toml`](../src/.chezmoidata/storecode.toml)
+(`storecode.installCmd`); until it's set, the
+`run_onchange_after_05-storecode` hook prints how to finish the install and exits
+cleanly — an apply never fails just because storecode isn't wired up yet. On any
+non-work profile the hook is a no-op.
 
 ### Coming from the direnv setup
 

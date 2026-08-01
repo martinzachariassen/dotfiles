@@ -553,6 +553,15 @@ chezmirror() {
     return 0
 }
 
+# Mirror the TOP LEVEL of $HOME to what chezmoi manages: list untracked ~/.*
+# entries (minus keepHome in cleanup.toml) and remove only what you confirm. The
+# file analogue of chezmirror; ~/.config is mirrored separately (exact_ + keep-
+# list). Confirms each by default; --all/-a bulk-confirms; YES=1 skips prompts;
+# DRY_RUN=1 previews. No controlling terminal ⇒ removes nothing.
+chezclean() {
+    _chez_run scripts/bin/clean.sh "$@"
+}
+
 # Print every dotfiles verb, grouped by frequency. Static text (no subprocesses).
 # Mirrors README.md / docs/commands.md — keep the three in sync.
 chezhelp() {
@@ -577,6 +586,8 @@ chezhelp() {
     chezaudit        List locally-installed packages in no Brewfile (report).
     chezmirror       Uninstall untracked packages, confirming each.
                        --all/-a  uninstall the whole set after one confirmation.
+    chezclean        Remove untracked top-level ~/.* entries, confirming each.
+                       --all/-a  remove the whole set after one confirmation.
     dotfiles         cd into the source repo.
 
   Under the hood
@@ -584,8 +595,8 @@ chezhelp() {
     macos-defaults   (Re-)apply macOS system defaults on their own.
     chezhelp         Show this list.
 
-  Knobs (chezup / chez):  DRY_RUN=1 print only  ·  YES=1 skip confirm
-  YES=1 chezmirror:  accept-all — uninstall every untracked package, no prompts
+  Knobs (chezup / chez / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  YES=1 chezmirror / chezclean:  accept-all — remove everything untracked, no prompts
   Deeper docs:  run `dotfiles`, then see docs/commands.md
 EOF
 }

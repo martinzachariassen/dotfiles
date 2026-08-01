@@ -20,7 +20,7 @@ Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
 ## The global defaults (`claudePersona` module)
 
 The file at
-[`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) →
+[`src/exact_dot_config/claude/CLAUDE.md`](../src/exact_dot_config/claude/CLAUDE.md) →
 `~/.config/claude/CLAUDE.md` is the **project-agnostic** working agreement Claude
 Code loads for **every** project on the machine: git/Conventional-Commit
 conventions, code style, communication, verification posture, and secrets rules.
@@ -28,7 +28,7 @@ It carries **no stack or machine specifics** — those live in each project's ow
 `CLAUDE.md`, and project-level instructions always win over it.
 
 `~/.config/claude/settings.json`
-([source](../src/dot_config/claude/settings.json)) carries the Claude Code
+([source](../src/exact_dot_config/claude/settings.json)) carries the Claude Code
 harness config — model, theme, and a read-only permission allowlist (git status/
 diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
@@ -43,5 +43,5 @@ same rules. Keep that crib in sync if the non-negotiables change.
 
 > Two files named `CLAUDE.md`, not to be confused: the root
 > [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this repo**;
-> [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) is the
+> [`src/exact_dot_config/claude/CLAUDE.md`](../src/exact_dot_config/claude/CLAUDE.md) is the
 > global defaults deployed to `$HOME` for use across **all** projects.

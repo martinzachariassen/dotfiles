@@ -45,10 +45,11 @@ put. Running every apply — each gated by a fast presence short-circuit, so a
 clean machine is a quick no-op — keeps "make this Mac match the repo" always true,
 with no separate fix step.
 
-`run_onchange_after_02c/02e/03/04` mutate state from a fixed manifest (a
+`run_onchange_after_02c/02e/03/04/05` mutate state from a fixed manifest (a
 deprecation list, `.pre-commit-config.yaml`, `packages/vscode-extensions.txt`,
-macOS defaults). The action pre-commit or `code` performs is identical regardless
-of apply count, so these re-fire only when their embedded content hash changes.
+macOS defaults, the storecode installer). The action performed is identical
+regardless of apply count, so these re-fire only when their embedded content hash
+changes.
 
 Package convergence uses Homebrew's native `brew bundle`: the `02-brew-bundle`
 hook reads the active file set from
@@ -64,6 +65,37 @@ installing what `packages/vscode-extensions.txt` lists and pruning what it doesn
 `scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin drivers
 that do render-time config, source their lib (if any), and call the entry point.
 
+## Mirroring `~/.config` to the repo
+
+Presence-convergence keeps installed *state* matching the repo; a parallel rule
+keeps `~/.config` matching it *structurally*. The config source dir is `exact_`
+([`src/exact_dot_config/`](../src/exact_dot_config)), so `chezmoi apply` removes
+any **top-level** `~/.config/X` the repo doesn't track — every Mac's `~/.config`
+stays a mirror of the repo instead of an ever-growing pile of whatever tools left
+behind. `exact_` does **not** recurse, so a managed subdir (`nvim`, `zsh`, …)
+keeps its own untracked children (caches, `.zcompdump`, local overrides).
+
+The one thing that spares an untracked top-level dir from that pruning is the
+keep-list in [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml)
+(`cleanup.keepConfig`), rendered into
+[`.chezmoiignore`](../src/.chezmoiignore): auth/state dirs like `op`, `gh`,
+`gcloud`, and chezmoi's own `~/.config/chezmoi` are listed there so an apply never
+touches them. Adding a new tool means either tracking it (`chezmoi add`) or adding
+it to `keepConfig`; until then it surfaces as a `D` line in `chezup`/`chezdiff`
+before any apply — the removal is previewed, never silent.
+
+The top level of `$HOME` can't be `exact_` (it holds `~/Library`, `~/Documents`,
+and other user data), so its untracked `~/.*` dotfiles are reconciled on demand by
+[`chezclean`](commands.md) against `cleanup.keepHome` — the confirm-gated file
+analogue of `chezmirror`. `cleanup.toml` is the single source of truth for both
+lists, so the automatic (`~/.config`) and manual (`$HOME`) halves can't drift.
+
+`run_onchange_after_02c-cleanup-deprecated` handles the leftovers a mirror can't:
+Homebrew packages and out-of-`~/.config` state the repo dropped, driven by
+`cleanup.deprecatedPaths` / `cleanup.deprecatedSymlinks` (it tests `-L` as well as
+`-e`, so a **dangling** symlink like a stale `~/.nix-profile` is caught, not
+skipped).
+
 ## Where each piece lives
 
 Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
@@ -75,7 +107,10 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
-| Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` |
+| Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` (reads `cleanup.deprecatedPaths`/`deprecatedSymlinks`) |
+| `~/.config` mirror keep-list | `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`) → `src/.chezmoiignore` (rendered) |
+| Top-level `$HOME` cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` |
+| storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |

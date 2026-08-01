@@ -32,8 +32,21 @@ DEPRECATED_CASKS=(
     "codex"             # repo no longer manages OpenAI tooling
     "chatgpt"
 )
+# Deprecated data paths OUTSIDE ~/.config, driven from src/.chezmoidata/cleanup.toml.
+# (~/.config deprecations are now removed automatically by the exact_ mirror —
+# see src/exact_dot_config + the keep-list in .chezmoiignore — so they don't
+# belong here.) Paths are $HOME-relative in the manifest; prefixed here.
 DEPRECATED_PATHS=(
-    "{{ .chezmoi.homeDir }}/.config/direnv"
+{{- range .cleanup.deprecatedPaths }}
+    "{{ $.chezmoi.homeDir }}/{{ . }}"
+{{- end }}
+)
+# Dangling symlinks need their own list: a broken symlink fails `-e` (which
+# follows the link to a missing target) but still passes `-L`.
+DEPRECATED_SYMLINKS=(
+{{- range .cleanup.deprecatedSymlinks }}
+    "{{ $.chezmoi.homeDir }}/{{ . }}"
+{{- end }}
 )
 
 echo "◆ Cleanup: removing deprecated tools"
@@ -67,11 +80,18 @@ if command -v brew >/dev/null 2>&1; then
     done
 fi
 
-# ─── 2. Deprecated config/data paths ──────────────────────────────────────────
+# ─── 2. Deprecated data paths + dangling symlinks ─────────────────────────────
 for p in ${DEPRECATED_PATHS[@]+"${DEPRECATED_PATHS[@]}"}; do
-    if [ -e "$p" ]; then
+    if [ -e "$p" ] || [ -L "$p" ]; then
         echo "→ removing $p"
         rm -rf "$p" && removed_any=true
+    fi
+done
+for s in ${DEPRECATED_SYMLINKS[@]+"${DEPRECATED_SYMLINKS[@]}"}; do
+    # -L catches a dangling symlink; -e covers a symlink to an existing target.
+    if [ -L "$s" ] || [ -e "$s" ]; then
+        echo "→ removing symlink $s"
+        rm -f "$s" && removed_any=true
     fi
 done
 

@@ -15,7 +15,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    MISE_TMPL="$REPO_ROOT/src/dot_config/mise/config.toml.tmpl"
+    MISE_TMPL="$REPO_ROOT/src/exact_dot_config/mise/config.toml.tmpl"
 
     if ! command -v python3 >/dev/null 2>&1; then
         skip "python3 not installed — needed to parse TOML"

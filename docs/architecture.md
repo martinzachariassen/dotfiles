@@ -41,7 +41,7 @@ src/                    # ← chezmoi's source dir; everything here deploys to $
   .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup questions
   .chezmoidata/         #   static data: module catalog + profile→Brewfile map
   .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
-  dot_config/           #   → ~/.config (zsh, git, mise, nvim, ghostty, starship, claude…)
+  exact_dot_config/     #   → ~/.config, mirrored: exact_ prunes untracked top-level entries (keep-list in .chezmoiignore)
   dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
 packages/               # what to install: core Brewfile + profile/module layers + editor lists
 scripts/                # tooling, grouped by who runs it (see below)
