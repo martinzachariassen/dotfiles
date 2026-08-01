@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Prune HOME dirs owned by a VS Code extension once that extension leaves the repo.
+# Runs AFTER 03-vscode (03 < 03b), so `code --list-extensions` already reflects
+# packages/vscode-extensions.txt: an extension dropped from the manifest is
+# uninstalled by 03, and this hook then removes its now-orphaned HOME dir. The
+# removal is driven entirely by repo data (the manifest + the cleanup.owners map),
+# so it happens the same way on every machine, with no manual step.
+#
+# Re-runs when EITHER input changes: the manifest hash (below) re-fires it when an
+# extension ID is added/removed, and the owners rows rendered into $OWNERS re-fire
+# it when the dir↔extension map changes.
+#   Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ VS Code HOME prune: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
+# `command -v code` check below finds the cask-installed binary (same as 03).
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+command -v code >/dev/null 2>&1 || exit 0
+
+# packages/ and scripts/ live at the repo root — reach them via .chezmoi.workingTree.
+ROOT="{{ .chezmoi.workingTree }}"
+HOME_DIR="{{ .chezmoi.homeDir }}"
+
+# shellcheck source=../../scripts/lib/vscode.sh
+. "$ROOT/scripts/lib/vscode.sh"
+
+# "dir<TAB>extension" rows for every cleanup.owners entry that declares an
+# extension, rendered from the single source of truth. dig-guarded so a missing map
+# renders nothing rather than erroring; entries without an extension emit nothing.
+OWNERS="$(
+    cat <<'EOF'
+{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $x := dig "extension" "" $m }}{{ if $x }}{{ $e }}{{ "\t" }}{{ $x }}
+{{ end }}{{ end -}}
+EOF
+)"
+
+installed="$(code --list-extensions 2>/dev/null || true)"
+orphaned="$(vscode_orphaned_home_dirs "$OWNERS" "$installed")"
+[ -n "$orphaned" ] || exit 0
+
+echo "▶ VS Code extension HOME prune"
+while IFS= read -r dir; do
+    [ -n "$dir" ] || continue
+    target="$HOME_DIR/$dir"
+    [ -e "$target" ] || [ -L "$target" ] || continue
+    echo "→ removing $target (owning VS Code extension no longer managed)"
+    rm -rf "$target"
+done <<EOF
+$orphaned
+EOF

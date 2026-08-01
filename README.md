@@ -117,7 +117,7 @@ package drift. Forget one? `chezhelp` prints the whole list in your terminal.
 | `chezbump`  | Routine dependency upgrade: `brew update && brew upgrade` + `mise upgrade`.                                         |
 | `chezaudit` | List Homebrew packages installed locally but **not tracked** in any Brewfile. Reports only.                         |
 | `chezmirror`| Enforce the Brewfile as truth in the **removal** direction — preview untracked items, then confirm each removal (`--all` / `YES=1` to batch). |
-| `chezclean` | The **file** analogue of `chezmirror`: mirror the top level of `$HOME` — list untracked `~/.*` entries (minus a keep-list), then confirm each removal (`--all` / `YES=1` to batch, `DRY_RUN=1` to preview). **Tool-aware:** keeps config whose owning tool is still installed (brew package present or command on PATH); uninstall the tool and it re-surfaces. |
+| `chezclean` | The **file** analogue of `chezmirror`: mirror the top level of `$HOME` — list untracked `~/.*` entries (minus a keep-list), then confirm each removal (`--all` / `YES=1` to batch, `DRY_RUN=1` to preview). **Tool-aware:** keeps config whose owning tool is still present (brew package installed, command on PATH, or owning VS Code extension installed); uninstall the tool and it re-surfaces. |
 
 > [!IMPORTANT]
 > **An apply never uninstalls.** It must be safe to run at any time, so it only
@@ -133,7 +133,10 @@ package drift. Forget one? `chezhelp` prints the whole list in your terminal.
 > auth/state dirs (`op`, `gh`, `gcloud`, chezmoi's own state, …), and every pending
 > removal shows as a `D` line in `chezup`/`chezdiff` first — never silent. The top
 > level of `$HOME` is reconciled the same way but confirm-gated, via `chezclean`,
-> which additionally keeps config whose owning tool is still installed.
+> which additionally keeps config whose owning tool is still present (brew package,
+> PATH command, or installed VS Code extension). Extension-owned dirs (`.sonarlint`,
+> `.lemminx`, …) go one step further: they're coupled to the extension lifecycle and
+> pruned automatically at apply time when their extension leaves the manifest.
 > See [docs/lifecycle.md](docs/lifecycle.md#mirroring-config-to-the-repo).
 
 `chezup` honours `DRY_RUN=1` (print every step, run nothing) and `YES=1` (skip

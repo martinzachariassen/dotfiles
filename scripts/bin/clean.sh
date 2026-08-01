@@ -10,8 +10,9 @@
 #   • ~/.config is governed separately (exact_ dir + keep-list in .chezmoiignore),
 #     so it is always kept here;
 #   • config whose owning tool is still installed is KEPT automatically — the
-#     tool's brew package is present OR its command is on PATH (so mise/gcloud
-#     tools count too); uninstalling a tool re-surfaces its leftovers;
+#     tool's brew package is present, its command is on PATH (so mise/gcloud tools
+#     count too), OR (for a VS Code extension-owned dir) its extension is installed;
+#     uninstalling a tool / removing an extension re-surfaces its leftovers;
 #   • nothing is removed without a confirmation (or an explicit --all / YES=1),
 #     and never at all without a controlling terminal.
 #
@@ -20,7 +21,8 @@
 # through chezmoi's own template engine — so they can't drift from the ~/.config
 # keep-list and need no jq. Most tools are matched by a stem heuristic
 # (command -v <name-minus-dot>); the owners map holds only the aliases where the
-# dir name and the tool's command/package diverge (.kube -> kubectl, .m2 -> mvn).
+# dir name and the tool's command/package/extension diverge (.kube -> kubectl,
+# .m2 -> mvn, .sonarlint -> the sonarlint-vscode extension).
 # Unlike a chezmoi hook this verb runs with a live stdin, so it talks to /dev/tty
 # directly (no tty.sh).
 #
@@ -103,13 +105,23 @@ _clean_candidates() {
 # / command -v); the pure classify logic underneath takes their output as plain
 # newline lists, so it's unit-testable exactly like _clean_candidates.
 
-# _clean_owners — rows "entry<TAB>package<TAB>binary" for each cleanup.owners
-# entry, via chezmoi's template engine (no jq). dig-guarded: a missing map
-# renders nothing — a bare `range .cleanup.owners` would ERROR when the key is
-# absent — so the feature is safe before/without the map. dig on each element
-# gives default-safe optional fields.
+# _clean_owners — rows "entry<TAB>package<TAB>binary<TAB>extension" for each
+# cleanup.owners entry, via chezmoi's template engine (no jq). dig-guarded: a
+# missing map renders nothing — a bare `range .cleanup.owners` would ERROR when the
+# key is absent — so the feature is safe before/without the map. dig on each element
+# gives default-safe optional fields. Always emits three tabs (so an empty field in
+# the middle survives), which the parsers below rely on.
 _clean_owners() {
-    chezmoi execute-template '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\n" }}{{ end }}' 2>/dev/null
+    chezmoi execute-template '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\t" }}{{ dig "extension" "" $m }}{{ "\n" }}{{ end }}' 2>/dev/null
+}
+
+# _clean_installed_vscode — installed VS Code extension IDs, lowercased and
+# sorted-unique, one per line. Empty with rc 0 when `code` is absent, so a machine
+# without VS Code simply degrades to the package/binary signals (same graceful
+# pattern as _clean_installed_brew). The ONLY `code` call in the classify path.
+_clean_installed_vscode() {
+    command -v code >/dev/null 2>&1 || return 0
+    code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' | sort -u
 }
 
 # _clean_installed_brew — installed formulae + casks, one per line. Empty with rc
@@ -146,54 +158,61 @@ _clean_stems() {
     done
 }
 
-# _clean_owner_binaries OWNERS — the non-empty binary field of each owner row, so
-# the caller can probe those commands alongside candidate stems in one pass.
-# Parsed with parameter expansion, not `read -r a b c` with IFS=<tab>: <tab> is
-# IFS-whitespace, so `read` would collapse an empty package field (".m2<tab><tab>
-# mvn") and read the binary into the wrong slot. A row needs two tabs to have one.
+# _clean_owner_binaries OWNERS — the non-empty binary field of each owner row (rows
+# are entry<TAB>package<TAB>binary<TAB>extension), so the caller can probe those
+# commands alongside candidate stems in one pass. Parsed with parameter expansion,
+# not `read -r a b c d` with IFS=<tab>: <tab> is IFS-whitespace, so `read` would
+# collapse an empty package/extension field (".m2<tab><tab>mvn<tab>") and read the
+# binary into the wrong slot. A row needs its three tabs for a binary field to exist.
 _clean_owner_binaries() {
-    local row rest bin tab=$'\t'
+    local row rest rest2 bin tab=$'\t'
     while IFS= read -r row; do
-        case "$row" in *"$tab"*"$tab"*) ;; *) continue ;; esac
-        rest="${row#*$tab}" # drop entry
-        bin="${rest#*$tab}" # drop package -> binary field
+        case "$row" in *"$tab"*"$tab"*"$tab"*) ;; *) continue ;; esac
+        rest="${row#*$tab}"     # drop entry
+        rest2="${rest#*$tab}"   # drop package
+        bin="${rest2%%"$tab"*}" # binary field (before the extension tab)
         [ -n "$bin" ] && printf '%s\n' "$bin"
     done <<<"$1"
 }
 
-# _clean_classify OWNERS BREWSET BINSET — read candidate entries on stdin; emit
-# "entry<TAB>verdict<TAB>label", verdict in keep|orphan|unknown. PURE: BREWSET and
-# BINSET are newline lists (like _clean_candidates' MANAGED/KEEP), so classifying
-# needs no tools and is fully unit-testable. Entries contain '.' (a regex
-# metachar), so every membership test is an exact string compare (grep -qxF).
-#   • mapped + (package in BREWSET OR binary in BINSET) -> keep   (label = tool)
-#   • mapped + neither present                          -> orphan (label = tool)
-#   • unmapped + stem in BINSET                         -> keep   (label = stem)
-#   • unmapped + stem absent                            -> unknown
+# _clean_classify OWNERS BREWSET BINSET EXTSET — read candidate entries on stdin;
+# emit "entry<TAB>verdict<TAB>label", verdict in keep|orphan|unknown. PURE: BREWSET,
+# BINSET and EXTSET are newline lists (like _clean_candidates' MANAGED/KEEP), so
+# classifying needs no tools and is fully unit-testable. Entries contain '.' (a
+# regex metachar), so every membership test is an exact string compare (grep -qxF).
+#   • mapped + (package∈BREWSET OR binary∈BINSET OR extension∈EXTSET) -> keep   (label = tool)
+#   • mapped + none present                                           -> orphan (label = tool)
+#   • unmapped + stem in BINSET                                       -> keep   (label = stem)
+#   • unmapped + stem absent                                          -> unknown
 _clean_classify() {
-    local owners="$1" brewset="$2" binset="$3" tab=$'\t'
-    local entry row rest pkg bin label found stem
+    local owners="$1" brewset="$2" binset="$3" extset="$4" tab=$'\t'
+    local entry row rest rest2 pkg bin ext label found stem
     while IFS= read -r entry; do
         [ -n "$entry" ] || continue
         found=0
         pkg=""
         bin=""
-        # Parameter-expansion split (not `read a b c`): <tab> is IFS-whitespace, so
-        # `read` collapses an empty package field (".m2<tab><tab>mvn") — losing the
-        # binary. A valid owner row has exactly two tabs (entry/package/binary).
+        ext=""
+        # Parameter-expansion split (not `read a b c d`): <tab> is IFS-whitespace, so
+        # `read` collapses an empty package/extension field (".m2<tab><tab>mvn<tab>")
+        # — losing the binary. A valid owner row has exactly three tabs
+        # (entry/package/binary/extension).
         while IFS= read -r row; do
-            case "$row" in *"$tab"*"$tab"*) ;; *) continue ;; esac
+            case "$row" in *"$tab"*"$tab"*"$tab"*) ;; *) continue ;; esac
             [ "${row%%"$tab"*}" = "$entry" ] || continue
             found=1
-            rest="${row#*$tab}"
+            rest="${row#*$tab}" # after entry
             pkg="${rest%%"$tab"*}"
-            bin="${rest#*$tab}"
+            rest2="${rest#*$tab}" # after package
+            bin="${rest2%%"$tab"*}"
+            ext="${rest2#*$tab}" # extension = last field
             break
         done <<<"$owners"
         if [ "$found" -eq 1 ]; then
-            label="${pkg:-$bin}"
+            label="${pkg:-${bin:-$ext}}"
             if { [ -n "$pkg" ] && printf '%s\n' "$brewset" | grep -qxF -- "$pkg"; } ||
-                { [ -n "$bin" ] && printf '%s\n' "$binset" | grep -qxF -- "$bin"; }; then
+                { [ -n "$bin" ] && printf '%s\n' "$binset" | grep -qxF -- "$bin"; } ||
+                { [ -n "$ext" ] && printf '%s\n' "$extset" | grep -qxF -- "$ext"; }; then
                 printf '%s\t%s\t%s\n' "$entry" keep "$label"
             else
                 printf '%s\t%s\t%s\n' "$entry" orphan "$label"
@@ -239,10 +258,11 @@ usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
 
   Mirror the top level of $HOME to what chezmoi manages: list untracked ~/.*
   entries and remove only what you confirm. An entry is KEPT automatically while
-  its owning tool is still installed — the tool's brew package is present OR its
-  command is on PATH (so mise/gcloud tools count too). Uninstall the tool and its
-  config re-surfaces as removable. Offered entries are labelled "orphan" (a known
-  tool, now gone) or "untracked" (no known owner).
+  its owning tool is still installed — the tool's brew package is present, its
+  command is on PATH (so mise/gcloud tools count too), OR its VS Code extension is
+  installed. Uninstall the tool / remove the extension and its config re-surfaces
+  as removable. Offered entries are labelled "orphan" (a known tool, now gone) or
+  "untracked" (no known owner).
 
   (no flag)     confirm each candidate individually
   --all, -a     remove the whole set after ONE confirmation (alias: --yes, -y)
@@ -304,19 +324,21 @@ _clean_main() {
         return 0
     fi
 
-    # Classify each candidate against installed tooling: keep config whose owner
-    # is present (brew package installed OR its command on PATH), so only orphaned
-    # or unknown leftovers are ever offered. Probe owner-binaries and candidate
-    # stems together in one command -v pass.
-    local owners brewset probe binset classified offered kept_owned kcount count
+    # Classify each candidate against installed tooling: keep config whose owner is
+    # present (brew package installed, its command on PATH, OR — for a VS Code
+    # extension-owned dir — its extension in `code --list-extensions`), so only
+    # orphaned or unknown leftovers are ever offered. Probe owner-binaries and
+    # candidate stems together in one command -v pass.
+    local owners brewset extset probe binset classified offered kept_owned kcount count
     owners="$(_clean_owners)"
     brewset="$(_clean_installed_brew)"
+    extset="$(_clean_installed_vscode)"
     probe="$({
         _clean_owner_binaries "$owners"
         printf '%s\n' "$candidates" | _clean_stems
     } | sort -u)"
     binset="$(printf '%s\n' "$probe" | _clean_present_bins)"
-    classified="$(printf '%s\n' "$candidates" | _clean_classify "$owners" "$brewset" "$binset")"
+    classified="$(printf '%s\n' "$candidates" | _clean_classify "$owners" "$brewset" "$binset" "$extset")"
     offered="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "orphan" || $2 == "unknown"')"
     kept_owned="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "keep" { print $1 "\t" $3 }')"
 

@@ -49,24 +49,31 @@ setup() {
     OWNERS_OUT="$STUBS/owners.out"
     BREW_FORMULAE_OUT="$STUBS/brew-formulae.out"
     BREW_CASKS_OUT="$STUBS/brew-casks.out"
+    VSCODE_OUT="$STUBS/vscode-extensions.out"
     # chezmoi managed lists target-relative paths; only the first "." segment
     # matters. Include a subpath (.config/nvim → .config) and a non-dot Library
     # path (dropped) to prove the parser.
     printf '%s\n' '.config' '.config/nvim' '.zshenv' '.ssh' 'Library/Application Support/x' >"$MANAGED_OUT"
     printf '%s\n' '.storecode' '.cache' '.config' '.ssh' >"$KEEP_OUT"
-    # Tool-ownership map: entry<TAB>package<TAB>binary. .m2 has an EMPTY package
-    # (Maven comes from mise, not brew) — the literal tab<tab> must survive parsing
-    # or the binary "mvn" would be lost, so build the rows with real tabs.
-    printf '%s\t%s\t%s\n' \
-        '.azure' 'azure-cli' 'az' \
-        '.kube' 'kubernetes-cli' 'kubectl' \
-        '.m2' '' 'mvn' \
-        '.vscode' 'visual-studio-code' 'code' >"$OWNERS_OUT"
+    # Tool-ownership map: entry<TAB>package<TAB>binary<TAB>extension. .m2 has an
+    # EMPTY package (Maven from mise) and .sonarlint/.codetogether have ONLY an
+    # extension (empty package+binary) — the literal tabs must survive parsing or
+    # "mvn"/the extension IDs would be lost, so build the rows with real tabs.
+    printf '%s\t%s\t%s\t%s\n' \
+        '.azure' 'azure-cli' 'az' '' \
+        '.kube' 'kubernetes-cli' 'kubectl' '' \
+        '.m2' '' 'mvn' '' \
+        '.vscode' 'visual-studio-code' 'code' '' \
+        '.sonarlint' '' '' 'sonarsource.sonarlint-vscode' \
+        '.codetogether' '' '' 'genuitecllc.codetogether' >"$OWNERS_OUT"
     # Installed brew set: kubernetes-cli present (keeps .kube via its package); NO
     # maven (so .m2 can only be kept via its binary, proving brew-only would misfire);
     # visual-studio-code cask absent (so .vscode is an orphan unless `code` is on PATH).
     printf '%s\n' 'kubernetes-cli' 'git' >"$BREW_FORMULAE_OUT"
     printf '%s\n' 'some-cask' >"$BREW_CASKS_OUT"
+    # Installed VS Code extensions: sonarlint-vscode present (keeps .sonarlint via
+    # its extension); genuitecllc.codetogether absent (so .codetogether is an orphan).
+    printf '%s\n' 'sonarsource.sonarlint-vscode' 'ms-python.python' >"$VSCODE_OUT"
 
     # Stub chezmoi: `managed`, and `execute-template` disambiguated by the template
     # body — keepHome and owners both go through execute-template.
@@ -93,6 +100,13 @@ case "\$2" in
 esac
 EOF
 
+    # Stub \`code\`: _clean_installed_vscode calls \`code --list-extensions\` directly
+    # (not via chezmoi), so it needs its own stub returning the canned installed set.
+    cat >"$STUBS/code" <<EOF
+#!/usr/bin/env bash
+[ "\$1" = --list-extensions ] && cat "$VSCODE_OUT" 2>/dev/null
+EOF
+
     # Real \`gum confirm\` reads keypresses from STDIN; the stub mirrors that so the
     # confirm-loop tests can drive it: one answer line per confirm, "yes" ⇒ 0.
     cat >"$STUBS/gum" <<'EOF'
@@ -108,7 +122,7 @@ EOF
         printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/$b"
     done
 
-    chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/gum" "$STUBS/mvn" "$STUBS/gradle"
+    chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/code" "$STUBS/gum" "$STUBS/mvn" "$STUBS/gradle"
 
     # Hermetic PATH for the tool-ownership tests: stubs + coreutils only, so real
     # az/kubectl/code on the host can't leak in and flip an "orphan" into a "keep".
@@ -321,13 +335,14 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 # ─── tool-ownership classification (pure units) ──────────────────────────────
-# _clean_classify OWNERS BREWSET BINSET reads candidate entries on stdin and
-# emits "entry<TAB>verdict<TAB>label". It's pure: the three lists stand in for
-# the map / installed-brew / on-PATH probes, so verdicts are fully deterministic.
+# _clean_classify OWNERS BREWSET BINSET EXTSET reads candidate entries on stdin and
+# emits "entry<TAB>verdict<TAB>label". It's pure: the four lists stand in for the
+# map / installed-brew / on-PATH / installed-extension probes, so verdicts are
+# fully deterministic. Owner rows are 4-field (entry/package/binary/extension).
 
 @test "_clean_classify keeps a mapped entry whose brew package is installed" {
-    run bash -c 'source "$1"; printf "%s\n" ".kube" | _clean_classify "$2" "$3" "$4"' \
-        _ "$SCRIPT" $'.kube\tkubernetes-cli\tkubectl' $'kubernetes-cli' ''
+    run bash -c 'source "$1"; printf "%s\n" ".kube" | _clean_classify "$2" "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.kube\tkubernetes-cli\tkubectl\t' $'kubernetes-cli' '' ''
     [ "$status" -eq 0 ]
     [ "$output" = $'.kube\tkeep\tkubernetes-cli' ]
 }
@@ -335,32 +350,69 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 @test "_clean_classify keeps a mapped entry via its binary even when brew lacks it" {
     # .m2's package is empty (Maven from mise); only the binary "mvn" can save it.
     # A brew-only check (empty BREWSET) would wrongly offer it — this pins the fix.
-    run bash -c 'source "$1"; printf "%s\n" ".m2" | _clean_classify "$2" "$3" "$4"' \
-        _ "$SCRIPT" $'.m2\t\tmvn' '' $'mvn'
+    run bash -c 'source "$1"; printf "%s\n" ".m2" | _clean_classify "$2" "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.m2\t\tmvn\t' '' $'mvn' ''
     [ "$status" -eq 0 ]
     [ "$output" = $'.m2\tkeep\tmvn' ]
 }
 
+@test "_clean_classify keeps an extension-owned entry when its extension is installed" {
+    # .sonarlint is owned solely by a VS Code extension (empty package + binary):
+    # only EXTSET membership can keep it. Also proves the empty middle fields (three
+    # tabs) don't shift the extension into the wrong slot.
+    run bash -c 'source "$1"; printf "%s\n" ".sonarlint" | _clean_classify "$2" "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' '' '' $'sonarsource.sonarlint-vscode'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.sonarlint\tkeep\tsonarsource.sonarlint-vscode' ]
+}
+
 @test "_clean_classify marks a mapped entry orphan when neither package nor binary is present" {
-    run bash -c 'source "$1"; printf "%s\n" ".azure" | _clean_classify "$2" "$3" "$4"' \
-        _ "$SCRIPT" $'.azure\tazure-cli\taz' '' ''
+    run bash -c 'source "$1"; printf "%s\n" ".azure" | _clean_classify "$2" "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.azure\tazure-cli\taz\t' '' '' ''
     [ "$status" -eq 0 ]
     [ "$output" = $'.azure\torphan\tazure-cli' ]
 }
 
+@test "_clean_classify marks an extension-owned entry orphan when its extension is gone" {
+    # The whole point of the 03b lifecycle coupling: extension no longer installed
+    # ⇒ its HOME dir surfaces as a removable orphan (labelled with the extension ID).
+    run bash -c 'source "$1"; printf "%s\n" ".sonarlint" | _clean_classify "$2" "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' '' '' ''
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.sonarlint\torphan\tsonarsource.sonarlint-vscode' ]
+}
+
 @test "_clean_classify keeps an unmapped entry by the stem heuristic (first-dot cut)" {
     # .terraform.d → stem "terraform" (cut at the FIRST dot), .gradle → "gradle".
-    run bash -c 'source "$1"; printf "%s\n" "$2" | _clean_classify "$3" "$4" "$5"' \
-        _ "$SCRIPT" $'.gradle\n.terraform.d' '' '' $'gradle\nterraform'
+    run bash -c 'source "$1"; printf "%s\n" "$2" | _clean_classify "$3" "$4" "$5" "$6"' \
+        _ "$SCRIPT" $'.gradle\n.terraform.d' '' '' $'gradle\nterraform' ''
     [ "$status" -eq 0 ]
     [ "$output" = $'.gradle\tkeep\tgradle\n.terraform.d\tkeep\tterraform' ]
 }
 
 @test "_clean_classify marks an unmapped, unknown entry as unknown (empty label)" {
-    run bash -c 'source "$1"; printf "%s\n" ".hawtjni" | _clean_classify "" "" ""' \
+    run bash -c 'source "$1"; printf "%s\n" ".hawtjni" | _clean_classify "" "" "" ""' \
         _ "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == $'.hawtjni\tunknown'* ]]
+}
+
+@test "_clean_installed_vscode lists extensions lowercased + sorted, empty when code absent" {
+    local d="$BATS_TEST_TMPDIR/vsc"
+    mkdir -p "$d"
+    # A `code` that lists mixed-case, unsorted IDs.
+    cat >"$d/code" <<'EOF'
+#!/usr/bin/env bash
+[ "$1" = --list-extensions ] && printf '%s\n' 'Zeta.One' 'alpha.Two'
+EOF
+    chmod +x "$d/code"
+    run env PATH="$d:/usr/bin:/bin" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'alpha.two\nzeta.one' ]
+    # No `code` on PATH ⇒ empty output, rc 0 (graceful degradation, like brew).
+    run env PATH="/usr/bin:/bin" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "_clean_stems strips the leading dot and cuts at the first remaining dot" {
@@ -370,10 +422,11 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
     [ "$output" = $'terraform\nm2\nclaude\ntestcontainers' ]
 }
 
-@test "_clean_owner_binaries yields each non-empty binary, incl. an empty-package row" {
-    # The .m2 row (empty package) must still surface "mvn": proves the tab-tab
-    # parse doesn't collapse the middle field.
-    local owners=$'.azure\tazure-cli\taz\n.kube\tkubernetes-cli\tkubectl\n.m2\t\tmvn\n.vscode\tvisual-studio-code\tcode'
+@test "_clean_owner_binaries yields each non-empty binary, incl. empty-package and extension-only rows" {
+    # The .m2 row (empty package) must still surface "mvn"; the extension-only
+    # .sonarlint row (empty binary) must surface NOTHING — proving the 4-field tab
+    # parse doesn't collapse the middle fields or leak the extension as a binary.
+    local owners=$'.azure\tazure-cli\taz\t\n.kube\tkubernetes-cli\tkubectl\t\n.m2\t\tmvn\t\n.sonarlint\t\t\tsonarsource.sonarlint-vscode\n.vscode\tvisual-studio-code\tcode\t'
     run bash -c 'source "$1"; _clean_owner_binaries "$2"' _ "$SCRIPT" "$owners"
     [ "$status" -eq 0 ]
     [ "$output" = $'az\nkubectl\nmvn\ncode' ]
@@ -452,4 +505,33 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
     [ "$status" -eq 0 ]
     [[ "$output" == *".m2 (kept — mvn installed)"* ]]           # binary check survives
     [[ "$output" == *".kube (dir) — orphan · config for kubernetes-cli, not installed"* ]]
+}
+
+# ─── VS Code extension ownership (DRY_RUN, hermetic PATH) ─────────────────────
+# The `code` stub on $SYSPATH reports sonarsource.sonarlint-vscode installed and
+# genuitecllc.codetogether absent, so .sonarlint is kept and .codetogether orphans.
+
+@test "keeps config owned by an installed VS Code extension (.sonarlint not offered)" {
+    local t="$BATS_TEST_TMPDIR/sonar"
+    mkdir -p "$t/.sonarlint" "$t/.hawtjni"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"kept 1 untracked entr"* ]]
+    [[ "$output" == *"owned by installed tooling"* ]]
+    [[ "$output" != *".sonarlint (dir)"* ]]   # never surfaced without -v
+    [[ "$output" == *".hawtjni"* ]]           # the ownerless junk still offered
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+    # -v names it and its owning extension.
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".sonarlint (kept — sonarsource.sonarlint-vscode installed)"* ]]
+}
+
+@test "offers an extension-owned dir as an orphan when its extension is gone (.codetogether)" {
+    local t="$BATS_TEST_TMPDIR/ct"
+    mkdir -p "$t/.codetogether"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".codetogether (dir) — orphan · config for genuitecllc.codetogether, not installed"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]]
 }

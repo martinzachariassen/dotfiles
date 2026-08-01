@@ -61,9 +61,16 @@ no longer lists) is `chezmirror`'s: an apply must never silently uninstall, so
 VS Code extensions are the deliberate exception: they carry no data and are
 trivial to reinstall, so `run_onchange_after_03-vscode` mirrors them outright —
 installing what `packages/vscode-extensions.txt` lists and pruning what it doesn't
-— with `chezdoctor` surfacing the drift read-only. Other custom logic lives in
-`scripts/lib/` so it stays shellcheck-able and unit-tested; hooks are thin drivers
-that do render-time config, source their lib (if any), and call the entry point.
+— with `chezdoctor` surfacing the drift read-only. Some extensions also drop a
+top-level dir in `$HOME` (`.sonarlint`, `.lemminx`, …); `run_onchange_after_03b-vscode-home-prune`
+couples those dirs to the extension lifecycle — it runs right after 03 (so
+`code --list-extensions` already reflects the manifest) and removes any
+extension-owned `$HOME` dir whose extension is no longer installed. The dir↔extension
+map is the `extension` field in `cleanup.owners` (below), so drop an ID from the
+manifest and the next apply uninstalls the extension *and* deletes its `$HOME` dir,
+identically on every machine. Other custom logic lives in `scripts/lib/` so it stays
+shellcheck-able and unit-tested; hooks are thin drivers that do render-time config,
+source their lib (if any), and call the entry point.
 
 ## Mirroring `~/.config` to the repo
 
@@ -88,14 +95,18 @@ The top level of `$HOME` can't be `exact_` (it holds `~/Library`, `~/Documents`,
 and other user data), so its untracked `~/.*` dotfiles are reconciled on demand by
 [`chezclean`](commands.md) against `cleanup.keepHome` — the confirm-gated file
 analogue of `chezmirror`. It is **tool-aware**: config whose owning tool is still
-installed (its brew package is present, or its command is on PATH — so tools from
-mise/gcloud/npm count too) is kept automatically and never offered; uninstall the
-tool and its leftovers re-surface as removable. Most tools are matched by a stem
-heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the
-`cleanup.owners` map supplies only the aliases where the dir name and the tool's
-command/package diverge (`.kube`→`kubectl`, `.m2`→`mvn` from mise). `cleanup.toml`
-is the single source of truth for all three lists (`keepConfig`, `keepHome`,
-`owners`), so the automatic (`~/.config`) and manual (`$HOME`) halves can't drift.
+present is kept automatically and never offered, where "present" is the union of
+three signals — its brew package is installed, its command is on PATH (so tools
+from mise/gcloud/npm count too), **or** its owning VS Code extension is in
+`code --list-extensions`; uninstall the tool (or drop the extension) and its
+leftovers re-surface as removable. Most tools are matched by a stem heuristic
+(`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the `cleanup.owners` map
+supplies only the aliases where the dir name and the tool's command/package/extension
+diverge (`.kube`→`kubectl`, `.m2`→`mvn` from mise, `.sonarlint`→the
+`sonarsource.sonarlint-vscode` extension). `cleanup.toml` is the single source of
+truth for all three lists (`keepConfig`, `keepHome`, `owners`), so the automatic
+(`~/.config`) and manual (`$HOME`) halves can't drift — and the same `owners` map
+drives the automatic 03b HOME-prune above.
 
 `run_onchange_after_02c-cleanup-deprecated` handles the leftovers a mirror can't:
 Homebrew packages and out-of-`~/.config` state the repo dropped, driven by
@@ -117,10 +128,11 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` (reads `cleanup.deprecatedPaths`/`deprecatedSymlinks`) |
 | `~/.config` mirror keep-list | `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`) → `src/.chezmoiignore` (rendered) |
 | Top-level `$HOME` cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` |
-| chezclean tool-ownership map (keep-while-installed) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
+| chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
+| VS Code extension-owned `$HOME`-dir prune (auto) | `run_onchange_after_03b-vscode-home-prune` + `cleanup.owners` (`extension`) + `scripts/lib/vscode.sh` |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |

@@ -56,10 +56,10 @@ _render_ignore() {
 }
 
 # The rendered tool-ownership map — the exact template chezclean reads: one
-# "entry<TAB>package<TAB>binary" row per cleanup.owners entry. dig-guarded so a
-# missing map renders empty rather than erroring.
+# "entry<TAB>package<TAB>binary<TAB>extension" row per cleanup.owners entry.
+# dig-guarded so a missing map renders empty rather than erroring.
 _render_owners() {
-    _render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\n" }}{{ end }}'
+    _render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\t" }}{{ dig "extension" "" $m }}{{ "\n" }}{{ end }}'
 }
 
 # ─── the exact_ switch itself ───────────────────────────────────────────────
@@ -138,17 +138,22 @@ _render_owners() {
 # owners map supplies the aliases where the dir name can't find the tool; if it
 # renders wrong (a lost binary, an empty row) chezclean would offer in-use config.
 
-@test "cleanup.owners renders as entry→package/binary rows" {
+@test "cleanup.owners renders as entry→package/binary/extension rows" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
     local owners
     owners="$(_render_owners)"
     [ -n "$owners" ]
-    # .kube maps to the kubernetes-cli package AND the kubectl binary.
-    grep -qxF $'.kube\tkubernetes-cli\tkubectl' <<<"$owners"
+    # .kube maps to the kubernetes-cli package AND the kubectl binary (empty ext).
+    grep -qxF $'.kube\tkubernetes-cli\tkubectl\t' <<<"$owners"
     # .m2 has NO package (Maven from mise) — the empty middle field must survive
     # rendering, or the "mvn" binary would be lost.
-    grep -qxF $'.m2\t\tmvn' <<<"$owners"
+    grep -qxF $'.m2\t\tmvn\t' <<<"$owners"
+    # .sonarlint is owned solely by a VS Code extension: empty package AND binary,
+    # so the row carries three tabs before the extension ID. If the empty middle
+    # fields collapsed, the extension would land in the binary slot and chezclean's
+    # 03b prune would misfire.
+    grep -qxF $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' <<<"$owners"
 }
 
 @test "at least one owners row maps a binary that differs from its dir stem (alias exercised)" {
@@ -165,15 +170,31 @@ _render_owners() {
     [ "$status" -eq 0 ]
 }
 
-@test "no owners row has both package and binary empty (every entry stays findable)" {
+@test "no owners row has package, binary AND extension all empty (every entry stays findable)" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
     local owners
     owners="$(_render_owners)"
-    # A row with neither field could never keep its entry — it'd be a dead typo.
-    run awk -F'\t' '$2 == "" && $3 == "" { print }' <<<"$owners"
+    # A row with none of the three signals could never keep its entry — a dead typo.
+    run awk -F'\t' '$2 == "" && $3 == "" && $4 == "" { print }' <<<"$owners"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+@test "every extension-owned owners row carries an extension ID coupled to hook 03b" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    local owners
+    owners="$(_render_owners)"
+    # The five extension-owned HOME dirs must each render their marketplace ID in
+    # the 4th column — that ID is what both chezclean and 03b key their prune on.
+    local dir
+    for dir in .sonarlint .sts4 .codetogether .lemminx .vs-kubernetes; do
+        awk -F'\t' -v d="$dir" '$1 == d && $4 != "" { found=1 } END { exit found ? 0 : 1 }' <<<"$owners" || {
+            echo "extension-owned dir missing its extension ID: $dir"
+            return 1
+        }
+    done
 }
 
 @test "the storecode install hook is work-profile + darwin gated" {

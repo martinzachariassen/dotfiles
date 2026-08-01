@@ -63,18 +63,30 @@ deprecatedSymlinks = [
     ".nix-profile", # dangling Nix profile symlink
 ]
 
-# Tool-ownership map for `chezclean`. Each key is a top-level ~/.* entry; chezclean
-# KEEPS it (never offers it for removal) while its owning tool is present — present
-# means the `package` is brew-installed OR the `binary` is on PATH. Uninstall the
-# tool and the entry re-surfaces as a removable orphan. `binary` is a PATH command,
-# so tools from mise/gcloud/npm count too, not only Homebrew; `package` is a brew
-# formula OR cask. Either field alone is enough to keep.
+# Tool-ownership map for `chezclean` (and the VS Code HOME-prune, hook 03b). Each
+# key is a top-level ~/.* entry; chezclean KEEPS it (never offers it for removal)
+# while its owning tool is present. "Present" is the UNION of three signals — ANY
+# one keeps the entry:
+#   • package   — a brew formula OR cask is installed
+#   • binary    — a command is on PATH (so mise/gcloud/npm tools count, not just brew)
+#   • extension — a VS Code marketplace ID is in `code --list-extensions` (lowercase)
+# Uninstall the tool / remove the extension and the entry re-surfaces as a removable
+# orphan. Any single field is enough to keep; a row may set more than one.
+#
+# The `extension` field does double duty. Besides chezclean, it drives the automatic
+# apply-time prune in run_onchange_after_03b-vscode-home-prune: because VS Code
+# extensions are themselves mirrored from packages/vscode-extensions.txt (hook 03),
+# an extension-owned dir is coupled to the extension's lifecycle — drop the ID from
+# the manifest and 03 uninstalls the extension, then 03b removes this HOME dir. Same
+# result on every machine, no manual step. A dir owned by JVM tooling (Maven/Gradle
+# caches) instead takes `binary = "mvn"`: kept while Java is around, but never
+# auto-pruned, since it can't be attributed to a single extension.
 #
 # List an entry here ONLY when its own name can't find the tool. chezclean already
 # keeps any entry whose stem (name minus leading dot, up to the first dot) is itself
 # a command on PATH — e.g. .gradle→gradle, .ollama→ollama, .minikube→minikube,
 # .terraform.d→terraform, .claude→claude. So this map is just the aliases where the
-# dir name and the tool's command/package diverge.
+# dir name and the tool's command/package/extension diverge.
 [cleanup.owners]
 [cleanup.owners.".azure"]
 package = "azure-cli" # dir "azure" ≠ cmd "az"
@@ -87,3 +99,27 @@ binary = "mvn" # Maven comes from mise here, NOT brew — the binary is the only
 [cleanup.owners.".vscode"]
 package = "visual-studio-code" # cask; dir "vscode" ≠ cmd "code"
 binary = "code"
+
+# VS Code extension-owned dirs — kept while the extension is installed, and
+# auto-pruned by hook 03b once its ID leaves packages/vscode-extensions.txt.
+[cleanup.owners.".sonarlint"]
+extension = "sonarsource.sonarlint-vscode"
+[cleanup.owners.".sts4"]
+extension = "vmware.vscode-spring-boot"
+[cleanup.owners.".codetogether"]
+extension = "genuitecllc.codetogether"
+[cleanup.owners.".lemminx"]
+extension = "redhat.vscode-xml"
+[cleanup.owners.".vs-kubernetes"]
+extension = "ms-kubernetes-tools.vscode-kubernetes-tools"
+
+# JVM tool caches — created by Maven/Gradle, not one extension, so they're kept
+# while `mvn` is on PATH (chezclean-only; hook 03b never auto-prunes these).
+[cleanup.owners.".hawtjni"]
+binary = "mvn"
+[cleanup.owners.".pdfbox.cache"]
+binary = "mvn"
+[cleanup.owners.".rampart"]
+binary = "mvn"
+[cleanup.owners.".testcontainers.properties"]
+binary = "mvn"
