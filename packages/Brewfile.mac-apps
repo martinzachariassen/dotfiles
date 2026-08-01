@@ -6,7 +6,6 @@ cask "google-drive"             # file sync
 cask "jordanbaird-ice@beta"     # menu bar manager
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
-cask "siyuan"                   # local-first note-taking / knowledge base
 cask "stats"                    # menu bar resource monitor
 
 # ─── Notes / Obsidian ─────────────────────────────────────────────────────────
