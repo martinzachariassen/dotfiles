@@ -258,12 +258,11 @@
         "scminput": false
     },
 
-    // Conventional Commits for the SCM "Generate Commit Message" action.
-    "github.copilot.chat.commitMessageGeneration.instructions": [
-        {
-            "text": "Use Conventional Commits: `<type>(<scope>): <subject>`. Types: feat, fix, docs, refactor, test, chore, perf, build, ci, style. Subject in imperative mood, lowercase, no trailing period, ≤72 chars. Breaking changes append `!` to the type and add a `BREAKING CHANGE:` footer. Body (when needed) is separated from the subject by a blank line, explains the *why*, and wraps at 72."
-        }
-    ],
+    // NOTE: `github.copilot.chat.commitMessageGeneration.instructions` is intentionally
+    // omitted. Any value here trips Copilot's Responsible AI filter and the SCM
+    // "Generate Commit Message" button fails with `422 Unprocessable Entity /
+    // promptFiltered` — a known VS Code bug (microsoft/vscode#316549, #316060, #316204).
+    // Conventional Commits is enforced by commit-msg hooks + CI regardless.
 
     // Conventional Commits for the GitHub PR "Generate Title/Description" action.
     "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [

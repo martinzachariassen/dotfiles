@@ -6,8 +6,14 @@ cask "google-drive"             # file sync
 cask "jordanbaird-ice@beta"     # menu bar manager
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
-cask "siyuan"                   # local-first note-taking / knowledge base
 cask "stats"                    # menu bar resource monitor
+
+# ─── Notes / Obsidian ─────────────────────────────────────────────────────────
+# Vault lives at ~/TheArchive (its own git repo, not chezmoi-managed).
+cask "obsidian"                 # markdown knowledge base
+cask "font-inter"               # Obsidian interface font ("Inter")
+cask "font-jetbrains-mono"      # Obsidian monospace font ("JetBrains Mono")
+cask "font-ia-writer-quattro"   # Obsidian editor font ("iA Writer Quattro S")
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
 cask "google-chrome"            # the only browser most web tooling assumes
