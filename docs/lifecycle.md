@@ -87,8 +87,15 @@ before any apply — the removal is previewed, never silent.
 The top level of `$HOME` can't be `exact_` (it holds `~/Library`, `~/Documents`,
 and other user data), so its untracked `~/.*` dotfiles are reconciled on demand by
 [`chezclean`](commands.md) against `cleanup.keepHome` — the confirm-gated file
-analogue of `chezmirror`. `cleanup.toml` is the single source of truth for both
-lists, so the automatic (`~/.config`) and manual (`$HOME`) halves can't drift.
+analogue of `chezmirror`. It is **tool-aware**: config whose owning tool is still
+installed (its brew package is present, or its command is on PATH — so tools from
+mise/gcloud/npm count too) is kept automatically and never offered; uninstall the
+tool and its leftovers re-surface as removable. Most tools are matched by a stem
+heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the
+`cleanup.owners` map supplies only the aliases where the dir name and the tool's
+command/package diverge (`.kube`→`kubectl`, `.m2`→`mvn` from mise). `cleanup.toml`
+is the single source of truth for all three lists (`keepConfig`, `keepHome`,
+`owners`), so the automatic (`~/.config`) and manual (`$HOME`) halves can't drift.
 
 `run_onchange_after_02c-cleanup-deprecated` handles the leftovers a mirror can't:
 Homebrew packages and out-of-`~/.config` state the repo dropped, driven by
@@ -110,6 +117,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Deprecated-tool cleanup | `run_onchange_after_02c-cleanup-deprecated` (reads `cleanup.deprecatedPaths`/`deprecatedSymlinks`) |
 | `~/.config` mirror keep-list | `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`) → `src/.chezmoiignore` (rendered) |
 | Top-level `$HOME` cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` |
+| chezclean tool-ownership map (keep-while-installed) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |

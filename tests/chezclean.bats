@@ -46,18 +46,50 @@ setup() {
     mkdir -p "$STUBS"
     MANAGED_OUT="$STUBS/managed.out"
     KEEP_OUT="$STUBS/keep.out"
+    OWNERS_OUT="$STUBS/owners.out"
+    BREW_FORMULAE_OUT="$STUBS/brew-formulae.out"
+    BREW_CASKS_OUT="$STUBS/brew-casks.out"
     # chezmoi managed lists target-relative paths; only the first "." segment
     # matters. Include a subpath (.config/nvim → .config) and a non-dot Library
     # path (dropped) to prove the parser.
     printf '%s\n' '.config' '.config/nvim' '.zshenv' '.ssh' 'Library/Application Support/x' >"$MANAGED_OUT"
     printf '%s\n' '.storecode' '.cache' '.config' '.ssh' >"$KEEP_OUT"
+    # Tool-ownership map: entry<TAB>package<TAB>binary. .m2 has an EMPTY package
+    # (Maven comes from mise, not brew) — the literal tab<tab> must survive parsing
+    # or the binary "mvn" would be lost, so build the rows with real tabs.
+    printf '%s\t%s\t%s\n' \
+        '.azure' 'azure-cli' 'az' \
+        '.kube' 'kubernetes-cli' 'kubectl' \
+        '.m2' '' 'mvn' \
+        '.vscode' 'visual-studio-code' 'code' >"$OWNERS_OUT"
+    # Installed brew set: kubernetes-cli present (keeps .kube via its package); NO
+    # maven (so .m2 can only be kept via its binary, proving brew-only would misfire);
+    # visual-studio-code cask absent (so .vscode is an orphan unless `code` is on PATH).
+    printf '%s\n' 'kubernetes-cli' 'git' >"$BREW_FORMULAE_OUT"
+    printf '%s\n' 'some-cask' >"$BREW_CASKS_OUT"
 
+    # Stub chezmoi: `managed`, and `execute-template` disambiguated by the template
+    # body — keepHome and owners both go through execute-template.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 case "\$1" in
     managed) cat "$MANAGED_OUT" 2>/dev/null ;;
-    execute-template) cat "$KEEP_OUT" 2>/dev/null ;;
+    execute-template)
+        case "\$2" in
+            *keepHome*) cat "$KEEP_OUT" 2>/dev/null ;;
+            *owners*) cat "$OWNERS_OUT" 2>/dev/null ;;
+        esac
+        ;;
     *) exit 0 ;;
+esac
+EOF
+
+    # Stub brew like chezmirror.bats: list --formula / --cask cat canned files.
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+case "\$2" in
+    --formula) cat "$BREW_FORMULAE_OUT" 2>/dev/null ;;
+    --cask) cat "$BREW_CASKS_OUT" 2>/dev/null ;;
 esac
 EOF
 
@@ -69,7 +101,18 @@ EOF
 IFS= read -r ans || ans=""
 [ "$ans" = yes ]
 EOF
-    chmod +x "$STUBS/chezmoi" "$STUBS/gum"
+
+    # Minimal tool stubs so a candidate's binary/stem can be "installed" on a
+    # restricted PATH: mvn = Maven from mise (keeps .m2), gradle = the stem heuristic.
+    for b in mvn gradle; do
+        printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/$b"
+    done
+
+    chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/gum" "$STUBS/mvn" "$STUBS/gradle"
+
+    # Hermetic PATH for the tool-ownership tests: stubs + coreutils only, so real
+    # az/kubectl/code on the host can't leak in and flip an "orphan" into a "keep".
+    SYSPATH="$STUBS:/usr/bin:/bin"
 }
 
 # Can this process open a controlling terminal? Mirrors clean.sh's own guard so
@@ -275,4 +318,138 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
     [ ! -e "$FAKEHOME/.junkfile" ]  # removed
     [ -d "$FAKEHOME/.hawtjni" ]     # kept (declined)
     [ -d "$FAKEHOME/.lemminx" ]     # kept (declined)
+}
+
+# ─── tool-ownership classification (pure units) ──────────────────────────────
+# _clean_classify OWNERS BREWSET BINSET reads candidate entries on stdin and
+# emits "entry<TAB>verdict<TAB>label". It's pure: the three lists stand in for
+# the map / installed-brew / on-PATH probes, so verdicts are fully deterministic.
+
+@test "_clean_classify keeps a mapped entry whose brew package is installed" {
+    run bash -c 'source "$1"; printf "%s\n" ".kube" | _clean_classify "$2" "$3" "$4"' \
+        _ "$SCRIPT" $'.kube\tkubernetes-cli\tkubectl' $'kubernetes-cli' ''
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.kube\tkeep\tkubernetes-cli' ]
+}
+
+@test "_clean_classify keeps a mapped entry via its binary even when brew lacks it" {
+    # .m2's package is empty (Maven from mise); only the binary "mvn" can save it.
+    # A brew-only check (empty BREWSET) would wrongly offer it — this pins the fix.
+    run bash -c 'source "$1"; printf "%s\n" ".m2" | _clean_classify "$2" "$3" "$4"' \
+        _ "$SCRIPT" $'.m2\t\tmvn' '' $'mvn'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.m2\tkeep\tmvn' ]
+}
+
+@test "_clean_classify marks a mapped entry orphan when neither package nor binary is present" {
+    run bash -c 'source "$1"; printf "%s\n" ".azure" | _clean_classify "$2" "$3" "$4"' \
+        _ "$SCRIPT" $'.azure\tazure-cli\taz' '' ''
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.azure\torphan\tazure-cli' ]
+}
+
+@test "_clean_classify keeps an unmapped entry by the stem heuristic (first-dot cut)" {
+    # .terraform.d → stem "terraform" (cut at the FIRST dot), .gradle → "gradle".
+    run bash -c 'source "$1"; printf "%s\n" "$2" | _clean_classify "$3" "$4" "$5"' \
+        _ "$SCRIPT" $'.gradle\n.terraform.d' '' '' $'gradle\nterraform'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'.gradle\tkeep\tgradle\n.terraform.d\tkeep\tterraform' ]
+}
+
+@test "_clean_classify marks an unmapped, unknown entry as unknown (empty label)" {
+    run bash -c 'source "$1"; printf "%s\n" ".hawtjni" | _clean_classify "" "" ""' \
+        _ "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == $'.hawtjni\tunknown'* ]]
+}
+
+@test "_clean_stems strips the leading dot and cuts at the first remaining dot" {
+    run bash -c 'source "$1"; printf "%s\n" "$2" | _clean_stems' \
+        _ "$SCRIPT" $'.terraform.d\n.m2\n.claude\n.testcontainers.properties'
+    [ "$status" -eq 0 ]
+    [ "$output" = $'terraform\nm2\nclaude\ntestcontainers' ]
+}
+
+@test "_clean_owner_binaries yields each non-empty binary, incl. an empty-package row" {
+    # The .m2 row (empty package) must still surface "mvn": proves the tab-tab
+    # parse doesn't collapse the middle field.
+    local owners=$'.azure\tazure-cli\taz\n.kube\tkubernetes-cli\tkubectl\n.m2\t\tmvn\n.vscode\tvisual-studio-code\tcode'
+    run bash -c 'source "$1"; _clean_owner_binaries "$2"' _ "$SCRIPT" "$owners"
+    [ "$status" -eq 0 ]
+    [ "$output" = $'az\nkubectl\nmvn\ncode' ]
+}
+
+@test "_clean_present_bins emits only commands on PATH, sorted-unique" {
+    local d="$BATS_TEST_TMPDIR/bins"
+    mkdir -p "$d"
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$d/mvn"
+    chmod +x "$d/mvn"
+    run env PATH="$d:/usr/bin:/bin" bash -c 'source "$1"; printf "%s\n" "$2" | _clean_present_bins' \
+        _ "$SCRIPT" $'mvn\nbogus-xyz-absent\nmvn'
+    [ "$status" -eq 0 ]
+    [ "$output" = "mvn" ]  # present + deduped; the absent one dropped
+}
+
+# ─── tool-ownership integration (DRY_RUN, hermetic PATH) ─────────────────────
+# These use $SYSPATH (stubs + coreutils only) so host-installed tools can't flip
+# a verdict, and their own target dir so the shared FAKEHOME tests stay intact.
+
+@test "keeps config owned by an installed brew package (.kube not offered)" {
+    local t="$BATS_TEST_TMPDIR/kube"
+    mkdir -p "$t/.kube" "$t/.hawtjni"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"kept 1 untracked entr"* ]]
+    [[ "$output" == *"owned by installed tooling"* ]]
+    [[ "$output" != *".kube"* ]]            # never surfaced without -v
+    [[ "$output" == *".hawtjni"* ]]         # the orphan-less junk still offered
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+    # -v names it and its owning package.
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".kube (kept — kubernetes-cli installed)"* ]]
+}
+
+@test "keeps config owned by a PATH binary from mise even when brew lacks it (.m2 via mvn)" {
+    local t="$BATS_TEST_TMPDIR/m2"
+    mkdir -p "$t/.m2" "$t/.hawtjni"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    # brew canned files omit maven, so this can only be the binary check.
+    [[ "$output" == *".m2 (kept — mvn installed)"* ]]
+    [[ "$output" != *"rm -rf $t/.m2"* ]]    # never scheduled for removal
+    [[ "$output" == *".hawtjni"* ]]
+}
+
+@test "offers an orphan whose tool is gone, annotated with the package (.azure)" {
+    local t="$BATS_TEST_TMPDIR/az"
+    mkdir -p "$t/.azure"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".azure (dir) — orphan · config for azure-cli, not installed"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+}
+
+@test "keeps a tool matched only by the stem heuristic (.gradle → gradle on PATH)" {
+    local t="$BATS_TEST_TMPDIR/gr"
+    mkdir -p "$t/.gradle" "$t/.hawtjni"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".gradle (kept — gradle installed)"* ]]
+    [[ "$output" != *"rm -rf $t/.gradle"* ]]
+}
+
+@test "degrades gracefully when brew is absent — still classifies via binaries" {
+    # A brew-less machine: no `brew` on PATH. .kube loses its (brew) owner and
+    # becomes an orphan; .m2 is still kept by its binary. Must not error.
+    local nb="$BATS_TEST_TMPDIR/nobrew"
+    mkdir -p "$nb"
+    cp "$STUBS/chezmoi" "$STUBS/mvn" "$nb/"
+    chmod +x "$nb/chezmoi" "$nb/mvn"
+    local t="$BATS_TEST_TMPDIR/nb-home"
+    mkdir -p "$t/.kube" "$t/.m2" "$t/.hawtjni"
+    run env PATH="$nb:/usr/bin:/bin" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".m2 (kept — mvn installed)"* ]]           # binary check survives
+    [[ "$output" == *".kube (dir) — orphan · config for kubernetes-cli, not installed"* ]]
 }

@@ -39,9 +39,14 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   the keep-list in `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`, rendered
   into `.chezmoiignore`) spares auth/state dirs (`op`, `gh`, `gcloud`, `chezmoi`).
   The top level of `$HOME` is reconciled on demand by `chezclean`
-  (`scripts/bin/clean.sh`) against `cleanup.keepHome`. Adding a tool = track it
-  (`chezmoi add`) or add it to the keep-list; both lists live in one file so they
-  can't drift. Full model in [docs/lifecycle.md](docs/lifecycle.md).
+  (`scripts/bin/clean.sh`) against `cleanup.keepHome`. `chezclean` is **tool-aware**:
+  it keeps config whose owning tool is still installed — the tool's brew package is
+  present *or* its command is on PATH (so mise/gcloud tools count) — matching most
+  tools by a stem heuristic (`command -v <name-minus-dot>`) and the `cleanup.owners`
+  map for name↔command aliases (`.kube`→`kubectl`, `.m2`→`mvn` from mise). Adding a
+  tool = track it (`chezmoi add`), add it to the keep-list, or (if its dir name
+  diverges from its command) add an `owners` alias; all three lists live in one file
+  so they can't drift. Full model in [docs/lifecycle.md](docs/lifecycle.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in
   `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and

@@ -55,6 +55,13 @@ _render_ignore() {
         --source="$SRC_DIR" <"$IGNORE"
 }
 
+# The rendered tool-ownership map — the exact template chezclean reads: one
+# "entry<TAB>package<TAB>binary" row per cleanup.owners entry. dig-guarded so a
+# missing map renders empty rather than erroring.
+_render_owners() {
+    _render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\n" }}{{ end }}'
+}
+
 # ─── the exact_ switch itself ───────────────────────────────────────────────
 
 @test "the ~/.config source dir is exact_ (mirror switch is on)" {
@@ -124,6 +131,49 @@ _render_ignore() {
             return 1
         }
     done
+}
+
+# ─── cleanup.owners: the tool-ownership map chezclean reads ───────────────────
+# chezclean keeps an untracked ~/.* entry while its owning tool is installed. The
+# owners map supplies the aliases where the dir name can't find the tool; if it
+# renders wrong (a lost binary, an empty row) chezclean would offer in-use config.
+
+@test "cleanup.owners renders as entry→package/binary rows" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    local owners
+    owners="$(_render_owners)"
+    [ -n "$owners" ]
+    # .kube maps to the kubernetes-cli package AND the kubectl binary.
+    grep -qxF $'.kube\tkubernetes-cli\tkubectl' <<<"$owners"
+    # .m2 has NO package (Maven from mise) — the empty middle field must survive
+    # rendering, or the "mvn" binary would be lost.
+    grep -qxF $'.m2\t\tmvn' <<<"$owners"
+}
+
+@test "at least one owners row maps a binary that differs from its dir stem (alias exercised)" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    local owners
+    owners="$(_render_owners)"
+    # awk preserves empty fields (unlike read with a whitespace IFS). A row whose
+    # binary differs from its stem (.kube→kubectl) is the whole reason the map
+    # exists — the stem heuristic alone would miss it.
+    run awk -F'\t' '{ stem=$1; sub(/^\./,"",stem); sub(/\..*/,"",stem)
+                      if ($3 != "" && $3 != stem) diverge++ }
+                    END { exit (diverge > 0) ? 0 : 1 }' <<<"$owners"
+    [ "$status" -eq 0 ]
+}
+
+@test "no owners row has both package and binary empty (every entry stays findable)" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    local owners
+    owners="$(_render_owners)"
+    # A row with neither field could never keep its entry — it'd be a dead typo.
+    run awk -F'\t' '$2 == "" && $3 == "" { print }' <<<"$owners"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "the storecode install hook is work-profile + darwin gated" {

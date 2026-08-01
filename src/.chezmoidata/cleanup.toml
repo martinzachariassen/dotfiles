@@ -62,3 +62,28 @@ deprecatedPaths = [
 deprecatedSymlinks = [
     ".nix-profile", # dangling Nix profile symlink
 ]
+
+# Tool-ownership map for `chezclean`. Each key is a top-level ~/.* entry; chezclean
+# KEEPS it (never offers it for removal) while its owning tool is present — present
+# means the `package` is brew-installed OR the `binary` is on PATH. Uninstall the
+# tool and the entry re-surfaces as a removable orphan. `binary` is a PATH command,
+# so tools from mise/gcloud/npm count too, not only Homebrew; `package` is a brew
+# formula OR cask. Either field alone is enough to keep.
+#
+# List an entry here ONLY when its own name can't find the tool. chezclean already
+# keeps any entry whose stem (name minus leading dot, up to the first dot) is itself
+# a command on PATH — e.g. .gradle→gradle, .ollama→ollama, .minikube→minikube,
+# .terraform.d→terraform, .claude→claude. So this map is just the aliases where the
+# dir name and the tool's command/package diverge.
+[cleanup.owners]
+[cleanup.owners.".azure"]
+package = "azure-cli" # dir "azure" ≠ cmd "az"
+binary = "az"
+[cleanup.owners.".kube"]
+package = "kubernetes-cli" # dir "kube" matches neither the formula nor "kubectl"
+binary = "kubectl"
+[cleanup.owners.".m2"]
+binary = "mvn" # Maven comes from mise here, NOT brew — the binary is the only signal
+[cleanup.owners.".vscode"]
+package = "visual-studio-code" # cask; dir "vscode" ≠ cmd "code"
+binary = "code"
