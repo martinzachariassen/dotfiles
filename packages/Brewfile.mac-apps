@@ -25,6 +25,7 @@ cask "vlc"
 
 # ─── Development ──────────────────────────────────────────────────────────────
 cask "bruno"                    # offline API client (Postman alternative)
+cask "fork"                     # Git client (GUI)
 cask "intellij-idea"            # JetBrains IDE
 
 # ─── AI tooling + apps ────────────────────────────────────────────────────────
