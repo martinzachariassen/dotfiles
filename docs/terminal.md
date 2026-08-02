@@ -6,7 +6,7 @@ layer itself is in [shell.md](shell.md); this doc covers the surrounding tools.
 
 ## Ghostty
 
-Config: [`src/exact_dot_config/ghostty/config.tmpl`](../src/exact_dot_config/ghostty/config.tmpl).
+Config: [`src/dot_config/ghostty/config.tmpl`](../src/dot_config/ghostty/config.tmpl).
 JetBrainsMono Nerd Font at 13pt with ligatures (`calt`/`liga`), 12px padding,
 subtle background blur/opacity, `bar` cursor, 100k scrollback.
 
@@ -25,16 +25,16 @@ Behaviour worth knowing:
 > line, or the value parses wrong and the app throws a config error on launch.
 
 The theme is a **local** file
-(`src/exact_dot_config/ghostty/themes/catppuccin-frappe`) rather than a built-in name,
+(`src/dot_config/ghostty/themes/catppuccin-frappe`) rather than a built-in name,
 for deterministic colors across Ghostty versions. Applied only when the `theme`
 module is selected.
 
 ## Zellij
 
-Config: [`src/exact_dot_config/zellij/config.kdl`](../src/exact_dot_config/zellij/config.kdl).
+Config: [`src/dot_config/zellij/config.kdl`](../src/dot_config/zellij/config.kdl).
 A modern tmux alternative: `default_shell zsh`, custom `main` layout with a
 one-line [zjstatus](https://github.com/dj95/zjstatus) bar
-([`layouts/main.kdl`](../src/exact_dot_config/zellij/layouts/main.kdl)),
+([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl)),
 `copy_on_select` → `pbcopy`, mouse mode on, sessions serialized across restarts,
 rounded pane frames showing pane titles.
 
@@ -55,7 +55,7 @@ wants the same chord. Dump the full set with `zellij setup --dump-config`.
 
 ## Starship
 
-Config: [`src/exact_dot_config/starship.toml`](../src/exact_dot_config/starship.toml), palette
+Config: [`src/dot_config/starship.toml`](../src/dot_config/starship.toml), palette
 `catppuccin_frappe`. A two-line prompt: context on line 1, prompt character on
 line 2. Modules cover development and cloud tooling and self-disable when
 irrelevant — directory, git branch/status, language versions

@@ -92,13 +92,13 @@ for template in "$SRC_DIR"/.chezmoiscripts/*.sh.tmpl; do
 done
 
 if command -v zsh >/dev/null 2>&1; then
-    echo "Checking rendered zsh syntax: exact_dot_config/zsh/dot_zshrc.tmpl"
+    echo "Checking rendered zsh syntax: dot_config/zsh/dot_zshrc.tmpl"
     HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi execute-template \
         --config="$tmpdir/.config/chezmoi/chezmoi.toml" \
         --destination="$tmpdir" \
         --source="$SRC_DIR" \
-        --file "$SRC_DIR/exact_dot_config/zsh/dot_zshrc.tmpl" | zsh -n
-    zsh -n "$SRC_DIR/dot_zshenv" "$SRC_DIR/exact_dot_config/zsh/dot_zprofile"
+        --file "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl" | zsh -n
+    zsh -n "$SRC_DIR/dot_zshenv" "$SRC_DIR/dot_config/zsh/dot_zprofile"
 else
     echo "Skipping rendered zsh syntax check: zsh not installed"
 fi

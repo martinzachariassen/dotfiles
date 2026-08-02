@@ -1,25 +1,22 @@
 #!/usr/bin/env bats
-# Guards for the HOME-mirror mechanism: the ~/.config keep-list (exact_ dir +
-# .chezmoiignore), its single source of truth (cleanup.toml), the storecode
-# exemption, and 02c's dangling-symlink removal.
+# Guards for the data that drives chezclean's reconciliation of $HOME and
+# ~/.config, plus the storecode install hook — all sourced from src/.chezmoidata
+# so they can't drift.
 #
 # Why this exists:
-#   ~/.config is an exact_ dir (src/exact_dot_config), so `chezmoi apply` removes
-#   any untracked top-level ~/.config/X. The ONLY thing that spares auth/state
-#   dirs (op, gh, gcloud, chezmoi's own state) from that removal is the keep-list
-#   rendered into .chezmoiignore from cleanup.keepConfig. If the two ever drift —
-#   a keepConfig entry that never reaches .chezmoiignore — the next apply would
-#   delete that dir on every machine. These tests pin the render, the critical
-#   entries, and the exact_ switch itself, so a regression fails here, not in
-#   $HOME.
+#   ~/.config is a normal dot_config dir (NOT exact_), so `chezmoi apply` never
+#   prunes it. Reconciliation is manual, via `chezclean`, which reads three lists
+#   from cleanup.toml: keepConfig (spare these ~/.config/X), keepHome (spare these
+#   ~/.*), and owners (keep an entry while its owning tool/extension is present).
+#   If any of those render wrong, chezclean would offer an in-use dir for removal —
+#   so these tests pin the render, the critical entries, the storecode exemption,
+#   and the 05-storecode hook's guards + never-fail-an-apply behaviour.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     SRC_DIR="$REPO_ROOT/src"
-    IGNORE="$SRC_DIR/.chezmoiignore"
     CLEANUP="$SRC_DIR/.chezmoidata/cleanup.toml"
     STORECODE_DATA="$SRC_DIR/.chezmoidata/storecode.toml"
-    SCRIPT_02C="$SRC_DIR/.chezmoiscripts/run_onchange_after_02c-cleanup-deprecated.sh.tmpl"
     STORECODE_HOOK="$SRC_DIR/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl"
 
     HAS_CHEZMOI=0
@@ -47,54 +44,35 @@ _render_str() {
         --source="$SRC_DIR" "$1"
 }
 
-# The rendered .chezmoiignore (keep-list block expanded).
-_render_ignore() {
-    HOME="$STUB_DIR/home" XDG_CONFIG_HOME="$STUB_DIR/home/.config" \
-        chezmoi execute-template \
-        --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
-        --source="$SRC_DIR" <"$IGNORE"
-}
-
 # The rendered tool-ownership map — the exact template chezclean reads: one
-# "entry<TAB>package<TAB>binary" row per cleanup.owners entry. dig-guarded so a
-# missing map renders empty rather than erroring.
+# "entry<TAB>package<TAB>binary<TAB>extension" row per cleanup.owners entry.
+# dig-guarded so a missing map renders empty rather than erroring.
 _render_owners() {
-    _render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\n" }}{{ end }}'
+    _render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\t" }}{{ dig "extension" "" $m }}{{ "\n" }}{{ end }}'
 }
 
-# ─── the exact_ switch itself ───────────────────────────────────────────────
-
-@test "the ~/.config source dir is exact_ (mirror switch is on)" {
-    # exact_ is what makes chezmoi PRUNE untracked ~/.config entries. If the dir
-    # ever reverts to plain dot_config the mirror silently stops enforcing.
-    [ -d "$SRC_DIR/exact_dot_config" ]
-    [ ! -d "$SRC_DIR/dot_config" ]
+# Render the 05-storecode hook against a fake HOME (so {{ .chezmoi.homeDir }}
+# points into it), returning only the logic BELOW the darwin/work template guards
+# — the `home=` line onward — so the behavioural tests run identically on macOS
+# and on Linux CI (where the darwin guard would otherwise short-circuit).
+_render_storecode_body() { # $1 = fake HOME
+    local rendered
+    rendered="$(HOME="$1" XDG_CONFIG_HOME="$1/.config" chezmoi execute-template \
+        --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
+        --source="$SRC_DIR" <"$STORECODE_HOOK")"
+    printf '%s\n' "$rendered" | sed -n '/^home=/,$p'
 }
 
-# ─── keepConfig ↔ .chezmoiignore: the safety net can't drift ────────────────
-
-@test "every cleanup.keepConfig entry is protected in the rendered .chezmoiignore" {
-    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
-    _setup_stub_chezmoi
-    local rendered keep
-    rendered="$(_render_ignore)"
-    keep="$(_render_str '{{ range .cleanup.keepConfig }}{{ . }}{{ "\n" }}{{ end }}')"
-    [ -n "$keep" ]
-    local entry
-    while IFS= read -r entry; do
-        [ -n "$entry" ] || continue
-        grep -qxF ".config/$entry" <<<"$rendered" || {
-            echo "keepConfig entry not protected in .chezmoiignore: .config/$entry"
-            return 1
-        }
-    done <<<"$keep"
-}
+# ─── keepConfig: the ~/.config keep-list chezclean spares ────────────────────
 
 @test "the critical auth/state dirs are pinned in keepConfig (chezmoi first)" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
+    # keepConfig is chezclean's keep-list for its ~/.config scope: any ~/.config/X
+    # not on it (and not chezmoi-managed / tool-owned) becomes a removal candidate.
     local keep first
     keep="$(_render_str '{{ range .cleanup.keepConfig }}{{ . }}{{ "\n" }}{{ end }}')"
+    [ -n "$keep" ]
     # chezmoi's own config+state dir MUST come first — removing it breaks chezmoi.
     first="$(printf '%s\n' "$keep" | grep -m1 .)"
     [ "$first" = "chezmoi" ]
@@ -124,7 +102,9 @@ _render_owners() {
     _setup_stub_chezmoi
     local keephome e
     keephome="$(_render_str '{{ range .cleanup.keepHome }}{{ . }}{{ "\n" }}{{ end }}')"
-    # .config is governed by exact_+keepConfig (not chezclean); .ssh holds keys.
+    # .config stays on keepHome so chezclean's $HOME scope never offers the whole
+    # dir — its children are reconciled separately against keepConfig; .ssh holds
+    # keys; .storecode is the work tool installed by 05-storecode.
     for e in .storecode .config .ssh; do
         grep -qxF "$e" <<<"$keephome" || {
             echo "keepHome missing required entry: $e"
@@ -134,21 +114,27 @@ _render_owners() {
 }
 
 # ─── cleanup.owners: the tool-ownership map chezclean reads ───────────────────
-# chezclean keeps an untracked ~/.* entry while its owning tool is installed. The
-# owners map supplies the aliases where the dir name can't find the tool; if it
-# renders wrong (a lost binary, an empty row) chezclean would offer in-use config.
+# chezclean keeps an untracked ~/.* or ~/.config/X entry while its owning tool is
+# installed. The owners map supplies the aliases where the dir name can't find the
+# tool; if it renders wrong (a lost binary, an empty row) chezclean would offer
+# in-use config.
 
-@test "cleanup.owners renders as entry→package/binary rows" {
+@test "cleanup.owners renders as entry→package/binary/extension rows" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
     local owners
     owners="$(_render_owners)"
     [ -n "$owners" ]
-    # .kube maps to the kubernetes-cli package AND the kubectl binary.
-    grep -qxF $'.kube\tkubernetes-cli\tkubectl' <<<"$owners"
+    # .kube maps to the kubernetes-cli package AND the kubectl binary (empty ext).
+    grep -qxF $'.kube\tkubernetes-cli\tkubectl\t' <<<"$owners"
     # .m2 has NO package (Maven from mise) — the empty middle field must survive
     # rendering, or the "mvn" binary would be lost.
-    grep -qxF $'.m2\t\tmvn' <<<"$owners"
+    grep -qxF $'.m2\t\tmvn\t' <<<"$owners"
+    # .sonarlint is owned solely by a VS Code extension: empty package AND binary,
+    # so the row carries three tabs before the extension ID. If the empty middle
+    # fields collapsed, the extension would land in the binary slot and chezclean's
+    # extension signal would misfire.
+    grep -qxF $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' <<<"$owners"
 }
 
 @test "at least one owners row maps a binary that differs from its dir stem (alias exercised)" {
@@ -165,16 +151,35 @@ _render_owners() {
     [ "$status" -eq 0 ]
 }
 
-@test "no owners row has both package and binary empty (every entry stays findable)" {
+@test "no owners row has package, binary AND extension all empty (every entry stays findable)" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
     local owners
     owners="$(_render_owners)"
-    # A row with neither field could never keep its entry — it'd be a dead typo.
-    run awk -F'\t' '$2 == "" && $3 == "" { print }' <<<"$owners"
+    # A row with none of the three signals could never keep its entry — a dead typo.
+    run awk -F'\t' '$2 == "" && $3 == "" && $4 == "" { print }' <<<"$owners"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+@test "every extension-owned owners row carries an extension ID (chezclean's extension signal)" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    local owners
+    owners="$(_render_owners)"
+    # The five extension-owned HOME dirs must each render their marketplace ID in
+    # the 4th column — that ID is what chezclean keys its `extension` signal on
+    # (kept while `code --list-extensions` lists it, offered once it's gone).
+    local dir
+    for dir in .sonarlint .sts4 .codetogether .lemminx .vs-kubernetes; do
+        awk -F'\t' -v d="$dir" '$1 == d && $4 != "" { found=1 } END { exit found ? 0 : 1 }' <<<"$owners" || {
+            echo "extension-owned dir missing its extension ID: $dir"
+            return 1
+        }
+    done
+}
+
+# ─── 05-storecode install hook ───────────────────────────────────────────────
 
 @test "the storecode install hook is work-profile + darwin gated" {
     grep -qF '{{ if ne .chezmoi.os "darwin" -}}' "$STORECODE_HOOK"
@@ -184,39 +189,32 @@ _render_owners() {
     grep -qE '^\[storecode\]' "$STORECODE_DATA"
 }
 
-# ─── 02c: dangling-symlink removal (the -e → -L regression) ──────────────────
-
-@test "02c source tests -L so a dangling symlink is caught, not just -e" {
-    # `[ -e ]` follows a symlink and FAILS on a dangling one, so the pre-fix loop
-    # silently skipped ~/.nix-profile. Pin that both the path loop and the symlink
-    # loop test -L.
-    grep -qF 'if [ -e "$p" ] || [ -L "$p" ]; then' "$SCRIPT_02C"
-    grep -qF 'if [ -L "$s" ] || [ -e "$s" ]; then' "$SCRIPT_02C"
-}
-
-@test "02c actually removes a dangling symlink when rendered" {
+@test "05-storecode is idempotent: skips when ~/.storecode already exists" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _setup_stub_chezmoi
-    local fakehome="$BATS_TEST_TMPDIR/fakehome"
-    mkdir -p "$fakehome"
-    # A dangling symlink (target never exists): fails -e, passes -L.
-    ln -s "$fakehome/never-exists" "$fakehome/.nix-profile"
-    [ -L "$fakehome/.nix-profile" ]
-    [ ! -e "$fakehome/.nix-profile" ]
-
-    # Render 02c with HOME=fakehome so the baked DEPRECATED_SYMLINKS points into
-    # it, then run ONLY the symlink array + its removal loop — skipping the darwin
-    # guard and the brew section (which would call brew / early-exit on Linux).
-    local rendered snippet
-    rendered="$(HOME="$fakehome" XDG_CONFIG_HOME="$fakehome/.config" chezmoi execute-template \
-        --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
-        --source="$SRC_DIR" <"$SCRIPT_02C")"
-    snippet="$(printf '%s\n' "$rendered" | sed -n '/^DEPRECATED_SYMLINKS=(/,/^)/p')"$'\n'
-    snippet+="removed_any=false"$'\n'
-    snippet+="$(printf '%s\n' "$rendered" | sed -n '/^for s in /,/^done/p')"
-
-    run bash -c "$snippet"
+    local fakehome="$BATS_TEST_TMPDIR/schome-present"
+    mkdir -p "$fakehome/.storecode" # the "already installed" marker
+    local body
+    body="$(_render_storecode_body "$fakehome")"
+    # A PATH without a real `storecode` so the skip is driven by the dir, not a
+    # stray binary that happens to be installed on the test host.
+    run env PATH="/usr/bin:/bin" bash -c "$body"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removing symlink"* ]]
-    [ ! -L "$fakehome/.nix-profile" ]  # the dangling link is gone
+    [[ "$output" == *"already installed"* ]]
+}
+
+@test "05-storecode with no installer configured prints guidance and exits 0 (never fails an apply)" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _setup_stub_chezmoi
+    # storecode.toml ships installCmd = "" — an apply must never fail just because
+    # the machine-specific installer isn't wired up yet. Pin that fail-safe.
+    grep -qE '^installCmd = ""' "$STORECODE_DATA"
+    local fakehome="$BATS_TEST_TMPDIR/schome-absent"
+    mkdir -p "$fakehome" # no ~/.storecode, and storecode not on the stub PATH
+    local body
+    body="$(_render_storecode_body "$fakehome")"
+    run env PATH="/usr/bin:/bin" bash -c "$body"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no installer is configured yet"* ]]
+    [[ "$output" != *"already installed"* ]]
 }

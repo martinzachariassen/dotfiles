@@ -3,7 +3,7 @@
 The command-line environment: plain zsh in an XDG layout, modern CLI
 replacements wired into aliases, fuzzy-finding, mise-managed runtimes, and git.
 No framework (oh-my-zsh/prezto/zinit) — the config in
-[`src/exact_dot_config/zsh/dot_zshrc.tmpl`](../src/exact_dot_config/zsh/dot_zshrc.tmpl) is
+[`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl) is
 extended directly.
 
 ## zsh
@@ -44,7 +44,7 @@ aliased — the notes in the `.zshrc` explain why.
 
 mise owns language runtimes — never asdf/nvm/jenv/pyenv/SDKMAN, and not Homebrew.
 Global defaults live in
-[`src/exact_dot_config/mise/config.toml.tmpl`](../src/exact_dot_config/mise/config.toml.tmpl)
+[`src/dot_config/mise/config.toml.tmpl`](../src/dot_config/mise/config.toml.tmpl)
 and apply in any directory that doesn't pin its own; per-project versions + env
 vars go in that project's committed `mise.toml` (its `[env]` block, not direnv)
 and override the globals on `cd`.
@@ -66,7 +66,7 @@ convergence runs on every apply via the `run_after_02b-mise-install` hook.
 
 ## git
 
-Config: [`src/exact_dot_config/git/config.tmpl`](../src/exact_dot_config/git/config.tmpl)
+Config: [`src/dot_config/git/config.tmpl`](../src/dot_config/git/config.tmpl)
 (XDG — global ignore at `~/.config/git/ignore`). Highlights:
 
 - **Signing** — templated on your `signingMode` answer: `1password` (SSH signing

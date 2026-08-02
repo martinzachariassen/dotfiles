@@ -20,7 +20,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/exact_dot_config/zsh/dot_zshrc.tmpl"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
     # A fake repo whose four Brewfile tiers the helper concatenates. Distinct
@@ -410,6 +410,104 @@ EOF
     grep -qF "still installed" <<<"$output"     # the stuck pkg is reported cleanly
     grep -qF "libpng" <<<"$output"              # …by name
     grep -qF "removed 1 · kept 0" <<<"$output"  # stuck ≠ kept (kept is declined only)
+}
+
+# ─── chezmirror: brew autoremove of orphaned dependencies ───────────────────
+# After the removal pass, chezmirror prunes formulae installed AS dependencies
+# that nothing in the Brewfiles needs any more. It previews with `brew autoremove
+# -n` (read-only), then runs `brew autoremove` — accept-all under --all/YES=1,
+# else behind one confirm. The no-TTY guard sits BEFORE this block, so it can only
+# run with a terminal (covered by the existing no-TTY safety test).
+
+# A brew stub whose `autoremove -n` reports ORPHANS and whose `autoremove` (no -n)
+# records that it actually ran, so we can assert the prune fired or didn't. The
+# log path expands at write time ($log); the stub's own \$1/\$2/\$* stay escaped.
+_stub_brew_with_orphan() { # $1 = AUTOREMOVE_LOG path
+    local log="$1"
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
+    cat >/dev/null
+    cat "$CANNED" 2>/dev/null
+    exit 0
+fi
+if [ "\$1" = uninstall ]; then
+    shift
+    printf '%s\n' "\$*" >>"$UNINSTALL_LOG"
+    exit 0
+fi
+if [ "\$1" = autoremove ]; then
+    if [ "\$2" = -n ]; then
+        printf '==> Would autoremove 1 unneeded formula:\nleftover-dep\n'
+    else
+        printf 'ran\n' >>"$log"
+    fi
+    exit 0
+fi
+exit 0
+EOF
+    chmod +x "$STUBS/brew"
+}
+
+@test "chezmirror prunes orphaned dependencies via brew autoremove (YES=1, accept-all)" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    AUTOREMOVE_LOG="$STUBS/autoremove.log"
+    _stub_brew_with_orphan "$AUTOREMOVE_LOG"
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"leftover-dep"* ]]                  # the orphan was previewed
+    [[ "$output" == *"pruned orphaned dependencies"* ]]
+    [ -f "$AUTOREMOVE_LOG" ]                             # `brew autoremove` actually ran
+    grep -qx "ran" "$AUTOREMOVE_LOG"
+}
+
+@test "chezmirror leaves orphaned deps alone when the autoremove confirm is declined" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    AUTOREMOVE_LOG="$STUBS/autoremove.log"
+    _stub_brew_with_orphan "$AUTOREMOVE_LOG"
+    # Per-package mode (no --all): three package confirms, then the autoremove
+    # confirm — decline the last one. gum reads one answer per confirm from stdin.
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nyes\nyes\nno'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"kept orphaned dependencies"* ]]
+    [ ! -f "$AUTOREMOVE_LOG" ]                           # prune declined ⇒ never ran
+}
+
+@test "chezmirror skips brew autoremove when nothing is orphaned (YES=1)" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    AUTOREMOVE_LOG="$STUBS/autoremove.log"
+    # `autoremove -n` prints only a "==>" header (0 unneeded) — no bare names, so
+    # chezmirror must treat it as "no orphans" and never invoke the real prune.
+    cat >"$STUBS/brew" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then cat >/dev/null; cat "$CANNED" 2>/dev/null; exit 0; fi
+if [ "\$1" = uninstall ]; then shift; printf '%s\n' "\$*" >>"$UNINSTALL_LOG"; exit 0; fi
+if [ "\$1" = autoremove ]; then
+    [ "\$2" = -n ] && { printf '==> Autoremoving 0 unneeded formulae\n'; exit 0; }
+    printf 'ran\n' >>"$AUTOREMOVE_LOG"; exit 0
+fi
+exit 0
+EOF
+    chmod +x "$STUBS/brew"
+    run env \
+        PATH="$STUBS:$PATH" YES=1 \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" != *"Orphaned dependencies"* ]]         # nothing surfaced
+    [ ! -f "$AUTOREMOVE_LOG" ]                           # prune never ran
 }
 
 @test "chezmirror untaps an untracked tap end-to-end (Would untap regression)" {

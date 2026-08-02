@@ -13,16 +13,3 @@ AGENTS.md
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
 {{ if not (has "appleDev" $modules) }}.swiftformat
 .config/swiftlint{{ end }}
-
-# ── ~/.config keep-list (the HOME mirror's safety net) ────────────────────────
-# ~/.config is an exact_ dir (src/exact_dot_config), so `chezmoi apply` removes
-# any top-level ~/.config/X that isn't in source. These entries are untracked but
-# critical — auth material, chezmoi's own state, live tool state — so ignoring
-# them protects each one from that removal. Single source of truth is
-# src/.chezmoidata/cleanup.toml; `chezclean` reads the same catalog for ~/.*.
-# `.config/X` protects the whole subtree because exact_ never recurses into a
-# dir that has no source counterpart. Keep this list == cleanup.keepConfig
-# (asserted in tests/cleanup-mirror.bats).
-{{ range .cleanup.keepConfig -}}
-.config/{{ . }}
-{{ end -}}

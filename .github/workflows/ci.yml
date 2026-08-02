@@ -45,7 +45,7 @@ jobs:
         # checked on its own — a bare `bash -n a b c` silently skips b and c.
         run: |
           for f in install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh; do bash -n "$f"; done
-          for f in src/dot_zshenv src/exact_dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
+          for f in src/dot_zshenv src/dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
 
   # Render every template via `chezmoi apply --dry-run` against stub data — no
   # disk writes, no interactive prompts. Catches Go-template syntax errors,

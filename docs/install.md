@@ -64,25 +64,27 @@ curl -fsSL …/install.sh | bash -s -- --promptDefaults     # non-interactive (C
 
 `install.sh` is **not** generated — edit it directly.
 
-## Deprecation cleanup
+## Cleaning up drift on an existing Mac
 
-On an existing Mac the installer runs a cleanup so you don't carry forward tools
-the repo no longer manages. It:
+The installer only ever **adds** — it renders managed files, installs the
+Brewfile, and runs `mise install`. It never uninstalls or deletes, so an existing
+Mac can carry forward tools, packages, and config the repo no longer manages
+(e.g. an old `~/.config/direnv`, a dropped `node` formula, leftover Nix
+remnants). Reconciling that drift back to the repo is a deliberate, **manual**
+step you run when you want to:
 
-- uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`,
-  `temurin@25`, `direnv`) — runtimes now come from **mise**;
-- removes deprecated tool state listed in
-  [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml)
-  (`cleanup.deprecatedPaths` / `cleanup.deprecatedSymlinks`) — currently the
-  leftover Nix remnants: the empty `~/.local/state/nix` and the dangling
-  `~/.nix-profile` symlink; and
-- lets the [`~/.config` mirror](lifecycle.md#mirroring-config-to-the-repo) drop
-  anything else the repo no longer tracks (e.g. the old `~/.config/direnv`),
-  previewed as a `D` line before it happens.
+- `chezmirror` — remove Homebrew packages, casks, and taps the Brewfiles no
+  longer declare (confirm-gated, one at a time), then `brew autoremove` orphaned
+  dependencies.
+- `chezclean` — remove untracked dotfiles the repo doesn't manage, across the top
+  level of `$HOME` (e.g. the dangling `~/.nix-profile` symlink) and `~/.config`
+  (e.g. `~/.config/direnv`). Tool-aware, confirm-gated. See
+  [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chezclean).
 
-On a fresh machine that never had the old stack, it's a silent no-op. The brew +
-deprecated-state step is the `run_onchange_after_02c-cleanup-deprecated` hook — see
-[lifecycle.md](lifecycle.md).
+Anything nested deeper than an immediate child is out of `chezclean`'s scope —
+e.g. the empty `~/.local/state/nix` is removed once by hand (`rm -rf
+~/.local/state/nix`). On a fresh machine that never had the old stack there's
+nothing to reconcile.
 
 ## Work-profile security tooling (storecode)
 

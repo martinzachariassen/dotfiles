@@ -32,3 +32,18 @@ cask "intellij-idea"            # JetBrains IDE
 brew "ollama"                   # local model runner/server
 cask "claude"                   # Anthropic Claude desktop app
 cask "claude-code"              # Anthropic Claude Code CLI
+
+# ─── Mac App Store apps (mas) ─────────────────────────────────────────────────
+# `mas` installs App Store apps declaratively so `brew bundle` reproduces them on
+# a fresh Mac (you must be signed in to the App Store first). This is INSTALL-only:
+# `brew bundle cleanup` never uninstalls `mas` apps, so removing an app this list
+# no longer names stays a manual `mas uninstall <id>` — consistent with this repo's
+# "removal is always manual" model. See docs/packages.md.
+brew "mas"                      # Mac App Store CLI (backs the `mas "…"` lines below)
+#
+# Populate from YOUR machine — `mas` can't be queried from CI, so nothing is
+# declared by default. On a signed-in Mac run `mas list` and paste the apps you
+# want reproduced, e.g.:
+#   mas "Xcode", id: 497799835
+#   mas "The Unarchiver", id: 425424353
+#   mas "Wipr 2", id: 1662217862
