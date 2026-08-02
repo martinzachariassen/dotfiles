@@ -96,6 +96,18 @@
         "**/build": true
     },
 
+    // chezmoi templates: highlight by their base language so the bulk of each
+    // file is correct; the Go-template directives just render inline. A
+    // whole-file "go" association would wrongly parse these shell/json bodies.
+    "files.associations": {
+        "*.sh.tmpl": "shellscript",
+        "*.json.tmpl": "jsonc",
+        "*.toml.tmpl": "toml",
+        "**/dot_zshrc.tmpl": "shellscript",
+        "**/ghostty/config.tmpl": "ini",
+        "**/git/config.tmpl": "ini"
+    },
+
     // Nest derived/companion files under their parent to cut Explorer noise.
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.expand": false,
