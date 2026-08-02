@@ -130,9 +130,21 @@ EOF
 
     chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/code" "$STUBS/gum" "$STUBS/mvn" "$STUBS/gradle"
 
-    # Hermetic PATH for the tool-ownership tests: stubs + coreutils only, so real
-    # az/kubectl/code on the host can't leak in and flip an "orphan" into a "keep".
-    SYSPATH="$STUBS:/usr/bin:/bin"
+    # Hermetic PATH for the tool-ownership tests: stubs + a curated coreutils dir,
+    # so real az/kubectl/code on the host can't leak in and flip an "orphan" into a
+    # "keep". /usr/bin is NOT safe to trust here — GitHub's ubuntu runners ship `az`
+    # and `kubectl` in /usr/bin, so a plain `$STUBS:/usr/bin:/bin` would resolve them
+    # as installed and the .azure/.kube orphan tests would fail on CI (they pass on a
+    # dev Mac only because Homebrew keeps those tools off /usr/bin). Instead symlink
+    # ONLY the utilities clean.sh needs into a dedicated dir; anything NOT linked here
+    # (az, kubectl, code, …) is guaranteed absent, whatever the host has installed.
+    COREBIN="$BATS_TEST_TMPDIR/corebin"
+    mkdir -p "$COREBIN"
+    local _u _p
+    for _u in bash sh env dirname basename sed grep sort awk tr cat rm ln mkdir cut head tail; do
+        _p="$(command -v "$_u" 2>/dev/null)" && ln -sf "$_p" "$COREBIN/$_u"
+    done
+    SYSPATH="$STUBS:$COREBIN"
 }
 
 # Can this process open a controlling terminal? Mirrors clean.sh's own guard so
@@ -412,11 +424,11 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 [ "$1" = --list-extensions ] && printf '%s\n' 'Zeta.One' 'alpha.Two'
 EOF
     chmod +x "$d/code"
-    run env PATH="$d:/usr/bin:/bin" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
+    run env PATH="$d:$COREBIN" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
     [ "$status" -eq 0 ]
     [ "$output" = $'alpha.two\nzeta.one' ]
     # No `code` on PATH ⇒ empty output, rc 0 (graceful degradation, like brew).
-    run env PATH="/usr/bin:/bin" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
+    run env PATH="$COREBIN" bash -c 'source "$1"; _clean_installed_vscode' _ "$SCRIPT"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
@@ -443,7 +455,7 @@ EOF
     mkdir -p "$d"
     printf '#!/usr/bin/env bash\nexit 0\n' >"$d/mvn"
     chmod +x "$d/mvn"
-    run env PATH="$d:/usr/bin:/bin" bash -c 'source "$1"; printf "%s\n" "$2" | _clean_present_bins' \
+    run env PATH="$d:$COREBIN" bash -c 'source "$1"; printf "%s\n" "$2" | _clean_present_bins' \
         _ "$SCRIPT" $'mvn\nbogus-xyz-absent\nmvn'
     [ "$status" -eq 0 ]
     [ "$output" = "mvn" ]  # present + deduped; the absent one dropped
@@ -507,7 +519,7 @@ EOF
     chmod +x "$nb/chezmoi" "$nb/mvn"
     local t="$BATS_TEST_TMPDIR/nb-home"
     mkdir -p "$t/.kube" "$t/.m2" "$t/.hawtjni"
-    run env PATH="$nb:/usr/bin:/bin" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    run env PATH="$nb:$COREBIN" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *".m2 (kept — mvn installed)"* ]]           # binary check survives
     [[ "$output" == *".kube (dir) — orphan · config for kubernetes-cli, not installed"* ]]
