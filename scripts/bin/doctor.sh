@@ -254,6 +254,16 @@ EOF
     else
         pass "no untracked brew packages"
     fi
+    # Orphaned dependencies: formulae installed only as another package's dep that
+    # nothing needs any more. Read-only preview (-n); the fix is chezmirror, which
+    # runs `brew autoremove` after its removal pass. Filter brew's "==>" headers so
+    # only bare formula names count.
+    orphans=$(brew autoremove -n 2>/dev/null | grep -vE '^==>' | grep -cE '^[^[:space:]]+$' || true)
+    if [ "${orphans:-0}" -gt 0 ]; then
+        warn "$orphans orphaned dependency(ies) — run \`chezmirror\` (or \`brew autoremove\`) to prune"
+    else
+        pass "no orphaned dependencies"
+    fi
 else
     fail "brew not on PATH"
 fi

@@ -1,0 +1,109 @@
+# Cleanup catalog — single source of truth for the keep-lists and tool-ownership
+# map that `chezclean` uses to reconcile untracked dotfiles. Merged into the template
+# data root, so `chezclean` reads every list via chezmoi's template engine. Keeping
+# `keepConfig`, `keepHome`, and `owners` in one place stops the two `chezclean`
+# scopes (~/.config and the top level of $HOME) from ever drifting apart.
+#
+# .chezmoidata files can't be templated; keep the `cleanup` namespace disjoint from
+# prompted answers (see packages.toml / modules.toml) so merges never collide.
+
+[cleanup]
+# Untracked ~/.config/X entries `chezclean` must NEVER offer to remove — auth
+# material, chezmoi's own state, or live tool state we deliberately don't manage.
+# Keep `chezmoi` here: removing ~/.config/chezmoi breaks chezmoi itself.
+keepConfig = [
+    "chezmoi",        # chezmoi's own config + boltdb state — never remove
+    "op",             # 1Password CLI auth — also drives git commit signing
+    "gh",             # GitHub CLI auth
+    "gcloud",         # gcloud CLI auth/state (cloudAuth)
+    "github-copilot", # Copilot auth
+    "carapace",       # completion cache (sourced in .zshrc)
+    "lazygit",        # lazygit state
+    "homebrew",       # Homebrew state
+    "gradle",         # Gradle user config
+    "jgit",           # jgit config
+    "kafkactl",       # kafkactl config (work)
+    "obsidian",       # Obsidian config
+    "raycast",        # Raycast config
+    "rest-client",    # rest-client state
+    "siyuan",         # SiYuan config
+    ".wrangler",      # Cloudflare Wrangler state
+    "cagent",         # cagent state
+]
+
+# Top-level ~/.* entries `chezclean` must NEVER offer to remove. Everything else
+# under ~ that starts with "." and isn't chezmoi-managed becomes a removal
+# candidate the user confirms. Keep a dir here once you've decided it stays, so
+# chezclean stops surfacing it. (User-data dirs like Documents/Developer don't
+# start with "." and are out of scope structurally.)
+keepHome = [
+    ".storecode",         # work security tool — installed by its own script (see 05-storecode)
+    ".ssh",               # chezmoi-managed dir + private keys
+    ".config",            # chezclean reconciles ~/.config as its own scope (keepConfig)
+    ".cache",             # XDG cache
+    ".local",             # XDG data/state/bin
+    ".docker",            # chezmoi-managed daemon.json + runtime
+    ".cups",              # macOS printing
+    ".CFUserTextEncoding", # macOS locale marker
+    ".ctsystem",          # macOS
+    ".zshenv",            # chezmoi-managed
+    ".Trash",             # macOS trash — emptying is a separate, manual action
+]
+
+# Tool-ownership map for `chezclean`. Each key is an untracked entry (a top-level
+# ~/.* dir, or a ~/.config/X dir); chezclean KEEPS it (never offers it for removal)
+# while its owning tool is present. "Present" is the UNION of three signals — ANY
+# one keeps the entry:
+#   • package   — a brew formula OR cask is installed
+#   • binary    — a command is on PATH (so mise/gcloud/npm tools count, not just brew)
+#   • extension — a VS Code marketplace ID is in `code --list-extensions` (lowercase)
+# Uninstall the tool / remove the extension and the entry re-surfaces as a removable
+# orphan. Any single field is enough to keep; a row may set more than one.
+#
+# The `extension` field couples an extension-owned dir to its extension's lifecycle:
+# because VS Code extensions are mirrored from packages/vscode-extensions.txt (hook
+# 03), dropping an ID from the manifest uninstalls the extension on the next apply,
+# after which chezclean offers that dir for removal. A dir owned by JVM tooling
+# (Maven/Gradle caches) instead takes `binary = "mvn"`: kept while Java is around.
+#
+# List an entry here ONLY when its own name can't find the tool. chezclean already
+# keeps any entry whose stem (name minus leading dot, up to the first dot) is itself
+# a command on PATH — e.g. .gradle→gradle, .ollama→ollama, .minikube→minikube,
+# .terraform.d→terraform, .claude→claude. So this map is just the aliases where the
+# dir name and the tool's command/package/extension diverge.
+[cleanup.owners]
+[cleanup.owners.".azure"]
+package = "azure-cli" # dir "azure" ≠ cmd "az"
+binary = "az"
+[cleanup.owners.".kube"]
+package = "kubernetes-cli" # dir "kube" matches neither the formula nor "kubectl"
+binary = "kubectl"
+[cleanup.owners.".m2"]
+binary = "mvn" # Maven comes from mise here, NOT brew — the binary is the only signal
+[cleanup.owners.".vscode"]
+package = "visual-studio-code" # cask; dir "vscode" ≠ cmd "code"
+binary = "code"
+
+# VS Code extension-owned dirs — kept while the extension is installed; offered by
+# chezclean once its ID leaves packages/vscode-extensions.txt (03 uninstalls it).
+[cleanup.owners.".sonarlint"]
+extension = "sonarsource.sonarlint-vscode"
+[cleanup.owners.".sts4"]
+extension = "vmware.vscode-spring-boot"
+[cleanup.owners.".codetogether"]
+extension = "genuitecllc.codetogether"
+[cleanup.owners.".lemminx"]
+extension = "redhat.vscode-xml"
+[cleanup.owners.".vs-kubernetes"]
+extension = "ms-kubernetes-tools.vscode-kubernetes-tools"
+
+# JVM tool caches — created by Maven/Gradle, not one extension, so they're kept
+# while `mvn` is on PATH.
+[cleanup.owners.".hawtjni"]
+binary = "mvn"
+[cleanup.owners.".pdfbox.cache"]
+binary = "mvn"
+[cleanup.owners.".rampart"]
+binary = "mvn"
+[cleanup.owners.".testcontainers.properties"]
+binary = "mvn"

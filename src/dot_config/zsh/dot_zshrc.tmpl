@@ -436,9 +436,11 @@ chezaudit() {
 }
 
 # Enforce the Brewfile in the REMOVAL direction: uninstall packages in no Brewfile
-# tier. Deliberately NOT wired into `chez` (a routine apply should never silently
+# tier, then prune any now-orphaned dependencies with `brew autoremove`.
+# Deliberately NOT wired into `chez` (a routine apply should never silently
 # uninstall). Asks per package by default; --all/-a does one bulk confirm; YES=1
-# skips even that. No controlling terminal ⇒ removes nothing.
+# skips even that. No controlling terminal ⇒ removes nothing. Removal only —
+# `chezsync` chains `chezup` (install) then this pass for a full reconcile.
 chezmirror() {
     local src={{ .chezmoi.workingTree | quote }}
 
@@ -449,6 +451,7 @@ chezmirror() {
             -a | --all | -y | --yes) all=1 ;;
             -h | --help)
                 echo "usage: chezmirror [--all|-a | --yes|-y]"
+                echo "  removal only — installs happen via chezup/chez; chezsync does both."
                 echo "  (no flag)   confirm each untracked package individually"
                 echo "  --all, -a   uninstall the whole untracked set after ONE confirmation"
                 echo "  --yes, -y   alias of --all;  YES=1 chezmirror skips that confirmation"
@@ -549,8 +552,74 @@ chezmirror() {
 
     echo
     echo "  removed $removed · kept $kept"
-    [ "$removed" -gt 0 ] && echo "  Tip: \`brew autoremove\` prunes any now-orphaned dependencies."
+
+    # Prune dependencies no longer needed by anything in the Brewfiles. `brew
+    # autoremove` only ever touches formulae installed AS dependencies that are now
+    # orphaned — never a Brewfile-tracked package — so it's safe to offer after a
+    # removal pass. Preview read-only first (-n), then run it: accept-all under
+    # --all/YES=1, else one confirm. We're already past the TTY gate above, so a
+    # prompt here always has a terminal. Filter brew's "==>" progress headers so
+    # only the bare formula names count as orphans.
+    local orphans ocount oyes oreply
+    orphans="$(brew autoremove -n 2>/dev/null | grep -vE '^==>' | grep -E '^[^[:space:]]+$' || true)"
+    if [ -n "$orphans" ]; then
+        ocount=$(printf '%s\n' "$orphans" | grep -c .)
+        echo
+        echo "── Orphaned dependencies (needed by nothing in your Brewfiles) ────"
+        printf '%s\n' "$orphans" | awk 'NF { printf "  %s\n", $0 }'
+        echo
+        if [ "$all" -eq 1 ]; then
+            oyes=1
+        elif command -v gum >/dev/null 2>&1; then
+            gum confirm "Prune $ocount orphaned dependency(ies) with brew autoremove?" && oyes=1 || oyes=0
+        else
+            printf 'Prune %s orphaned dependency(ies) with brew autoremove? [y/N] ' "$ocount"
+            IFS= read -r oreply </dev/tty || oreply=""
+            case "$oreply" in y | Y | yes | YES) oyes=1 ;; *) oyes=0 ;; esac
+        fi
+        if [ "$oyes" -eq 1 ]; then
+            brew autoremove
+            echo "  ✓ pruned orphaned dependencies"
+        else
+            echo "  kept orphaned dependencies — run \`brew autoremove\` to prune later."
+        fi
+    fi
     return 0
+}
+
+# Full package reconcile in one verb: FIRST converge to the repo (chezup: pull →
+# preview → apply, installing everything the Brewfiles declare), THEN prune what
+# the repo no longer tracks (chezmirror: uninstall untracked packages behind a
+# confirm). `chezup` only ADDS, `chezmirror` only REMOVES — chezsync is the
+# "make this Mac's packages match the repo, both directions" shortcut. Untracked
+# *files* stay a separate, deliberate step (`chezclean`). Honours DRY_RUN=1
+# (preview both directions via chezaudit, change nothing) and YES=1 (skip both
+# confirm gates). Trailing args pass through to chezup → chezmoi apply.
+#
+# chezup exits 0 both when in sync and when you decline its apply gate, so the
+# removal pass still runs after a clean/declined apply — but chezmirror has its own
+# confirm, so nothing is uninstalled without a second yes. A FAILED apply exits
+# non-zero and aborts before any removal.
+chezsync() {
+    chezup "$@" || return $?
+    echo
+    if [ "${DRY_RUN:-}" = 1 ]; then
+        echo "── Package removals chezmirror would reconcile (preview) ──────"
+        chezaudit
+        echo "  (DRY_RUN=1 — re-run without it to prune, or run \`chezmirror\`.)"
+        return 0
+    fi
+    echo "── Reconciling package removals (chezmirror) ─────────────────"
+    chezmirror
+}
+
+# Reconcile untracked dotfiles to what chezmoi manages — both the top level of
+# $HOME (keepHome) and ~/.config (keepConfig) in cleanup.toml — removing only what
+# you confirm. The file analogue of chezmirror. Confirms each by default; --all/-a
+# bulk-confirms; YES=1 skips prompts; DRY_RUN=1 previews. No controlling terminal
+# ⇒ removes nothing.
+chezclean() {
+    _chez_run scripts/bin/clean.sh "$@"
 }
 
 # Print every dotfiles verb, grouped by frequency. Static text (no subprocesses).
@@ -575,17 +644,24 @@ chezhelp() {
     chezdiff         Explain pending changes + local drift in plain words (read-only).
     chezbump         Upgrade deps: brew upgrade + mise upgrade.
     chezaudit        List locally-installed packages in no Brewfile (report).
-    chezmirror       Uninstall untracked packages, confirming each.
+    chezmirror       Uninstall untracked packages (removal only), confirming each.
                        --all/-a  uninstall the whole set after one confirmation.
+    chezsync         Full package reconcile: chezup (install) + chezmirror (remove).
+    chezclean        Remove untracked top-level ~/.* entries, confirming each.
+                       --all/-a  remove the whole set after one confirmation.
     dotfiles         cd into the source repo.
+
+  Add something new to the repo
+    new brew pkg     add the line to packages/Brewfile* → chez  (apply installs it)
+    new dotfile      chezmoi add ~/.foo   ·   update tracked: chezmoi re-add ~/.foo
 
   Under the hood
     install.sh       Bootstrap a fresh Mac (curl | bash entry point).
     macos-defaults   (Re-)apply macOS system defaults on their own.
     chezhelp         Show this list.
 
-  Knobs (chezup / chez):  DRY_RUN=1 print only  ·  YES=1 skip confirm
-  YES=1 chezmirror:  accept-all — uninstall every untracked package, no prompts
+  Knobs (chezup / chez / chezsync / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  YES=1 chezmirror / chezclean:  accept-all — remove everything untracked, no prompts
   Deeper docs:  run `dotfiles`, then see docs/commands.md
 EOF
 }

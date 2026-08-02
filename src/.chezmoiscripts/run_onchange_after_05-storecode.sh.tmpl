@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# run_onchange_after_05-storecode — install storecode, the work-only security
+# tool. storecode ships via its OWN installer, not Homebrew, so this is the one
+# place that installs it. Runs on the work profile only, is idempotent (skips
+# when already present), and never fails an apply just because the installer
+# isn't configured yet. The install command is data-driven from
+# src/.chezmoidata/storecode.toml (.storecode.installCmd). run_onchange re-fires
+# only when this rendered content changes.
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ storecode: not on macOS, skipping"
+exit 0
+{{ end -}}
+{{ if ne .profile "work" -}}
+echo "→ storecode: not the work profile, skipping"
+exit 0
+{{ end -}}
+
+home="{{ .chezmoi.homeDir }}"
+
+# Already installed? (binary on PATH, or its home dir exists.) Nothing to do.
+if command -v storecode >/dev/null 2>&1 || [ -e "$home/.storecode" ]; then
+    echo "✓ storecode already installed"
+    exit 0
+fi
+
+install_cmd={{ .storecode.installCmd | quote }}
+if [ -z "$install_cmd" ]; then
+    echo "◆ storecode: not installed, and no installer is configured yet."
+    echo "  Set [storecode].installCmd in src/.chezmoidata/storecode.toml to the"
+    echo "  work installer (e.g. a 'curl -fsSL …/install.sh | bash' one-liner),"
+    echo "  then run 'chezup'. storecode is intentionally not a Homebrew package;"
+    echo "  ~/.storecode is kept automatically by chezclean."
+    exit 0
+fi
+
+echo "◆ storecode: installing…"
+if eval "$install_cmd"; then
+    echo "✓ storecode installed"
+else
+    echo "  ! storecode install failed — run it manually: $install_cmd" >&2
+    exit 1
+fi

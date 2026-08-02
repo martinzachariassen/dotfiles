@@ -116,13 +116,29 @@ package drift. Forget one? `chezhelp` prints the whole list in your terminal.
 | `chezdiff`  | Explain what would change in **plain words** — pending repo → `$HOME` writes and local drift. Read-only.            |
 | `chezbump`  | Routine dependency upgrade: `brew update && brew upgrade` + `mise upgrade`.                                         |
 | `chezaudit` | List Homebrew packages installed locally but **not tracked** in any Brewfile. Reports only.                         |
-| `chezmirror`| Enforce the Brewfile as truth in the **removal** direction — preview untracked items, then confirm each removal (`--all` / `YES=1` to batch). |
+| `chezmirror`| Enforce the Brewfile as truth in the **removal** direction — preview untracked items, then confirm each removal (`--all` / `YES=1` to batch). Removal only; installs happen via `chez`/`chezup`. |
+| `chezsync`  | **Full package reconcile in one step:** `chezup` (install what the Brewfiles declare) then `chezmirror` (uninstall what they don't) — both directions. Files stay separate (`chezclean`). `DRY_RUN=1` previews, `YES=1` skips confirms. |
+| `chezclean` | The **file** analogue of `chezmirror`: reconcile untracked dotfiles to what chezmoi manages — both the top level of `$HOME` (keep-list `cleanup.keepHome`) and `~/.config` (keep-list `cleanup.keepConfig`) — then confirm each removal (`--all` / `YES=1` to batch, `DRY_RUN=1` to preview). **Tool-aware:** keeps config whose owning tool is still present (brew package installed, command on PATH, or owning VS Code extension installed); uninstall the tool and it re-surfaces. |
 
 > [!IMPORTANT]
 > **An apply never uninstalls.** It must be safe to run at any time, so it only
 > ever *adds* presence. Freshness is `chezbump`'s job; *removal* is
 > `chezmirror`'s, always behind a confirm. Full rationale in
 > [docs/lifecycle.md](docs/lifecycle.md#convergence-guarantee).
+
+> [!NOTE]
+> **Removal is manual — an apply never deletes.** An apply only *adds* (renders
+> managed files, `brew bundle`, `mise install`); reconciling a machine back to the
+> repo is `chezmirror` (Homebrew packages) and `chezclean` (untracked dotfiles), both
+> confirm-gated and run by hand. `chezclean` covers the top level of `$HOME`
+> (keep-list `cleanup.keepHome`) *and* `~/.config` (keep-list `cleanup.keepConfig`,
+> which spares auth/state dirs like `op`, `gh`, `gcloud`, chezmoi's own state), and
+> keeps config whose owning tool is still present (brew package, PATH command, or
+> installed VS Code extension) — so extension-owned dirs (`.sonarlint`, `.lemminx`, …)
+> re-surface as removable once their extension leaves the manifest. Keep-lists live in
+> [`src/.chezmoidata/cleanup.toml`](src/.chezmoidata/cleanup.toml). If a machine
+> drifts, it's up to that machine to run the verbs.
+> See [docs/lifecycle.md](docs/lifecycle.md#mirroring-config-to-the-repo).
 
 `chezup` honours `DRY_RUN=1` (print every step, run nothing) and `YES=1` (skip
 the confirm gate), and forwards trailing args to `chezmoi apply`. If a verb

@@ -54,6 +54,4 @@ cask "visual-studio-code"      # VS Code app; settings/extensions managed by che
 # ─── Fonts ────────────────────────────────────────────────────────────────────
 cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this
 
-# ─── Mac App Store apps (requires `mas`) ──────────────────────────────────────
-# brew "mas"
-# mas "Xcode", id: 497799835
+# Mac App Store apps live in the macApps tier — see packages/Brewfile.mac-apps.

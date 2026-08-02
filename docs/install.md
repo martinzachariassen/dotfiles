@@ -64,18 +64,40 @@ curl -fsSL …/install.sh | bash -s -- --promptDefaults     # non-interactive (C
 
 `install.sh` is **not** generated — edit it directly.
 
-## Deprecation cleanup
+## Cleaning up drift on an existing Mac
 
-On an existing Mac the installer runs a cleanup so you don't carry forward tools
-the repo no longer manages. It:
+The installer only ever **adds** — it renders managed files, installs the
+Brewfile, and runs `mise install`. It never uninstalls or deletes, so an existing
+Mac can carry forward tools, packages, and config the repo no longer manages
+(e.g. an old `~/.config/direnv`, a dropped `node` formula, leftover Nix
+remnants). Reconciling that drift back to the repo is a deliberate, **manual**
+step you run when you want to:
 
-- uninstalls the Homebrew packages this repo dropped (`node`, `temurin@21`,
-  `temurin@25`, `direnv`) — runtimes now come from **mise**; and
-- removes the leftover `~/.config/direnv` config.
+- `chezmirror` — remove Homebrew packages, casks, and taps the Brewfiles no
+  longer declare (confirm-gated, one at a time), then `brew autoremove` orphaned
+  dependencies.
+- `chezclean` — remove untracked dotfiles the repo doesn't manage, across the top
+  level of `$HOME` (e.g. the dangling `~/.nix-profile` symlink) and `~/.config`
+  (e.g. `~/.config/direnv`). Tool-aware, confirm-gated. See
+  [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chezclean).
 
-On a fresh machine that never had the old stack, it's a silent no-op. Implemented
-as the `run_onchange_after_02c-cleanup-deprecated` hook — see
-[lifecycle.md](lifecycle.md).
+Anything nested deeper than an immediate child is out of `chezclean`'s scope —
+e.g. the empty `~/.local/state/nix` is removed once by hand (`rm -rf
+~/.local/state/nix`). On a fresh machine that never had the old stack there's
+nothing to reconcile.
+
+## Work-profile security tooling (storecode)
+
+On the **work** profile the apply also ensures `storecode` — an internal security
+tool that guards shell commands — is installed. It ships via its **own** installer
+(not Homebrew), so it's never a Brewfile entry and `chezaudit`/`chezmirror` never
+flag it; `~/.storecode` is on the cleanup keep-list (`cleanup.keepHome`) so
+`chezclean` never offers to remove it. The installer command is data-driven in
+[`src/.chezmoidata/storecode.toml`](../src/.chezmoidata/storecode.toml)
+(`storecode.installCmd`); until it's set, the
+`run_onchange_after_05-storecode` hook prints how to finish the install and exits
+cleanly — an apply never fails just because storecode isn't wired up yet. On any
+non-work profile the hook is a no-op.
 
 ### Coming from the direnv setup
 
