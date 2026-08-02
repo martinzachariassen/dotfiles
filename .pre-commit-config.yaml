@@ -33,7 +33,7 @@ repos:
         name: zsh -n
         entry: bash -c 'for f; do zsh -n "$f"; done' --
         language: system
-        files: '^src/(dot_zshenv|exact_dot_config/zsh/dot_zprofile)$'
+        files: '^src/(dot_zshenv|dot_config/zsh/dot_zprofile)$'
 
       - id: typos
         name: typos

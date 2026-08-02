@@ -1,8 +1,10 @@
 #!/usr/bin/env bats
-# Behavioural tests for clean.sh — the chezclean verb that mirrors the TOP LEVEL
-# of $HOME to what chezmoi manages: it surfaces untracked ~/.* entries (minus the
-# keepHome list) and removes only what you confirm. The file analogue of
-# chezmirror (which does the same for Homebrew packages).
+# Behavioural tests for clean.sh — the chezclean verb that reconciles untracked
+# dotfiles to what chezmoi manages across TWO scopes: the top level of $HOME
+# (minus keepHome) and ~/.config (minus keepConfig). It removes only what you
+# confirm. The file analogue of chezmirror (which does the same for Homebrew
+# packages). Because ~/.config is a normal dot_config dir (not exact_), an apply
+# never prunes it — scope 2 here is what reconciles it.
 #
 # Why this exists:
 #   The dangerous, subtle bit is the candidate set: home entry, MINUS every
@@ -46,6 +48,7 @@ setup() {
     mkdir -p "$STUBS"
     MANAGED_OUT="$STUBS/managed.out"
     KEEP_OUT="$STUBS/keep.out"
+    KEEPCONFIG_OUT="$STUBS/keepconfig.out"
     OWNERS_OUT="$STUBS/owners.out"
     BREW_FORMULAE_OUT="$STUBS/brew-formulae.out"
     BREW_CASKS_OUT="$STUBS/brew-casks.out"
@@ -55,6 +58,8 @@ setup() {
     # path (dropped) to prove the parser.
     printf '%s\n' '.config' '.config/nvim' '.zshenv' '.ssh' 'Library/Application Support/x' >"$MANAGED_OUT"
     printf '%s\n' '.storecode' '.cache' '.config' '.ssh' >"$KEEP_OUT"
+    # keepConfig (scope 2): auth/state dirs under ~/.config never offered for removal.
+    printf '%s\n' 'gh' 'op' >"$KEEPCONFIG_OUT"
     # Tool-ownership map: entry<TAB>package<TAB>binary<TAB>extension. .m2 has an
     # EMPTY package (Maven from mise) and .sonarlint/.codetogether have ONLY an
     # extension (empty package+binary) — the literal tabs must survive parsing or
@@ -84,6 +89,7 @@ case "\$1" in
     execute-template)
         case "\$2" in
             *keepHome*) cat "$KEEP_OUT" 2>/dev/null ;;
+            *keepConfig*) cat "$KEEPCONFIG_OUT" 2>/dev/null ;;
             *owners*) cat "$OWNERS_OUT" 2>/dev/null ;;
         esac
         ;;
@@ -374,8 +380,8 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 @test "_clean_classify marks an extension-owned entry orphan when its extension is gone" {
-    # The whole point of the 03b lifecycle coupling: extension no longer installed
-    # ⇒ its HOME dir surfaces as a removable orphan (labelled with the extension ID).
+    # The whole point of the extension signal: extension no longer installed ⇒ its
+    # HOME dir surfaces as a removable orphan (labelled with the extension ID).
     run bash -c 'source "$1"; printf "%s\n" ".sonarlint" | _clean_classify "$2" "$3" "$4" "$5"' \
         _ "$SCRIPT" $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' '' '' ''
     [ "$status" -eq 0 ]
@@ -534,4 +540,59 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *".codetogether (dir) — orphan · config for genuitecllc.codetogether, not installed"* ]]
     [[ "$output" == *"removed 1 · kept 0"* ]]
+}
+
+# ─── scope 2: ~/.config reconciliation (DRY_RUN, hermetic PATH) ───────────────
+# ~/.config is a normal dot_config dir now (not exact_), so an apply never prunes
+# it — chezclean's second scope does. Its entries are mostly NON-dot (nvim, gh),
+# unlike scope 1. keepConfig (gh, op) is the auth/state keep-list; managed_config
+# is derived from `chezmoi managed` lines under .config/ (here: .config/nvim → nvim).
+
+@test "scope 2: offers an untracked ~/.config child, spares keepConfig and managed children" {
+    local t="$BATS_TEST_TMPDIR/cfg"
+    mkdir -p "$t/.config/gh" "$t/.config/nvim" "$t/.config/randomcfg"
+    ln -s "$t/.config/nowhere" "$t/.config/deadcfg"  # dangling — cruft, must be offered
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".config/randomcfg (dir) — untracked"* ]]
+    [[ "$output" == *".config/deadcfg (symlink) — untracked"* ]]
+    [[ "$output" != *".config/gh"* ]]    # keepConfig-spared, never surfaced
+    [[ "$output" != *".config/nvim"* ]]  # chezmoi-managed, never surfaced
+    [[ "$output" == *"removed 2 · kept 0"* ]]
+}
+
+@test "scope 2: keeps a ~/.config child whose tool is on PATH (stem heuristic)" {
+    local t="$BATS_TEST_TMPDIR/cfg2"
+    mkdir -p "$t/.config/gradle" "$t/.config/randomcfg"  # gradle stub is on $SYSPATH
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".config/gradle (kept — gradle installed)"* ]]  # stem "gradle" on PATH
+    [[ "$output" != *".config/gradle (dir) —"* ]]                    # never offered
+    [[ "$output" == *".config/randomcfg"* ]]                         # the ownerless junk offered
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+}
+
+@test "scope 2: empty keepConfig skips ~/.config (refusal) but still reconciles \$HOME" {
+    : >"$KEEPCONFIG_OUT"  # chezmoi execute-template yields nothing for keepConfig
+    local t="$BATS_TEST_TMPDIR/cfg3"
+    mkdir -p "$t/.config/junkcfg" "$t/.junktop"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"skipping ~/.config"* ]]
+    [[ "$output" == *"empty keep-list"* ]]
+    [[ "$output" != *".config/junkcfg"* ]]  # ~/.config never reconciled
+    [[ "$output" == *".junktop"* ]]          # scope 1 (keepHome) still runs
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [ -d "$t/.config/junkcfg" ]              # untouched
+}
+
+@test "scope 2: YES=1 removes an untracked ~/.config child, spares keepConfig (needs a tty)" {
+    have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
+    local t="$BATS_TEST_TMPDIR/cfg4"
+    mkdir -p "$t/.config/junkcfg" "$t/.config/gh"
+    run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" YES=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [ ! -e "$t/.config/junkcfg" ]  # removed
+    [ -d "$t/.config/gh" ]         # keepConfig-spared, untouched
 }

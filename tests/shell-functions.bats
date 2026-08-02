@@ -7,7 +7,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/exact_dot_config/zsh/dot_zshrc.tmpl"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     if ! command -v zsh >/dev/null 2>&1; then
         skip "zsh not installed"
     fi

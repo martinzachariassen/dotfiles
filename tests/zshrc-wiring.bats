@@ -16,9 +16,9 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/exact_dot_config/zsh/dot_zshrc.tmpl"
+    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     ZSHENV="$REPO_ROOT/src/dot_zshenv"
-    ZPROFILE="$REPO_ROOT/src/exact_dot_config/zsh/dot_zprofile"
+    ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
 }
 
 # ─── ~/.zshenv: must stay in $HOME (zsh reads it before ZDOTDIR is set) ────
@@ -137,7 +137,7 @@ setup() {
 @test "zshrc defines chezhelp and it lists every verb" {
     grep -qE '^chezhelp\(\) \{' "$ZSHRC"
     body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
-    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror chezclean dotfiles; do
+    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror chezsync chezclean dotfiles; do
         grep -qE "^ +${verb} " <<<"$body" || {
             echo "chezhelp is missing an entry for: ${verb}"
             return 1
@@ -175,6 +175,16 @@ setup() {
 @test "zshrc defines the chezclean function routed through _chez_run" {
     grep -qE '^chezclean\(\) \{' "$ZSHRC"
     sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/clean.sh'
+}
+
+# chezsync is the two-way package reconcile: it must compose the install direction
+# (chezup) and the removal direction (chezmirror) — never re-implement either.
+# Behaviour (ordering, DRY_RUN preview, fail-fast) is exercised in tests/chezsync.bats.
+@test "zshrc defines chezsync composing chezup then chezmirror" {
+    grep -qE '^chezsync\(\) \{' "$ZSHRC"
+    body="$(sed -n '/^chezsync() {/,/^}/p' "$ZSHRC")"
+    grep -qF 'chezup' <<<"$body"
+    grep -qF 'chezmirror' <<<"$body"
 }
 
 @test "chez surfaces Brewfile drift but never auto-uninstalls" {

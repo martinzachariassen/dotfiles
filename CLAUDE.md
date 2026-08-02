@@ -34,28 +34,27 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 - Feature gating is data-driven: modules in `src/.chezmoidata/modules.toml`,
   packages in `src/.chezmoidata/packages.toml`. Templates gate with
   `{{ if has "theme" .modules }}`.
-- **HOME is mirrored to the repo.** `~/.config` is an `exact_` dir
-  (`src/exact_dot_config/`), so an apply prunes untracked *top-level* `~/.config/X`;
-  the keep-list in `src/.chezmoidata/cleanup.toml` (`cleanup.keepConfig`, rendered
-  into `.chezmoiignore`) spares auth/state dirs (`op`, `gh`, `gcloud`, `chezmoi`).
-  The top level of `$HOME` is reconciled on demand by `chezclean`
-  (`scripts/bin/clean.sh`) against `cleanup.keepHome`. `chezclean` is **tool-aware**:
-  it keeps config whose owning tool is still present — the union of three signals:
-  the tool's brew package is installed, its command is on PATH (so mise/gcloud tools
-  count), *or* its owning VS Code extension is in `code --list-extensions` — matching
-  most tools by a stem heuristic (`command -v <name-minus-dot>`) and the
-  `cleanup.owners` map for name↔command/package/extension aliases (`.kube`→`kubectl`,
-  `.m2`→`mvn` from mise, `.sonarlint`→`sonarsource.sonarlint-vscode`). Adding a tool =
-  track it (`chezmoi add`), add it to the keep-list, or (if its dir name diverges from
-  its command) add an `owners` alias; all three lists live in one file so they can't
-  drift. **Extension-owned dirs are also auto-pruned:** the `owners` entries with an
-  `extension` field are coupled to the extension lifecycle by
-  `run_onchange_after_03b-vscode-home-prune` — it runs after the 03 extension mirror,
-  so `code --list-extensions` already matches `packages/vscode-extensions.txt`, then
-  `rm -rf`s any extension-owned `$HOME` dir whose extension is no longer installed.
-  Drop an extension ID from the manifest → next apply uninstalls it *and* deletes its
-  dir, identically on every machine (deleting an extension in the VS Code UI is
-  reverted by 03 — remove it from the manifest instead). Full model in
+- **Removal is always manual — an apply never deletes.** `chezmoi apply` only
+  *adds/updates* (renders managed files, `brew bundle`, `mise install`). Reconciling a
+  machine back to the repo — removing what the repo no longer tracks — is done by two
+  confirm-gated verbs you run by hand: `chezmirror` for Homebrew packages, and
+  `chezclean` (`scripts/bin/clean.sh`) for untracked dotfiles. There are no
+  hand-maintained deprecation lists and no auto-prune hooks. If a machine drifts, it's
+  up to that machine's owner to run the verbs.
+- **`chezclean` reconciles both the top level of `$HOME` and `~/.config`.** `~/.config`
+  is a normal `dot_config` dir (not `exact_`), so an apply won't prune it; instead
+  `chezclean` surfaces untracked `~/.*` (vs `cleanup.keepHome`) and untracked
+  `~/.config/X` (vs `cleanup.keepConfig`) and removes only what you confirm. It's
+  **tool-aware**: config whose owning tool is still present is kept automatically — the
+  union of three signals: the tool's brew package is installed, its command is on PATH
+  (so mise/gcloud tools count), *or* its owning VS Code extension is in
+  `code --list-extensions` — matching most tools by a stem heuristic
+  (`command -v <name-minus-dot>`) and the `cleanup.owners` map for
+  name↔command/package/extension aliases (`.kube`→`kubectl`, `.m2`→`mvn` from mise,
+  `.sonarlint`→`sonarsource.sonarlint-vscode`). Adding a tool = track it
+  (`chezmoi add`), add it to a keep-list, or (if its dir name diverges from its
+  command) add an `owners` alias; `keepConfig`/`keepHome`/`owners` all live in
+  `cleanup.toml` so they can't drift. Full model in
   [docs/lifecycle.md](docs/lifecycle.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in

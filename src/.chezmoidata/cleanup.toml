@@ -1,19 +1,16 @@
-# Cleanup catalog — single source of truth for the HOME-mirror keep-lists and the
-# set of dropped tooling to remove. Merged into the template data root, so the
-# keep-list renders into `.chezmoiignore` ({{ .cleanup.keepConfig }}) and the hooks
-# / scripts read the same lists via `chezmoi data`. Keeping the two in one place
-# stops the auto-prune (exact_ ~/.config) and the confirm-gated `chezclean` verb
-# from ever drifting apart.
+# Cleanup catalog — single source of truth for the keep-lists and tool-ownership
+# map that `chezclean` uses to reconcile untracked dotfiles. Merged into the template
+# data root, so `chezclean` reads every list via chezmoi's template engine. Keeping
+# `keepConfig`, `keepHome`, and `owners` in one place stops the two `chezclean`
+# scopes (~/.config and the top level of $HOME) from ever drifting apart.
 #
 # .chezmoidata files can't be templated; keep the `cleanup` namespace disjoint from
 # prompted answers (see packages.toml / modules.toml) so merges never collide.
 
 [cleanup]
-# ~/.config top-level entries to PRESERVE. `.chezmoiignore` turns each into an
-# ignore rule, which protects it from removal even though ~/.config is exact_.
-# Every entry here is untracked-but-critical: auth material, chezmoi's own state,
-# or live tool state we deliberately don't manage. `chezmoi` MUST stay first — it
-# is chezmoi's own config+state dir; removing it breaks chezmoi itself.
+# Untracked ~/.config/X entries `chezclean` must NEVER offer to remove — auth
+# material, chezmoi's own state, or live tool state we deliberately don't manage.
+# Keep `chezmoi` here: removing ~/.config/chezmoi breaks chezmoi itself.
 keepConfig = [
     "chezmoi",        # chezmoi's own config + boltdb state — never remove
     "op",             # 1Password CLI auth — also drives git commit signing
@@ -42,7 +39,7 @@ keepConfig = [
 keepHome = [
     ".storecode",         # work security tool — installed by its own script (see 05-storecode)
     ".ssh",               # chezmoi-managed dir + private keys
-    ".config",            # governed by exact_ + keepConfig, not by chezclean
+    ".config",            # chezclean reconciles ~/.config as its own scope (keepConfig)
     ".cache",             # XDG cache
     ".local",             # XDG data/state/bin
     ".docker",            # chezmoi-managed daemon.json + runtime
@@ -53,18 +50,8 @@ keepHome = [
     ".Trash",             # macOS trash — emptying is a separate, manual action
 ]
 
-# Dropped tooling to remove everywhere, driven into 02c-cleanup-deprecated.
-# Paths are relative to $HOME. Symlinks are listed separately because the presence
-# check differs (a dangling symlink fails `-e`, so 02c also tests `-L`).
-deprecatedPaths = [
-    ".local/state/nix", # Nix state dir — Nix/Devbox no longer used
-]
-deprecatedSymlinks = [
-    ".nix-profile", # dangling Nix profile symlink
-]
-
-# Tool-ownership map for `chezclean` (and the VS Code HOME-prune, hook 03b). Each
-# key is a top-level ~/.* entry; chezclean KEEPS it (never offers it for removal)
+# Tool-ownership map for `chezclean`. Each key is an untracked entry (a top-level
+# ~/.* dir, or a ~/.config/X dir); chezclean KEEPS it (never offers it for removal)
 # while its owning tool is present. "Present" is the UNION of three signals — ANY
 # one keeps the entry:
 #   • package   — a brew formula OR cask is installed
@@ -73,14 +60,11 @@ deprecatedSymlinks = [
 # Uninstall the tool / remove the extension and the entry re-surfaces as a removable
 # orphan. Any single field is enough to keep; a row may set more than one.
 #
-# The `extension` field does double duty. Besides chezclean, it drives the automatic
-# apply-time prune in run_onchange_after_03b-vscode-home-prune: because VS Code
-# extensions are themselves mirrored from packages/vscode-extensions.txt (hook 03),
-# an extension-owned dir is coupled to the extension's lifecycle — drop the ID from
-# the manifest and 03 uninstalls the extension, then 03b removes this HOME dir. Same
-# result on every machine, no manual step. A dir owned by JVM tooling (Maven/Gradle
-# caches) instead takes `binary = "mvn"`: kept while Java is around, but never
-# auto-pruned, since it can't be attributed to a single extension.
+# The `extension` field couples an extension-owned dir to its extension's lifecycle:
+# because VS Code extensions are mirrored from packages/vscode-extensions.txt (hook
+# 03), dropping an ID from the manifest uninstalls the extension on the next apply,
+# after which chezclean offers that dir for removal. A dir owned by JVM tooling
+# (Maven/Gradle caches) instead takes `binary = "mvn"`: kept while Java is around.
 #
 # List an entry here ONLY when its own name can't find the tool. chezclean already
 # keeps any entry whose stem (name minus leading dot, up to the first dot) is itself
@@ -100,8 +84,8 @@ binary = "mvn" # Maven comes from mise here, NOT brew — the binary is the only
 package = "visual-studio-code" # cask; dir "vscode" ≠ cmd "code"
 binary = "code"
 
-# VS Code extension-owned dirs — kept while the extension is installed, and
-# auto-pruned by hook 03b once its ID leaves packages/vscode-extensions.txt.
+# VS Code extension-owned dirs — kept while the extension is installed; offered by
+# chezclean once its ID leaves packages/vscode-extensions.txt (03 uninstalls it).
 [cleanup.owners.".sonarlint"]
 extension = "sonarsource.sonarlint-vscode"
 [cleanup.owners.".sts4"]
@@ -114,7 +98,7 @@ extension = "redhat.vscode-xml"
 extension = "ms-kubernetes-tools.vscode-kubernetes-tools"
 
 # JVM tool caches — created by Maven/Gradle, not one extension, so they're kept
-# while `mvn` is on PATH (chezclean-only; hook 03b never auto-prunes these).
+# while `mvn` is on PATH.
 [cleanup.owners.".hawtjni"]
 binary = "mvn"
 [cleanup.owners.".pdfbox.cache"]

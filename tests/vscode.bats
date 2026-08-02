@@ -83,54 +83,6 @@ setup() {
     [ "${#lines[@]}" -eq 2 ]
 }
 
-# ─── vscode_orphaned_home_dirs (the 03b HOME-prune set) ────────────────────────
-# ROWS are "dir<TAB>extension" lines (extension-owned HOME dirs, from cleanup.owners);
-# INSTALLED is raw `code --list-extensions`. Emit each dir whose extension is gone.
-
-@test "vscode_orphaned_home_dirs returns nothing when every extension is installed" {
-    local rows
-    rows="$(printf '%s\n' ".lemminx"$'\t'"redhat.vscode-xml" ".sonarlint"$'\t'"sonarsource.sonarlint-vscode")"
-    run vscode_orphaned_home_dirs "$rows" $'redhat.vscode-xml\nsonarsource.sonarlint-vscode'
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "vscode_orphaned_home_dirs returns the dir whose extension is gone" {
-    local rows
-    rows="$(printf '%s\n' ".lemminx"$'\t'"redhat.vscode-xml" ".sonarlint"$'\t'"sonarsource.sonarlint-vscode")"
-    run vscode_orphaned_home_dirs "$rows" $'sonarsource.sonarlint-vscode'
-    [ "$status" -eq 0 ]
-    [ "$output" = ".lemminx" ]
-}
-
-@test "vscode_orphaned_home_dirs matches case-insensitively (installed list mixed-case)" {
-    # `code --list-extensions` can report a different case; a mixed-case installed
-    # ID must still count as present, not look orphaned.
-    run vscode_orphaned_home_dirs ".lemminx"$'\t'"redhat.vscode-xml" $'RedHat.vscode-XML'
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "vscode_orphaned_home_dirs lowercases the map's own extension ID too" {
-    run vscode_orphaned_home_dirs ".lemminx"$'\t'"RedHat.vscode-XML" $'redhat.vscode-xml'
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
-@test "vscode_orphaned_home_dirs returns every dir when nothing is installed" {
-    local rows
-    rows="$(printf '%s\n' ".lemminx"$'\t'"redhat.vscode-xml" ".sonarlint"$'\t'"sonarsource.sonarlint-vscode")"
-    run vscode_orphaned_home_dirs "$rows" ""
-    [ "$status" -eq 0 ]
-    [ "${#lines[@]}" -eq 2 ]
-}
-
-@test "vscode_orphaned_home_dirs with empty rows returns nothing" {
-    run vscode_orphaned_home_dirs "" $'redhat.vscode-xml'
-    [ "$status" -eq 0 ]
-    [ -z "$output" ]
-}
-
 # ─── in-sync: no drift in either direction ─────────────────────────────────────
 
 @test "identical sets (any case/order) report no drift" {

@@ -47,26 +47,3 @@ vscode_missing() {
         <(printf '%s\n' "$1" | vscode_normalize) \
         <(printf '%s\n' "$2" | vscode_normalize)
 }
-
-# vscode_orphaned_home_dirs ROWS INSTALLED — ROWS is "dir<TAB>extension" lines (one
-# per extension-owned HOME dir, from cleanup.owners), INSTALLED is raw
-# `code --list-extensions` output. Emit each DIR whose owning extension is NOT
-# installed. Pure: no `code` call, no filesystem — hook 03b feeds it live data and
-# performs the removal. Extension IDs are lowercased on both sides (marketplace IDs
-# are case-insensitive), so case drift can't make an installed extension look gone.
-vscode_orphaned_home_dirs() {
-    local rows="$1" installed row dir ext tab
-    tab="$(printf '\t')"
-    installed="$(printf '%s\n' "$2" | vscode_normalize)"
-    while IFS= read -r row; do
-        case "$row" in *"$tab"*) ;; *) continue ;; esac
-        dir="${row%%"$tab"*}"
-        ext="${row#*"$tab"}"
-        [ -n "$dir" ] && [ -n "$ext" ] || continue
-        ext="$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
-        printf '%s\n' "$installed" | grep -qxF -- "$ext" && continue
-        printf '%s\n' "$dir"
-    done <<EOF
-$rows
-EOF
-}

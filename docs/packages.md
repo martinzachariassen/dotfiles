@@ -22,6 +22,24 @@ source of truth. The `run_after_02-brew-bundle` hook reads the active set and ru
 `brew bundle --no-upgrade`, converging *presence*, not freshness. See
 [lifecycle.md](lifecycle.md#where-each-piece-lives).
 
+### Mac App Store apps (`mas`)
+
+App Store apps are declared with [`mas`](https://github.com/mas-cli/mas) in the
+`macApps` tier ([`Brewfile.mac-apps`](../packages/Brewfile.mac-apps)) so `brew
+bundle` reproduces them on a fresh Mac. Each line is `mas "Name", id: NNN`; you
+must be signed in to the App Store before an apply installs them.
+
+This is **install/reproducibility only** — it does *not* make App Store apps
+auto-prune, on purpose. `brew bundle cleanup` (the engine behind
+[`chezmirror`](commands.md)) never uninstalls `mas` apps, so dropping a `mas` line
+does **not** remove the app; that stays a manual `mas uninstall <id>`. This matches
+the repo's [removal-is-manual model](lifecycle.md) — an apply only adds.
+
+Nothing is declared by default: `mas` can't be queried from CI, and speculative
+IDs would install unwanted apps. Populate the list from your own machine — run
+`mas list` on a signed-in Mac and paste the apps you want reproduced into
+`Brewfile.mac-apps` under the `mas` section.
+
 ## Profiles
 
 One of `personal`, `work`, or `minimal`, chosen at setup. A profile selects its
@@ -35,7 +53,7 @@ gate on membership with sprig `has`, e.g. `{{ if has "theme" .modules }}…{{ en
 
 | Module | What it adds |
 |---|---|
-| `macApps` | GUI and AI apps (Raycast, Chrome, Claude, Ollama). |
+| `macApps` | GUI and AI apps (Raycast, Chrome, Claude, Ollama) plus `mas` for App Store apps (see [above](#mac-app-store-apps-mas)). |
 | `macosDefaults` | macOS system defaults (needs sudo) — see [macos.md](macos.md). |
 | `cloudAuth` | Cloud CLIs and auth walkthrough (gh, az, gcloud, op). |
 | `claudePersona` | Claude global defaults at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |

@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# clean.sh — mirror the TOP LEVEL of $HOME to what chezmoi manages: surface
-# untracked ~/.* entries (minus a keep-list) and remove only what you confirm.
-# The file analogue of chezmirror (which does the same for Homebrew packages).
+# clean.sh — reconcile untracked dotfiles to what chezmoi manages, across TWO
+# scopes, removing only what you confirm. The file analogue of chezmirror (which
+# does the same for Homebrew packages). Because ~/.config is a normal dot_config
+# dir (not exact_), an apply never prunes it — this verb is what reconciles it.
+#   scope 1 — the TOP LEVEL of $HOME: untracked ~/.* entries (keep-list keepHome).
+#   scope 2 — ~/.config: untracked ~/.config/X children       (keep-list keepConfig).
 #
 # Scope is deliberately narrow and safe:
-#   • only entries whose name begins with "." are ever considered, so ~/Library,
+#   • scope 1 considers only entries whose name begins with "." — so ~/Library,
 #     ~/Documents, ~/Developer and other user data are out of scope structurally;
-#   • it NEVER descends into a directory — only whole top-level entries;
-#   • ~/.config is governed separately (exact_ dir + keep-list in .chezmoiignore),
-#     so it is always kept here;
+#   • scope 2 considers every immediate child of ~/.config (its entries are mostly
+#     non-dot: nvim, gh, …), still never descending past that immediate child;
+#   • neither scope EVER descends into a directory — only whole children;
 #   • config whose owning tool is still installed is KEPT automatically — the
 #     tool's brew package is present, its command is on PATH (so mise/gcloud tools
 #     count too), OR (for a VS Code extension-owned dir) its extension is installed;
@@ -16,13 +19,13 @@
 #   • nothing is removed without a confirmation (or an explicit --all / YES=1),
 #     and never at all without a controlling terminal.
 #
-# Both the keep-list and the tool-ownership map are the single source of truth in
-# src/.chezmoidata/cleanup.toml (.cleanup.keepHome / .cleanup.owners), read
-# through chezmoi's own template engine — so they can't drift from the ~/.config
-# keep-list and need no jq. Most tools are matched by a stem heuristic
-# (command -v <name-minus-dot>); the owners map holds only the aliases where the
-# dir name and the tool's command/package/extension diverge (.kube -> kubectl,
-# .m2 -> mvn, .sonarlint -> the sonarlint-vscode extension).
+# Both keep-lists and the tool-ownership map are the single source of truth in
+# src/.chezmoidata/cleanup.toml (.cleanup.keepHome / .keepConfig / .owners), read
+# through chezmoi's own template engine — so the two scopes can't drift apart and
+# need no jq. Most tools are matched by a stem heuristic (command -v
+# <name-minus-dot>); the owners map holds only the aliases where the dir name and
+# the tool's command/package/extension diverge (.kube -> kubectl, .m2 -> mvn,
+# .sonarlint -> the sonarlint-vscode extension).
 # Unlike a chezmoi hook this verb runs with a live stdin, so it talks to /dev/tty
 # directly (no tty.sh).
 #
@@ -82,9 +85,48 @@ _clean_managed_top() {
 }
 
 # _clean_keep_home — the keep-list from the single source of truth, via chezmoi's
-# template engine (no jq; can't drift from the .chezmoiignore keep-list).
+# template engine (no jq; can't drift from the ~/.config keep-list).
 _clean_keep_home() {
     chezmoi execute-template '{{ range .cleanup.keepHome }}{{ . }}{{ "\n" }}{{ end }}' 2>/dev/null
+}
+
+# _clean_config_entries DIR — basenames of every immediate child of DIR, dot or
+# not (~/.config holds mostly non-dot dirs like nvim/gh, plus a few dot ones such
+# as .wrangler), excluding . and .., one per line, sorted-unique. Never descends;
+# dangling symlinks count (cruft too). The ~/.config analogue of
+# _clean_home_dotentries, which is $HOME-only and dot-only.
+_clean_config_entries() {
+    local dir="$1" path name
+    [ -d "$dir" ] || return 0
+    for path in "$dir"/* "$dir"/.*; do
+        name="${path##*/}"
+        case "$name" in
+            . | ..) continue ;;
+        esac
+        # A glob that matches nothing yields the literal pattern; guard against it.
+        [ -e "$path" ] || [ -L "$path" ] || continue
+        printf '%s\n' "$name"
+    done | sort -u
+}
+
+# _clean_managed_config — immediate children of ~/.config that chezmoi manages
+# (e.g. nvim, gh, zsh), one per line, sorted-unique. `chezmoi managed` lists
+# target-relative paths; keep those under .config/ and take the first segment
+# after it. The ~/.config analogue of _clean_managed_top.
+_clean_managed_config() {
+    chezmoi managed 2>/dev/null |
+        grep '^\.config/' |
+        sed 's#^\.config/##; s#/.*##' |
+        grep -v '^$' |
+        sort -u
+}
+
+# _clean_keep_config — the ~/.config keep-list from the single source of truth,
+# via chezmoi's template engine (no jq). Its consumer is this verb (scope 2) — the
+# auth/state dirs (gh, op, gcloud, …) that must never be offered even though no
+# "tool on PATH" signal covers them.
+_clean_keep_config() {
+    chezmoi execute-template '{{ range .cleanup.keepConfig }}{{ . }}{{ "\n" }}{{ end }}' 2>/dev/null
 }
 
 # _clean_candidates MANAGED KEEP — read home dot-entries on stdin; emit those
@@ -256,10 +298,11 @@ _clean_help() {
     cat <<'EOF'
 usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
 
-  Mirror the top level of $HOME to what chezmoi manages: list untracked ~/.*
-  entries and remove only what you confirm. An entry is KEPT automatically while
-  its owning tool is still installed — the tool's brew package is present, its
-  command is on PATH (so mise/gcloud tools count too), OR its VS Code extension is
+  Reconcile untracked dotfiles to what chezmoi manages, across two scopes — the
+  top level of $HOME (keep-list keepHome) and ~/.config (keep-list keepConfig) —
+  and remove only what you confirm. An entry is KEPT automatically while its
+  owning tool is still installed — the tool's brew package is present, its command
+  is on PATH (so mise/gcloud tools count too), OR its VS Code extension is
   installed. Uninstall the tool / remove the extension and its config re-surfaces
   as removable. Offered entries are labelled "orphan" (a known tool, now gone) or
   "untracked" (no known owner).
@@ -270,9 +313,79 @@ usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
   --verbose, -v also list the entries kept because their tool is installed
 
   YES=1 chezclean   accept-all with no prompt (still needs a terminal).
-  Keep an entry for good: add it to keepHome in src/.chezmoidata/cleanup.toml;
-  map a tool's config dir to its command in cleanup.owners (e.g. .kube -> kubectl).
+  Keep an entry for good: add it to keepHome / keepConfig in
+  src/.chezmoidata/cleanup.toml; map a tool's config dir to its command in
+  cleanup.owners (e.g. .kube -> kubectl).
 EOF
+}
+
+# _clean_collect LABEL SCANDIR PATHPREFIX ENTRIES KEEP MANAGED OWNERS BREWSET \
+#                EXTSET VERBOSE
+# Reconcile ONE scope up to (but not including) removal: from the scope's raw
+# ENTRIES (newline list), drop what chezmoi MANAGES and the KEEP-list spares,
+# classify the rest against installed tooling (OWNERS/BREWSET/EXTSET + a per-scope
+# command -v probe), report what tool-ownership spared (—verbose names them), and
+# APPEND every still-offered entry to the global _CLEAN_OFFERED as
+# "fullpath<TAB>display<TAB>verdict<TAB>label". Prints only human-facing log lines;
+# the offered set is returned via the global so _clean_main can confirm/remove both
+# scopes in one uniform pass. PATHPREFIX (""/".config/") disambiguates display
+# names and the removal path across scopes.
+_clean_collect() {
+    local label="$1" scandir="$2" pathprefix="$3" entries="$4" keep="$5" managed="$6"
+    local owners="$7" brewset="$8" extset="$9" verbose="${10}"
+    local candidates probe binset classified offered kept_owned kcount count
+
+    candidates="$(printf '%s\n' "$entries" | _clean_candidates "$managed" "$keep")"
+    if [ -z "$candidates" ]; then
+        ok "$label is clean — every entry is managed or kept"
+        return 0
+    fi
+
+    # Classify each candidate against installed tooling: keep config whose owner is
+    # present (brew package installed, its command on PATH, OR — for a VS Code
+    # extension-owned dir — its extension in `code --list-extensions`), so only
+    # orphaned or unknown leftovers are ever offered. Probe owner-binaries and
+    # candidate stems together in one command -v pass.
+    probe="$({
+        _clean_owner_binaries "$owners"
+        printf '%s\n' "$candidates" | _clean_stems
+    } | sort -u)"
+    binset="$(printf '%s\n' "$probe" | _clean_present_bins)"
+    classified="$(printf '%s\n' "$candidates" | _clean_classify "$owners" "$brewset" "$binset" "$extset")"
+    offered="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "orphan" || $2 == "unknown"')"
+    kept_owned="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "keep" { print $1 "\t" $3 }')"
+
+    # Reassure the user about what tool-ownership spared; --verbose lists them.
+    kcount="$(printf '%s\n' "$kept_owned" | grep -c .)"
+    if [ "$kcount" -gt 0 ]; then
+        info "kept $kcount untracked entr$([ "$kcount" -eq 1 ] && printf y || printf ies) in $label owned by installed tooling$([ "$verbose" -eq 1 ] || printf ' (-v to list)')"
+        if [ "$verbose" -eq 1 ]; then
+            local ke kl
+            while IFS=$'\t' read -r ke kl; do
+                [ -n "$ke" ] || continue
+                dim "    $pathprefix$ke (kept — $kl installed)"
+            done <<<"$kept_owned"
+        fi
+    fi
+
+    if [ -z "$offered" ]; then
+        ok "$label is clean — every entry is managed, kept, or owned by an installed tool"
+        return 0
+    fi
+
+    count="$(printf '%s\n' "$offered" | grep -c .)"
+    info "$count untracked entr$([ "$count" -eq 1 ] && printf y || printf ies) under $label with no installed owner:"
+    local pname pverdict plabel pann
+    while IFS=$'\t' read -r pname pverdict plabel; do
+        [ -n "$pname" ] || continue
+        case "$pverdict" in
+            orphan) pann="orphan · config for ${plabel}, not installed" ;;
+            *) pann="untracked" ;;
+        esac
+        dim "    $pathprefix$pname ($(_clean_kind "$scandir/$pname")) — $pann"
+        _CLEAN_OFFERED+="$scandir/$pname"$'\t'"$pathprefix$pname"$'\t'"$pverdict"$'\t'"$plabel"$'\n'
+    done <<<"$offered"
+    hr
 }
 
 # ─── main ─────────────────────────────────────────────────────────────────────
@@ -309,69 +422,49 @@ _clean_main() {
         return 1
     fi
 
-    local keep managed entries candidates
-    keep="$(_clean_keep_home)"
-    if [ -z "$keep" ]; then
+    # keepHome guards $HOME's top level, which ALWAYS holds critical dirs (.ssh,
+    # auth) — an unreadable keep-list there would offer them for deletion, so it's
+    # a hard, fail-closed error. keepConfig (scope 2) is checked below and merely
+    # skips ~/.config if unreadable: scope 1 is independent and already validated.
+    local keep_home keep_config
+    keep_home="$(_clean_keep_home)"
+    if [ -z "$keep_home" ]; then
         fail "empty keep-list (could not read .cleanup.keepHome) — refusing to touch \$HOME"
         return 1
     fi
-    managed="$(_clean_managed_top)"
-    entries="$(_clean_home_dotentries "$TARGET")"
-    candidates="$(printf '%s\n' "$entries" | _clean_candidates "$managed" "$keep")"
 
-    if [ -z "$candidates" ]; then
-        ok "\$HOME top level is clean — every ~/.* entry is managed or kept"
-        return 0
-    fi
-
-    # Classify each candidate against installed tooling: keep config whose owner is
-    # present (brew package installed, its command on PATH, OR — for a VS Code
-    # extension-owned dir — its extension in `code --list-extensions`), so only
-    # orphaned or unknown leftovers are ever offered. Probe owner-binaries and
-    # candidate stems together in one command -v pass.
-    local owners brewset extset probe binset classified offered kept_owned kcount count
+    # Installed-tool signals, computed ONCE and shared by both scopes.
+    local owners brewset extset
     owners="$(_clean_owners)"
     brewset="$(_clean_installed_brew)"
     extset="$(_clean_installed_vscode)"
-    probe="$({
-        _clean_owner_binaries "$owners"
-        printf '%s\n' "$candidates" | _clean_stems
-    } | sort -u)"
-    binset="$(printf '%s\n' "$probe" | _clean_present_bins)"
-    classified="$(printf '%s\n' "$candidates" | _clean_classify "$owners" "$brewset" "$binset" "$extset")"
-    offered="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "orphan" || $2 == "unknown"')"
-    kept_owned="$(printf '%s\n' "$classified" | awk -F'\t' '$2 == "keep" { print $1 "\t" $3 }')"
 
-    # Reassure the user about what tool-ownership spared; --verbose lists them.
-    kcount="$(printf '%s\n' "$kept_owned" | grep -c .)"
-    if [ "$kcount" -gt 0 ]; then
-        info "kept $kcount untracked entr$([ "$kcount" -eq 1 ] && printf y || printf ies) owned by installed tooling$([ "$verbose" -eq 1 ] || printf ' (-v to list)')"
-        if [ "$verbose" -eq 1 ]; then
-            local ke kl
-            while IFS=$'\t' read -r ke kl; do
-                [ -n "$ke" ] || continue
-                dim "    $ke (kept — $kl installed)"
-            done <<<"$kept_owned"
-        fi
+    # Collect the offered set across both scopes into _CLEAN_OFFERED, then decide
+    # and remove in one uniform pass — so there's ONE tty gate, ONE bulk confirm,
+    # and ONE summary regardless of how many scopes surfaced something.
+    _CLEAN_OFFERED=""
+
+    # scope 1 — top level of $HOME (dot-only; keepHome).
+    _clean_collect "\$HOME top level" "$TARGET" "" \
+        "$(_clean_home_dotentries "$TARGET")" "$keep_home" "$(_clean_managed_top)" \
+        "$owners" "$brewset" "$extset" "$verbose"
+
+    # scope 2 — ~/.config (all children; keepConfig). Skipped fail-safe if its
+    # keep-list is unreadable (never offer ~/.config/X with nothing spared).
+    keep_config="$(_clean_keep_config)"
+    if [ -n "$keep_config" ]; then
+        _clean_collect "~/.config" "$TARGET/.config" ".config/" \
+            "$(_clean_config_entries "$TARGET/.config")" "$keep_config" "$(_clean_managed_config)" \
+            "$owners" "$brewset" "$extset" "$verbose"
+    elif [ -d "$TARGET/.config" ]; then
+        warn "skipping ~/.config — empty keep-list (could not read .cleanup.keepConfig)"
     fi
 
-    if [ -z "$offered" ]; then
-        ok "\$HOME top level is clean — every ~/.* entry is managed, kept, or owned by an installed tool"
+    if [ -z "$_CLEAN_OFFERED" ]; then
         return 0
     fi
-
-    count="$(printf '%s\n' "$offered" | grep -c .)"
-    info "$count untracked top-level entr$([ "$count" -eq 1 ] && printf y || printf ies) with no installed owner:"
-    local pname pverdict plabel pann
-    while IFS=$'\t' read -r pname pverdict plabel; do
-        [ -n "$pname" ] || continue
-        case "$pverdict" in
-            orphan) pann="orphan · config for ${plabel}, not installed" ;;
-            *) pann="untracked" ;;
-        esac
-        dim "    $pname ($(_clean_kind "$TARGET/$pname")) — $pann"
-    done <<<"$offered"
-    hr
+    local count
+    count="$(printf '%s' "$_CLEAN_OFFERED" | grep -c .)"
 
     # No controlling terminal ⇒ remove nothing. DRY_RUN is exempt: it deletes
     # nothing, so it stays a safe preview that works headless (e.g. in CI).
@@ -399,36 +492,37 @@ _clean_main() {
 
     # Phase 1 — decide. Confirm each entry (unless accept-all); collect approvals.
     # Feed the list on fd 3, keeping stdin on the terminal so gum reads keypresses.
-    # Rows are "name<TAB>verdict<TAB>label"; the label hints why an orphan surfaced.
-    local approved="" kept=0 name verdict label hint reply ok_one
-    while IFS=$'\t' read -r name verdict label <&3; do
-        [ -n "$name" ] || continue
+    # Rows are "fullpath<TAB>display<TAB>verdict<TAB>label" (display carries the
+    # ~/.config/ prefix for scope 2; the label hints why an orphan surfaced).
+    local approved="" kept=0 fpath display verdict label hint reply ok_one
+    while IFS=$'\t' read -r fpath display verdict label <&3; do
+        [ -n "$fpath" ] || continue
         hint=""
         [ "$verdict" = orphan ] && hint=" · ${label} not installed"
         if [ "$all" -eq 1 ]; then
             ok_one=1
         elif command -v gum >/dev/null 2>&1; then
-            gum confirm "Remove $name ($(_clean_kind "$TARGET/$name")$hint)?" && ok_one=1 || ok_one=0
+            gum confirm "Remove $display ($(_clean_kind "$fpath")$hint)?" && ok_one=1 || ok_one=0
         else
-            printf '%s  Remove %s (%s%s)? [y/N] ' "$(line_prefix)" "$name" "$(_clean_kind "$TARGET/$name")" "$hint" >/dev/tty
+            printf '%s  Remove %s (%s%s)? [y/N] ' "$(line_prefix)" "$display" "$(_clean_kind "$fpath")" "$hint" >/dev/tty
             IFS= read -r reply </dev/tty || reply=""
             case "$reply" in y | Y | yes | YES) ok_one=1 ;; *) ok_one=0 ;; esac
         fi
         if [ "$ok_one" -eq 1 ]; then
-            approved+="$name"$'\n'
+            approved+="$fpath"$'\n'
         else
             kept=$((kept + 1))
         fi
-    done 3<<<"$offered"
+    done 3<<<"$_CLEAN_OFFERED"
 
-    # Phase 2 — remove the approved set.
+    # Phase 2 — remove the approved set (full paths, so scope-agnostic).
     local removed=0
-    while IFS= read -r name; do
-        [ -n "$name" ] || continue
-        if _clean_remove_one "$TARGET/$name"; then
+    while IFS= read -r fpath; do
+        [ -n "$fpath" ] || continue
+        if _clean_remove_one "$fpath"; then
             removed=$((removed + 1))
         else
-            warn "could not remove $name — remove it by hand"
+            warn "could not remove $fpath — remove it by hand"
         fi
     done <<<"$approved"
 
