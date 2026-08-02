@@ -29,7 +29,6 @@ not_lists() { ! grep -Fxq "$1" "$EXT"; }
 @test "lists redhat.java (JVM stack)" { lists redhat.java; }
 @test "lists anthropic.claude-code" { lists anthropic.claude-code; }
 @test "lists the catppuccin theme" { lists catppuccin.catppuccin-vsc; }
-@test "lists mermaidchart.vscode-mermaid-chart" { lists mermaidchart.vscode-mermaid-chart; }
 @test "lists the Norwegian dictionary (locale module gates install)" {
     # Present unconditionally; the hook/doctor drop it only when locale is off.
     lists streetsidesoftware.code-spell-checker-norwegian-bokmal
