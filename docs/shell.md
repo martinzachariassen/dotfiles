@@ -67,7 +67,7 @@ convergence runs on every apply via the `run_after_02b-mise-install` hook.
 ## git
 
 Config: [`src/dot_config/git/config.tmpl`](../src/dot_config/git/config.tmpl)
-(XDG — global ignore at `~/.config/git/ignore`). Highlights:
+(XDG layout). Highlights:
 
 - **Signing** — templated on your `signingMode` answer: `1password` (SSH signing
   via `op-ssh-sign`), `ssh-key` (plain SSH signing), or `off`. The signing block
