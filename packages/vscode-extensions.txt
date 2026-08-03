@@ -24,6 +24,7 @@ hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
+mermaidchart.vscode-mermaid-chart
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
@@ -56,4 +57,5 @@ vscjava.vscode-spring-boot-dashboard
 vscjava.vscode-spring-initializr
 vscodevim.vim
 vmware.vscode-spring-boot
+vstirbu.vscode-mermaid-preview
 wmaurer.change-case
