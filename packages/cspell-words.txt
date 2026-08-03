@@ -12,6 +12,7 @@ healthcheck
 hikari
 Hikari
 isready
+javac
 livenessstate
 mockk
 nvim
