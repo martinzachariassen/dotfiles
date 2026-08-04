@@ -1,7 +1,3 @@
-<div align="center">
-
-<img src="assets/banner.png" alt="martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Frappé" width="900">
-
 # dotfiles
 
 One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, managed by [chezmoi](https://chezmoi.io).
@@ -9,9 +5,9 @@ One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, m
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-**Status:** Personal, single-machine setup. Actively maintained, applied to my Mac most weeks.
+![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Frappé](assets/banner.png)
 
-</div>
+**Status:** Personal, single-machine setup. Actively maintained, applied to my Mac most weeks.
 
 ## Why
 
