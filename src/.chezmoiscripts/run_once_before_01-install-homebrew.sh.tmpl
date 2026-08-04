@@ -15,15 +15,8 @@ if command -v brew >/dev/null 2>&1; then
 fi
 
 echo "→ Installing Homebrew. This is usually about a minute on a fresh Mac."
-installer="$(mktemp)"
-trap 'rm -f "$installer"' EXIT
-curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$installer"
-NONINTERACTIVE=1 /bin/bash "$installer"
-rm -f "$installer"
-trap - EXIT
-
-if [ -x /opt/homebrew/bin/brew ]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
+# shellcheck source=../../scripts/lib/homebrew.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/homebrew.sh"
+homebrew_install
 
 echo "✓ Homebrew installed and ready"

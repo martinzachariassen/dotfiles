@@ -55,6 +55,8 @@ fi
 info "Xcode Command Line Tools present."
 
 # --- 2. Homebrew ----------------------------------------------------------
+# Inlined rather than shared with scripts/lib/homebrew.sh: this runs before the
+# repo is cloned (step 4 below), so there's nothing local to source yet.
 if ! load_brew; then
     info "Installing Homebrew. It needs administrator access on a fresh Mac."
     if [ -r /dev/tty ]; then
