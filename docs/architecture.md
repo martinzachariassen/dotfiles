@@ -78,6 +78,7 @@ the chezmoi hooks reach them across the source/root boundary via
 | `chezmoi-data.sh` | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, wizard |
 | `tty.sh` | `tty_reattach` (stdin → controlling terminal) | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
 | `sudo.sh` | `sudo_keep_warm` (background sudo-timestamp refresh) | `run_before_00`, macos-defaults |
+| `homebrew.sh` | `homebrew_install` | `run_once_before_01` |
 | `semver.sh` | `semver_extract` / `semver_lt` | doctor |
 
 The everyday scripts share the tiny logging library `log.sh`:

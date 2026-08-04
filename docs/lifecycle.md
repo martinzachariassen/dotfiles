@@ -123,7 +123,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Concern | Source |
 |---|---|
 | Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `scripts/lib/sudo.sh`) |
-| Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` |
+| Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `scripts/lib/homebrew.sh`) |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezaudit` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
@@ -146,11 +146,13 @@ separate, plain scripts — see [install.md](install.md) and
 [commands.md](commands.md).
 
 `install.sh` is a small hand-written script fetched via `curl | bash`
-**before this repo exists on disk**, so it can't source anything. It
-installs only the prerequisites (Xcode CLT → Homebrew → chezmoi → clone),
-then hands off to `scripts/bin/wizard.sh` (repo now on disk, so it *can*
-source `scripts/lib/*`). The wizard asks the setup questions and feeds them
-to `chezmoi init --apply`, whose `--apply` runs the hooks above. See
+**before this repo exists on disk**, so it can't source anything — its
+Homebrew-install step is necessarily its own inline copy of what
+`scripts/lib/homebrew.sh` does for `run_once_before_01` below. It installs
+only the prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands
+off to `scripts/bin/wizard.sh` (repo now on disk, so it *can* source
+`scripts/lib/*`). The wizard asks the setup questions and feeds them to
+`chezmoi init --apply`, whose `--apply` runs the hooks above. See
 [packages.md](packages.md#the-wizard) for the wizard's three prompt tiers.
 
 The everyday verbs (`chezup`, `chezdoctor`, …) are shell functions that bake
