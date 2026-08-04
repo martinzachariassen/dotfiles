@@ -3,6 +3,7 @@ allopen
 assertj
 chezmoi
 cloudsdktool
+dedup
 Efla
 fasterxml
 flywaydb
@@ -15,9 +16,14 @@ isready
 javac
 livenessstate
 mockk
+nacked
+nacking
+nacks
 nvim
 pgdata
+processingjob
 readinessstate
+rethrowing
 signingkey
 springframework
 stdlib
