@@ -1,9 +1,9 @@
 # macOS defaults
 
 Every system setting this repo changes, grouped by domain. Applied by
-[`scripts/bin/macos-defaults.sh`](../scripts/bin/macos-defaults.sh) — the single
-source of truth — when the `macosDefaults` module is selected. This doc mirrors
-the script; if the two disagree, the script wins.
+[`scripts/bin/macos-defaults.sh`](../scripts/bin/macos-defaults.sh) — the
+single source of truth — when the `macosDefaults` module is selected. This doc
+mirrors the script; if the two disagree, the script wins.
 
 Each `defaults write` is annotated inline, so **to change a setting, edit the
 script** and comment out or adjust the line. See
@@ -117,34 +117,35 @@ enable.
 ## Touch ID for sudo (Sonoma 14+)
 
 On macOS 14+, the script enables Touch ID for `sudo` by appending
-`auth sufficient pam_tid.so` to `/etc/pam.d/sudo_local` — the **upgrade-stable**
-file introduced in Sonoma (editing the older `/etc/pam.d/sudo` got reverted on
-every OS update). Idempotent (skips if the line is present) and skipped cleanly
-on pre-Sonoma.
+`auth sufficient pam_tid.so` to `/etc/pam.d/sudo_local` — the
+**upgrade-stable** file introduced in Sonoma (editing the older
+`/etc/pam.d/sudo` got reverted on every OS update). Idempotent (skips if the
+line is present) and skipped cleanly on pre-Sonoma.
 
 ## Applying & reverting
 
 **How it runs.** The `run_onchange_after_04-macos-defaults` hook (see
-[lifecycle.md](lifecycle.md)) applies the script only when the `macosDefaults`
-module is selected **and** its *contents change* — the hook embeds a sha256 of
-the script, so a routine `chezmoi apply` that didn't touch it is a no-op with no
-sudo prompt. Edit the script and the next apply re-runs it.
+[lifecycle.md](lifecycle.md)) applies the script only when the
+`macosDefaults` module is selected **and** its *contents change* — the hook
+embeds a sha256 of the script, so a routine `chezmoi apply` that didn't touch
+it is a no-op with no sudo prompt. Edit the script and the next apply re-runs
+it.
 
 **Idempotent + fast.** The `def_write` helper reads each key first and writes
-only when the value differs, tracking which domains changed. It then restarts
-**only** the affected apps (Finder, Dock, SystemUIServer), so an unchanged run
-touches nothing.
+only when the value differs, tracking which domains changed. It then
+restarts **only** the affected apps (Finder, Dock, SystemUIServer), so an
+unchanged run touches nothing.
 
-**Apply by hand** (e.g. after a macOS update reset something) without editing the
-script:
+**Apply by hand** (after a macOS update reset something, say) without editing
+the script:
 
 ```sh
 macos-defaults          # the zsh alias → scripts/bin/macos-defaults.sh
 ```
 
 **Revert a setting.** There's no automatic undo — comment the line out in the
-script (documents intent, but won't reset an already-applied value), then reset
-the live value yourself:
+script (documents intent, but won't reset an already-applied value), then
+reset the live value yourself:
 
 ```sh
 defaults delete com.apple.dock tilesize        # back to the macOS default
