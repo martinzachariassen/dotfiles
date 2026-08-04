@@ -53,6 +53,16 @@ and `NO_ZELLIJ=1 zsh` is the escape hatch for a bare shell. Ghostty's own
 `window-save-state = default` (not `always`) keeps a relaunch from restoring
 every tab and multiplying detached sessions — Zellij owns persistence.
 
+**New tabs open where you were.** A fresh Ghostty tab normally starts at `$HOME`
+because Zellij never forwards the active pane's directory to Ghostty
+([zellij#3811](https://github.com/zellij-org/zellij/issues/3811)), so
+`window-inherit-working-directory` has nothing to inherit. The `.zshrc` bridges it:
+each pane records its cwd to `$XDG_STATE_HOME/zellij/last-cwd` on every prompt/`cd`
+(`_zj_record_cwd`), and a tab launched at `$HOME` reads it back and `cd`s there
+before attaching (`_zj_inherit_cwd`), so the new session opens in — and is named
+after — the project you were just in. Scope is "most-recently-active pane," so
+across windows the last one you touched wins.
+
 Keybinds are Zellij's mode-based defaults — `Ctrl+P` pane mode, `Ctrl+T` tab
 mode, and `Ctrl+G` to lock/unlock Zellij's own bindings when an inner app
 (vim) wants the same chord. Dump the full set with

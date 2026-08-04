@@ -164,3 +164,51 @@ run_session_name() {
     [ "$status" -eq 0 ]
     [ "$output" = "my-name" ]
 }
+
+# Run a new-tab cwd helper ($1) with the state file at $2, from cwd $3.
+run_cwd_fn() {
+    zsh -c "_zj_cwd_file='$2'; cd '$3'; \
+        $(extract_fn_block _zj_record_cwd); $(extract_fn_block _zj_inherit_cwd); $1"
+}
+
+@test "_zj_record_cwd / _zj_inherit_cwd definitions exist in the template" {
+    run extract_fn_block _zj_record_cwd
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"_zj_record_cwd() {"* ]]
+    run extract_fn_block _zj_inherit_cwd
+    [[ "$output" == *"_zj_inherit_cwd() {"* ]]
+}
+
+@test "_zj_record_cwd writes \$PWD and creates the state dir" {
+    local file="$BATS_TEST_TMPDIR/state/zellij/last-cwd"
+    mkdir -p "$BATS_TEST_TMPDIR/proj"
+    run run_cwd_fn _zj_record_cwd "$file" "$BATS_TEST_TMPDIR/proj"
+    [ "$status" -eq 0 ]
+    [ -d "$BATS_TEST_TMPDIR/state/zellij" ]
+    [ "$(cat "$file")" = "$BATS_TEST_TMPDIR/proj" ]
+}
+
+@test "_zj_inherit_cwd round-trips the recorded directory" {
+    local file="$BATS_TEST_TMPDIR/state/zellij/last-cwd"
+    mkdir -p "$BATS_TEST_TMPDIR/proj"
+    run_cwd_fn _zj_record_cwd "$file" "$BATS_TEST_TMPDIR/proj"
+    run run_cwd_fn _zj_inherit_cwd "$file" "$HOME"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$BATS_TEST_TMPDIR/proj" ]
+}
+
+@test "_zj_inherit_cwd prints nothing when the recorded dir is gone" {
+    local file="$BATS_TEST_TMPDIR/state/zellij/last-cwd"
+    mkdir -p "$BATS_TEST_TMPDIR/state/zellij" "$BATS_TEST_TMPDIR/gone"
+    printf '%s\n' "$BATS_TEST_TMPDIR/gone" > "$file"
+    rmdir "$BATS_TEST_TMPDIR/gone"
+    run run_cwd_fn _zj_inherit_cwd "$file" "$HOME"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+@test "_zj_inherit_cwd prints nothing when no state file exists" {
+    run run_cwd_fn _zj_inherit_cwd "$BATS_TEST_TMPDIR/state/zellij/last-cwd" "$HOME"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

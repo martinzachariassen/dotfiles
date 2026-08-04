@@ -661,6 +661,30 @@ _zj_pick_session() {
 # Drop exited sessions so the graveyard can't accumulate.
 _zj_prune() { command zellij delete-all-sessions -y >/dev/null 2>&1; }
 
+# "Open the new tab where we currently are." Zellij doesn't forward the active
+# pane's cwd to Ghostty via OSC 7 (zellij#3811), so a new Ghostty tab always
+# starts at $HOME. We bridge it ourselves: each pane records its cwd, and a fresh
+# tab reads it back before attaching. Scope is "most-recently-active pane" — the
+# last pane to draw a prompt or cd wins, which across windows is the one you just
+# touched.
+_zj_cwd_file="${XDG_STATE_HOME:-$HOME/.local/state}/zellij/last-cwd"
+
+# Record $PWD as the active-pane cwd (creating the state dir on first use).
+_zj_record_cwd() {
+    [[ -d "${_zj_cwd_file:h}" ]] || command mkdir -p "${_zj_cwd_file:h}" 2>/dev/null || return
+    print -r -- "$PWD" > "$_zj_cwd_file" 2>/dev/null
+}
+
+# Print the recorded cwd, but only if it still points at a real directory.
+# Always succeeds (empty output ⇒ nothing to inherit), so callers can chain on it.
+_zj_inherit_cwd() {
+    local target
+    [[ -r "$_zj_cwd_file" ]] || return 0
+    target="$(< "$_zj_cwd_file")"
+    [[ -n "$target" && -d "$target" ]] && print -r -- "$target"
+    return 0
+}
+
 # zj [name]  no arg: attach to a fresh session for cwd. With a name: attach even
 #            if running (joining/resurrecting on purpose). zj -l lists.
 zj() {
@@ -685,12 +709,24 @@ if [[ -n "$ZELLIJ" ]]; then
     add-zsh-hook precmd  _zj_title_precmd
     add-zsh-hook preexec _zj_title_preexec
     add-zsh-hook chpwd   _zj_rename_tab
+    # Track this pane's cwd so the next new Ghostty tab can open here.
+    add-zsh-hook precmd  _zj_record_cwd
+    add-zsh-hook chpwd   _zj_record_cwd
     _zj_rename_tab
+    _zj_record_cwd
 elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION" \
         && -t 1 ]] && command -v zellij >/dev/null; then
     # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to
     # a working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
     _zj_prune
+    # Ghostty starts every new tab at $HOME (Zellij hides the pane cwd from it), so
+    # from there, reopen wherever the last-active pane was — that's the tab we came
+    # from. Names the session after the inherited dir's project, too.
+    if [[ "$PWD" == "$HOME" ]]; then
+        _zj_inherited="$(_zj_inherit_cwd)"
+        [[ -n "$_zj_inherited" ]] && builtin cd -- "$_zj_inherited"
+        unset _zj_inherited
+    fi
     _ZJ_SESSION="$(_zj_pick_session "$(_zj_session_name)")"
     # PTY hangup (window close) reaps this window's own session; a manual detach
     # doesn't HUP and is left alone — resurrect later with `zj <name>`.
