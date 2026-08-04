@@ -29,6 +29,8 @@ The special prefixes/suffixes change how a file is deployed — preserve them:
 |---|---|
 | `dot_*` | Renders to a `.`-prefixed name (`dot_zshenv` → `~/.zshenv`). |
 | `private_dot_*` | Same, but `0600` perms (`private_dot_ssh/` → `~/.ssh/`). |
+| `executable_*` | Renders with `+x` set (`executable_statusline.sh`). |
+| `symlink_*` | Renders as a symlink whose target is the file's contents (`symlink_personal.txt.tmpl`). |
 | `remove_*` | Removes the target path from `$HOME` (used to retire old files). |
 | `run_*` | A hook script — see [lifecycle.md](lifecycle.md). |
 | `.tmpl` | A Go template, rendered with the chezmoi data model. |

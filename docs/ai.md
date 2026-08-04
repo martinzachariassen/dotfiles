@@ -30,7 +30,7 @@ project's own `CLAUDE.md`, and project-level instructions always win over it.
 `~/.config/claude/settings.json`
 ([source](../src/dot_config/claude/settings.json)) carries the Claude Code
 harness config — model, theme, and a read-only permission allowlist (git
-status/diff/log, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
+status/diff/log/show, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
 ## One rulebook, two assistants
 
