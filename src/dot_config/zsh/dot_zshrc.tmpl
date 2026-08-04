@@ -13,8 +13,7 @@ setopt EXTENDED_GLOB
 command -v mise >/dev/null && eval "$(mise activate zsh)"
 
 # ─── History ──────────────────────────────────────────────────────────────────
-# macOS /etc/zshrc runs after ~/.zshenv and resets HISTFILE; re-set it here (last
-# rc to run) so our XDG path wins.
+# macOS /etc/zshrc runs after ~/.zshenv and resets HISTFILE, so re-set it here.
 export HISTFILE="$XDG_STATE_HOME/zsh/history"
 [ -d "${HISTFILE%/*}" ] || mkdir -p "${HISTFILE%/*}"
 HISTSIZE=50000
@@ -42,8 +41,7 @@ if [ -d /opt/homebrew/share/zsh-completions ]; then
 fi
 
 autoload -Uz compinit
-# -C skips the per-shell security audit; brew perms are tightened at install time
-# and after every `brew bundle`, so it has nothing to find. Audit via `compaudit`.
+# -C skips the security audit; brew perms are already tightened at install time.
 compinit -C -d "$ZSH_COMPDUMP"
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
@@ -52,18 +50,16 @@ zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 # Force emacs keymap; zsh would otherwise infer vi from $EDITOR=nvim.
 bindkey -e
 
-# ↑/↓ prefix-aware history search, cursor left at end-of-line.
+# ↑/↓ prefix-aware history search.
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
-# Bind terminfo codes and literal ^[[ sequences so it works in either cursor mode.
 [ -n "${terminfo[kcuu1]}" ] && bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
 [ -n "${terminfo[kcud1]}" ] && bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
 bindkey '^[[A' up-line-or-beginning-search
 bindkey '^[[B' down-line-or-beginning-search
 
 # ─── fzf ──────────────────────────────────────────────────────────────────────
-# Use fd as the walker: faster than find, respects .gitignore.
 if command -v fd >/dev/null; then
     export FZF_DEFAULT_COMMAND='fd --type f --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
@@ -86,15 +82,13 @@ fi
 command -v starship >/dev/null && eval "$(starship init zsh)"
 
 # ─── Modern CLI replacements ──────────────────────────────────────────────────
-# Alias only if present so a fresh box still works.
 command -v eza >/dev/null && {
     alias ls='eza --group-directories-first'
     alias ll='eza -lah --group-directories-first --git --time-style=long-iso'
     alias tree='eza --tree --level=3 --group-directories-first'
 }
 command -v bat >/dev/null && alias cat='bat --paging=never --style=plain'
-# `find` is deliberately NOT aliased to fd — fd isn't a drop-in and silently
-# misbehaves for muscle-memory `find … -exec` invocations.
+# `find` is deliberately NOT aliased to fd — fd isn't a drop-in replacement.
 
 # ─── Tool shortcuts ───────────────────────────────────────────────────────────
 alias n='nvim'
@@ -128,10 +122,9 @@ alias ...='cd ../..'
 mkcd() { mkdir -p "$1" && cd "$1" || return; }
 
 # ─── Dotfiles meta-commands ───────────────────────────────────────────────────
-# _chez_run REL [args...] — run a repo helper by working-tree-relative path (baked
-# in at apply time). If the script is missing — repo moved it but this shell's
-# config predates the change — self-heal: pull + apply to regenerate these
-# functions, then reload so the corrected paths take effect.
+# _chez_run REL [args...] — run a repo helper by working-tree-relative path. If
+# missing (repo moved it since this shell's config was generated), self-heal:
+# pull + apply to regenerate, then reload.
 _chez_run() {
     local rel=$1
     shift
@@ -175,9 +168,8 @@ dotfiles() {
     fi
 }
 
-# Quiet `chezmoi apply --force` with a single upfront confirm when managed files
-# in $HOME have drifted (plain apply's per-file prompt collides with later sudo
-# prompts). Pass -v for the per-file content diffs.
+# `chezmoi apply --force`, with one upfront confirm when managed files in $HOME
+# have drifted (avoids colliding with later sudo prompts). -v for per-file diffs.
 chez() {
     local status_output response
     status_output=$(chezmoi status --exclude scripts 2>&1)
@@ -208,8 +200,7 @@ chez() {
     fi
     chezmoi apply --force "$@"
     local rc=$?
-    # Flag packages present locally but in no Brewfile so `chez` never silently
-    # uninstalls; `chezmirror` reconciles on demand.
+    # Flag untracked packages so `chez` never silently uninstalls.
     if command -v brew >/dev/null 2>&1; then
         local untracked
         untracked=$(_chez_brew_untracked)
@@ -222,8 +213,8 @@ chez() {
     return $rc
 }
 
-# Plain-language, read-only drift explainer: translates `chezmoi status`'s two-letter
-# codes into a directional summary of what `chez` would do. Never applies or pulls.
+# Read-only drift explainer: plain-language version of `chezmoi status`'s codes.
+# Never applies or pulls.
 chezdiff() {
     case "${1:-}" in
         -h | --help)
@@ -256,8 +247,7 @@ chezdiff() {
         return 0
     fi
 
-    # right column → "apply would write", left column → "you edited locally". A file
-    # that drifted AND changed upstream (MM) lands in both.
+    # right column → "apply would write", left column → "you edited locally".
     local pending drift line col1 col2 path
     pending=""
     drift=""
@@ -294,8 +284,7 @@ chezdiff() {
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
-# Converge this Mac to the repo: pull + preview + apply. Brew/mise apply scripts
-# reconcile real installed state on every apply, so packages match too.
+# Converge this Mac to the repo: pull + preview + apply.
 # Knobs: YES=1 skip confirm · DRY_RUN=1 print without running. Extra args → apply.
 chezup() {
     _chez_run scripts/bin/chezup.sh "$@"
@@ -307,8 +296,8 @@ chezdoctor() {
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
-# Fill in newly-added setup keys only; keeps answers you've already given (chezmoi's
-# prompt*Once reads persisted answers). To re-choose everything, use `chezreset`.
+# Fill in newly-added setup keys only; keeps existing answers. To re-choose
+# everything, use `chezreset`.
 chezreinit() {
     local src={{ .chezmoi.workingTree | quote }}
     (cd "$src" && git pull --ff-only) || return $?
@@ -317,14 +306,13 @@ chezreinit() {
     chezmoi init && chez "$@"
 }
 
-# Set this Mac up "as new": reset chezmoi's persistent state so run_once_* /
-# run_onchange_* hooks re-fire, re-ask the full wizard, then apply. Does NOT
-# uninstall packages or delete files. Confirm-gated.
+# Set this Mac up "as new": reset chezmoi's persistent state so run_once_*/
+# run_onchange_* hooks re-fire, re-ask the wizard, then apply. Doesn't uninstall
+# anything. Confirm-gated.
 chezreset() {
     local src reply
     src={{ .chezmoi.workingTree | quote }}
-    # Self-heal a stale wizard path BEFORE the destructive state reset below —
-    # never leave the machine half-reset with no way to finish the wizard.
+    # Self-heal a stale wizard path before the destructive state reset below.
     [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "$@"; return; }
     (cd "$src" && git pull --ff-only) || return $?
     if [ -r /dev/tty ]; then
@@ -342,8 +330,7 @@ chezreset() {
     bash "$src/scripts/bin/wizard.sh" "$@"
 }
 
-# Routine dependency bump: brew + mise global runtimes. Per-project runtimes travel
-# with their own repos. Doesn't auto-commit — review the diff yourself.
+# Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
 chezbump() {
     local src={{ .chezmoi.workingTree | quote }}
     echo "── brew update + upgrade ─────────────────────────────────────"
@@ -367,10 +354,8 @@ chezbump() {
     echo "Now: cd $src && git diff   to review, then commit."
 }
 
-# Internal: names of `brew leaves` formulae installed locally but in no Brewfile
-# tier (one per line, empty when in sync). Both sides are reduced to the bare leaf
-# name so tap-qualified formulae (hashicorp/tap/terraform) don't read as untracked.
-# Formulae only — casks come via `brew bundle cleanup` in _chez_brew_removals.
+# `brew leaves` formulae installed locally but in no Brewfile tier, bare name
+# only (so tap-qualified formulae like hashicorp/tap/terraform aren't flagged).
 _chez_brew_untracked() {
     local src={{ .chezmoi.workingTree | quote }}
     local tracked
@@ -382,15 +367,11 @@ _chez_brew_untracked() {
         <(printf '%s\n' "$tracked")
 }
 
-# Internal: emit "<kind>\t<name>" (cask | formula | tap) for every Homebrew item in
-# no Brewfile tier — the authoritative removal set chezmirror acts on. Takes repo
-# root as $1; pure, so it's unit-testable against a stubbed `brew`.
-#
-# The tier set is the `Brewfile.*` glob — NOT a hardcoded list — so a newly added
-# tier (e.g. Brewfile.apple-dev) is honoured automatically; hardcoding once made
-# chezmirror flag every apple-dev package as untracked. Matches _chez_brew_untracked.
-# `brew bundle cleanup` honours only ONE --file, so tiers are concatenated onto
-# stdin (--file=-); passing several --file would read just the last tier.
+# "<kind>\t<name>" (cask | formula | tap) for every Homebrew item in no Brewfile
+# tier — the removal set chezmirror acts on. $1 is the repo root; pure/testable.
+# The tier set comes from the `Brewfile.*` glob, not a hardcoded list, so new
+# tiers are picked up automatically. `brew bundle cleanup` only honours one
+# --file, so tiers are concatenated onto stdin (--file=-).
 _chez_brew_removals() {
     local src=$1
     cat "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null |
@@ -398,16 +379,13 @@ _chez_brew_removals() {
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
             /^Would untap:/              { kind = "tap";     next }
-            # Reset on the cache-pruning / trailer sections so their paths never
-            # leak in as bogus "formula" removals.
             /^Would .brew cleanup.:/     { kind = "";        next }
             /^Run .brew bundle cleanup/  { kind = "";        next }
             kind && NF                   { print kind "\t" $0 }
         '
 }
 
-# Internal: remove one package, routing casks and taps to the right subcommand.
-# Split out so the dispatch is unit-testable without a TTY.
+# Remove one package, routing casks/taps to the right subcommand.
 _chez_brew_uninstall_one() {
     if [ "$1" = cask ]; then
         brew uninstall --cask "$2"
@@ -418,8 +396,7 @@ _chez_brew_uninstall_one() {
     fi
 }
 
-# Report brew packages installed locally but tracked in no Brewfile. Reports only;
-# use `chezmirror` to act.
+# Report brew packages installed locally but tracked in no Brewfile.
 chezaudit() {
     local untracked
     untracked=$(_chez_brew_untracked)
@@ -435,12 +412,9 @@ chezaudit() {
     fi
 }
 
-# Enforce the Brewfile in the REMOVAL direction: uninstall packages in no Brewfile
-# tier, then prune any now-orphaned dependencies with `brew autoremove`.
-# Deliberately NOT wired into `chez` (a routine apply should never silently
-# uninstall). Asks per package by default; --all/-a does one bulk confirm; YES=1
-# skips even that. No controlling terminal ⇒ removes nothing. Removal only —
-# `chezsync` chains `chezup` (install) then this pass for a full reconcile.
+# Removal direction of the Brewfile: uninstall untracked packages, then prune
+# orphaned dependencies. Not wired into `chez` — a routine apply should never
+# silently uninstall. `chezsync` chains chezup (install) + this (remove).
 chezmirror() {
     local src={{ .chezmoi.workingTree | quote }}
 
@@ -476,8 +450,7 @@ chezmirror() {
     printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
     echo
 
-    # `[ -r /dev/tty ]` is unreliable (perm bits read rw with no controlling tty),
-    # so actually try to open it — a failed open is the real "no terminal" signal.
+    # `[ -r /dev/tty ]` is unreliable, so actually try to open it.
     if ! { : </dev/tty; } 2>/dev/null; then
         echo "No TTY — not removing. Re-run interactively to confirm each."
         return 0
@@ -497,10 +470,8 @@ chezmirror() {
         [ "$ok" -eq 1 ] || { echo "aborted — nothing removed"; return 0; }
     fi
 
-    # Phase 1 — decide. Confirm each package (unless accept-all) and collect the
-    # approved set; nothing is uninstalled yet. Feed the list on fd 3, NOT stdin:
-    # `gum confirm` reads keypresses from stdin, so a here-string on fd 0 would
-    # make gum auto-answer "no" and drain the list.
+    # Phase 1 — decide, without uninstalling yet. List on fd 3, not stdin: `gum
+    # confirm` reads keypresses from stdin, so a here-string there would drain it.
     local kind name reply ok kept=0 approved=""
     while IFS=$'\t' read -r kind name <&3; do
         [ -n "$name" ] || continue
@@ -520,14 +491,10 @@ chezmirror() {
         fi
     done 3<<<"$parsed"
 
-    # Phase 2 — remove, retrying in passes. `brew bundle cleanup` lists deps BEFORE
-    # their dependents, so a one-shot pass fails on every shared dep ("still a
-    # dependency"). Keep looping until a whole pass removes nothing: each pass frees
-    # the leaves, unblocking the deps beneath them next time. Suppress brew's stderr
-    # so the transient "refusing to uninstall" noise doesn't leak — whatever is
-    # still stuck after no pass makes progress is reported once, cleanly.
-    # List on fd 3 again, keeping brew's stdin on the terminal — a here-string on
-    # fd 0 would become brew's stdin and, if it ever read a line, drain the pass.
+    # Phase 2 — remove, retrying in passes: `brew bundle cleanup` lists deps
+    # before dependents, so shared deps fail until the leaves above them are
+    # gone. Loop until a pass removes nothing. List on fd 3 again to keep
+    # brew's stdin on the terminal.
     local removed=0 pending=$approved progressed leftover
     while [ -n "$pending" ]; do
         progressed=0 leftover=""
@@ -553,13 +520,8 @@ chezmirror() {
     echo
     echo "  removed $removed · kept $kept"
 
-    # Prune dependencies no longer needed by anything in the Brewfiles. `brew
-    # autoremove` only ever touches formulae installed AS dependencies that are now
-    # orphaned — never a Brewfile-tracked package — so it's safe to offer after a
-    # removal pass. Preview read-only first (-n), then run it: accept-all under
-    # --all/YES=1, else one confirm. We're already past the TTY gate above, so a
-    # prompt here always has a terminal. Filter brew's "==>" progress headers so
-    # only the bare formula names count as orphans.
+    # `brew autoremove` only touches orphaned dependency-only formulae, never a
+    # Brewfile-tracked package, so it's safe to offer after a removal pass.
     local orphans ocount oyes oreply
     orphans="$(brew autoremove -n 2>/dev/null | grep -vE '^==>' | grep -E '^[^[:space:]]+$' || true)"
     if [ -n "$orphans" ]; then
@@ -587,19 +549,9 @@ chezmirror() {
     return 0
 }
 
-# Full package reconcile in one verb: FIRST converge to the repo (chezup: pull →
-# preview → apply, installing everything the Brewfiles declare), THEN prune what
-# the repo no longer tracks (chezmirror: uninstall untracked packages behind a
-# confirm). `chezup` only ADDS, `chezmirror` only REMOVES — chezsync is the
-# "make this Mac's packages match the repo, both directions" shortcut. Untracked
-# *files* stay a separate, deliberate step (`chezclean`). Honours DRY_RUN=1
-# (preview both directions via chezaudit, change nothing) and YES=1 (skip both
-# confirm gates). Trailing args pass through to chezup → chezmoi apply.
-#
-# chezup exits 0 both when in sync and when you decline its apply gate, so the
-# removal pass still runs after a clean/declined apply — but chezmirror has its own
-# confirm, so nothing is uninstalled without a second yes. A FAILED apply exits
-# non-zero and aborts before any removal.
+# Full reconcile: chezup (install what the repo declares) then chezmirror
+# (remove what it no longer tracks). Untracked *files* are a separate step
+# (`chezclean`). Honours DRY_RUN=1 and YES=1. Trailing args pass to chezup.
 chezsync() {
     chezup "$@" || return $?
     echo
@@ -613,17 +565,14 @@ chezsync() {
     chezmirror
 }
 
-# Reconcile untracked dotfiles to what chezmoi manages — both the top level of
-# $HOME (keepHome) and ~/.config (keepConfig) in cleanup.toml — removing only what
-# you confirm. The file analogue of chezmirror. Confirms each by default; --all/-a
-# bulk-confirms; YES=1 skips prompts; DRY_RUN=1 previews. No controlling terminal
-# ⇒ removes nothing.
+# Reconcile untracked dotfiles to what chezmoi manages (both $HOME's top level
+# and ~/.config, per cleanup.toml). The file analogue of chezmirror.
 chezclean() {
     _chez_run scripts/bin/clean.sh "$@"
 }
 
-# Print every dotfiles verb, grouped by frequency. Static text (no subprocesses).
-# Mirrors README.md / docs/commands.md — keep the three in sync.
+# Print every dotfiles verb, grouped by frequency. Mirrors README.md /
+# docs/commands.md — keep the three in sync.
 chezhelp() {
     cat <<'EOF'
 
@@ -667,16 +616,13 @@ EOF
 }
 
 # ─── Zellij ───────────────────────────────────────────────────────────────────
-# One Ghostty window = one Zellij session. First window in a project gets the
-# project name; later windows in the same project get "-2", "-3"… so two windows
-# never co-attach to one session (which mirrors keystrokes). A new window always
-# lands in a *fresh* session, and closing a window reaps its session (see the
-# TRAPHUP below), so the "-N" suffix stays low instead of climbing all day.
-# Deliberate resurrection/join is `zj <name>`.
+# One Ghostty window = one Zellij session: first window in a project gets the
+# project name, later windows get "-2", "-3"… so windows never co-attach to one
+# session. A new window always gets a fresh session; closing one reaps its
+# session (TRAPHUP below). Deliberate resurrection/join is `zj <name>`.
 
-# Session name from arg, else the git repo root name so every window inside a
-# project shares one base regardless of which subdir it opened in. Outside a repo:
-# cwd basename ($HOME → "home"). Folds slashes/spaces and lowercases.
+# Session name from arg, else the git repo root name (so every window in a
+# project shares one base); outside a repo, cwd basename ($HOME → "home").
 _zj_session_name() {
     local name="${1:-}"
     if [[ -z "$name" ]]; then
@@ -694,9 +640,8 @@ _zj_session_name() {
     print -r -- "${(L)name:-home}"
 }
 
-# First unused session name for base $1: "<base>", else "<base>-2"… Every existing
-# session counts as taken — running OR exited — so `attach -c` always creates a
-# brand-new session and never resurrects a stale one.
+# First unused session name for base $1: "<base>", else "<base>-2"… Exited
+# sessions count as taken too, so `attach -c` never resurrects a stale one.
 _zj_pick_session() {
     local base="$1" out line name
     local -A taken=()
@@ -713,12 +658,11 @@ _zj_pick_session() {
     print -r -- "$candidate"
 }
 
-# Drop exited/serialized sessions so the graveyard can't accumulate (and so a
-# fresh window keeps low suffixes). Non-force ⇒ only ever touches dead sessions.
+# Drop exited sessions so the graveyard can't accumulate.
 _zj_prune() { command zellij delete-all-sessions -y >/dev/null 2>&1; }
 
 # zj [name]  no arg: attach to a fresh session for cwd. With a name: attach even
-#            if running (joining/resurrecting a named session on purpose). zj -l lists.
+#            if running (joining/resurrecting on purpose). zj -l lists.
 zj() {
     if [[ "${1:-}" == "-l" || "${1:-}" == "--list" ]]; then
         zellij list-sessions
@@ -733,8 +677,7 @@ zj() {
 alias zjclean='zellij delete-all-sessions -y'
 
 if [[ -n "$ZELLIJ" ]]; then
-    # Inside a pane Ghostty's shell integration isn't injected, so set the OSC 2
-    # title ourselves: short path at the prompt, running command during execution.
+    # Inside a pane Ghostty's shell integration isn't injected, so set OSC 2 titles ourselves.
     _zj_title_precmd()  { print -n "\e]2;${(%):-%(4~|…/%3~|%~)}\a"; }
     _zj_title_preexec() { print -rn -- $'\e]2;'"${1//[[:cntrl:]]}"$'\a'; }
     _zj_rename_tab() { command zellij action rename-tab "${PWD:A:t}" 2>/dev/null; }
@@ -745,14 +688,12 @@ if [[ -n "$ZELLIJ" ]]; then
     _zj_rename_tab
 elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION" \
         && -t 1 ]] && command -v zellij >/dev/null; then
-    # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to a
-    # working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
+    # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to
+    # a working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
     _zj_prune
     _ZJ_SESSION="$(_zj_pick_session "$(_zj_session_name)")"
-    # Closing the window (PTY hangup → SIGHUP) reaps this window's own session, so
-    # detached daemons can't pile up and inflate the "-N" suffix. A manual detach
-    # returns from attach normally (no HUP) and is left alone — resurrect it later
-    # with `zj <name>`. Only ever touches the one session this window created.
+    # PTY hangup (window close) reaps this window's own session; a manual detach
+    # doesn't HUP and is left alone — resurrect later with `zj <name>`.
     TRAPHUP() { command zellij kill-session "$_ZJ_SESSION" >/dev/null 2>&1 }
     zellij attach -c "$_ZJ_SESSION"
 fi

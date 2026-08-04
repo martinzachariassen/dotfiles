@@ -10,9 +10,8 @@ setup() {
     WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
 }
 
-# The config template is rendered before .chezmoidata loads, so it must list the
-# module names literally. That list MUST match the catalog keys, or a prompted
-# module would have no label (and vice versa).
+# Rendered before .chezmoidata loads, so the template lists module names
+# literally — must match catalog keys or a prompted module has no label.
 @test "wizard \$allModules matches [moduleCatalog] keys" {
     local tmpl_names catalog_names
     tmpl_names="$(grep -F '$allModules := list' "$TMPL" \
@@ -23,7 +22,6 @@ setup() {
     [ "$tmpl_names" = "$catalog_names" ]
 }
 
-# Every profile-default module name must be a real module.
 @test "profile default module sets reference known modules" {
     local known defaults bad
     known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
@@ -36,12 +34,9 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in defaults:$bad"; false; }
 }
 
-# scripts/bin/wizard.sh composes each profile's default module set from
-# [profileDefaults] in modules.toml (base ∪ extra, gated by inherit); the config
-# template restates the same effective sets literally (it renders before
-# .chezmoidata loads). They MUST agree per profile, or the wizard and a raw
-# `chezmoi init --prompt` would pre-check different boxes. We compare against the
-# wizard's own profile_defaults so the composition rule lives in exactly one place.
+# wizard.sh composes defaults from [profileDefaults] (base ∪ extra, gated by
+# inherit); the template must restate the same per-profile set or the wizard
+# and a raw `chezmoi init --prompt` would pre-check different boxes.
 @test "[profileDefaults] mirrors the template's \$defaults per profile" {
     local p tmpl data
     for p in personal work minimal; do
@@ -56,9 +51,8 @@ setup() {
     done
 }
 
-# Every module name across the profileDefaults tables (base + per-profile extra)
-# must be a real catalog module. The inherit table holds bare bools, not quoted
-# names, so it contributes nothing to this scan.
+# The inherit table holds bare bools, not quoted names, so it contributes
+# nothing to this scan.
 @test "[profileDefaults] entries reference known modules" {
     local known bad m
     known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
@@ -71,7 +65,6 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in profileDefaults:$bad"; false; }
 }
 
-# Every Brewfile path in the package catalog must exist on disk.
 @test "packages.toml Brewfile paths all exist" {
     local path
     grep -oE '"[^"]+"' "$PACKAGES_DATA" | tr -d '"' | while IFS= read -r path; do

@@ -1,17 +1,14 @@
-// Custom VS Code keybindings — chezmoi-managed. Editor-chrome chords vim doesn't
-// cover (vim leader maps live in settings.json); chosen to not clobber macOS defaults.
+// Editor-chrome chords vim doesn't cover (vim leader maps live in settings.json);
+// chosen not to clobber macOS defaults.
 [
-    // Editor group / pane management
     { "key": "cmd+ctrl+right", "command": "workbench.action.moveEditorToNextGroup" },
     { "key": "cmd+ctrl+left", "command": "workbench.action.moveEditorToPreviousGroup" },
     { "key": "cmd+ctrl+up", "command": "workbench.action.toggleMaximizeEditorGroup" },
 
-    // Terminal
     { "key": "cmd+ctrl+t", "command": "workbench.action.terminal.split", "when": "terminalFocus" },
 
-    // Swift/iOS (Sweetpad) — Xcode-style build loop. Scoped to Swift files so
-    // cmd+r doesn't hijack Java/Kotlin/TS work; drop the `when` for global.
-    // cmd+ctrl+r (not cmd+.) stops, since cmd+. is the Quick Fix chord.
+    // Sweetpad Xcode-style build loop, scoped to Swift so cmd+r doesn't hijack
+    // other languages; cmd+ctrl+r not cmd+. (that's Quick Fix).
     { "key": "cmd+r", "command": "sweetpad.build.launch", "when": "editorLangId == swift" },
     {
         "key": "cmd+shift+r",
@@ -21,9 +18,7 @@
     },
     { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" },
 
-    // SwiftLint autocorrect on demand. It's deliberately off the save cycle
-    // (swiftlint --fix rewrites the file on disk and would race the save), so this
-    // is how you apply fixable lint violations. Formatting is separate: SwiftFormat
-    // runs on save. Scoped to Swift; no-ops if the SwiftLint extension isn't installed.
+    // Off the save cycle — swiftlint --fix would race the save; SwiftFormat
+    // handles on-save formatting separately.
     { "key": "cmd+ctrl+l", "command": "swiftlint.fixDocument", "when": "editorLangId == swift" }
 ]

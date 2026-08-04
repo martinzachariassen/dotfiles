@@ -1,17 +1,9 @@
-# storecode — the work-only security tool (the code guard behind this machine's
-# command hooks). It is installed by its OWN installer, NOT Homebrew, so it never
-# belongs in a Brewfile and chezaudit/chezmirror never flag it. Its home dir
-# ~/.storecode is on cleanup.keepHome, so `chezclean` never offers to remove it,
-# and it's out of scope for the ~/.config mirror. See the install hook:
+# storecode — work-only security tool, installed by its OWN installer, NOT
+# Homebrew (never belongs in a Brewfile). ~/.storecode is on cleanup.keepHome. See
 # src/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl (work profile only).
-#
-# .chezmoidata files can't be templated; keep the `storecode` namespace disjoint
-# from prompted answers (profile/modules/…) so the data merge never collides.
 
 [storecode]
-# The exact command that installs storecode on a fresh work Mac. It's
-# environment-specific (an internal installer / one-liner), so it ships empty:
-# when unset, the hook prints how to finish the install and exits 0 — an apply
-# never fails just because storecode isn't wired up yet. Set it to the real
-# installer, e.g. "curl -fsSL https://…/install.sh | bash", then run `chezup`.
+# Environment-specific installer, so it ships empty: unset means the hook prints
+# how to finish and exits 0 rather than failing the apply. Set the real installer,
+# e.g. "curl -fsSL https://…/install.sh | bash", then run `chezup`.
 installCmd = ""

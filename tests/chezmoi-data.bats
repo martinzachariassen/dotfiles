@@ -1,9 +1,7 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/lib/chezmoi-data.sh.
-#
-# CI runs without jq installed, so these exercise the sed fallback path; the jq
-# path is covered by the jq-guarded tests below when jq is present. Both paths
-# must return identical values — that's the whole point of the shared reader.
+# Unit tests for scripts/lib/chezmoi-data.sh. CI runs without jq, so these
+# exercise the sed fallback; jq-guarded tests below cover the jq path when
+# present. Both paths must return identical values.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -32,8 +30,8 @@ setup() {
 # ─── cm_data_bool (the false-reading regression) ───────────────────────────────
 
 @test "cm_data_bool reads a nested feature that is false (not the default)" {
-    # The bug this guards: jq's `//` treats false as empty, so a disabled
-    # feature used to read back as its default. Must be a literal "false".
+    # jq's `//` treats false as empty, so a disabled feature used to read
+    # back as its default.
     run cm_data_bool "$JSON" macApps
     [ "$output" = "false" ]
 }

@@ -2,7 +2,6 @@
 
 palette = "catppuccin_frappe"
 
-# Two-line prompt: context on line 1, prompt char on line 2.
 format = """
 $directory\
 $git_branch$git_status\

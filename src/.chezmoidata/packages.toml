@@ -1,14 +1,10 @@
-# Package catalog — single source of truth for which Brewfiles apply. Merged into
-# the template data root, so hooks read `{{ .brewfiles.core }}` and scripts read it
-# via `chezmoi data`. Paths are relative to the repo root (git working tree), not
-# chezmoi's src/ — hooks join them with {{ .chezmoi.workingTree }}.
-# .chezmoidata files can't be templated; keep the `brewfiles` namespace disjoint
-# from prompted answers so merges never collide.
+# Package catalog — which Brewfiles apply. Paths are relative to the repo root
+# (git working tree), not chezmoi's src/ — hooks join them with
+# {{ .chezmoi.workingTree }}.
 
 [brewfiles]
 core = "packages/Brewfile"
 
-# Installed when the named module is selected (see modules.toml).
 [brewfiles.byModule]
 macApps = "packages/Brewfile.mac-apps"
 appleDev = "packages/Brewfile.apple-dev"

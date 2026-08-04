@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 # run_after_02-brew-bundle — converge Homebrew to the active Brewfiles.
-#
-# run_after (every apply), not run_onchange, so real installed state is
-# reconciled. --no-upgrade guarantees presence not freshness, so a clean machine
-# short-circuits instead of upgrading every apply (freshness is `chezbump`'s job).
-# The active file set comes from .chezmoidata/packages.toml (core + modules + profile).
+# run_after (not onchange) reconciles real installed state; --no-upgrade gives
+# presence not freshness (freshness is chezbump's job).
 
 set -uo pipefail
 
@@ -13,16 +10,13 @@ echo "→ Homebrew packages: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Reattach stdin so casks that invoke sudo can read the password (belt-and-braces
-# to run_before_00-sudo-cache's pre-auth). scripts/ + packages/ live at the repo
-# root — reach them via .chezmoi.workingTree.
+# Reattach stdin so casks needing sudo can prompt (belt-and-braces to run_before_00-sudo-cache).
 # shellcheck source=../../scripts/lib/tty.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 tty_reattach || echo "! no terminal available; casks needing sudo may ask later"
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-# Active Brewfiles resolved at render time: core + selected modules + profile.
 {{ $modules := dig "modules" (list) . -}}
 FILES=(
     "{{ .chezmoi.workingTree }}/{{ .brewfiles.core }}"
@@ -55,9 +49,7 @@ if [ "$missing" -eq 0 ]; then
 fi
 
 # ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
-# Homebrew 6.0 ignores non-official taps until trusted (docs.brew.sh/Tap-Trust);
-# a `tap` line in our Brewfile is the trust decision, so mirror it into the trust
-# store before install or `brew bundle` silently skips those formulae. Idempotent.
+# Homebrew 6.0 ignores non-official taps until trusted; without this, `brew bundle` silently skips their formulae.
 for f in "${FILES[@]}"; do
     [ -f "$f" ] || continue
     while IFS= read -r taprepo; do
@@ -67,9 +59,7 @@ for f in "${FILES[@]}"; do
 done
 
 # ─── Pre-flight: clear stale partial downloads ───────────────────────────────
-# A leftover *.incomplete from an interrupted fetch can trigger a `dir_s_rmdir`
-# race that aborts an otherwise-successful pour, making `brew bundle` report the
-# file as failed. `rm -f` is idempotent.
+# A leftover *.incomplete can trigger a race that makes brew bundle wrongly report the file as failed.
 cache_dir="$(brew --cache 2>/dev/null)/downloads"
 [ -d "$cache_dir" ] && rm -f "$cache_dir"/*.incomplete 2>/dev/null || true
 

@@ -46,7 +46,6 @@ sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote 
 [diff]
     pager = "delta"
 
-# Force apply so drifted files are overwritten instead of a per-file prompt mid-run;
-# the `chez` wrapper shows status with a y/N first as the safety net.
+# Force apply (no per-file prompt); the `chez` wrapper shows a y/N first as the safety net.
 [apply]
     force = true

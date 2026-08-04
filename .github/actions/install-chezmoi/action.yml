@@ -7,13 +7,9 @@ runs:
       shell: bash
       run: |
         bin="$HOME/.local/bin"
-        # Download the installer fully before running it — a truncated fetch
-        # fails here rather than executing half a script — and retry a few
-        # times to ride out transient network blips on the runner.
+        # Fetched fully before running (fails clean if truncated) — retries handle network blips.
         script="$(curl -fsLS --retry 3 --retry-delay 2 get.chezmoi.io)"
         sh -c "$script" -- -b "$bin"
         echo "$bin" >> "$GITHUB_PATH"
-        # $GITHUB_PATH only takes effect in later steps, so verify via the full
-        # path here — fails the job immediately with a clear error if the
-        # install didn't land.
+        # $GITHUB_PATH only applies to later steps — verify via full path now to fail fast.
         "$bin/chezmoi" --version

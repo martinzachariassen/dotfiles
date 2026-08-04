@@ -1,9 +1,7 @@
 #!/usr/bin/env bats
-# Tests for shell helper functions defined in the zsh config.
-#
-# These extract the *real* function definition from the source template and run
-# it under zsh, so a regression in the committed definition fails the test —
-# rather than re-declaring the function in the test and only checking a copy.
+# Tests for shell helper functions defined in the zsh config. Extracts the real
+# definition from the source template and runs it under zsh, rather than
+# re-declaring a copy, so a regression in the committed code fails here.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -13,14 +11,13 @@ setup() {
     fi
 }
 
-# Pull a single-line `name() { ... }` definition out of the template. The line
-# carries no Go-template directives, so it is valid shell as-is.
+# No Go-template directives on this line, so it's valid shell as-is.
 extract_fn() {
     grep -E "^$1\(\) \{" "$ZSHRC" | head -n1
 }
 
-# Pull a multi-line `name() { ... }` block (top-level closing brace) out of the
-# template. The zellij block carries no Go-template directives either.
+# The zellij block carries no Go-template directives either, so it's valid
+# shell as-is.
 extract_fn_block() {
     awk "/^$1\(\) \{/,/^\}/" "$ZSHRC"
 }

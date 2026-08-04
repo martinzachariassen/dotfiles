@@ -6,27 +6,21 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    # Weekly macOS render canary (Mondays 06:17 UTC) — catches macOS-only
-    # template/path breakage the Linux jobs can't see (they short-circuit the
-    # darwin-guarded hooks to `exit 0`).
+    # Weekly macOS canary — Linux jobs short-circuit darwin-guarded hooks to `exit 0`.
     - cron: "17 6 * * 1"
 
 permissions:
   contents: read
 
 concurrency:
-  # Include event_name so a push to main and the weekly schedule (which share
-  # github.ref = refs/heads/main) land in different groups. And never cancel a
-  # scheduled run — otherwise a push during the Monday window silently kills that
-  # week's macOS render canary, which only runs on schedule.
+  # event_name splits push-to-main from the weekly schedule (same github.ref).
+  # Never cancel a scheduled run — a push during the window would kill the canary.
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
-  # Lint plain shell scripts + check shell parser syntax. The src/.chezmoiscripts/
-  # *.sh.tmpl files are intentionally excluded — their Go template directives
-  # (e.g. `{{ if ne .chezmoi.os "darwin" }}exit 0{{ end }}`) confuse shellcheck.
-  # They're validated by `render` (template syntax) + `test` (rendered bodies).
+  # .chezmoiscripts/*.sh.tmpl excluded — Go template directives confuse shellcheck;
+  # covered instead by `render` (syntax) + `test` (rendered bodies).
   shell:
     name: shell scripts
     runs-on: ubuntu-latest
@@ -41,17 +35,13 @@ jobs:
       - name: shfmt
         run: shfmt -d -i 4 -ci install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
       - name: Parser syntax
-        # bash -n / zsh -n only parse their FIRST argument, so each file must be
-        # checked on its own — a bare `bash -n a b c` silently skips b and c.
+        # bash -n / zsh -n only parse their first arg — loop, don't pass multiple files.
         run: |
           for f in install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh; do bash -n "$f"; done
           for f in src/dot_zshenv src/dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
 
-  # Render every template via `chezmoi apply --dry-run` against stub data — no
-  # disk writes, no interactive prompts. Catches Go-template syntax errors,
-  # undefined variables, and stale references. The curated matrix exercises both
-  # values of each data axis that branches a template: profile (personal/work),
-  # features.macApps, and useOnePassword (git signing on/off, the fork path).
+  # `chezmoi apply --dry-run` against stub data — no disk writes, no prompts.
+  # Matrix exercises both values of each branching axis: profile, macApps, useOnePassword.
   render:
     name: chezmoi render
     runs-on: ubuntu-latest
@@ -77,10 +67,7 @@ jobs:
           USE_ONE_PASSWORD: ${{ matrix.use_one_password }}
         run: bash scripts/ci/render-check.sh "$PWD"
 
-  # bats-core suite in tests/: semver helper, shell functions, mise config,
-  # and the static + dynamic checks on every chezmoi hook
-  # (chezmoi-scripts.bats renders each hook and runs it on Linux to confirm the
-  # darwin guard fires before any macOS-only command — hence chezmoi here).
+  # chezmoi-scripts.bats renders + runs each hook on Linux to confirm the darwin guard fires first.
   test:
     name: shell unit tests
     runs-on: ubuntu-latest
@@ -93,8 +80,7 @@ jobs:
       - uses: ./.github/actions/install-chezmoi
       - run: bats tests/
 
-  # Validate every JSON / JSONC (VS Code) / TOML output parses as the language it
-  # claims to be. `render` proves templates render; this proves outputs are valid.
+  # `render` proves templates render; this proves the JSON/JSONC/TOML output is valid.
   config:
     name: config files
     runs-on: ubuntu-latest
@@ -115,9 +101,7 @@ jobs:
           persist-credentials: false
       - uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89 # v1.47.2
 
-  # Secret scanning. `gitleaks dir` scans the working tree, so it's independent of
-  # checkout depth. Pinned via its Go module (no release-asset URL to drift) and run
-  # via the resolved GOPATH/bin path, never $GITHUB_PATH, to avoid a code-exec sink.
+  # Run via resolved GOPATH/bin, never $GITHUB_PATH, to avoid a code-exec sink.
   secrets:
     name: secret scan
     runs-on: ubuntu-latest
@@ -133,10 +117,7 @@ jobs:
           bin="$(go env GOPATH)/bin"
           "$bin/gitleaks" dir . --redact --no-banner
 
-  # Lint the workflow files themselves. The `shell` job lints *.sh scripts;
-  # this lints the workflow YAML plus the bash embedded in every `run:` step
-  # (actionlint shells out to the runner's preinstalled shellcheck for those).
-  # Pinned via its Go module for the same reason as `secrets`.
+  # Also lints bash embedded in `run:` steps via the runner's preinstalled shellcheck.
   actionlint:
     name: workflow lint
     runs-on: ubuntu-latest
@@ -152,9 +133,7 @@ jobs:
           bin="$(go env GOPATH)/bin"
           "$bin/actionlint" -color
 
-  # Workflow security audit (zizmor): flags risks Dependabot can't — injectable
-  # `run:` steps, over-broad permissions, credential persistence. The read-only
-  # GITHUB_TOKEN lets it verify each action's pin against upstream tags.
+  # Read-only GITHUB_TOKEN lets zizmor verify each action's pin against upstream tags.
   zizmor:
     name: workflow audit
     runs-on: ubuntu-latest
@@ -197,8 +176,7 @@ jobs:
           subjectPatternError: |
             PR title subject must be 1-72 characters (Conventional Commits).
 
-  # Resolve every Brewfile formula/cask name without installing (blocking), then
-  # report installed-state drift (advisory — hosted macOS runners are slow/flaky).
+  # Resolve step blocks; drift-check is advisory only (hosted macOS runners are flaky).
   brew:
     name: brew packages
     runs-on: macos-latest
@@ -213,9 +191,8 @@ jobs:
         continue-on-error: true
         run: bash scripts/ci/brew-check-modules.sh "$PWD"
 
-  # The Linux `render` job never executes the real macOS hook bodies (the darwin
-  # guards exit 0). This re-runs the render on macOS where those guards fall
-  # through. Gated to the weekly schedule + manual dispatch to keep PRs fast.
+  # Re-runs render on macOS, where the darwin guards actually fall through (Linux `render` can't).
+  # Gated to schedule + manual dispatch to keep PRs fast.
   render-macos:
     name: chezmoi render (macOS canary)
     runs-on: macos-latest

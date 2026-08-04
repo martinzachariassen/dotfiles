@@ -1,30 +1,27 @@
 #!/usr/bin/env bats
-# Behavioural tests for the Brewfile-removal reconciler: chezmirror and the
-# helpers it shares with chezbump (_chez_brew_removals, _chez_brew_uninstall_one).
+# Tests for chezmirror and the helpers it shares with chezbump
+# (_chez_brew_removals, _chez_brew_uninstall_one) — the reconciler that
+# uninstalls Homebrew packages tracked in NO Brewfile tier.
 #
-# Why this exists:
-#   chezmirror uninstalls Homebrew packages tracked in NO Brewfile tier. The
-#   dangerous, subtle bit is computing that "untracked" set: `brew bundle
-#   cleanup` honours only ONE --file, so the tiers must be concatenated and
-#   piped in via --file=-. Passing several --file reads just the LAST tier and
-#   would report almost the entire toolchain as untracked — one confirmed run
-#   would wipe the machine. These tests pin the union, the parser, the
-#   cask-vs-formula uninstall dispatch, and the no-TTY safety guard by
-#   extracting the REAL functions from the template and running them against a
-#   stubbed `brew`/`gum` — so a regression in the committed source fails here.
+# The dangerous bit: `brew bundle cleanup` honours only ONE --file, so the
+# tiers must be concatenated and piped via --file=-. Passing several --file
+# reads just the LAST tier and would report almost the whole toolchain as
+# untracked — one confirmed run would wipe the machine. These tests extract
+# the REAL functions from the template and run them against a stubbed
+# brew/gum, so a regression in the committed source fails here.
 #
-#   The interactive per-package loop needs a controlling terminal, so the two
-#   TTY-dependent tests are inverse-gated: the safety test runs headless (CI),
-#   the confirm-loop test runs only under a real/pseudo tty. Run the loop test
-#   locally with:  script -q /dev/null bats tests/chezmirror.bats
+# The interactive per-package loop needs a controlling terminal; the two
+# TTY-dependent tests are inverse-gated (safety runs headless in CI, the
+# confirm-loop test needs a real/pseudo tty). Run it locally with:
+#   script -q /dev/null bats tests/chezmirror.bats
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
-    # A fake repo whose four Brewfile tiers the helper concatenates. Distinct
-    # markers per tier let us prove the UNION (all four) reaches brew's stdin.
+    # Fake repo with four Brewfile tiers, each with a distinct marker, so we
+    # can prove the UNION reaches brew's stdin.
     FAKE="$(mktemp -d)"
     mkdir -p "$FAKE/packages"
     printf 'brew "marker-core"\n' >"$FAKE/packages/Brewfile"
@@ -39,10 +36,9 @@ setup() {
     STDIN_LOG="$STUBS/brew-stdin"   # what got piped into `brew bundle cleanup`
     UNINSTALL_LOG="$STUBS/uninstall.log"
 
-    # Representative cleanup output: one cask + two formulae, then the cache-
-    # pruning section newer Homebrew appends. The parser MUST stop at
-    # "Would `brew cleanup`:" — otherwise every "Would remove: …/Caches/…" line
-    # leaks in as a bogus "formula" removal (the bug this pins).
+    # One cask + two formulae, then the cache-pruning section newer Homebrew
+    # appends. The parser must stop at "Would `brew cleanup`:" — otherwise
+    # every "Would remove: …/Caches/…" line leaks in as a bogus removal.
     cat >"$CANNED" <<'EOF'
 Would uninstall casks:
 orphan-app
@@ -76,10 +72,9 @@ fi
 exit 0
 EOF
 
-    # Real `gum confirm` (bubbletea) reads keypresses from STDIN. The stub mirrors
-    # that: one answer line per confirm, consumed from stdin. This is what makes
-    # the confirm-loop test able to catch the bug — if chezmirror ever feeds the
-    # package list on stdin again, gum reads packages instead of these answers.
+    # stub mirrors real gum confirm (reads STDIN): one answer line per confirm.
+    # If chezmirror ever feeds the package list on stdin again, gum would read
+    # packages instead of these answers — that's the regression this catches.
     cat >"$STUBS/gum" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = confirm ] || exit 0
@@ -94,9 +89,8 @@ teardown() {
     [ -n "${STUBS:-}" ] && rm -rf "$STUBS"
 }
 
-# Pull one or more function bodies out of the template, repointing the single
-# `local src={{ .chezmoi.workingTree | quote }}` line at the fake repo. The
-# helpers carry no template directives, so only chezmirror's src line changes.
+# Pull function bodies out of the template, repointing chezmirror's
+# `local src={{ .chezmoi.workingTree | quote }}` line at the fake repo.
 extract() {
     local fn
     for fn in "$@"; do
@@ -104,8 +98,7 @@ extract() {
     done | sed "s|^    local src={{.*}}|    local src=\"$FAKE\"|"
 }
 
-# Can this process actually open a controlling terminal? Mirrors the guard the
-# function itself uses, so the TTY-gated tests agree with production behaviour.
+# Mirrors chezmirror's own tty guard, for the TTY-gated tests below.
 have_tty() { { : </dev/tty; } >/dev/null 2>&1; }
 
 run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
@@ -130,19 +123,15 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
 @test "_chez_brew_removals stops at the cache-prune section (no leaked paths)" {
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
-    # The "Would `brew cleanup`:" section and its "Would remove: …/Caches/…"
-    # lines must NEVER surface as removals — that's the parser bug regression.
+    # The cache-prune section must never surface as a removal (parser bug regression).
     ! grep -q 'Would remove' <<<"$output"
     ! grep -q 'Caches/Homebrew' <<<"$output"
     ! grep -q 'brew cleanup' <<<"$output"
 }
 
 @test "_chez_brew_removals labels the untap section 'tap' without leaking its header" {
-    # Modern `brew bundle cleanup` appends a "Would untap:" section (each entry a
-    # tap name like "supabase/tap") after dropping a tap's last tracked formula.
-    # Neither the header nor its entries may inherit the preceding "formula" kind
-    # — the bug that made chezmirror `brew uninstall "Would untap:"` and a bare
-    # tap name. They must surface as their own "tap" kind for `brew untap`.
+    # "Would untap:" entries must not inherit the preceding "formula" kind — the
+    # bug that made chezmirror `brew uninstall "Would untap:"` and a bare tap name.
     cat >"$CANNED" <<'EOF'
 Would uninstall formulae:
 orphan-cli
@@ -171,12 +160,8 @@ EOF
 }
 
 @test "_chez_brew_removals sweeps in a newly-added tier (apple-dev glob regression)" {
-    # The original bug: the helper hardcoded four tier filenames and silently
-    # ignored a fifth one added later (Brewfile.apple-dev), so every package
-    # tracked ONLY there read as untracked and got queued for uninstall. The tier
-    # set must be the `Brewfile.*` glob, so ANY new tier is honoured with no code
-    # change. Drop a fifth tier the hardcoded list never knew about and prove its
-    # contents reach brew's stdin.
+    # Original bug: hardcoded tier filenames silently ignored a new tier, so its
+    # packages read as untracked. Tier set must be the `Brewfile.*` glob.
     printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
@@ -235,24 +220,21 @@ EOF
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
     [ "$status" -eq 0 ]
     [[ "$output" == *"No TTY"* ]]
-    # It previewed the untracked set but uninstalled NOTHING.
     [[ "$output" == *"orphan-app"* ]]
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
 @test "chezmirror uninstalls only the confirmed packages, one at a time" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # Answers arrive on STDIN (as real gum reads them): confirm the cask, decline
-    # bats-core, confirm the other formula. This is the bug's regression test —
-    # if chezmirror feeds the package list on stdin again, gum reads packages
-    # instead of these answers and the loop miscounts / drains early.
+    # Regression test: confirm cask, decline bats-core, confirm the other formula.
+    # If chezmirror ever feeds the package list on stdin again, gum reads
+    # packages instead of these answers and the loop miscounts.
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nno\nyes'
     [ "$status" -eq 0 ]
-    # orphan-app (cask, routed via --cask) and orphan-cli removed; bats-core kept.
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
@@ -279,8 +261,7 @@ EOF
 
 @test "chezmirror --all uninstalls the whole set after ONE confirmation" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # A single 'yes' on stdin gates the whole batch; the per-package loop then
-    # runs unattended (no further prompts), so exactly one gum answer is consumed.
+    # One 'yes' gates the whole batch; the per-package loop then runs unattended.
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
@@ -308,8 +289,7 @@ EOF
 
 @test "YES=1 chezmirror accepts all with no prompt at all" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # No stdin fed: YES=1 must not read any answer (bulk confirm skipped, per-item
-    # prompts skipped). A stray read would hang; </dev/null proves it never reads.
+    # YES=1 must never read stdin — a stray read would hang; </dev/null proves it.
     run env \
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
@@ -323,15 +303,13 @@ EOF
 @test "chezmirror removes an interdependent set despite deps-first order (retry passes)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # `brew bundle cleanup` lists a dependency BEFORE its dependent, so a one-shot
-    # uninstall of that order fails ("still required by …") on the dep — the exact
-    # symptom chezmirror showed. Model it: `libpng` refuses until `cairo` is gone,
-    # and CANNED lists libpng first. The retry-in-passes loop must still clear both.
+    # uninstall fails on the dep ("still required by …") — the retry-in-passes
+    # loop must still clear both. libpng refuses until cairo is gone.
     cat >"$CANNED" <<'EOF'
 Would uninstall formulae:
 libpng
 cairo
 EOF
-    # Stateful stub: uninstalling libpng fails while cairo is still installed.
     cat >"$STUBS/brew" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
@@ -357,10 +335,9 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
-    # Both removed, cairo first (it unblocked libpng), nothing left stuck. NOTE:
-    # `[[ … ]]` does NOT fail a bats test as a non-final line (bash set -e skips
-    # it), so every assertion here is a set -e-guarding simple command — `[ … ]`
-    # or `grep`. A no-op `[[ … ]]` would let a regression pass silently.
+    # A non-final `[[ … ]]` never fails a bats test (set -e skips it), so every
+    # assertion here uses `[ … ]`/`grep` instead — a no-op `[[ … ]]` would let
+    # a regression pass silently.
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "cairo" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "libpng" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
@@ -370,10 +347,8 @@ EOF
 
 @test "chezmirror reports a package it can never remove instead of erroring out" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # `libpng` can never be uninstalled (something outside the Brewfiles still needs
-    # it); `zlib` removes fine. The retry loop must remove zlib, give up on libpng
-    # after a no-progress pass (no infinite loop), report it once under "still
-    # installed", count it as neither removed nor kept, and still exit 0.
+    # libpng can never be uninstalled; zlib removes fine. The retry loop must
+    # remove zlib, give up on libpng after a no-progress pass (no infinite loop).
     cat >"$CANNED" <<'EOF'
 Would uninstall formulae:
 libpng
@@ -405,23 +380,17 @@ EOF
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
     [ "$(cat "$UNINSTALL_LOG")" = "zlib" ]     # only zlib actually left
-    # Guard with `grep`, not `[[ … ]]` — a non-final `[[ … ]]` never fails a bats
-    # test (set -e skips it), so it would rubber-stamp the old "! failed" wording.
-    grep -qF "still installed" <<<"$output"     # the stuck pkg is reported cleanly
-    grep -qF "libpng" <<<"$output"              # …by name
+    grep -qF "still installed" <<<"$output"
+    grep -qF "libpng" <<<"$output"
     grep -qF "removed 1 · kept 0" <<<"$output"  # stuck ≠ kept (kept is declined only)
 }
 
 # ─── chezmirror: brew autoremove of orphaned dependencies ───────────────────
-# After the removal pass, chezmirror prunes formulae installed AS dependencies
-# that nothing in the Brewfiles needs any more. It previews with `brew autoremove
-# -n` (read-only), then runs `brew autoremove` — accept-all under --all/YES=1,
-# else behind one confirm. The no-TTY guard sits BEFORE this block, so it can only
-# run with a terminal (covered by the existing no-TTY safety test).
+# After the removal pass, chezmirror prunes formulae installed as dependencies
+# nothing needs any more: preview via `brew autoremove -n`, then run it for
+# real — accept-all under --all/YES=1, else behind one confirm.
 
-# A brew stub whose `autoremove -n` reports ORPHANS and whose `autoremove` (no -n)
-# records that it actually ran, so we can assert the prune fired or didn't. The
-# log path expands at write time ($log); the stub's own \$1/\$2/\$* stay escaped.
+# `autoremove -n` reports ORPHANS; `autoremove` (no -n) records that it ran.
 _stub_brew_with_orphan() { # $1 = AUTOREMOVE_LOG path
     local log="$1"
     cat >"$STUBS/brew" <<EOF
@@ -470,8 +439,7 @@ EOF
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     AUTOREMOVE_LOG="$STUBS/autoremove.log"
     _stub_brew_with_orphan "$AUTOREMOVE_LOG"
-    # Per-package mode (no --all): three package confirms, then the autoremove
-    # confirm — decline the last one. gum reads one answer per confirm from stdin.
+    # Three package confirms, then the autoremove confirm — decline the last.
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
@@ -486,8 +454,7 @@ EOF
 @test "chezmirror skips brew autoremove when nothing is orphaned (YES=1)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     AUTOREMOVE_LOG="$STUBS/autoremove.log"
-    # `autoremove -n` prints only a "==>" header (0 unneeded) — no bare names, so
-    # chezmirror must treat it as "no orphans" and never invoke the real prune.
+    # Header-only output (0 unneeded, no bare names) must read as "no orphans".
     cat >"$STUBS/brew" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then cat >/dev/null; cat "$CANNED" 2>/dev/null; exit 0; fi
@@ -512,8 +479,7 @@ EOF
 
 @test "chezmirror untaps an untracked tap end-to-end (Would untap regression)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # A tap-only preview: pre-fix this fed `brew uninstall "Would untap:"` and a
-    # bare tap name (both errored). Now it must route through `brew untap`.
+    # Pre-fix, a tap-only preview fed `brew uninstall "Would untap:"` (errored).
     cat >"$CANNED" <<'EOF'
 Would untap:
 acme/formulae

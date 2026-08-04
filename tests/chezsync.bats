@@ -1,13 +1,7 @@
 #!/usr/bin/env bats
-# Behavioural tests for `chezsync`, the two-way package reconcile verb.
-#
-# chezsync composes three existing verbs — chezup (install direction), chezmirror
-# (removal direction) and chezaudit (read-only preview under DRY_RUN). Its own
-# logic is just the orchestration: run order, the DRY_RUN preview branch, arg
-# passthrough, and fail-fast when the apply step errors. Like the other
-# zsh-function suites we EXTRACT the real chezsync body from the committed template
-# and run it under zsh, stubbing the composed verbs so a regression in the source
-# fails here (we never re-declare a copy of the logic).
+# Behavioural tests for `chezsync`, which orchestrates chezup/chezmirror/chezaudit
+# (install, removal, DRY_RUN preview). Extracts the real body from the committed
+# template and runs it under zsh with the composed verbs stubbed.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -15,14 +9,12 @@ setup() {
     command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
 }
 
-# Extract a function body verbatim from the committed template.
 extract() {
     sed -n "/^${1}() {/,/^}/p" "$ZSHRC"
 }
 
-# chezup/chezmirror/chezaudit stubbed as functions that announce themselves, so we
-# can assert which ran (and in what order) with no brew/chezmoi. chezup echoes its
-# args (to prove passthrough) and honours CHEZUP_RC (to prove fail-fast).
+# Stubs announce themselves so run order is assertable without brew/chezmoi;
+# chezup echoes its args (passthrough) and honors CHEZUP_RC (fail-fast).
 STUBS='
 chezup()     { echo "CHEZUP $*"; return ${CHEZUP_RC:-0}; }
 chezmirror() { echo "CHEZMIRROR"; }

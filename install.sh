@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# install.sh — bootstrap a fresh macOS (Apple Silicon) machine, then hand off to
+# install.sh — bootstraps a fresh macOS (Apple Silicon) machine, then hands off to
 # `chezmoi init --apply`. Idempotent; safe to re-run.
-#
-# Env: DOTFILES_REPO=<url>, DOTFILES_DIR=<path>. Extra args forward to chezmoi
-# init, e.g. `... | bash -s -- --promptDefaults`.
+# Env: DOTFILES_REPO=<url>, DOTFILES_DIR=<path>. Extra args forward to chezmoi init.
 
 set -euo pipefail
 
@@ -17,8 +15,7 @@ die() {
     exit 1
 }
 
-# Clean Ctrl-C during the prerequisite steps; the wizard/chezmoi exec replaces
-# this handler with its own.
+# The wizard/chezmoi exec later replaces this handler with its own.
 on_interrupt() {
     printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
     warn "aborted — nothing further was applied."
@@ -80,17 +77,15 @@ info "Using $(chezmoi --version | head -n 1)."
 if [ -d "$SOURCE_DIR/.git" ]; then
     info "Repo already present at $SOURCE_DIR."
 else
-    # Brace-delimit ${SOURCE_DIR}: system bash 3.2 otherwise absorbs the trailing
-    # multibyte "…" into the var name and dies under `set -u`.
+    # Braces required: bash 3.2 absorbs the trailing "…" into the var name under set -u.
     info "Cloning $REPO into ${SOURCE_DIR}…"
     mkdir -p "$(dirname "$SOURCE_DIR")"
     git clone "$REPO" "$SOURCE_DIR"
 fi
 
 # --- 5. Hand off to the setup wizard -------------------------------------
-# The plain-text wizard reads /dev/tty directly, so it works under `curl | bash`
-# where chezmoi's raw-mode promptChoice TUI is unreliable. Callers passing their
-# own chezmoi flags skip the wizard and go straight to chezmoi.
+# Wizard reads /dev/tty directly, so it works under `curl | bash` (chezmoi's raw-mode
+# TUI doesn't). Extra args skip it and go straight to chezmoi.
 if [ "$#" -eq 0 ]; then
     info "Starting the setup wizard, then applying."
     exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"

@@ -14,8 +14,7 @@
     defaultBranch = main
 
 {{ if $signing -}}
-# Signing on (signingMode = {{ $signingMode }}). Disable: signingMode = "off" in
-# ~/.config/chezmoi/chezmoi.toml, then `chezmoi apply`.
+# Disable: signingMode = "off" in ~/.config/chezmoi/chezmoi.toml, then `chezmoi apply`.
 [commit]
     gpgsign = true
 
@@ -51,8 +50,7 @@
     navigate = true
     line-numbers = true
     side-by-side = false
-    # Same -FRK flags as $LESS in ~/.zshenv; deliberately no -X (alt-screen so
-    # output clears on exit instead of cluttering scrollback).
+    # Same -FRK flags as $LESS in ~/.zshenv; no -X so it alt-screens and clears on exit.
     pager = "less -FRK -P'Press q or Ctrl-C to quit · / search · h for help'"
 
 [diff]

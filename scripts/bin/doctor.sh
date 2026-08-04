@@ -3,12 +3,10 @@
 # expects (XDG layout, claude config, op signing, brew drift, auth), beyond what
 # `chezmoi doctor` covers. Exit 1 on any fail; warnings stay 0.
 
-# Tildes in status strings are display text, not command paths, so leave them
-# literal. File-level disable must precede the first command below.
+# Tildes below are display text, not paths — leave them literal.
 # shellcheck disable=SC2088
 set -uo pipefail
 
-# ─── Color + shared helpers ───────────────────────────────────────────────────
 # log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_DOCTOR_DIR/../lib/log.sh" ]; then
@@ -60,7 +58,6 @@ if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
     . "$_DOCTOR_DIR/../lib/vscode.sh"
 fi
 
-# ─── 1. Source repo ───────────────────────────────────────────────────────────
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
     pass "repo at $SOURCE_DIR"
@@ -82,7 +79,6 @@ else
     fail "repo missing at $SOURCE_DIR — re-run install.sh"
 fi
 
-# ─── 2. chezmoi ───────────────────────────────────────────────────────────────
 section "chezmoi"
 if command -v chezmoi >/dev/null 2>&1; then
     pass "chezmoi installed: $(chezmoi --version | head -1)"
@@ -113,7 +109,6 @@ else
     fail "chezmoi not installed — re-run install.sh"
 fi
 
-# ─── 3. XDG layout ────────────────────────────────────────────────────────────
 section "XDG layout"
 for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
     if [ -f "$legacy" ]; then
@@ -134,7 +129,6 @@ else
     fail "~/.zshenv missing — run: chezmoi apply"
 fi
 
-# ─── 4. Claude config ─────────────────────────────────────────────────────────
 section "Claude config"
 ccdir=$(zsh -c 'source "$HOME/.zshenv" >/dev/null 2>&1; printf %s "${CLAUDE_CONFIG_DIR:-}"')
 if [ "$ccdir" = "$HOME/.config/claude" ]; then
@@ -148,7 +142,6 @@ else
     fail "~/.config/claude/CLAUDE.md missing — run: chezmoi apply"
 fi
 
-# ─── 5. Git signing via 1Password ─────────────────────────────────────────────
 section "Git signing (1Password SSH agent)"
 SSH_SIGN=/Applications/1Password.app/Contents/MacOS/op-ssh-sign
 if [ -x "$SSH_SIGN" ]; then
@@ -199,12 +192,11 @@ if [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then
     rm -rf "$tmpdir"
 fi
 
-# ─── 6. Brewfile sync ─────────────────────────────────────────────────────────
 section "Homebrew packages"
 if command -v brew >/dev/null 2>&1; then
     pass "brew installed"
-    # Resolve active Brewfiles from packages.toml, the same map the brew hook
-    # uses. --no-upgrade keeps this a presence check (freshness is chezbump's job).
+    # Resolves the same Brewfile map as the brew hook; --no-upgrade keeps this a
+    # presence check (freshness is chezbump's job).
     data_json="$(cm_data_json)"
     active_files="$(printf '%s' "$data_json" | jq -r '
         (.modules // []) as $mods
@@ -239,7 +231,7 @@ EOF
             warn "Ollama service not started — run: scripts/bin/setup-ollama.sh"
         fi
     fi
-    # Drift the other way: ad-hoc installs not in any Brewfile.
+    # Opposite-direction drift: ad-hoc installs not in any Brewfile.
     leaves_tmp=$(mktemp)
     brew leaves >"$leaves_tmp" 2>/dev/null || true
     tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.* 2>/dev/null |
@@ -254,10 +246,8 @@ EOF
     else
         pass "no untracked brew packages"
     fi
-    # Orphaned dependencies: formulae installed only as another package's dep that
-    # nothing needs any more. Read-only preview (-n); the fix is chezmirror, which
-    # runs `brew autoremove` after its removal pass. Filter brew's "==>" headers so
-    # only bare formula names count.
+    # -n previews only (chezmirror runs the real `brew autoremove`); filter out
+    # brew's "==>" headers so only formula names count.
     orphans=$(brew autoremove -n 2>/dev/null | grep -vE '^==>' | grep -cE '^[^[:space:]]+$' || true)
     if [ "${orphans:-0}" -gt 0 ]; then
         warn "$orphans orphaned dependency(ies) — run \`chezmirror\` (or \`brew autoremove\`) to prune"
@@ -268,17 +258,15 @@ else
     fail "brew not on PATH"
 fi
 
-# ─── 6b. VS Code extension mirror ─────────────────────────────────────────────
-# Report both drift directions against the manifest (source of truth) so doctor
-# surfaces what the next apply's 03-vscode hook would reconcile.
+# Reports both drift directions against the manifest so doctor surfaces what the
+# next apply's 03-vscode hook would reconcile.
 section "VS Code extensions"
 if command -v code >/dev/null 2>&1; then
     vsc_manifest_file="$SOURCE_DIR/packages/vscode-extensions.txt"
     if [ ! -f "$vsc_manifest_file" ]; then
         warn "extension manifest missing: packages/vscode-extensions.txt"
     else
-        # Drop the Norwegian dictionary when the locale module is off, mirroring
-        # the 03-vscode hook's locale guard.
+        # Mirrors the 03-vscode hook's locale guard.
         vsc_exclude=()
         if ! printf '%s' "$(cm_data_json)" | jq -e '(.modules // []) | index("locale")' >/dev/null 2>&1; then
             vsc_exclude=(streetsidesoftware.code-spell-checker-norwegian-bokmal)
@@ -304,7 +292,6 @@ else
     note "VS Code CLI not on PATH — extension check skipped"
 fi
 
-# ─── 7. mise (runtimes) ───────────────────────────────────────────────────────
 section "mise (runtimes)"
 if command -v mise >/dev/null 2>&1; then
     pass "mise installed: $(mise version 2>/dev/null | head -1)"
@@ -338,7 +325,6 @@ if command -v direnv >/dev/null 2>&1; then
     warn "legacy \`direnv\` still on PATH — no longer used; remove with: brew uninstall direnv && rm -rf ~/.config/direnv"
 fi
 
-# ─── 8. Auth state (FYI) ──────────────────────────────────────────────────────
 section "Cloud auth (informational)"
 if command -v gh >/dev/null 2>&1; then
     if gh auth status >/dev/null 2>&1; then
@@ -368,10 +354,8 @@ if command -v gcloud >/dev/null 2>&1; then
     fi
 fi
 if command -v op >/dev/null 2>&1; then
-    # `op account/vault list` prompt interactively with no accounts configured;
-    # </dev/null keeps this read-only check from ambushing the next prompt. Check
-    # config.json first: absent means op was never configured (the common state
-    # when only the desktop SSH integration is used), so there's nothing to check.
+    # </dev/null avoids an interactive prompt; config.json absent means op was
+    # never configured (desktop-only SSH setups), so there's nothing to check.
     if [ -f "$HOME/.config/op/config.json" ] || [ -f "$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/Library/Application Support/1Password/Data/op/config.json" ]; then
         if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             pass "1Password CLI signed in"
@@ -383,7 +367,6 @@ if command -v op >/dev/null 2>&1; then
     fi
 fi
 
-# ─── 9. Fonts ─────────────────────────────────────────────────────────────────
 section "Fonts"
 # Glob install locations directly (`ls | grep` mangles non-alphanumeric names).
 jetbrains_nerd_font_installed() {
@@ -401,7 +384,6 @@ else
     warn "JetBrainsMono Nerd Font not found — terminal icons will look broken"
 fi
 
-# ─── 10. Privacy permissions ──────────────────────────────────────────────────
 section "Privacy permissions (manual check)"
 echo "  ${DIM}macOS won't let scripts inspect Privacy permissions. Verify manually:${RESET}"
 echo "  ${DIM}  System Settings ${ARROW_MARK} Privacy & Security ${ARROW_MARK}${RESET}"
@@ -411,7 +393,6 @@ echo "  ${DIM}    ${NOTE} Screen Recording:    Raycast / screenshot tools${RESET
 echo "  ${DIM}    ${NOTE} Input Monitoring:    Karabiner (if used)${RESET}"
 echo "  ${DIM}    ${NOTE} Developer Tools:     your terminal (avoids Gatekeeper friction)${RESET}"
 
-# ─── Summary ──────────────────────────────────────────────────────────────────
 echo
 echo "${BOLD}${RULE} Summary ${RULE}${RESET}"
 echo "  ${GREEN}${PASS} pass${RESET}   ${YELLOW}${ACTION} action${RESET}   ${BLUE}${INFOCOUNT} info${RESET}   ${RED}${FAIL} fail${RESET}"

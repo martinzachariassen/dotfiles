@@ -1,7 +1,6 @@
 # ~/.config/zsh/.zprofile — login shell setup, runs once before .zshrc.
 
-# Set vars inline rather than `brew shellenv` to keep an external process out of
-# every `/bin/zsh -l`.
+# Set vars inline rather than `brew shellenv` to keep an external process out of every `/bin/zsh -l`.
 if [ -d /opt/homebrew ]; then
     export HOMEBREW_PREFIX="/opt/homebrew"
     export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
@@ -14,6 +13,5 @@ if [ -d /opt/homebrew ]; then
     export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}"
 fi
 
-# Set here, not .zshenv: /etc/zprofile's path_helper runs in between and would
-# otherwise sink ~/.local/bin below /usr/bin.
+# Set here, not .zshenv: /etc/zprofile's path_helper runs in between and would sink this below /usr/bin.
 path=("$HOME/.local/bin" $path)

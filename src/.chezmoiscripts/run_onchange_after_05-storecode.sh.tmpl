@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 # run_onchange_after_05-storecode — install storecode, the work-only security
-# tool. storecode ships via its OWN installer, not Homebrew, so this is the one
-# place that installs it. Runs on the work profile only, is idempotent (skips
-# when already present), and never fails an apply just because the installer
-# isn't configured yet. The install command is data-driven from
-# src/.chezmoidata/storecode.toml (.storecode.installCmd). run_onchange re-fires
-# only when this rendered content changes.
+# tool. Ships via its OWN installer, not Homebrew — this is the one place that
+# installs it. Install command is data-driven from storecode.toml (.installCmd).
 
 set -euo pipefail
 
@@ -20,7 +16,6 @@ exit 0
 
 home="{{ .chezmoi.homeDir }}"
 
-# Already installed? (binary on PATH, or its home dir exists.) Nothing to do.
 if command -v storecode >/dev/null 2>&1 || [ -e "$home/.storecode" ]; then
     echo "✓ storecode already installed"
     exit 0

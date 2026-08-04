@@ -1,7 +1,6 @@
-# Optional-module catalog — the single source for module names + labels. Selected
-# at `chezmoi init`; chosen names land in `.modules` and templates gate with
-# `{{ if has "theme" .modules }}`. Keep the `moduleCatalog` namespace disjoint
-# from prompted answers (see packages.toml).
+# Optional-module catalog — module names + labels selected at `chezmoi init`;
+# templates gate with `{{ if has "theme" .modules }}`. Keep this namespace
+# disjoint from prompted answers (packages.toml) so merges don't collide.
 
 [moduleCatalog]
 macApps = "GUI and AI apps (Raycast, Chrome, Claude)"
@@ -13,20 +12,18 @@ locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
 appleDev = "Swift/iOS dev (SwiftLint, SwiftFormat, xcbeautify, xcodes, fastlane)"
 
-# Wizard's per-profile pre-checks, composed as: effective = (inherit ? base : []) ∪ extra.
-# .chezmoi.toml.tmpl restates each profile's effective list literally (it renders
-# before .chezmoidata loads); tests/data-model.bats enforces the two match. Every
-# name must be a [moduleCatalog] key.
+# effective = (inherit ? base : []) ∪ extra. .chezmoi.toml.tmpl restates this
+# literally (renders before .chezmoidata loads); tests/data-model.bats enforces
+# the two match.
 [profileDefaults]
 base = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
 
-# Whether a profile starts from `base`; minimal is the deliberately-empty one.
+# minimal is deliberately empty.
 [profileDefaults.inherit]
 personal = true
 work = true
 minimal = false
 
-# Per-profile additions layered on top of the inherited base.
 [profileDefaults.extra]
 personal = ["appleDev"]
 work = ["cloudAuth"]

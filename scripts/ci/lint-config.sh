@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# lint-config.sh — parse every JSON/TOML config in the source tree before a
-# `chezmoi apply` writes them into $HOME. Templates (*.tmpl) are covered by
-# render-check instead. Run from repo root, or pass the source dir as $1.
+# lint-config.sh — parse every JSON/TOML config before `chezmoi apply` writes them into $HOME.
+# Templates (*.tmpl) are covered by render-check instead.
 
 set -euo pipefail
 
@@ -96,28 +95,24 @@ run() {
     "$@" || errors=$((errors + 1))
 }
 
-# git's view (cached + untracked, --exclude-standard) so gitignored locals stay
-# unlinted while new working-dir files are caught. `./` prefix matches VSCODE_DIR.
+# cached + untracked so gitignored locals stay unlinted; `./` prefix matches VSCODE_DIR.
 list_paths() {
     local pattern="$1"
     git ls-files -co --exclude-standard -- "$pattern" | sed 's|^|./|' | sort
 }
 
-# ─── Strict JSON ──────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     is_jsonc "$f" && continue
     echo "JSON   $f"
     run validate_strict_json "$f"
 done < <(list_paths '*.json')
 
-# ─── JSONC ────────────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     is_jsonc "$f" || continue
     echo "JSONC  $f"
     run validate_jsonc "$f"
 done < <(list_paths '*.json')
 
-# ─── Strict TOML ──────────────────────────────────────────────────────────────
 while IFS= read -r f; do
     echo "TOML   $f"
     run validate_toml "$f"

@@ -1,25 +1,13 @@
 #!/usr/bin/env bats
-# Behavioural tests for clean.sh — the chezclean verb that reconciles untracked
-# dotfiles to what chezmoi manages across TWO scopes: the top level of $HOME
-# (minus keepHome) and ~/.config (minus keepConfig). It removes only what you
-# confirm. The file analogue of chezmirror (which does the same for Homebrew
-# packages). Because ~/.config is a normal dot_config dir (not exact_), an apply
-# never prunes it — scope 2 here is what reconciles it.
+# Tests for clean.sh (chezclean): reconciles untracked dotfiles across $HOME's
+# top level and ~/.config to what chezmoi manages, removing only what's
+# confirmed. Candidates = entries minus managed minus keep-list; a drift there
+# could offer auth/state dirs for deletion, so these tests pin that computation
+# plus the safety guards (no removal without confirm, nothing without a tty).
 #
-# Why this exists:
-#   The dangerous, subtle bit is the candidate set: home entry, MINUS every
-#   chezmoi-managed top-level component, MINUS the keep-list. A drift in any of
-#   the three (a managed dir parsed wrong, an empty keep-list read as "keep
-#   nothing") would offer auth/state/user dirs for deletion. These tests pin the
-#   pure candidate computation, the keep-list/managed filtering, the symlink-safe
-#   removal, and — most importantly — the safety guards: nothing is removed
-#   without a confirmation, and NOTHING at all without a controlling terminal.
-#
-#   The interactive/removing paths need a controlling terminal (clean.sh reads
-#   confirms via a live tty / gum), so those tests are inverse-gated: the safety
-#   + dry-run tests run headless (CI); the confirm/remove tests run only under a
-#   real or pseudo tty. Run the full set locally with:
-#       script -q /dev/null bats tests/chezclean.bats
+# Interactive/removing tests need a controlling terminal and are inverse-gated
+# from the headless safety/dry-run tests. Run the full set locally with:
+#     script -q /dev/null bats tests/chezclean.bats
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -27,8 +15,8 @@ setup() {
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
     [ -x "$SCRIPT" ] || skip "clean.sh missing or not executable"
 
-    # A fake $HOME whose top level mixes managed dirs, keep-listed dirs, and pure
-    # junk. Candidates must be exactly the junk: not managed, not on keepHome.
+    # Fake $HOME mixing managed dirs, keep-listed dirs, and junk; candidates
+    # must be exactly the junk.
     FAKEHOME="$BATS_TEST_TMPDIR/home"
     mkdir -p \
         "$FAKEHOME/.config" \
@@ -42,8 +30,8 @@ setup() {
     # A non-dot entry must be structurally out of scope (never a candidate).
     mkdir -p "$FAKEHOME/Documents"
 
-    # Stub chezmoi: `managed` and `execute-template` (keepHome) read from files so
-    # individual tests can rewrite them (e.g. to force an empty keep-list).
+    # Stub chezmoi: managed/execute-template read from files so tests can
+    # rewrite them (e.g. force an empty keep-list).
     STUBS="$BATS_TEST_TMPDIR/stubs"
     mkdir -p "$STUBS"
     MANAGED_OUT="$STUBS/managed.out"
@@ -53,17 +41,15 @@ setup() {
     BREW_FORMULAE_OUT="$STUBS/brew-formulae.out"
     BREW_CASKS_OUT="$STUBS/brew-casks.out"
     VSCODE_OUT="$STUBS/vscode-extensions.out"
-    # chezmoi managed lists target-relative paths; only the first "." segment
-    # matters. Include a subpath (.config/nvim → .config) and a non-dot Library
-    # path (dropped) to prove the parser.
+    # managed lists target-relative paths; only the first segment matters
+    # (.config/nvim → .config); the Library path has no leading dot, dropped.
     printf '%s\n' '.config' '.config/nvim' '.zshenv' '.ssh' 'Library/Application Support/x' >"$MANAGED_OUT"
     printf '%s\n' '.storecode' '.cache' '.config' '.ssh' >"$KEEP_OUT"
     # keepConfig (scope 2): auth/state dirs under ~/.config never offered for removal.
     printf '%s\n' 'gh' 'op' >"$KEEPCONFIG_OUT"
-    # Tool-ownership map: entry<TAB>package<TAB>binary<TAB>extension. .m2 has an
-    # EMPTY package (Maven from mise) and .sonarlint/.codetogether have ONLY an
-    # extension (empty package+binary) — the literal tabs must survive parsing or
-    # "mvn"/the extension IDs would be lost, so build the rows with real tabs.
+    # owners map: entry<TAB>package<TAB>binary<TAB>extension. .m2 has an empty
+    # package (mise); .sonarlint/.codetogether have only an extension — the
+    # literal tabs must survive parsing or those fields would be lost.
     printf '%s\t%s\t%s\t%s\n' \
         '.azure' 'azure-cli' 'az' '' \
         '.kube' 'kubernetes-cli' 'kubectl' '' \
@@ -71,17 +57,16 @@ setup() {
         '.vscode' 'visual-studio-code' 'code' '' \
         '.sonarlint' '' '' 'sonarsource.sonarlint-vscode' \
         '.codetogether' '' '' 'genuitecllc.codetogether' >"$OWNERS_OUT"
-    # Installed brew set: kubernetes-cli present (keeps .kube via its package); NO
-    # maven (so .m2 can only be kept via its binary, proving brew-only would misfire);
-    # visual-studio-code cask absent (so .vscode is an orphan unless `code` is on PATH).
+    # kubernetes-cli installed (keeps .kube via package); no maven (so .m2 can
+    # only be kept via its binary); no vscode cask (so .vscode is an orphan
+    # unless `code` is on PATH).
     printf '%s\n' 'kubernetes-cli' 'git' >"$BREW_FORMULAE_OUT"
     printf '%s\n' 'some-cask' >"$BREW_CASKS_OUT"
-    # Installed VS Code extensions: sonarlint-vscode present (keeps .sonarlint via
-    # its extension); genuitecllc.codetogether absent (so .codetogether is an orphan).
+    # sonarlint-vscode installed (keeps .sonarlint); codetogether absent (orphan).
     printf '%s\n' 'sonarsource.sonarlint-vscode' 'ms-python.python' >"$VSCODE_OUT"
 
-    # Stub chezmoi: `managed`, and `execute-template` disambiguated by the template
-    # body — keepHome and owners both go through execute-template.
+    # execute-template disambiguated by template body — keepHome and owners
+    # both go through it.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 case "\$1" in
@@ -97,7 +82,7 @@ case "\$1" in
 esac
 EOF
 
-    # Stub brew like chezmirror.bats: list --formula / --cask cat canned files.
+    # brew stub like chezmirror.bats: list --formula / --cask cat canned files.
     cat >"$STUBS/brew" <<EOF
 #!/usr/bin/env bash
 case "\$2" in
@@ -106,15 +91,13 @@ case "\$2" in
 esac
 EOF
 
-    # Stub \`code\`: _clean_installed_vscode calls \`code --list-extensions\` directly
-    # (not via chezmoi), so it needs its own stub returning the canned installed set.
+    # code stub: _clean_installed_vscode calls it directly, not via chezmoi.
     cat >"$STUBS/code" <<EOF
 #!/usr/bin/env bash
 [ "\$1" = --list-extensions ] && cat "$VSCODE_OUT" 2>/dev/null
 EOF
 
-    # Real \`gum confirm\` reads keypresses from STDIN; the stub mirrors that so the
-    # confirm-loop tests can drive it: one answer line per confirm, "yes" ⇒ 0.
+    # stub mirrors real `gum confirm` (reads STDIN): one answer line per confirm.
     cat >"$STUBS/gum" <<'EOF'
 #!/usr/bin/env bash
 [ "$1" = confirm ] || exit 0
@@ -122,22 +105,17 @@ IFS= read -r ans || ans=""
 [ "$ans" = yes ]
 EOF
 
-    # Minimal tool stubs so a candidate's binary/stem can be "installed" on a
-    # restricted PATH: mvn = Maven from mise (keeps .m2), gradle = the stem heuristic.
+    # mvn/gradle stubs so their binary/stem reads as installed on a restricted PATH.
     for b in mvn gradle; do
         printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/$b"
     done
 
     chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/code" "$STUBS/gum" "$STUBS/mvn" "$STUBS/gradle"
 
-    # Hermetic PATH for the tool-ownership tests: stubs + a curated coreutils dir,
-    # so real az/kubectl/code on the host can't leak in and flip an "orphan" into a
-    # "keep". /usr/bin is NOT safe to trust here — GitHub's ubuntu runners ship `az`
-    # and `kubectl` in /usr/bin, so a plain `$STUBS:/usr/bin:/bin` would resolve them
-    # as installed and the .azure/.kube orphan tests would fail on CI (they pass on a
-    # dev Mac only because Homebrew keeps those tools off /usr/bin). Instead symlink
-    # ONLY the utilities clean.sh needs into a dedicated dir; anything NOT linked here
-    # (az, kubectl, code, …) is guaranteed absent, whatever the host has installed.
+    # Hermetic PATH for tool-ownership tests: stubs + curated coreutils only.
+    # /usr/bin is NOT safe here — GitHub's ubuntu runners ship az/kubectl there,
+    # which would flip the .azure/.kube orphan tests to "kept" on CI. Symlink
+    # only the utilities clean.sh needs so nothing else on the host leaks in.
     COREBIN="$BATS_TEST_TMPDIR/corebin"
     mkdir -p "$COREBIN"
     local _u _p
@@ -147,11 +125,9 @@ EOF
     SYSPATH="$STUBS:$COREBIN"
 }
 
-# Can this process open a controlling terminal? Mirrors clean.sh's own guard so
-# the tty-gated tests agree with production behaviour.
+# Mirrors clean.sh's own tty guard, for the tty-gated tests below.
 have_tty() { { : </dev/tty; } >/dev/null 2>&1; }
 
-# Run the whole script under the stubbed PATH against the fake $HOME.
 run_clean() { # run_clean [args...] — extra env via caller's `run env` if needed
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" "$@"
 }
@@ -197,8 +173,7 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 @test "_clean_managed_top reduces managed paths to unique top-level dot segments" {
     run env PATH="$STUBS:$PATH" bash -c 'source "$1"; _clean_managed_top' _ "$SCRIPT"
     [ "$status" -eq 0 ]
-    # .config (from both .config and .config/nvim, deduped), .ssh, .zshenv;
-    # the Library/* path is dropped (no leading dot).
+    # .config deduped from two entries; Library/* dropped (no leading dot).
     [ "$output" = $'.config\n.ssh\n.zshenv' ]
 }
 
@@ -240,7 +215,6 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 @test "DRY_RUN previews the untracked set and deletes nothing (works headless)" {
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    # Exactly the junk is surfaced…
     for j in .deadlink .hawtjni .junkfile .lemminx; do
         [[ "$output" == *"$j"* ]] || {
             echo "candidate missing from preview: $j"
@@ -248,12 +222,10 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
             return 1
         }
     done
-    # …and the managed / keep-listed / non-dot entries are NOT.
     ! grep -qE '(^| )\.storecode ' <<<"$output"
     ! grep -qF 'Documents' <<<"$output"
     [[ "$output" == *"dry-run"* ]]
     [[ "$output" == *"removed 4 · kept 0"* ]]
-    # Nothing was actually deleted.
     [ -d "$FAKEHOME/.hawtjni" ]
     [ -L "$FAKEHOME/.deadlink" ]
     [ -f "$FAKEHOME/.junkfile" ]
@@ -274,7 +246,6 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"no TTY"* ]]
-    # It previewed the untracked set but removed NOTHING.
     [[ "$output" == *".hawtjni"* ]]
     [ -d "$FAKEHOME/.hawtjni" ]
     [ -f "$FAKEHOME/.junkfile" ]
@@ -308,15 +279,13 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 
 @test "YES=1 removes the whole untracked set with no prompt (needs a tty)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # No stdin: YES=1 must not read any answer. A stray read would hang;
-    # </dev/null proves it never reads.
+    # YES=1 must never read stdin — a stray read would hang; </dev/null proves it.
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"removed 4 · kept 0"* ]]
     for j in .deadlink .hawtjni .junkfile .lemminx; do
         [ ! -e "$FAKEHOME/$j" ] && [ ! -L "$FAKEHOME/$j" ]
     done
-    # Managed + keep-listed + user data untouched.
     [ -d "$FAKEHOME/.config" ]
     [ -d "$FAKEHOME/.storecode" ]
     [ -d "$FAKEHOME/Documents" ]
@@ -341,8 +310,8 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 
 @test "per-item confirm removes only the approved entries, one at a time" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
-    # Candidates, sorted: .deadlink .hawtjni .junkfile .lemminx.
-    # Answer yes / no / yes / no ⇒ remove .deadlink and .junkfile; keep the rest.
+    # yes/no/yes/no over sorted candidates (.deadlink .hawtjni .junkfile .lemminx)
+    # removes the first and third.
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" <<<$'yes\nno\nyes\nno'
     [ "$status" -eq 0 ]
     [[ "$output" == *"removed 2 · kept 2"* ]]
@@ -353,10 +322,9 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 # ─── tool-ownership classification (pure units) ──────────────────────────────
-# _clean_classify OWNERS BREWSET BINSET EXTSET reads candidate entries on stdin and
-# emits "entry<TAB>verdict<TAB>label". It's pure: the four lists stand in for the
-# map / installed-brew / on-PATH / installed-extension probes, so verdicts are
-# fully deterministic. Owner rows are 4-field (entry/package/binary/extension).
+# _clean_classify OWNERS BREWSET BINSET EXTSET reads candidates on stdin, emits
+# "entry<TAB>verdict<TAB>label". Pure: the four lists stand in for the real
+# probes, so verdicts are deterministic. Owner rows are 4-field.
 
 @test "_clean_classify keeps a mapped entry whose brew package is installed" {
     run bash -c 'source "$1"; printf "%s\n" ".kube" | _clean_classify "$2" "$3" "$4" "$5"' \
@@ -366,8 +334,8 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 @test "_clean_classify keeps a mapped entry via its binary even when brew lacks it" {
-    # .m2's package is empty (Maven from mise); only the binary "mvn" can save it.
-    # A brew-only check (empty BREWSET) would wrongly offer it — this pins the fix.
+    # .m2's package is empty (mise); only its binary "mvn" can save it — pins
+    # the brew-only-check bug.
     run bash -c 'source "$1"; printf "%s\n" ".m2" | _clean_classify "$2" "$3" "$4" "$5"' \
         _ "$SCRIPT" $'.m2\t\tmvn\t' '' $'mvn' ''
     [ "$status" -eq 0 ]
@@ -375,9 +343,8 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 @test "_clean_classify keeps an extension-owned entry when its extension is installed" {
-    # .sonarlint is owned solely by a VS Code extension (empty package + binary):
-    # only EXTSET membership can keep it. Also proves the empty middle fields (three
-    # tabs) don't shift the extension into the wrong slot.
+    # .sonarlint is owned only by an extension (empty package+binary); also
+    # proves empty middle tab fields don't shift it into the wrong slot.
     run bash -c 'source "$1"; printf "%s\n" ".sonarlint" | _clean_classify "$2" "$3" "$4" "$5"' \
         _ "$SCRIPT" $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' '' '' $'sonarsource.sonarlint-vscode'
     [ "$status" -eq 0 ]
@@ -392,8 +359,7 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 @test "_clean_classify marks an extension-owned entry orphan when its extension is gone" {
-    # The whole point of the extension signal: extension no longer installed ⇒ its
-    # HOME dir surfaces as a removable orphan (labelled with the extension ID).
+    # Extension gone ⇒ its HOME dir surfaces as removable, labelled by extension ID.
     run bash -c 'source "$1"; printf "%s\n" ".sonarlint" | _clean_classify "$2" "$3" "$4" "$5"' \
         _ "$SCRIPT" $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' '' '' ''
     [ "$status" -eq 0 ]
@@ -401,7 +367,7 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
 }
 
 @test "_clean_classify keeps an unmapped entry by the stem heuristic (first-dot cut)" {
-    # .terraform.d → stem "terraform" (cut at the FIRST dot), .gradle → "gradle".
+    # stem cut at the FIRST dot: .terraform.d → terraform, .gradle → gradle.
     run bash -c 'source "$1"; printf "%s\n" "$2" | _clean_classify "$3" "$4" "$5" "$6"' \
         _ "$SCRIPT" $'.gradle\n.terraform.d' '' '' $'gradle\nterraform' ''
     [ "$status" -eq 0 ]
@@ -441,9 +407,8 @@ EOF
 }
 
 @test "_clean_owner_binaries yields each non-empty binary, incl. empty-package and extension-only rows" {
-    # The .m2 row (empty package) must still surface "mvn"; the extension-only
-    # .sonarlint row (empty binary) must surface NOTHING — proving the 4-field tab
-    # parse doesn't collapse the middle fields or leak the extension as a binary.
+    # .m2 (empty package) must surface "mvn"; extension-only .sonarlint must
+    # surface nothing — proves the 4-field tab parse doesn't collapse fields.
     local owners=$'.azure\tazure-cli\taz\t\n.kube\tkubernetes-cli\tkubectl\t\n.m2\t\tmvn\t\n.sonarlint\t\t\tsonarsource.sonarlint-vscode\n.vscode\tvisual-studio-code\tcode\t'
     run bash -c 'source "$1"; _clean_owner_binaries "$2"' _ "$SCRIPT" "$owners"
     [ "$status" -eq 0 ]
@@ -462,8 +427,8 @@ EOF
 }
 
 # ─── tool-ownership integration (DRY_RUN, hermetic PATH) ─────────────────────
-# These use $SYSPATH (stubs + coreutils only) so host-installed tools can't flip
-# a verdict, and their own target dir so the shared FAKEHOME tests stay intact.
+# $SYSPATH (stubs + coreutils only) so host tools can't flip a verdict; own
+# target dir so the shared FAKEHOME tests stay intact.
 
 @test "keeps config owned by an installed brew package (.kube not offered)" {
     local t="$BATS_TEST_TMPDIR/kube"
@@ -511,8 +476,7 @@ EOF
 }
 
 @test "degrades gracefully when brew is absent — still classifies via binaries" {
-    # A brew-less machine: no `brew` on PATH. .kube loses its (brew) owner and
-    # becomes an orphan; .m2 is still kept by its binary. Must not error.
+    # No brew on PATH: .kube loses its brew owner (orphan), .m2 still kept via binary.
     local nb="$BATS_TEST_TMPDIR/nobrew"
     mkdir -p "$nb"
     cp "$STUBS/chezmoi" "$STUBS/mvn" "$nb/"
@@ -555,10 +519,8 @@ EOF
 }
 
 # ─── scope 2: ~/.config reconciliation (DRY_RUN, hermetic PATH) ───────────────
-# ~/.config is a normal dot_config dir now (not exact_), so an apply never prunes
-# it — chezclean's second scope does. Its entries are mostly NON-dot (nvim, gh),
-# unlike scope 1. keepConfig (gh, op) is the auth/state keep-list; managed_config
-# is derived from `chezmoi managed` lines under .config/ (here: .config/nvim → nvim).
+# ~/.config is a normal dot_config dir (not exact_), so an apply never prunes
+# it — this second scope does. keepConfig (gh, op) is the auth/state keep-list.
 
 @test "scope 2: offers an untracked ~/.config child, spares keepConfig and managed children" {
     local t="$BATS_TEST_TMPDIR/cfg"

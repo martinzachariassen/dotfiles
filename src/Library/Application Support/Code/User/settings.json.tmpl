@@ -1,7 +1,5 @@
 {
-    // =========================================================
-    // APPEARANCE
-    // =========================================================
+    // ── Appearance ──
 
 {{ if has "theme" (dig "modules" (list) .) -}}
     "workbench.colorTheme": "Catppuccin Frappé",
@@ -23,9 +21,7 @@
     "workbench.editor.limit.value": 10,
     "workbench.editor.limit.perEditorGroup": true,
 
-    // =========================================================
-    // FONT & EDITOR
-    // =========================================================
+    // ── Font & editor ──
 
     "editor.fontFamily": "'JetBrainsMono Nerd Font', Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 14,
@@ -67,9 +63,7 @@
     "editor.linkedEditing": true,
     "editor.accessibilitySupport": "off",
 
-    // =========================================================
-    // FILES
-    // =========================================================
+    // ── Files ──
 
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 1000,
@@ -96,9 +90,8 @@
         "**/build": true
     },
 
-    // chezmoi templates: highlight by their base language so the bulk of each
-    // file is correct; the Go-template directives just render inline. A
-    // whole-file "go" association would wrongly parse these shell/json bodies.
+    // Highlight chezmoi .tmpl files by base language; a whole-file "go"
+    // association would wrongly parse the shell/json bodies.
     "files.associations": {
         "*.sh.tmpl": "shellscript",
         "*.json.tmpl": "jsonc",
@@ -129,9 +122,7 @@
         "readme.md": "license, license.*, contributing.*, changelog.*, code_of_conduct.*, security.*"
     },
 
-    // =========================================================
-    // SEARCH
-    // =========================================================
+    // ── Search ──
 
     "search.exclude": {
         "**/node_modules": true,
@@ -142,13 +133,10 @@
 
     "search.followSymlinks": false,
 
-    // todo-tree's VSIX ships without its bundled rg and fails on activation;
-    // point it at the Homebrew rg.
+    // todo-tree's VSIX ships without its bundled rg and fails on activation.
     "todo-tree.ripgrep.ripgrep": "/opt/homebrew/bin/rg",
 
-    // =========================================================
-    // EXPLORER & GIT
-    // =========================================================
+    // ── Explorer & git ──
 
     "explorer.confirmDelete": false,
     "explorer.confirmDragAndDrop": false,
@@ -173,9 +161,7 @@
     "github.gitAuthentication": true,
     "githubPullRequests.pullBranch": "never",
 
-    // =========================================================
-    // TERMINAL
-    // =========================================================
+    // ── Terminal ──
 
     "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'",
     "terminal.integrated.fontSize": 13,
@@ -184,17 +170,12 @@
     "terminal.integrated.smoothScrolling": true,
     "terminal.integrated.enablePersistentSessions": false,
 
-    // =========================================================
-    // PROJECT ENVIRONMENT
-    // =========================================================
+    // ── Project environment ──
 
-    // Off so the extension doesn't write JDK paths into this chezmoi-managed file
-    // (the paths below are the single source of truth).
+    // Off so the extension doesn't write JDK paths into this chezmoi-managed file.
     "mise.configureExtensionsAutomatically": false,
 
-    // =========================================================
-    // VIM
-    // =========================================================
+    // ── Vim ──
 
     "vim.leader": "<space>",
     "vim.useSystemClipboard": true,
@@ -259,9 +240,7 @@
         }
     ],
 
-    // =========================================================
-    // AI / COPILOT
-    // =========================================================
+    // ── AI / Copilot ──
 
     "github.copilot.enable": {
         "*": true,
@@ -270,11 +249,9 @@
         "scminput": false
     },
 
-    // NOTE: `github.copilot.chat.commitMessageGeneration.instructions` is intentionally
-    // omitted. Any value here trips Copilot's Responsible AI filter and the SCM
-    // "Generate Commit Message" button fails with `422 Unprocessable Entity /
-    // promptFiltered` — a known VS Code bug (microsoft/vscode#316549, #316060, #316204).
-    // Conventional Commits is enforced by commit-msg hooks + CI regardless.
+    // `commitMessageGeneration.instructions` intentionally omitted: any value here
+    // trips Copilot's filter and breaks "Generate Commit Message" with a 422
+    // (microsoft/vscode#316549). commit-msg hooks + CI enforce Conventional Commits anyway.
 
     // Conventional Commits for the GitHub PR "Generate Title/Description" action.
     "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
@@ -298,17 +275,15 @@
 
     "chat.editor.fontSize": 14,
 
-    // =========================================================
-    // BACKEND / INFRA
-    // =========================================================
+    // ── Backend / infra ──
 
     "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "automatic",
     "java.inlayHints.parameterNames.enabled": "literals",
     "java.saveActions.organizeImports": true,
 
-    // Pin the editor JDK to mise's version-named install path (a durable anchor
-    // across runtime updates); project build versions stay pinned per project.
+    // Pin the editor JDK to mise's version-named install path, a durable anchor
+    // across runtime updates.
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
     "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
@@ -321,7 +296,6 @@
     ],
 {{ end -}}
 
-    // Language-server heap/GC tuning.
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
     "java.import.gradle.wrapper.enabled": true,
 
@@ -360,9 +334,8 @@
     "spring-boot.ls.problem.application-properties.enabled": true,
     "spring-boot.ls.problem.application-yaml.enabled": true,
 
-    // JetBrains Kotlin LSP (Alpha, JVM-only). `intellij.*` because the server is
-    // IntelliJ's engine repackaged. serverPort -1 → use the VSIX-bundled server;
-    // jdkForSymbolResolution → same mise temurin-25 path as JDT.LS.
+    // JetBrains Kotlin LSP (Alpha, JVM-only); `intellij.*` because the server is
+    // IntelliJ's engine repackaged. serverPort -1 uses the VSIX-bundled server.
     "intellij.dev.serverPort": -1,
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
     "intellij.jdkForSymbolResolution": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
@@ -402,9 +375,8 @@
 
     "cSpell.language": "{{ if has "locale" (dig "modules" (list) .) }}en-US,nb{{ else }}en-US{{ end }}",
 
-    // ~/.config/cspell/personal.txt is a symlink into this repo
-    // (packages/cspell-words.txt), so words added via the quick-fix land in
-    // `git status` and sync on the next apply — no settings edit, no re-add.
+    // ~/.config/cspell/personal.txt symlinks into packages/cspell-words.txt, so
+    // words added via quick-fix land in `git status` — no settings edit needed.
     "cSpell.customDictionaries": {
         "personal": {
             "name": "personal",
@@ -415,9 +387,7 @@
         }
     },
 
-    // =========================================================
-    // LANGUAGE-SPECIFIC
-    // =========================================================
+    // ── Language-specific ──
 
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
@@ -480,8 +450,7 @@
         "editor.detectIndentation": false
     },
 
-    // Formatter is jetbrains.kotlin-server (the current extension), not the
-    // deprecated jetbrains.kotlin.
+    // jetbrains.kotlin-server is the current extension; jetbrains.kotlin is deprecated.
     "[kotlin]": {
         "editor.defaultFormatter": "jetbrains.kotlin-server",
         "editor.tabSize": 4,
@@ -527,38 +496,28 @@
         }
     },
 
-    // Swift/iOS (appleDev module). Official Swift extension drives SourceKit-LSP;
-    // Sweetpad wraps xcodebuild/simulator/debug. Formatting is the SwiftFormat
-    // extension (vknabel): it pipes the buffer through Homebrew swiftformat and
-    // returns text edits, so — unlike a disk-editing CLI — it never races VS Code's
-    // save and can't trigger the "content is newer" conflict. SwiftLint surfaces the
-    // Homebrew swiftlint binary as inline diagnostics only; its --fix rewrites the
-    // file on disk, so it's kept off the save cycle (run it on demand via the
-    // keybinding, or through pre-commit). See docs/editors.md.
+    // Swift/iOS (appleDev): Swift extension drives SourceKit-LSP, Sweetpad wraps
+    // xcodebuild. SwiftFormat (vknabel) pipes edits via stdin so it never races
+    // VS Code's save; SwiftLint's --fix rewrites on disk so it stays off the save
+    // cycle (run via keybinding or pre-commit). See docs/editors.md.
 {{ if has "appleDev" (dig "modules" (list) .) -}}
     "[swift]": {
         "editor.defaultFormatter": "vknabel.vscode-swiftformat",
         "editor.tabSize": 4,
         "editor.detectIndentation": false,
-        // No on-save code actions: swiftlint --fix would edit the file on disk and
-        // race the save. Empty object overrides the global source.organizeImports.
+        // Empty object overrides the global source.organizeImports.
         "editor.codeActionsOnSave": {}
     },
     "swift.backgroundIndexing": true,
-    // SwiftFormat feeds the file via stdin and resolves .swiftformat by ascending
-    // from it (~/.swiftformat is the global fallback), so nothing is written to disk.
     "swiftformat.path": "/opt/homebrew/bin/swiftformat",
     "sweetpad.build.xcbeautifyEnabled": true,
     "swiftlint.path": "/opt/homebrew/bin/swiftlint",
-    // SwiftLint doesn't ascend to $HOME, so point the extension at the global
-    // config as a fallback. A project's own .swiftlint.yml is listed first and
-    // wins; the home file (deployed by chezmoi) applies everywhere else.
+    // SwiftLint doesn't ascend to $HOME; a project's .swiftlint.yml wins if present,
+    // else this chezmoi-deployed config applies.
     "swiftlint.configSearchPaths": [".swiftlint.yml", "{{ .chezmoi.homeDir }}/.config/swiftlint/config.yml"],
 {{ end -}}
 
-    // =========================================================
-    // PERFORMANCE
-    // =========================================================
+    // ── Performance ──
 
     "extensions.ignoreRecommendations": true,
     "telemetry.telemetryLevel": "off",
@@ -567,9 +526,7 @@
 
     "update.mode": "manual",
 
-    // =========================================================
-    // SECURITY
-    // =========================================================
+    // ── Security ──
 
     "security.workspace.trust.enabled": true
 }

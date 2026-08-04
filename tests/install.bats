@@ -1,26 +1,20 @@
 #!/usr/bin/env bats
-# Behavioural tests for install.sh — the one-shot `curl | bash` bootstrap for a
-# fresh Mac (Xcode CLT → Homebrew → chezmoi → clone → hand off to the wizard).
+# Tests for install.sh — the one-shot `curl | bash` bootstrap for a fresh Mac
+# (Xcode CLT → Homebrew → chezmoi → clone → hand off to the wizard).
 #
-# Why this exists:
-#   This is the very first code a new machine runs, and it's the hardest to test
-#   for real (it wants to install Homebrew and reboot into a GUI dialog). The
-#   parts that actually break are the GUARDS and the HAND-OFF: refusing a non-Mac
-#   or a root invocation, warning-but-continuing on non-Apple-Silicon, not
-#   re-cloning an existing repo, and choosing the plain-text wizard vs. a direct
-#   `chezmoi init` based on whether extra args were passed. We drive the REAL
-#   script with every prerequisite stubbed (uname/id/xcode-select/brew/chezmoi/
-#   git) and a fake, already-cloned source dir, so each situation is exercised
-#   without touching the network or the system.
+# The parts that actually break are the guards and the hand-off: refusing a
+# non-Mac or root invocation, warning-but-continuing on non-Apple-Silicon, not
+# re-cloning an existing repo, and wizard vs. direct `chezmoi init` based on
+# args. We drive the real script with every prerequisite stubbed and a fake,
+# already-cloned source dir, so each path is exercised without touching the
+# network or the system.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     INSTALL="$REPO_ROOT/install.sh"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
-    # A fake, already-present source repo so the clone step is a no-op. Its
-    # wizard.sh is what install.sh execs on the no-args path — a real (tiny)
-    # script that just announces itself and its args.
+    # Fake, already-present source repo so the clone step is a no-op.
     REPO="$(mktemp -d)"
     mkdir -p "$REPO/.git" "$REPO/scripts/bin"
     cat >"$REPO/scripts/bin/wizard.sh" <<'EOF'
@@ -33,8 +27,8 @@ EOF
     GIT_LOG="$STUBS/git.log"
     CHEZMOI_LOG="$STUBS/chezmoi.log"
 
-    # uname: OS + arch come from env so a test can flip either axis. Defaults
-    # describe the supported machine (Apple-Silicon macOS).
+    # OS + arch come from env so a test can flip either axis; defaults are
+    # the supported machine (Apple-Silicon macOS).
     cat >"$STUBS/uname" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
@@ -60,8 +54,7 @@ EOF
 #!/usr/bin/env bash
 exit 0
 EOF
-    # chezmoi present ⇒ the brew-install-chezmoi step is skipped. On the args
-    # path install.sh execs `chezmoi init …`; record it so we can assert on it.
+    # chezmoi present ⇒ the install step is skipped; record `init` calls.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = --version ]; then echo "chezmoi version v2.0.0"; exit 0; fi

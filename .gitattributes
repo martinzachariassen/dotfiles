@@ -1,6 +1,4 @@
-# Force LF line endings on checkout/checkin for everything textual.
-# Protects shell scripts and chezmoi templates from accidentally being
-# converted to CRLF on Windows clones.
+# Forces LF; protects shell scripts/templates from CRLF on Windows clones.
 * text=auto eol=lf
 
 *.sh    text eol=lf
@@ -12,7 +10,6 @@
 *.yaml  text eol=lf
 *.md    text eol=lf
 
-# Binary files we don't want git to mangle
 *.png   binary
 *.jpg   binary
 *.icns  binary

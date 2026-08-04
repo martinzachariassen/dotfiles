@@ -6,9 +6,7 @@ layout {
         children
         pane size=1 borderless=true {
             plugin location="https://github.com/dj95/zjstatus/releases/download/v0.24.0/zjstatus.wasm" {
-                // Catppuccin Frappé: base #303446 surface0 #414559 text #c6d0f5
-                // blue #8caaee mauve #ca9ee6 green #a6d189 red #e78284
-                // yellow #e5c890 teal #81c8be peach #ef9f76 subtext1 #a5adce
+                // Catppuccin Frappé: base #303446 surface0 #414559 text #c6d0f5 blue #8caaee mauve #ca9ee6 green #a6d189 red #e78284 yellow #e5c890 teal #81c8be peach #ef9f76 subtext1 #a5adce
                 format_left   "#[bg=#ca9ee6,fg=#303446,bold] {session} {mode}"
                 format_center "{tabs}"
                 format_right  "#[bg=#303446,fg=#737994]{swap_layout}"
@@ -44,8 +42,7 @@ layout {
         }
     }
 
-    // Mirrored from Zellij's built-in default.swap.kdl so Alt+[ / Alt+]
-    // auto-arrangement keeps working with the custom bar.
+    // Mirrored from Zellij's built-in default.swap.kdl so Alt+[ / Alt+] keeps working with the custom bar.
     swap_tiled_layout name="vertical" {
         tab max_panes=5 {
             pane split_direction="vertical" {

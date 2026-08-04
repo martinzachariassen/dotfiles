@@ -1,24 +1,21 @@
 # ~/.config/swiftlint/config.yml — global SwiftLint defaults (appleDev module).
-#
-# SwiftLint does NOT walk up to $HOME on its own, so this file isn't auto-discovered
-# the way ~/.swiftformat is. The vknabel VS Code extension wires it in via
-# `swiftlint.configSearchPaths` (see the [swift] block in VS Code settings), which
-# checks a project's own .swiftlint.yml first and falls back to this file — so
-# per-project configs win. To use it from the CLI: `swiftlint --config ~/.config/swiftlint/config.yml`.
+# Unlike SwiftFormat, SwiftLint doesn't auto-discover $HOME configs — the vknabel VS
+# Code extension wires this in via `swiftlint.configSearchPaths`; per-project
+# .swiftlint.yml still wins. CLI: `swiftlint --config ~/.config/swiftlint/config.yml`.
 
 disabled_rules:
-  - todo # TODO/FIXME markers are intentional notes, not violations
-  - trailing_whitespace # SwiftFormat owns whitespace; don't double-report
-  - modifier_order # SwiftFormat's modifierOrder enforces this on save; warn-only here just double-reports
+  - todo # intentional notes, not violations
+  - trailing_whitespace # SwiftFormat owns this
+  - modifier_order # SwiftFormat enforces this on save; warn-only here just double-reports
 
 opt_in_rules:
-  - empty_count # prefer isEmpty over count == 0
+  - empty_count
   - empty_string
-  - first_where # .first(where:) over .filter { }.first
+  - first_where
   - last_where
   - contains_over_first_not_nil
   - sorted_first_last
-  - force_unwrapping # flag ! — a common crash source
+  - force_unwrapping # a common crash source
   - explicit_init
   - closure_spacing
   - collection_alignment
@@ -29,8 +26,7 @@ opt_in_rules:
   - vertical_whitespace_closing_braces
   - toggle_bool
 
-# Aligned with SwiftFormat --maxwidth 120. Error threshold left roomy so only
-# genuinely unreadable lines fail a build; comments and URLs are exempt.
+# Aligned with SwiftFormat --maxwidth 120; error threshold left roomy on purpose.
 line_length:
   warning: 120
   error: 200

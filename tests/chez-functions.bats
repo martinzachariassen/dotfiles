@@ -1,15 +1,13 @@
 #!/usr/bin/env bats
-# Behavioural tests for the zsh dotfiles meta-commands that aren't the Brewfile
-# reconciler (that one is covered end-to-end in chezmirror.bats):
-#   _chez_run          — the self-heal wrapper behind chezup/chezdoctor/macos-defaults
-#   _chez_brew_untracked / chezaudit — the read-only "what did I install off-book?" drift report
+# Tests for the zsh dotfiles meta-commands not covered by chezmirror.bats:
+#   _chez_run          — self-heal wrapper behind chezup/chezdoctor/macos-defaults
+#   _chez_brew_untracked / chezaudit — read-only "what did I install off-book?" report
 #   chez               — the smart `chezmoi apply` wrapper (status gate + apply + drift notice)
 #
-# Like shell-functions.bats and chezmirror.bats, these EXTRACT the real function
-# bodies from the committed template and run them (under zsh) against stubbed
-# chezmoi/brew, repointing the apply-time `local src={{ … }}` line at a fake repo.
-# A regression in the committed source therefore fails here — we never re-declare
-# a copy of the logic.
+# These extract the real function bodies from the committed template and run
+# them (under zsh) against stubbed chezmoi/brew, repointing the apply-time
+# `local src={{ … }}` line at a fake repo — a regression in the committed
+# source fails here directly.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -18,9 +16,8 @@ setup() {
 
     FAKE="$(mktemp -d)"
     mkdir -p "$FAKE/packages" "$FAKE/scripts/bin"
-    # All four Brewfile tiers, matching the real repo: _chez_brew_untracked globs
-    # `Brewfile.*`, and zsh's NOMATCH would abort the read if the tiers were
-    # absent. One tracked formula (git); `brew leaves` (stubbed) decides drift.
+    # All four tiers must exist — zsh's NOMATCH would abort _chez_brew_untracked's
+    # `Brewfile.*` glob read otherwise. One tracked formula (git).
     printf 'brew "git"\n' >"$FAKE/packages/Brewfile"
     : >"$FAKE/packages/Brewfile.mac-apps"
     : >"$FAKE/packages/Brewfile.personal"
@@ -30,9 +27,8 @@ setup() {
     APPLY_LOG="$STUBS/apply.log"
     DIFF_LOG="$STUBS/diff.log"
 
-    # chezmoi stub: `status` prints CHEZMOI_STATUS (empty = clean); `apply`
-    # records its args and honours CHEZMOI_APPLY_RC; `diff` records its args
-    # (chezdiff's raw-passthrough path).
+    # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and honours
+    # CHEZMOI_APPLY_RC; diff records args (chezdiff's raw-passthrough path).
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then printf '%s' "\${CHEZMOI_STATUS:-}"; exit 0; fi
@@ -40,9 +36,8 @@ if [ "\$1" = apply ]; then shift; printf 'apply %s\n' "\$*" >>"$APPLY_LOG"; exit
 if [ "\$1" = diff ]; then shift; printf 'diff %s\n' "\$*" >>"$DIFF_LOG"; exit 0; fi
 exit 0
 EOF
-    # brew stub: `leaves` prints BREW_LEAVES (chezaudit/chez); `bundle cleanup`
-    # consumes the piped-in tier union and echoes BREW_CLEANUP_OUT (chezbump);
-    # update/upgrade are no-ops. Covers every brew call these functions make.
+    # brew stub: leaves prints BREW_LEAVES; bundle cleanup consumes the piped
+    # tier union and echoes BREW_CLEANUP_OUT; update/upgrade are no-ops.
     cat >"$STUBS/brew" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = leaves ]; then printf '%s\n' ${BREW_LEAVES:-}; exit 0; fi
@@ -53,8 +48,7 @@ if [ "$1" = bundle ] && [ "$2" = cleanup ]; then
 fi
 exit 0
 EOF
-    # mise stub so chezbump's `mise upgrade` never reaches the real (networked)
-    # global runtime upgrade; `command -v mise` still resolves it.
+    # mise stub so chezbump's `mise upgrade` never hits the real network call.
     printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/mise"
     chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/mise"
 }
@@ -93,9 +87,8 @@ EOF
 }
 
 @test "_chez_run on a missing script with no chezmoi tells you how to fix by hand" {
-    # Hide chezmoi so the self-heal can't run: it must degrade to a
-    # copy-pasteable manual recovery line and return non-zero, never wedge.
-    # /usr/bin:/bin has zsh + coreutils but not Homebrew's chezmoi.
+    # /usr/bin:/bin has zsh + coreutils but not Homebrew's chezmoi, so the
+    # self-heal can't run — it must degrade to a manual recovery line, not wedge.
     PATH="/usr/bin:/bin" command -v chezmoi >/dev/null 2>&1 && skip "chezmoi on system PATH"
     run env PATH="/usr/bin:/bin" APPLY_LOG="$APPLY_LOG" \
         zsh -c "$(extract _chez_run); _chez_run scripts/bin/gone.sh"
@@ -118,13 +111,10 @@ EOF
 }
 
 @test "_chez_brew_untracked treats a tap-qualified leaf as tracked (both sides normalised)" {
-    # Regression: tap formulae surface tap-qualified from `brew leaves`
-    # (hashicorp/tap/terraform) while the Brewfile lists them the same way. The
-    # tracked side was reduced to the bare leaf name but the leaves side was not,
-    # so every tap-installed-and-tracked package was a phantom "untracked" hit.
-    # The Azure entry also proves the tap-prefix case is irrelevant: the Brewfile
-    # capitalises it (Azure/…) while `brew leaves` lowercases it (azure/…) — both
-    # collapse to the bare leaf, so neither should be reported.
+    # Regression: `brew leaves` reports tap formulae tap-qualified; the tracked
+    # side was reduced to the bare leaf but the leaves side wasn't, so every
+    # tap-installed-and-tracked package was a phantom "untracked" hit. Azure
+    # also proves case doesn't matter (Azure/… vs azure/… both collapse).
     printf 'brew "hashicorp/tap/terraform"\nbrew "Azure/kubelogin/kubelogin"\n' \
         >>"$FAKE/packages/Brewfile.work"
     BREW_LEAVES=$'git\nhashicorp/tap/terraform\nazure/kubelogin/kubelogin' \
@@ -135,8 +125,7 @@ EOF
 }
 
 @test "_chez_brew_untracked still flags a tap leaf that is in no Brewfile" {
-    # The normalisation must not swallow genuine drift: an untracked tap formula
-    # is reported by its bare leaf name (not the tap path).
+    # Normalisation must not swallow genuine drift.
     BREW_LEAVES=$'git\nhashicorp/tap/packer' \
         run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
     [ "$status" -eq 0 ]
@@ -163,7 +152,7 @@ EOF
 # ─── chez: the smart apply wrapper ──────────────────────────────────────────
 
 @test "chez applies without prompting when there is no drift" {
-    # Empty status ⇒ no confirmation gate, straight to `chezmoi apply --force`.
+    # Empty status ⇒ straight to `chezmoi apply --force`, no confirmation gate.
     CHEZMOI_STATUS="" BREW_LEAVES=$'git' \
         run_zsh "$(extract chez _chez_brew_untracked); chez"
     [ "$status" -eq 0 ]
@@ -171,8 +160,7 @@ EOF
 }
 
 @test "chez surfaces a Brewfile-removal drift notice after applying" {
-    # A leaf tracked in no Brewfile ⇒ the informational notice fires and names
-    # chezmirror as the reconcile path — but chez itself never uninstalls.
+    # Notice names chezmirror as the reconcile path; chez itself never uninstalls.
     CHEZMOI_STATUS="" BREW_LEAVES=$'git\njq' \
         run_zsh "$(extract chez _chez_brew_untracked); chez"
     [ "$status" -eq 0 ]
@@ -181,8 +169,7 @@ EOF
 }
 
 @test "chez does not raise a phantom drift notice for a tracked tap leaf" {
-    # End-to-end guard: a tap formula tracked in the Brewfile must not trip the
-    # post-apply "installed locally but in no Brewfile" notice.
+    # End-to-end guard for the tap-normalisation logic above.
     printf 'brew "hashicorp/tap/terraform"\n' >>"$FAKE/packages/Brewfile.work"
     CHEZMOI_STATUS="" BREW_LEAVES=$'git\nhashicorp/tap/terraform' \
         run_zsh "$(extract chez _chez_brew_untracked); chez"

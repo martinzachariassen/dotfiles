@@ -6,8 +6,7 @@ semver_extract() {
     printf '%s\n' "$1" | grep -oE '[0-9]+(\.[0-9]+)*' | head -n1
 }
 
-# semver_lt A B — true if A < B. Missing trailing components count as 0; leading
-# zeros are base-10, not octal.
+# semver_lt A B — true if A < B; missing components count as 0, leading zeros are base-10 not octal.
 semver_lt() {
     _a="$1"
     _b="$2"

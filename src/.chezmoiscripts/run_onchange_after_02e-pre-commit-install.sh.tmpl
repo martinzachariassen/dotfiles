@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 # run_onchange_after_02e-pre-commit-install — activate this repo's git hooks.
-#
-# `pre-commit install` writes a dispatcher into .git/hooks — a per-clone action
-# chezmoi can't express as a managed file (hooks live under .git). run_onchange
-# keyed on the config hash below re-fires only when the hook set (or this script)
-# changes; `pre-commit install` is idempotent. The binary comes from brew-bundle (02).
+# Hooks live under .git, so chezmoi can't manage them as a file; run_onchange
+# keyed on the hash below re-fires only when the hook set changes.
 #
 # pre-commit config hash: {{ include "../.pre-commit-config.yaml" | sha256sum }}
 
@@ -15,8 +12,7 @@ echo "→ pre-commit: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
-# `command -v pre-commit` check below finds the bundle-installed binary.
+# Put Homebrew's bin on PATH so a non-login apply still finds pre-commit.
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -28,15 +24,12 @@ if ! command -v pre-commit >/dev/null 2>&1; then
     exit 0
 fi
 
-# .git + .pre-commit-config.yaml live at the repo root, not src/.
 repo="{{ .chezmoi.workingTree }}"
 if [ ! -d "$repo/.git" ]; then
     echo "  ! ${repo} is not a git checkout — skipping hook install"
     exit 0
 fi
 
-# default_install_hook_types in the config wires up both stages; --install-hooks
-# pre-builds any managed hook environments (a no-op for our language: system hooks).
 ( cd "$repo" && pre-commit install --install-hooks >/dev/null )
 
 echo "  ${GREEN:-}✓${RESET:-} pre-commit hooks installed (pre-commit + commit-msg)"

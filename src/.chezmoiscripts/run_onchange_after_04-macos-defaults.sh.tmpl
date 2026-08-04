@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Applies scripts/bin/macos-defaults.sh when its contents change. run_onchange
-# keyed on the hash below re-fires only on edits to that script — a routine apply
-# stays a no-op and skips the sudo prompt. (run_once silently ignored later edits.)
-# Re-apply without editing via the `macos-defaults` zsh alias.
+# Applies scripts/bin/macos-defaults.sh when its contents change (run_once would
+# silently ignore later edits). Re-apply without editing via the `macos-defaults` alias.
 #
 # scripts/bin/macos-defaults.sh  hash: {{ include "../scripts/bin/macos-defaults.sh" | sha256sum }}
 
@@ -18,13 +16,11 @@ echo "→ macOS defaults: 'macosDefaults' module not selected, skipping"
 exit 0
 {{ end -}}
 
-# chezmoi runs scripts with stdin closed, so sudo inside macos-defaults.sh would
-# hang; reopen the TTY below (or skip cleanly in no-tty contexts).
 echo "▶ macOS defaults"
 echo "  System preferences pass (re-runs when the defaults script changes)."
 echo "  Some changes need a reboot."
 
-# scripts/ lives at the repo root — reach it via .chezmoi.workingTree.
+# chezmoi runs scripts with stdin closed; sudo inside macos-defaults.sh would hang without this.
 # shellcheck source=../../scripts/lib/tty.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 if ! tty_reattach; then

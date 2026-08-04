@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # run_after_02b-mise-install — materialize mise's global toolchain.
-#
 # `mise activate` puts tools on PATH but doesn't install missing versions, so
-# eagerly download the global toolchain here for the first interactive shell.
-# run_after (every apply), not run_onchange: converges real installed state (a
-# runtime can go missing while config.toml stays put), gated by a fast
-# `mise ls --missing` short-circuit. mise + its config are in place by now (02).
+# eagerly download them here. run_after (not onchange): a runtime can go
+# missing while config.toml stays put, so it re-converges every apply.
 
 set -euo pipefail
 
@@ -14,8 +11,7 @@ echo "→ mise: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
-# `command -v mise` check below finds the bundle-installed binary.
+# Put Homebrew's bin on PATH so a non-login apply still finds mise.
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -23,13 +19,11 @@ fi
 echo "▶ mise runtimes"
 
 if ! command -v mise >/dev/null 2>&1; then
-    # Missing here means brew-bundle (02) failed or hasn't run; don't fail the apply.
     echo "! mise not on PATH yet — skipping global install."
     echo "  Re-run \`chezup\` after brew bundle finishes to install runtimes."
     exit 0
 fi
 
-# Fast path: no missing tools ⇒ routine apply is a quiet no-op.
 if [ -z "$(cd "$HOME" && mise ls --missing 2>/dev/null)" ]; then
     echo "  ✓ global runtimes already installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
     exit 0
@@ -38,8 +32,6 @@ fi
 echo "→ Installing global runtimes from ~/.config/mise/config.toml"
 echo "  (java + node; downloads only what's missing, idempotent)"
 
-# Installs every tool pinned in the global config; already-installed versions are
-# skipped. Don't fail the apply on a transient network error.
 if (cd "$HOME" && mise install); then
     echo "✓ mise runtimes installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
 else

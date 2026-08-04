@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# chezmoi-data.sh — read chezmoi `[data]` values without a hard jq dependency.
-# jq when present, sed fallback for a fresh Mac. Missing keys echo ""; callers
-# apply defaults.
+# chezmoi-data.sh — read chezmoi `[data]` values without a hard jq dependency (sed fallback). Missing keys echo "".
 # shellcheck disable=SC2034,SC2329
 
 [ -n "${__DOTFILES_CHEZMOI_DATA_SH:-}" ] && return 0
@@ -23,9 +21,7 @@ cm_data_string() {
     fi
 }
 
-# cm_data_bool JSON KEY — bool from top level then `.features`. Uses `has()`,
-# not jq's `//`, which treats literal `false` as empty and returns the default.
-# sed fallback uses ERE so `(true|false)` works under BSD sed.
+# cm_data_bool JSON KEY — bool from top level then `.features`; uses has(), not jq's `//` which treats false as empty.
 cm_data_bool() {
     local json="$1" key="$2"
     if command -v jq >/dev/null 2>&1; then
@@ -40,8 +36,7 @@ cm_data_bool() {
     fi
 }
 
-# cm_toml_string FILE KEY — read `key = "value"`; last resort when chezmoi
-# isn't on PATH yet.
+# cm_toml_string FILE KEY — read `key = "value"`; last resort when chezmoi isn't on PATH yet.
 cm_toml_string() {
     local file="$1" key="$2"
     [ -f "$file" ] || return 0

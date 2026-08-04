@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# run_before_00-sudo-cache — pre-authenticate sudo up front, on a clean terminal,
-# so later steps (brew casks, macos-defaults) don't prompt mid-apply. Prompting
-# on a clean TTY also dodges a race where the first keystroke is eaten before
-# sudo flips the line discipline to no-echo on GPU terminals.
+# run_before_00-sudo-cache — pre-authenticate sudo so later steps (brew casks,
+# macos-defaults) don't prompt mid-apply. A clean TTY here also dodges a race
+# where the first keystroke is eaten before sudo goes no-echo.
 
 set -uo pipefail
 
@@ -10,13 +9,10 @@ set -uo pipefail
 exit 0
 {{ end -}}
 
-# Warm cache: skip the prompt but fall through to start the keeper anyway, so a
-# cache that expires partway through a long apply doesn't re-prompt later.
 if sudo -n true 2>/dev/null; then
     echo "✓ sudo already cached"
 else
-    # Re-attach stdin (chezmoi closes it); no TTY means nobody to ask — warn and skip.
-    # scripts/ lives at the repo root — reach it via .chezmoi.workingTree.
+    # chezmoi closes stdin; no TTY means nobody to ask — warn and skip.
     # shellcheck source=../../scripts/lib/tty.sh
     . "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
     if ! tty_reattach; then
@@ -34,8 +30,7 @@ else
   If Touch ID for sudo is already enabled, just tap your finger.
 EOF
 
-    # Settle pause so pending output drains before sudo flips the line discipline
-    # (guards the first-keystroke-eaten race).
+    # Let pending output drain before sudo flips the line discipline (first-keystroke race).
     sleep 0.2
 
     if ! sudo -v -p "[chezmoi] sudo password: "; then
@@ -45,13 +40,9 @@ EOF
     echo "✓ sudo cached for this apply"
 fi
 
-# Background keeper — refresh the sudo timestamp while chezmoi is alive, on both
-# paths above, so no later step re-prompts. Only ever `sudo -n`, which extends an
-# existing timestamp and never triggers Touch ID.
-#
-# Double-fork: `( command & )` orphans the keeper to init so zsh doesn't wait on
-# our process group after apply (a perceived "halt"). Tight `sleep 2` poll so the
-# keeper notices chezmoi exiting within 2s, while only refreshing every ~240s.
+# Background keeper: refreshes the sudo timestamp (sudo -n, never triggers Touch ID)
+# until chezmoi exits. Double-forked so zsh doesn't wait on our process group after
+# apply. Polls every 2s to notice chezmoi exiting promptly, but only refreshes ~240s.
 CHEZMOI_PID=$PPID
 (
     (

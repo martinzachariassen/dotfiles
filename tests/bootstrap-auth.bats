@@ -1,12 +1,7 @@
 #!/usr/bin/env bats
-# Tests for scripts/bin/bootstrap-auth.sh — the post-install account walkthrough.
-#
-# The script itself is a long, interactive, network-touching sequence (gh/az/
-# gcloud/op sign-ins) that isn't safe to drive from a unit test. Its one piece of
-# pure decision logic is has_module — the gate that decides whether to run the
-# cloud-auth section at all, based on the selected chezmoi .modules. We extract
-# the REAL function and run it against a stubbed chezmoi so a regression in the
-# gate (e.g. wrong jq path, or not failing closed when chezmoi is absent) fails.
+# Tests for has_module, the only pure logic in bootstrap-auth.sh's otherwise
+# interactive, network-touching script. Extracts the real function and runs it
+# against a stubbed chezmoi.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -47,7 +42,6 @@ extract() { sed -n '/^has_module() {/,/^}/p' "$BOOT"; }
 }
 
 @test "has_module fails closed when chezmoi is not installed" {
-    # No chezmoi on PATH ⇒ the walkthrough must NOT assume a module is active.
     # /usr/bin:/bin has bash but not Homebrew's chezmoi; skip if that's not true.
     PATH="/usr/bin:/bin" command -v chezmoi >/dev/null 2>&1 && skip "chezmoi on system PATH"
     run env PATH="/usr/bin:/bin" bash -c "$(extract); has_module cloudAuth"

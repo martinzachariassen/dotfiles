@@ -1,6 +1,5 @@
-# Repo tooling (scripts/, packages/, tests/, …) lives at the repo root, outside
-# this src/ source tree, so chezmoi never sees it. This file only excludes files
-# that DO live under src/ but must not deploy to $HOME.
+# Excludes files that live under src/ but must not deploy to $HOME. Root-level
+# tooling (scripts/, packages/, tests/) is outside src/, so chezmoi never sees it.
 
 # Docs carried alongside managed content — keep out of $HOME.
 README.md
