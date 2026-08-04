@@ -40,22 +40,10 @@ EOF
     echo "✓ sudo cached for this apply"
 fi
 
-# Background keeper: refreshes the sudo timestamp (sudo -n, never triggers Touch ID)
-# until chezmoi exits. Double-forked so zsh doesn't wait on our process group after
-# apply. Polls every 2s to notice chezmoi exiting promptly, but only refreshes ~240s.
-CHEZMOI_PID=$PPID
-(
-    (
-        refresh_in=0
-        while kill -0 "$CHEZMOI_PID" 2>/dev/null; do
-            if [ "$refresh_in" -le 0 ]; then
-                sudo -n true 2>/dev/null || exit
-                refresh_in=240   # inside the default 5-min cache
-            fi
-            sleep 2
-            refresh_in=$((refresh_in - 2))
-        done
-    ) &
-) </dev/null >/dev/null 2>&1
+# Background keeper: refreshes the sudo timestamp until chezmoi exits, so later
+# steps (brew casks, macos-defaults) don't hit a lapsed cache mid-apply.
+# shellcheck source=../../scripts/lib/sudo.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/sudo.sh"
+sudo_keep_warm "$PPID"
 
 echo "✓ sudo kept warm for this apply"
