@@ -1,5 +1,5 @@
 # Brewfile.personal — extras layered on core for the `personal` profile.
 
 # ─── Automation ───────────────────────────────────────────────────────────────
-brew "cliclick"                 # CLI mouse/keyboard event emulation (UI scripting)
+brew "cliclick"                 # mouse/keyboard event emulation (UI scripting)
 

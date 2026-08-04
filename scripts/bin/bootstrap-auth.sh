@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# bootstrap-auth.sh - idempotent post-install account/auth walkthrough; each step
-# probes existing state and skips if already signed in.
-#
-# Env: SKIP_GH SKIP_AZ SKIP_AKS SKIP_GCLOUD SKIP_GKE SKIP_OP SKIP_SIGNTEST=1
-#      each skip that step; YES=1 runs without pause prompts.
+# bootstrap-auth.sh — idempotent post-install account/auth walkthrough; each
+# step probes existing state and skips if already signed in.
+# Env: SKIP_GH SKIP_AZ SKIP_AKS SKIP_GCLOUD SKIP_GKE SKIP_OP SKIP_SIGNTEST=1 skips
+#      that step; YES=1 skips pause prompts.
 
 set -uo pipefail
 
-# Repo root, not chezmoi's src/ source dir: workingTree is where scripts/ +
-# packages/ live.
+# Repo root, not chezmoi's src/: workingTree is where scripts/ + packages/ live.
 SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi execute-template '{{ .chezmoi.workingTree }}' 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
@@ -69,7 +67,6 @@ banner() {
 
 banner
 
-# ─── 1. 1Password GUI / SSH agent ─────────────────────────────────────────────
 if [ "${SKIP_OP:-0}" != "1" ]; then
     step "1Password" "Open the app, sign in, enable the SSH agent: Settings -> Developer."
     if [ ! -d /Applications/1Password.app ]; then
@@ -90,7 +87,6 @@ if [ "${SKIP_OP:-0}" != "1" ]; then
     fi
 fi
 
-# ─── 2. GitHub CLI ────────────────────────────────────────────────────────────
 if [ "${SKIP_GH:-0}" != "1" ]; then
     step "GitHub CLI" "Authenticate gh so you can push, create PRs, and use \`gh pr checkout\`."
     if ! command -v gh >/dev/null 2>&1; then
@@ -103,7 +99,6 @@ if [ "${SKIP_GH:-0}" != "1" ]; then
     fi
 fi
 
-# ─── 3. Azure CLI + AKS kubelogin ─────────────────────────────────────────────
 if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
     step "Azure CLI" "Sign in to Azure for AKS, Azure DevOps, etc."
     if ! command -v az >/dev/null 2>&1; then
@@ -115,8 +110,8 @@ if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
         az login || warn "az login was cancelled or failed"
     fi
 
-    # Use `az aks install-cli`, not brew's `kubelogin` (int128's generic OIDC
-    # plugin), which is not the AKS binary Microsoft documents.
+    # az aks install-cli, not brew's kubelogin (int128's generic OIDC plugin) —
+    # that's not the AKS binary Microsoft documents.
     if [ "${SKIP_AKS:-0}" != "1" ] && command -v az >/dev/null 2>&1; then
         step "AKS kubelogin" "Required for kubectl against AKS clusters using Microsoft Entra ID."
         if command -v kubelogin >/dev/null 2>&1 && kubelogin --version 2>/dev/null | grep -qi 'git hash:'; then
@@ -128,7 +123,6 @@ if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
     fi
 fi
 
-# ─── 4. Google Cloud CLI + GKE plugin ─────────────────────────────────────────
 if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
     step "Google Cloud CLI" "Sign in for GCP/GKE work."
     if ! command -v gcloud >/dev/null 2>&1; then
@@ -162,14 +156,12 @@ if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
     fi
 fi
 
-# ─── 5. 1Password CLI ─────────────────────────────────────────────────────────
 if [ "${SKIP_OP:-0}" != "1" ]; then
     step "1Password CLI" "The \`op\` CLI - used by chezmoi if you template secrets."
     if ! command -v op >/dev/null 2>&1; then
         warn "op not installed - skipping (in Brewfile)"
     else
-        # `op account/vault list` prompt interactively with no accounts
-        # configured; </dev/null keeps this script from being ambushed.
+        # </dev/null: op account/vault list prompt interactively with no accounts configured.
         if op account list </dev/null >/dev/null 2>&1 && op vault list </dev/null >/dev/null 2>&1; then
             ok "op CLI already signed in"
         else
@@ -182,7 +174,6 @@ if [ "${SKIP_OP:-0}" != "1" ]; then
     fi
 fi
 
-# ─── 6. Git signing config ────────────────────────────────────────────────────
 if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     step "Git signing config" "Signing (signingMode + signingKey) is owned by the setup wizard."
     gitkey="$(git config --global user.signingkey 2>/dev/null || true)"
@@ -196,7 +187,6 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     fi
 fi
 
-# ─── 7. Git signing smoke test ────────────────────────────────────────────────
 if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     step "Git signing smoke test" "Verifies op-ssh-sign + 1Password agent + your git config all line up."
     SSH_SIGN=/Applications/1Password.app/Contents/MacOS/op-ssh-sign
@@ -229,7 +219,6 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     fi
 fi
 
-# ─── Done ─────────────────────────────────────────────────────────────────────
 echo
 printf "%s\n" "${CYAN}${BOX_TOP}${RESET}"
 box_line "Auth bootstrap complete" "${GREEN}${BOLD}" "$RESET"

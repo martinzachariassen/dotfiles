@@ -2,56 +2,56 @@
 # packages/Brewfile.<feature>. Entries sorted alphabetically within each section.
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
-brew "actionlint"              # GitHub Actions workflow linter (pre-commit + CI)
-brew "bats-core"               # Bash test framework — runs this repo's tests/*.bats (local + CI)
-brew "chezmoi"                 # this very repo's manager
-brew "gh"                      # GitHub CLI
+brew "actionlint"              # pre-commit + CI
+brew "bats-core"               # runs tests/*.bats
+brew "chezmoi"                 # this repo's manager
+brew "gh"
 brew "git"
-brew "git-delta"               # syntax-highlighted git diffs
-brew "gitleaks"                # secret scanner (pre-commit + CI)
-brew "gum"                     # interactive shell prompts (backs the wizard's arrow/space pickers)
-brew "jq"                      # JSON
-brew "lazygit"                 # git TUI — staging, blame, branch ops, all interactive
-brew "pre-commit"              # git hook framework
-brew "tlrc"                    # `tldr <cmd>` — maintained Rust client (old `tldr` formula was disabled upstream)
-brew "typos-cli"               # source-code spell checker (pre-commit hook; CI uses the action)
-brew "zizmor"                  # GitHub Actions security auditor (pre-commit + CI)
+brew "git-delta"
+brew "gitleaks"                # pre-commit + CI
+brew "gum"                     # backs wizard's pickers
+brew "jq"
+brew "lazygit"
+brew "pre-commit"
+brew "tlrc"                    # tldr client; tldr formula disabled upstream
+brew "typos-cli"               # pre-commit; CI uses the action
+brew "zizmor"                  # pre-commit + CI
 
 # ─── Modern CLI replacements (the shell config aliases these by default) ──────
 brew "bat"                     # cat
-brew "carapace"                # richer shell completions for many CLIs
+brew "carapace"                # shell completions
 brew "eza"                     # ls
 brew "fd"                      # find
-brew "fzf"                     # fuzzy finder; integrated into zsh (Ctrl-R)
-brew "hadolint"                # Dockerfile linter (backs the hadolint VS Code ext)
+brew "fzf"                     # fuzzy finder (Ctrl-R)
+brew "hadolint"                # Dockerfile linter
 brew "ripgrep"                 # grep
-brew "shellcheck"              # shell-script linter (editor ext + pre-commit + CI)
-brew "shfmt"                   # shell-script formatter (backs the shell-format VS Code ext)
-brew "zoxide"                  # smarter cd based on directory frecency
+brew "shellcheck"              # pre-commit + CI
+brew "shfmt"                   # shell formatter
+brew "zoxide"                  # smarter cd
 
 # ─── Runtimes ─────────────────────────────────────────────────────────────────
-brew "mise"                    # owns language runtimes (java, node, python, …)
+brew "mise"                    # language runtime manager
 
 # ─── Editor (terminal) ────────────────────────────────────────────────────────
-brew "neovim"                  # init.lua in dot_config/nvim ships LazyVim presets
+brew "neovim"                  # LazyVim config in dot_config/nvim
 
 # ─── Shell ────────────────────────────────────────────────────────────────────
-brew "starship"                # cross-shell prompt
-brew "zellij"                  # terminal multiplexer (modern tmux alternative)
-brew "zsh-autosuggestions"     # fish-style type-ahead suggestions (→ to accept)
+brew "starship"
+brew "zellij"                  # tmux alternative
+brew "zsh-autosuggestions"     # type-ahead (→ to accept)
 brew "zsh-completions"
-brew "zsh-syntax-highlighting" # source this last in zshrc
+brew "zsh-syntax-highlighting" # source this last
 
 # ─── GUI essentials (terminal + 1Password are foundational here) ──────────────
-cask "1password"               # GUI app — SSH agent + git signing live here
-cask "1password-cli"           # `op` CLI — used by chezmoi if you template secrets
-cask "docker-desktop"          # if you'd rather use colima/podman, swap this line
-cask "ghostty"                 # terminal emulator (Catppuccin Frappé)
-cask "visual-studio-code"      # VS Code app; settings/extensions managed by chezmoi
+cask "1password"               # SSH agent + git signing
+cask "1password-cli"           # op CLI; chezmoi secrets
+cask "docker-desktop"          # or colima/podman
+cask "ghostty"                 # Catppuccin Frappé
+cask "visual-studio-code"      # chezmoi manages settings
 
 # JDKs come from mise, not Homebrew — see dot_config/mise/config.toml.
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
-cask "font-jetbrains-mono-nerd-font"   # primary; Ghostty + VS Code reference this
+cask "font-jetbrains-mono-nerd-font"   # Ghostty + VS Code
 
 # Mac App Store apps live in the macApps tier — see packages/Brewfile.mac-apps.

@@ -1,34 +1,29 @@
 #!/usr/bin/env bats
-# Behavioural tests for scripts/bin/chezup.sh — the everyday "converge this Mac to
-# the repo" verb (pull → preview drift → apply) behind the `chezup` zsh function.
+# Tests for scripts/bin/chezup.sh — the everyday "converge this Mac to the
+# repo" verb (pull → preview drift → apply) behind the `chezup` zsh function.
 #
-# Why this exists:
-#   chezup is the command run most often, so its control flow has to be exactly
-#   right across the states it meets: a missing/renamed repo, a failed pull, a
-#   clean tree, drifted files, a missing chezmoi, and DRY_RUN/YES overrides. None
-#   of that is visible to `bash -n`. We run the REAL script with a fake source
-#   repo and stubbed `git`/`chezmoi` on PATH, driving each branch by env var, and
-#   assert both the exit code and that a real apply only happens when it should.
+# chezup runs most often, so its control flow must be exactly right across
+# every state: missing/renamed repo, failed pull, clean tree, drifted files,
+# missing chezmoi, DRY_RUN/YES overrides — none of which `bash -n` can see. We
+# run the real script with a fake repo and stubbed git/chezmoi, driving each
+# branch by env var.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     CHEZUP="$REPO_ROOT/scripts/bin/chezup.sh"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
-    # A fake source dir chezup points DOTFILES_DIR at. `.git` present = a repo.
     REPO="$(mktemp -d)"
     mkdir -p "$REPO/.git"
 
-    # Stub bin dir (prepended to PATH) + the log the chezmoi stub writes to.
     STUBS="$(mktemp -d)"
     APPLY_LOG="$STUBS/apply.log"
     STATE="$STUBS/state"  # lets the git stub model a pull that advances HEAD
     mkdir -p "$STATE"
 
-    # git stub: only the three subcommands chezup calls. By default HEAD is fixed
-    # (before==after ⇒ an up-to-date pull). GIT_ADVANCE=1 makes `pull` drop a
-    # marker so the post-pull rev-parse returns a DIFFERENT hash (a real advance);
-    # GIT_PULL_RC forces a failed pull.
+    # git stub: HEAD fixed by default (up-to-date pull). GIT_ADVANCE=1 drops a
+    # marker so post-pull rev-parse returns a different hash; GIT_PULL_RC forces
+    # a failed pull.
     cat >"$STUBS/git" <<EOF
 #!/usr/bin/env bash
 args="\$*"
@@ -44,8 +39,8 @@ case "\$args" in
 esac
 EOF
 
-    # chezmoi stub: `status` prints CHEZMOI_STATUS (empty = in sync); `apply`
-    # records its args and honours CHEZMOI_APPLY_RC.
+    # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and
+    # honours CHEZMOI_APPLY_RC.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then
@@ -94,10 +89,8 @@ run_chezup() {
 }
 
 @test "chezup fails when chezmoi is not on PATH" {
-    # A PATH with the git stub + system coreutils but no chezmoi: the pull
-    # succeeds, the drift check can't. chezmoi lives in Homebrew's bin (outside
-    # /usr/bin:/bin), so this reliably hides it; skip in the unlikely event a
-    # system-path chezmoi exists.
+    # chezmoi lives in Homebrew's bin (outside /usr/bin:/bin), so this
+    # reliably hides it.
     PATH="/usr/bin:/bin" command -v chezmoi >/dev/null 2>&1 && skip "chezmoi on system PATH"
     local nochez="$STUBS/nochez"
     mkdir -p "$nochez"
@@ -126,8 +119,6 @@ run_chezup() {
 }
 
 @test "chezup fails loudly (exit 1) when its log.sh helper is missing" {
-    # doctor.sh / bootstrap-auth.sh share this defensive guard: a checkout without
-    # the sibling lib is broken, so fail rather than limp on with degraded output.
     ISO="$(mktemp -d)"
     mkdir -p "$ISO/scripts/bin"  # note: no scripts/lib ⇒ log.sh is absent
     cp "$CHEZUP" "$ISO/scripts/bin/chezup.sh"

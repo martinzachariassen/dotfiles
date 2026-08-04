@@ -17,17 +17,15 @@ ui_init_status
 printf '%s macOS defaults\n' "$NODE"
 echo "  Applying Finder, Dock, keyboard, screenshots, security, and developer preferences."
 
-# Under `chezmoi apply` the pre-auth hook already cached credentials, so this is a
-# no-op; standalone it prompts. The sleep works around a first-keystroke-eaten
-# TTY race on GPU terminals (Ghostty/Alacritty/Kitty); the -p label makes clear
-# this is the sudo password.
+# Under chezmoi apply the pre-auth hook already cached creds (no-op here); the
+# sleep works around a first-keystroke-eaten TTY race on GPU terminals.
 if ! sudo -n true 2>/dev/null; then
     sleep 0.2
 fi
 sudo -v -p "[macos-defaults] sudo password: "
 
-# Keep sudo alive. Double-forked + tight poll so the keeper exits within 2s of
-# this script instead of leaving the shell seemingly halted.
+# Keep sudo alive; double-forked + tight poll so the keeper exits within 2s of
+# this script ending.
 PARENT_PID=$$
 (
     (
@@ -50,7 +48,6 @@ def_write() {
     local domain="$1" key="$2" type="$3" value="$4"
     local current
     current=$(defaults read "$domain" "$key" 2>/dev/null || true)
-    # `defaults read` yields 0/1 for bools; normalize before comparing.
     local want
     case "$type" in
         -bool)
@@ -64,9 +61,7 @@ def_write() {
     fi
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # KEYBOARD & INPUT
-# ═══════════════════════════════════════════════════════════════════════════════
 def_write NSGlobalDomain ApplePressAndHoldEnabled -bool false # so you can hold j/k in vim
 def_write NSGlobalDomain KeyRepeat -int 2                     # min 2 (≈30ms)
 def_write NSGlobalDomain InitialKeyRepeat -int 15             # min 15 (≈225ms)
@@ -81,18 +76,14 @@ def_write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true
 def_write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
 def_write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TRACKPAD
-# ═══════════════════════════════════════════════════════════════════════════════
 def_write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
 defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1 # -currentHost can't go through the helper
 def_write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # FINDER
-# ═══════════════════════════════════════════════════════════════════════════════
 def_write NSGlobalDomain AppleShowAllExtensions -bool true
-def_write com.apple.finder AppleShowAllFiles -bool true # show hidden files
+def_write com.apple.finder AppleShowAllFiles -bool true
 def_write com.apple.finder ShowPathbar -bool true
 def_write com.apple.finder ShowStatusBar -bool true
 def_write com.apple.finder _FXShowPosixPathInTitle -bool true
@@ -112,9 +103,7 @@ def_write com.apple.desktopservices DSDontWriteUSBStores -bool true
 chflags nohidden "${HOME}/Library" 2>/dev/null || true # Apple hides it by default
 sudo chflags nohidden /Volumes 2>/dev/null || true
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DOCK
-# ═══════════════════════════════════════════════════════════════════════════════
 def_write com.apple.dock tilesize -int 42
 def_write com.apple.dock autohide -bool true
 def_write com.apple.dock autohide-delay -float 0           # no delay before showing
@@ -127,9 +116,7 @@ def_write com.apple.dock minimize-to-application -bool true   # minimize into th
 def_write com.apple.dock showhidden -bool true                # translucent icons for hidden apps
 def_write com.apple.dock expose-animation-duration -float 0.1 # faster Mission Control animation
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # SCREENSHOTS
-# ═══════════════════════════════════════════════════════════════════════════════
 mkdir -p "${HOME}/Pictures/Screenshots"
 def_write com.apple.screencapture location -string "${HOME}/Pictures/Screenshots"
 def_write com.apple.screencapture type -string "png"
@@ -137,50 +124,38 @@ def_write com.apple.screencapture disable-shadow -bool true
 def_write com.apple.screencapture include-date -bool true
 def_write com.apple.screencapture show-thumbnail -bool false # file lands immediately, no floating thumbnail
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # WINDOWS & DOCUMENTS
-# ═══════════════════════════════════════════════════════════════════════════════
 def_write NSGlobalDomain NSWindowResizeTime -float 0.001               # near-instant resize animation
 def_write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false # default Save to local disk, not iCloud
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TEXTEDIT
-# ═══════════════════════════════════════════════════════════════════════════════
 {
     defaults write com.apple.TextEdit RichText -int 0
     defaults write com.apple.TextEdit PlainTextEncoding -int 4
     defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 } 2>/dev/null || s_warn "TextEdit defaults skipped (sandbox)."
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # SECURITY & PRIVACY
-# ═══════════════════════════════════════════════════════════════════════════════
-# Require password immediately after sleep/screensaver. These keys moved to a
-# Lock Screen pane in newer macOS; writes may be silently ignored but don't error.
+# These moved to a Lock Screen pane in newer macOS; writes may be silently ignored.
 defaults write com.apple.screensaver askForPassword -int 1 2>/dev/null || true
 defaults write com.apple.screensaver askForPasswordDelay -int 0 2>/dev/null || true
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # DEVELOPMENT NICETIES
-# ═══════════════════════════════════════════════════════════════════════════════
 defaults write com.apple.dt.Xcode ShowBuildOperationDuration -bool true 2>/dev/null || true
 
 def_write NSGlobalDomain AppleFontSmoothing -int 1 # subpixel AA on non-Retina LCDs
 
 def_write NSGlobalDomain CGDisableCursorLocationMagnification -bool true # no shake-to-find cursor
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TOUCH ID FOR SUDO (Sonoma 14+)
-# ═══════════════════════════════════════════════════════════════════════════════
-# Apple added /etc/pam.d/sudo_local in Sonoma so this survives OS upgrades; the
-# protected /etc/pam.d/sudo got reverted on every update. Single `sudo tee`
-# because the file is root-owned.
+# sudo_local (added in Sonoma) survives OS upgrades; /etc/pam.d/sudo itself got
+# reverted on every update. Single `sudo tee` since the file is root-owned.
 SUDO_LOCAL=/etc/pam.d/sudo_local
 SUDO_LOCAL_TEMPLATE=/etc/pam.d/sudo_local.template
 macos_major=$(sw_vers -productVersion | cut -d. -f1)
 if [ "$macos_major" -ge 14 ]; then
     if sudo grep -q "pam_tid.so" "$SUDO_LOCAL" 2>/dev/null; then
-        : # already configured
+        :
     else
         if [ -r "$SUDO_LOCAL_TEMPLATE" ] && ! sudo test -f "$SUDO_LOCAL"; then
             sudo cp "$SUDO_LOCAL_TEMPLATE" "$SUDO_LOCAL"
@@ -193,9 +168,6 @@ else
     s_warn "Touch ID for sudo skipped — requires macOS Sonoma (14+)"
 fi
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Apply changes
-# ═══════════════════════════════════════════════════════════════════════════════
 restart_if_changed() {
     local app="$1"
     shift

@@ -1,11 +1,10 @@
 #!/usr/bin/env bats
 # Unit tests for scripts/bin/wizard.sh pure helpers.
 #
-# The wizard is sourced with WIZARD_LIB_ONLY=1, which defines its functions and
-# loads the module catalog, then returns BEFORE any /dev/tty prompting or apply —
-# so these run headless in CI. The interactive flow itself is exercised manually
-# via a pty (see the PR notes); here we lock down the drift-prone bits: the prompt
-# messages / choices extracted from the template, and the module data readers.
+# WIZARD_LIB_ONLY=1 sources the wizard's functions and module catalog, then
+# returns before any /dev/tty prompting or apply — so these run headless in
+# CI. The interactive flow itself is exercised manually via a pty; here we
+# lock down the drift-prone bits: prompt messages/choices and module readers.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -72,10 +71,8 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 # gum is progressive enhancement: WIZARD_NO_GUM=1 must force the plain-text path
 # regardless of whether gum is installed (keeps first-boot + tests deterministic).
 @test "use_gum is disabled by WIZARD_NO_GUM" {
-    # export so the flag survives the `source` return: bash's `source` is a
-    # regular builtin (outside POSIX mode), so a bare `WIZARD_NO_GUM=1 source …`
-    # prefix reverts once sourcing finishes and use_gum would miss it — passing
-    # only on machines without gum (like CI). export makes the check real.
+    # Must export: a bare `WIZARD_NO_GUM=1 source …` prefix reverts once
+    # sourcing finishes, so use_gum would miss it (falsely passing on CI).
     run bash -c "export WIZARD_NO_GUM=1 WIZARD_LIB_ONLY=1; source '$WIZ'; use_gum && echo on || echo off"
     [ "$output" = "off" ]
 }
@@ -98,8 +95,7 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$output" = "ok" ]
 }
 
-# The pure-bash TUI is the middle tier (first-boot, no gum). Its safety net is
-# use_tui: it MUST refuse a dumb/disabled terminal so we fall through to the
+# use_tui must refuse a dumb/disabled terminal so we fall through to the
 # numbered menu rather than drawing escape codes into a terminal that can't.
 @test "use_tui is disabled by WIZARD_NO_TUI" {
     run bash -c "export WIZARD_LIB_ONLY=1 WIZARD_NO_TUI=1 TERM=xterm; source '$WIZ'; use_tui && echo on || echo off"
@@ -116,10 +112,8 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$output" = "ok" ]
 }
 
-# Ctrl-C must abort the whole wizard, not fall through: every prompt reads with a
-# `read … || fallback`, which also swallows an interrupted read. A SIGINT/SIGTERM
-# trap running on_interrupt is what quits cleanly (exit 130), so lock in that it's
-# armed and points at the handler.
+# Every prompt reads with `read … || fallback`, which also swallows an
+# interrupted read — only the SIGINT/SIGTERM trap can quit cleanly (exit 130).
 @test "a SIGINT trap is armed to quit cleanly" {
     run wiz 'declare -F on_interrupt >/dev/null && echo ok'
     [ "$output" = "ok" ]

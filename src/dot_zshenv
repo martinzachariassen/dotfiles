@@ -1,5 +1,5 @@
-# ~/.zshenv — read by every zsh invocation before any other rc file. Must stay in
-# $HOME. Keep minimal: universal env vars only; interactive config is in $ZDOTDIR/.zshrc.
+# ~/.zshenv — read by every zsh invocation before any other rc file; must stay in
+# $HOME. Universal env vars only — interactive config is in $ZDOTDIR/.zshrc.
 
 # ─── Config location ──────────────────────────────────────────────────────────
 export ZDOTDIR="$HOME/.config/zsh"
@@ -30,13 +30,11 @@ export SHELL_SESSIONS_DISABLE=1
 export COLORTERM=truecolor
 
 # ─── Pager behaviour ──────────────────────────────────────────────────────────
-# -FRK: quit-if-one-screen, raw ANSI (delta colors), Ctrl-C quits. Deliberately
-# no -X so less uses the alt-screen buffer and clears cleanly on exit. less
-# doesn't strip quotes from $LESS, so the -P prompt is left unquoted.
+# -FRK: quit-if-one-screen, raw ANSI, Ctrl-C quits; no -X so it alt-screens and
+# clears on exit. less doesn't strip quotes from $LESS, so -P is left unquoted.
 export LESS='-FRK -PPress q or Ctrl-C to quit · / search · h for help'
 export LESSHISTFILE="$XDG_STATE_HOME/less/history"
 
 # ─── PATH ─────────────────────────────────────────────────────────────────────
-# Dedup for every invocation. Actual prepends live in .zprofile — they must run
-# after /etc/zprofile's path_helper, which would otherwise sink them below /usr/bin.
+# Dedup only; prepends live in .zprofile, which must run after path_helper (else it sinks them below /usr/bin).
 typeset -U path fpath PATH

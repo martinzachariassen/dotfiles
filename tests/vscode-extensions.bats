@@ -1,17 +1,7 @@
 #!/usr/bin/env bats
-# Pin load-bearing entries in packages/vscode-extensions.txt and guard the
-# mirror's negative invariants.
-#
-# Why this exists:
-#   The 03-vscode hook mirrors this file one-to-one onto the machine — anything
-#   listed is installed, anything NOT listed is uninstalled on the next apply. So
-#   a stray edit here has real teeth: dropping a load-bearing extension would
-#   silently uninstall it everywhere, and re-adding an intentionally-dropped one
-#   would resurrect it. These tests fail on either.
-#
-# Scope: load-bearing entries only (extensions the JVM stack, theme, locale
-# module, or AI tooling assume). Casual preference extensions are not pinned so
-# the tests don't churn on routine edits.
+# Pins load-bearing entries in packages/vscode-extensions.txt. The 03-vscode
+# hook mirrors this file 1:1 (anything unlisted gets uninstalled), so a stray
+# edit has real teeth — only load-bearing extensions are pinned here.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -35,9 +25,7 @@ not_lists() { ! grep -Fxq "$1" "$EXT"; }
 }
 
 # ─── Negative invariants: extensions the mirror should prune ────────────────────
-# These are ms-python.python extensionPack members. A pack seeds them on install
-# but does NOT re-pull them after a manual uninstall, so the mirror removes them
-# and they must stay OUT of the manifest (re-adding would re-track them).
+# ms-python.python extensionPack members: reseeded by the pack but not re-tracked after removal, so they must stay out of the manifest.
 
 @test "does NOT list ms-python.vscode-pylance" { not_lists ms-python.vscode-pylance; }
 @test "does NOT list ms-python.debugpy" { not_lists ms-python.debugpy; }

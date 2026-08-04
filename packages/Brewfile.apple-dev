@@ -4,26 +4,25 @@
 tap "xcodesorg/made"
 
 # Core: lint, format, Xcode version management, SF Symbols browser
-brew "swiftlint"   # Xcode has no linter — wire in as a Run Script build phase
-brew "swiftformat" # style enforcement; build phase or pre-commit hook
+brew "swiftlint"   # wire in as a Run Script build phase
+brew "swiftformat" # build phase or pre-commit hook
 brew "xcodesorg/made/xcodes"
-brew "aria2"     # parallel downloads for `xcodes install`
-cask "sf-symbols" # browse the SF Symbols you use in SwiftUI
+brew "aria2"     # for `xcodes install`
+cask "sf-symbols" # SF Symbols browser
 
-# VS Code as the daily driver — generates buildServer.json so SourceKit-LSP
-# understands an .xcodeproj/.xcworkspace. Required by the Sweetpad extension for
-# autocomplete/jump-to-def; the Swift extension needs it too outside plain SwiftPM.
+# VS Code as daily driver: generates buildServer.json for SourceKit-LSP,
+# needed by Sweetpad and the Swift extension outside plain SwiftPM.
 brew "xcode-build-server"
 
 # CI / terminal builds — kicks in once you build outside Xcode or ship
-brew "xcbeautify" # readable `xcodebuild` output
-brew "fastlane"   # App Store build/sign/upload automation
+brew "xcbeautify" # readable xcodebuild output
+brew "fastlane"   # build/sign/upload automation
 
 # Optional — uncomment per project when the need actually shows up.
 # tap "peripheryapp/periphery"
 # brew "peripheryapp/periphery/periphery" # dead-code detection
-# brew "ios-deploy"                       # install/run on a device from the CLI
-# brew "xcodegen"                         # .xcodeproj from a YAML spec — kills merge conflicts
+# brew "ios-deploy"                       # install/run on device
+# brew "xcodegen"                         # YAML spec; avoids merge conflicts
 # brew "swiftgen"                         # type-safe assets/strings/colors
 # brew "sourcery"                         # Swift meta-programming / boilerplate
 # cask "proxyman"                         # network/API debugging

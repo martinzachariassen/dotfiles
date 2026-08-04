@@ -3,14 +3,12 @@
 # committed config files, the VS Code [swift] settings, and the extension mirror
 # all appear iff appleDev is selected, and vanish cleanly when it isn't.
 #
-# Why this exists:
-#   Module gating spans four files that have to agree (.chezmoiignore, the
-#   settings template, the 03-vscode hook, and the Brewfile). A drift in any one
-#   ships half a feature. Two failure modes are pinned here specifically:
-#     1. Ignoring .config/swiftlint/config.yml (the file) but not the directory
-#        leaves an empty ~/.config/swiftlint on every non-appleDev machine.
-#     2. A stray comma in the gated [swift] block renders invalid JSON only when
-#        the module is on — something render-check (bash/zsh only) never catches.
+# Module gating spans four files that must agree (.chezmoiignore, the settings
+# template, the 03-vscode hook, the Brewfile); a drift in one ships half a
+# feature. Two failure modes pinned specifically: (1) ignoring the swiftlint
+# config file but not its directory leaves an empty ~/.config/swiftlint
+# everywhere; (2) a stray comma in the gated [swift] block renders invalid
+# JSON only when the module is on — render-check (bash/zsh only) never catches it.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -112,8 +110,7 @@ PY
     _stub_config '["macApps"]'
     run _managed
     [ "$status" -eq 0 ]
-    # Not just the files — the directory must be unmanaged too, else chezmoi
-    # creates an empty ~/.config/swiftlint on machines that never wanted it.
+    # The directory must be unmanaged too, else chezmoi creates an empty one.
     ! echo "$output" | grep -q "swiftformat"
     ! echo "$output" | grep -q "swiftlint"
 }
@@ -160,9 +157,8 @@ PY
 }
 
 # ─── SwiftFormat / SwiftLint coordination invariant ─────────────────────────────
-# Line length is the one rule both tools must agree on (SwiftLint only warns;
-# SwiftFormat is what actually wraps). If these drift apart the linter flags what
-# the formatter won't fix — the exact trap the shared 120 was chosen to avoid.
+# SwiftLint only warns on line length; SwiftFormat is what actually wraps. If
+# these drift apart the linter flags what the formatter won't fix.
 
 @test "swiftformat --maxwidth and swiftlint line_length are both 120" {
     grep -qE '^--maxwidth[[:space:]]+120\b' "$SRC_DIR/dot_swiftformat"

@@ -4,9 +4,7 @@
 
 set -euo pipefail
 
-# ─── Inputs from chezmoi data ────────────────────────────────────────────────
 PROFILE="{{ .profile }}"
-# Repo root (git working tree) — what users think of as "the dotfiles".
 SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
 
@@ -17,7 +15,6 @@ EXTRAS="${EXTRAS}{{ $m }} · "
 EXTRAS="${EXTRAS% · }"
 [ -z "$EXTRAS" ] && EXTRAS="(none enabled)"
 
-# ─── Colors (only if stdout is a real TTY) ───────────────────────────────────
 if [ -t 1 ]; then
     B=$'\033[1m'; D=$'\033[2m'
     G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; M=$'\033[35m'
@@ -26,7 +23,6 @@ else
     B="";D="";G="";C="";Y="";M="";R=""
 fi
 
-# ─── Output ──────────────────────────────────────────────────────────────────
 cat <<EOF
 
 ${C}╭────────────────────────────────────────────────────────────╮${R}

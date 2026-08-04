@@ -1,21 +1,14 @@
 #!/usr/bin/env bats
 # Static + dynamic checks for .chezmoiscripts/*.sh.tmpl.
 #
-# Why this exists:
-#   The chezmoi-managed scripts run on every `chezmoi apply`, but the existing
-#   CI only checks bash syntax of the rendered bodies (render-check.sh runs
-#   `bash -n`). That catches parse errors but not runtime regressions like:
-#     - a missing darwin-only guard letting `brew` calls fire on Linux,
-#     - a script naming that breaks chezmoi's run-order,
-#     - a missing `set -uo pipefail` so an unset var doesn't surface,
-#     - a missing bash shebang.
+# CI's render-check.sh only runs `bash -n` on rendered bodies — catches parse
+# errors, not a missing darwin guard, wrong run-order naming, missing
+# `set -uo pipefail`, or a missing shebang.
 #
-#   The dynamic check renders each template with stub chezmoi data and
-#   executes it on the (Linux) bats runner under a stripped PATH. Every
-#   macOS-targeting script must exit 0 via its `{{ if ne .chezmoi.os "darwin"
-#   }}exit 0{{ end }}` guard; the OS-agnostic 99-completion summary must run
-#   to completion. On macOS, the dynamic test is skipped — the same scripts
-#   would actually call brew/sudo and aren't safe to drive from a unit test.
+# The dynamic check renders each template with stub chezmoi data and executes
+# it on the (Linux) bats runner under a stripped PATH: every macOS-targeting
+# script must exit 0 via its darwin guard. Skipped on macOS — the same
+# scripts would actually call brew/sudo there.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -30,9 +23,8 @@ setup() {
 # ─── .chezmoiroot: the split that keeps the repo root clean ─────────────────
 
 @test ".chezmoiroot names the src/ source subdir" {
-    # Load-bearing: .chezmoiroot MUST live at the repo root (not under src/) and
-    # point chezmoi at src/. If it's missing or renamed, chezmoi treats the repo
-    # root as the source and tries to deploy scripts/, packages/, tests/… to \$HOME.
+    # If missing/renamed, chezmoi treats the repo root as source and tries to
+    # deploy scripts/, packages/, tests/… to $HOME.
     [ -f "$REPO_ROOT/.chezmoiroot" ]
     [ "$(tr -d '[:space:]' <"$REPO_ROOT/.chezmoiroot")" = "src" ]
     [ -d "$SCRIPTS_DIR" ]
@@ -55,9 +47,8 @@ setup() {
 }
 
 @test "every chezmoi script enables strict bash mode" {
-    # `set -uo pipefail` (no -e) is acceptable when the script wants to
-    # continue past failing commands (e.g. brew-bundle's continue-on-error).
-    # `set -euo pipefail` is the stricter default.
+    # `set -uo pipefail` (no -e) is fine when a script wants to continue past
+    # failing commands; `set -euo pipefail` is the stricter default.
     for tmpl in "$SCRIPTS_DIR"/*.sh.tmpl; do
         if ! grep -qE '^set -e?uo pipefail$' "$tmpl"; then
             echo "missing 'set -[e]uo pipefail' in $(basename "$tmpl")"
@@ -67,8 +58,7 @@ setup() {
 }
 
 @test "every chezmoi script follows the run_<when>_<seq>-<name>.sh.tmpl naming" {
-    # chezmoi uses the prefix to choose when the script runs; a typo here
-    # silently demotes the script to "every-apply" or vice-versa.
+    # A typo silently demotes the script to "every-apply" or vice-versa.
     for tmpl in "$SCRIPTS_DIR"/*.sh.tmpl; do
         name="$(basename "$tmpl")"
         case "$name" in
@@ -86,9 +76,7 @@ setup() {
 }
 
 @test "macOS-targeting chezmoi scripts include the darwin guard" {
-    # Skipped by name: 99-completion is OS-agnostic by design (it just prints
-    # a closing banner with chezmoi-rendered data). If you add another
-    # OS-agnostic script, add it here.
+    # 99-completion is OS-agnostic by design; add other exceptions here.
     for tmpl in "$SCRIPTS_DIR"/*.sh.tmpl; do
         case "$(basename "$tmpl")" in
             run_onchange_after_99-completion.sh.tmpl) continue ;;
@@ -145,9 +133,8 @@ _render_template() {
             return 1
         fi
 
-        # Stripped PATH ensures a missing guard would crash on the first
-        # macOS-only command (no `brew`, `mise`, `code`, or `defaults` here).
-        # HOME is the isolated stub so any rogue `rm -rf` only nukes scratch.
+        # Stripped PATH: a missing guard would crash on the first macOS-only
+        # command. HOME is the isolated stub so a rogue `rm -rf` only hits scratch.
         run env -i \
             HOME="$STUB_DIR/home" \
             PATH="/usr/bin:/bin" \

@@ -1,23 +1,14 @@
 #!/usr/bin/env bats
 # Pin the critical packages each Brewfile module is expected to declare.
 #
-# Why this exists:
-#   `brew-resolve` proves every name in a Brewfile is real, and `brew-check`
-#   proves the runner already has them — neither proves that the file still
-#   contains the packages this dotfiles stack actually assumes. A one-off
-#   delete (`brew "ripgrep"` removed while debugging) would slip past every
-#   other CI job because the file still parses and the remaining names still
-#   resolve. These tests fail on that.
+# brew-resolve/brew-check prove names are real and installed, not that the
+# file still contains what this stack assumes — a one-off delete would slip
+# past every other CI job. Scope: load-bearing entries only (what the shell,
+# doctor, or install scripts explicitly assume); casual app/font additions
+# aren't pinned so the tests don't churn on routine edits.
 #
-# Scope: load-bearing entries only — packages the shell, doctor, install
-# scripts, or feature docs explicitly assume are present. Casual additions/
-# removals (a personal app, a font tweak) are deliberately not pinned so the
-# tests don't churn on every routine edit.
-#
-# Match mechanism: literal `<kind> "<name>"` substring (grep -F). That
-# tolerates trailing comments, alphabetical reordering, and section moves,
-# without false-matching `cask "1password"` against `cask "1password-cli"`
-# (the closing quote anchors it).
+# Match mechanism: literal `<kind> "<name>"` substring (grep -F) — tolerates
+# reordering/comments without false-matching "1password" on "1password-cli".
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -83,22 +74,17 @@ not_declares() {
 # ─── Negative invariants on core: runtimes belong to mise, not brew ────────
 
 @test "core Brewfile does NOT declare node (mise owns Node)" {
-    # README + cleanup script explicitly call out the migration: Homebrew
-    # node was uninstalled and replaced by mise. Re-adding it would put a
-    # stale binary on PATH ahead of mise's shim on fresh installs.
+    # Re-adding it would put a stale binary on PATH ahead of mise's shim.
     not_declares "$CORE" brew node
 }
 @test "core Brewfile does NOT declare any temurin JDK (mise owns Java)" {
-    # Matches `brew "temurin"`, `brew "temurin@21"`, `cask "temurin"`, etc.
-    # Same migration reason as node — the cleanup script uninstalls these.
+    # Matches brew/cask "temurin", "temurin@21", etc. — same migration as node.
     ! grep -qE '^[[:space:]]*(brew|cask)[[:space:]]+"temurin' "$CORE"
 }
 @test "core Brewfile does NOT declare python directly (mise owns Python)" {
     not_declares "$CORE" brew python
 }
 @test "core Brewfile does NOT declare direnv (replaced by mise [env])" {
-    # README: "mise.toml [env] section, not direnv". The cleanup script
-    # uninstalls leftover direnv from the previous stack.
     not_declares "$CORE" brew direnv
 }
 
@@ -108,8 +94,7 @@ not_declares() {
     [ -f "$MAC_APPS" ]
 }
 @test "mac-apps Brewfile declares ollama" {
-    # README "Local AI" row: "Ollama (run as a brew service) plus the Claude
-    # and Claude Code apps." Doctor checks for the running service.
+    # Doctor checks for the running service.
     declares "$MAC_APPS" brew ollama
 }
 @test "mac-apps Brewfile declares the Claude desktop app" {
@@ -173,8 +158,6 @@ not_declares() {
 # ─── Personal module: minimal, just verify file exists ─────────────────────
 
 @test "personal Brewfile exists" {
-    # Casks here are pure preference — nothing else in the stack depends on
-    # any specific entry, so we don't pin contents. The file existing at all
-    # is the only invariant (chezmoi data wires the install path to it).
+    # Casks here are pure preference; only existence is pinned.
     [ -f "$PERSONAL" ]
 }

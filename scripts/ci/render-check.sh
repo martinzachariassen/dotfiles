@@ -4,8 +4,7 @@
 set -euo pipefail
 
 SOURCE_DIR="${1:-$(pwd)}"
-# $SOURCE_DIR stays the repo root so .chezmoi.workingTree resolves for hooks that
-# reach root-level scripts/ + packages/; chezmoi's source is the src/ subdir.
+# $SOURCE_DIR stays the repo root so .chezmoi.workingTree resolves; chezmoi's source is src/.
 SRC_DIR="$SOURCE_DIR/src"
 PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"

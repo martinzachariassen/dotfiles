@@ -1,6 +1,5 @@
 # Ghostty config — managed by chezmoi. https://ghostty.org/docs/config/reference
-# Ghostty has NO inline comments: `# foo` after a value is parsed as part of the
-# value and errors on launch. Every comment must be on its own line.
+# Ghostty has NO inline comments: `# foo` after a value errors on launch.
 
 # ─── Theme ────────────────────────────────────────────────────────────────────
 # Local theme file (chezmoi-managed) for version-independent colors.
@@ -18,9 +17,7 @@ font-feature = liga
 window-padding-x = 12
 window-padding-y = 12
 window-padding-balance = true
-# `default`, not `always`: each Ghostty window auto-attaches its own Zellij session,
-# so restoring every tab on launch just multiplies detached sessions. Let Zellij own
-# persistence; a relaunch starts clean.
+# `default`, not `always`: Zellij owns tab persistence; restoring here would just multiply detached sessions.
 window-save-state = default
 background-blur-radius = 20
 background-opacity = 0.97
@@ -45,8 +42,7 @@ shell-integration = zsh
 shell-integration-features = cursor,sudo,title
 
 # ─── Scrollback ───────────────────────────────────────────────────────────────
-# Measured in BYTES, not lines (default 10MB); allocated lazily. 100MB ≈ 100k
-# lines of heavily-styled output where ANSI escapes count against the limit.
+# Measured in BYTES not lines (default 10MB); ANSI escapes count against the limit.
 scrollback-limit = 100000000
 
 # ─── Keybindings ──────────────────────────────────────────────────────────────

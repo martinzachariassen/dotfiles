@@ -19,8 +19,7 @@ resolve() {
         brew search "$flag" "$name" 2>/dev/null | grep -Fxq "$name"
 }
 
-# check_deprecation KIND NAME — disabled → hard fail (missing=1); deprecated →
-# warning. Best-effort: needs jq + JSON, silently skips if either is absent.
+# check_deprecation KIND NAME — disabled fails, deprecated warns; needs jq, skips silently otherwise.
 check_deprecation() {
     local kind="$1" name="$2" flag json node disabled deprecated
     command -v jq >/dev/null 2>&1 || return 0

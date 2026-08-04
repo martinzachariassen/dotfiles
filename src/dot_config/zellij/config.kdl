@@ -24,5 +24,4 @@ ui {
     }
 }
 
-// Keybinds are Zellij's mode-based defaults; Ctrl+G locks/unlocks them when an
-// app wants the same chord. Customize via `zellij setup --dump-config`.
+// Keybinds are Zellij's mode-based defaults; Ctrl+G locks/unlocks them for apps that want the same chord.

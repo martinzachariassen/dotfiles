@@ -1,17 +1,11 @@
 #!/usr/bin/env bats
-# Pin the global mise runtime declarations.
+# Pin the global mise runtime declarations (Java 25, Node LTS, Python, Maven,
+# Gradle). Nothing else in CI guards these — render-check only parses
+# templates, lint-config only validates TOML — so a silent drop while editing
+# config.toml would break per-project builds on the next apply undetected.
 #
-# Why this exists:
-#   The "active development stack" — Java 25, Node LTS, Python, Maven, Gradle —
-#   is part of the repo's contract. A silent drop (an accidental delete while
-#   editing config.toml) would break per-project builds on the next fresh
-#   apply, but nothing else in CI guards it: render-check only parses templates,
-#   lint-config only checks that the TOML is valid, and the chezmoi-scripts
-#   dynamic check doesn't read this file.
-#
-# These tests parse the TOML structurally (via python3's tomllib) rather than
-# grepping for substrings, so reordering or reformatting the file won't
-# false-fail.
+# Parses the TOML structurally (python3's tomllib) rather than grepping for
+# substrings, so reordering/reformatting won't false-fail.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -24,11 +18,9 @@ setup() {
         skip "python3 tomllib not available (needs 3.11+)"
     fi
 
-    # config.toml is now a chezmoi template (the JVM runtimes are gated by the
-    # jvmStack module). Render its fully-enabled form by stripping the Go-template
-    # directive lines ({{ ... }}); the JVM runtimes are then all present, which is
-    # exactly the "active stack" contract these tests pin — without needing
-    # chezmoi in the test environment.
+    # config.toml is a chezmoi template (JVM runtimes gated by jvmStack).
+    # Render the fully-enabled form by stripping Go-template directive lines,
+    # so the tests can pin the "active stack" without needing chezmoi here.
     MISE_TOML="$BATS_TEST_TMPDIR/mise-config.toml"
     grep -v '^{{' "$MISE_TMPL" >"$MISE_TOML"
 }
@@ -72,8 +64,7 @@ PY
 }
 
 @test "mise declares Java with temurin-25" {
-    # Java is configured as a list so VS Code's java.configuration.runtimes
-    # can pick it up. Dropping it silently breaks projects that pin to it.
+    # Configured as a list so VS Code's java.configuration.runtimes can pick it up.
     java="$(_mise_get tools.java)"
     echo "tools.java = $java" >&2
     echo "$java" | grep -q '"temurin-25"'

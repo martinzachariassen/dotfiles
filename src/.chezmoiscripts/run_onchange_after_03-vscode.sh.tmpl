@@ -11,13 +11,11 @@ echo "→ VS Code: not on macOS, skipping"
 exit 0
 {{ end -}}
 
-# Put Homebrew's bin on PATH when apply runs outside a login shell, so the
-# `command -v code` check below finds the bundle-installed binary.
+# Put Homebrew's bin on PATH so a non-login apply still finds the code CLI.
 if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-# packages/ and scripts/ live at the repo root — reach them via .chezmoi.workingTree.
 ROOT="{{ .chezmoi.workingTree }}"
 EXTENSIONS_FILE="$ROOT/packages/vscode-extensions.txt"
 EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
@@ -39,9 +37,7 @@ installed_extensions() {
     code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
 }
 
-# One manifest drives both install and prune. Entries owned by an optional module
-# are excluded when that module is off, so install and prune stay consistent
-# instead of fighting each other every apply.
+# One manifest drives both install and prune; excluding off-module entries keeps them consistent.
 EXCLUDES=()
 {{ if not (has "locale" (dig "modules" (list) .)) -}}
 EXCLUDES+=("streetsidesoftware.code-spell-checker-norwegian-bokmal") # locale module
@@ -68,13 +64,10 @@ $MANIFEST
 EOF
 }
 
-# The CLI refuses to uninstall an extension *pack* whose members have external
-# dependents (e.g. vscjava.vscode-java-pack bundles redhat.java). Fall back to
-# removing it on disk and pruning VS Code's extensions cache.
+# Fallback for extension packs the CLI refuses to uninstall (external dependents).
 remove_extension_on_disk() {
     local ext="$1" changed=false dir cache
 
-    # nocaseglob guards publisher-case drift; nullglob makes a no-match expand to nothing.
     shopt -s nullglob nocaseglob
     for dir in "$EXTENSIONS_DIR/$ext"-*; do
         [ -d "$dir" ] || continue
@@ -82,7 +75,6 @@ remove_extension_on_disk() {
     done
     shopt -u nullglob nocaseglob
 
-    # Drop the stale entry so `code --list-extensions` stops reporting a phantom failure.
     cache="$EXTENSIONS_DIR/extensions.json"
     if [ -f "$cache" ] && command -v python3 >/dev/null 2>&1; then
         if python3 - "$cache" "$ext" <<'PY'
@@ -105,7 +97,6 @@ PY
     [ "$changed" = true ]
 }
 
-# Uninstall every locally-installed extension absent from the manifest.
 prune_untracked_extensions() {
     local installed untracked ext
     installed="$(installed_extensions)"
@@ -118,7 +109,6 @@ prune_untracked_extensions() {
         if code --uninstall-extension "$ext" >/dev/null 2>&1; then
             continue
         fi
-        # CLI refused (e.g. a pack member has external dependents) — remove on disk.
         if remove_extension_on_disk "$ext"; then
             echo "  ↳ CLI declined; removed on disk instead"
         else

@@ -2,7 +2,7 @@
 # selected. Pure preference; nothing here is required by the shell config.
 
 # ─── Productivity & system ────────────────────────────────────────────────────
-cask "google-drive"             # file sync
+cask "google-drive"
 cask "jordanbaird-ice@beta"     # menu bar manager
 cask "pearcleaner"              # app uninstaller
 cask "raycast"                  # Spotlight replacement
@@ -10,13 +10,13 @@ cask "stats"                    # menu bar resource monitor
 
 # ─── Notes / Obsidian ─────────────────────────────────────────────────────────
 # Vault lives at ~/TheArchive (its own git repo, not chezmoi-managed).
-cask "obsidian"                 # markdown knowledge base
-cask "font-inter"               # Obsidian interface font ("Inter")
-cask "font-jetbrains-mono"      # Obsidian monospace font ("JetBrains Mono")
-cask "font-ia-writer-quattro"   # Obsidian editor font ("iA Writer Quattro S")
+cask "obsidian"
+cask "font-inter"               # Obsidian interface font
+cask "font-jetbrains-mono"      # Obsidian monospace font
+cask "font-ia-writer-quattro"   # Obsidian editor font
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
-cask "google-chrome"            # the only browser most web tooling assumes
+cask "google-chrome"            # what web tooling assumes
 
 # ─── Media ────────────────────────────────────────────────────────────────────
 cask "obs"                      # screen recording / streaming
@@ -24,15 +24,15 @@ cask "spotify"
 cask "vlc"
 
 # ─── Development ──────────────────────────────────────────────────────────────
-cask "bruno"                    # offline API client (Postman alternative)
-cask "fork"                     # Git client (GUI)
-cask "intellij-idea"            # JetBrains IDE
+cask "bruno"                    # Postman alternative
+cask "fork"                     # git client
+cask "intellij-idea"
 
 # ─── AI tooling + apps ────────────────────────────────────────────────────────
 # ollama installs but pulls no models — see scripts/bin/setup-ollama.sh.
-brew "ollama"                   # local model runner/server
-cask "claude"                   # Anthropic Claude desktop app
-cask "claude-code"              # Anthropic Claude Code CLI
+brew "ollama"
+cask "claude"
+cask "claude-code"
 
 # ─── Mac App Store apps (mas) ─────────────────────────────────────────────────
 # `mas` installs App Store apps declaratively so `brew bundle` reproduces them on
@@ -40,7 +40,7 @@ cask "claude-code"              # Anthropic Claude Code CLI
 # `brew bundle cleanup` never uninstalls `mas` apps, so removing an app this list
 # no longer names stays a manual `mas uninstall <id>` — consistent with this repo's
 # "removal is always manual" model. See docs/packages.md.
-brew "mas"                      # Mac App Store CLI (backs the `mas "…"` lines below)
+brew "mas"                      # backs the `mas` lines below
 #
 # Populate from YOUR machine — `mas` can't be queried from CI, so nothing is
 # declared by default. On a signed-in Mac run `mas list` and paste the apps you

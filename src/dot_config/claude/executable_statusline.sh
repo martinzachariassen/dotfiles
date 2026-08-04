@@ -66,8 +66,7 @@ pct_color() {
 osc8() { printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"; }
 
 # --- parse every field in one jq call (jq startup dominates runtime) ---
-# Numbers are stringified so join() accepts them; absent fields fall back to ""
-# (or 0) and still emit a US separator, keeping the read positions aligned.
+# Numbers are stringified so join() accepts them; absent fields still emit a separator, keeping read positions aligned.
 fields="$(jq -r '
     [ (.model.display_name // "?"),
       (.workspace.current_dir // ""),
@@ -110,9 +109,7 @@ cache_is_stale() {
 
 if cache_is_stale; then
     if git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
-        # porcelain=v2 gives branch, ahead/behind, and per-file X/Y status in one
-        # pass; awk tallies staged (index col), modified (worktree col), untracked,
-        # and conflicts, emitting a single pipe-delimited cache line.
+        # porcelain=v2 gives branch/ahead/behind/per-file status in one pass; awk tallies into a pipe-delimited cache line.
         git -C "$DIR" status --porcelain=v2 --branch 2>/dev/null | awk '
             /^# branch.head / { head = $3 }
             /^# branch.ab / { ahead = $3; behind = $4 }

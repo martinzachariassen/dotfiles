@@ -22,10 +22,8 @@ MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 . "$_DIR/../lib/chezmoi-data.sh"
 ui_init_logging
 
-# ─── Ctrl-C quits cleanly ────────────────────────────────────────────────────
-# Prompts read with `read … || fallback`, which swallows an interrupted read and
-# marches on; trap so Ctrl-C aborts. Restore the cursor (pickers can hide it),
-# exit 130 so callers see a real interrupt.
+# `read … || fallback` swallows an interrupted read and marches on, so trap
+# Ctrl-C explicitly; restore the cursor (pickers can hide it) and exit 130.
 on_interrupt() {
     printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
     info "aborted — nothing changed" >/dev/tty 2>/dev/null || true
@@ -38,8 +36,7 @@ trap on_interrupt INT TERM
     exit 1
 }
 
-# run_chezmoi — exec `chezmoi init`, or print the command under DRY_RUN so tests
-# can exercise answer-gathering without touching $HOME.
+# run_chezmoi — exec `chezmoi init`, or print it under DRY_RUN (for tests).
 run_chezmoi() {
     if [ "$DRY_RUN" = "1" ]; then
         printf 'chezmoi init'
@@ -50,9 +47,8 @@ run_chezmoi() {
     exec chezmoi init "$@"
 }
 
-# ─── Read the wizard's questions from the source of truth ────────────────────
-# prompt_msg KEY — the message chezmoi shows for a prompt*Once KEY; also the flag
-# key we pass back, so reading it here keeps the two in sync.
+# prompt_msg KEY — the message chezmoi shows for a prompt*Once KEY; reading it
+# here (vs. hardcoding) keeps the flag text and the template in sync.
 prompt_msg() {
     sed -nE "s/.*prompt(String|Choice|Multichoice)Once \. \"$1\"[[:space:]]+\"([^\"]*)\".*/\2/p" \
         "$TMPL" | head -n1
@@ -64,8 +60,8 @@ prompt_choices() {
         "$TMPL" | head -n1 | grep -oE '"[^"]+"' | tr -d '"'
 }
 
-# profile_defaults PROFILE — space-separated default module keys. Effective set is
-# (inherit ? base : []) ∪ extra, base first, de-duplicated.
+# profile_defaults PROFILE — space-separated default module keys: (inherit ?
+# base : []) ∪ extra, base first, de-duplicated.
 profile_defaults() {
     local p="$1" inherits base extra out="" seen=" " tok
 
@@ -75,8 +71,7 @@ profile_defaults() {
         f && $1==p {print $3; exit}
     ' "$MODULES_TOML")"
 
-    # grep exits 1 on an empty array (personal/minimal have none); swallow it so
-    # pipefail doesn't trip.
+    # grep exits 1 on an empty array (personal/minimal have none); swallow it.
     base="$(awk '
         /^\[profileDefaults\]/ {f=1; next}
         /^\[/                  {f=0}
@@ -104,14 +99,12 @@ existing_modules() {
     printf '%s' "${DATA_JSON:-}" | jq -r '.modules[]? // empty' 2>/dev/null | tr '\n' ' '
 }
 
-# ─── Prompt helpers (all I/O on /dev/tty; the answer goes to stdout) ──────────
-# Three tiers, most→least capable: gum (installed) → bash TUI arrow/space picker
-# (capable terminal, works before Homebrew) → numbered menu (dumb terminal).
+# Prompt helpers: I/O on /dev/tty, answer on stdout. Three tiers, most→least
+# capable: gum → bash TUI arrow/space picker → numbered menu (dumb terminal).
 
 use_gum() { [ "${WIZARD_NO_GUM:-0}" != "1" ] && command -v gum >/dev/null 2>&1; }
 
-# use_tui — pure-bash arrow/space picker; gated OUT for TERM=dumb / no rw
-# /dev/tty / WIZARD_NO_TUI=1. Also accepts digits if arrow escapes don't register.
+# use_tui — pure-bash arrow/space picker; gated out for TERM=dumb / no rw /dev/tty.
 use_tui() {
     [ "${WIZARD_NO_TUI:-0}" != "1" ] || return 1
     [ "${TERM:-dumb}" != "dumb" ] || return 1
@@ -119,8 +112,8 @@ use_tui() {
 }
 
 # _tui_read_key — read one keypress; echo UP/DOWN/SPACE/ENTER, a digit, or the
-# raw char. Arrows arrive as ESC [ A/B; the 2-byte tail read has an integer
-# timeout (bash-3.2 `read -t` is whole seconds) so a lone ESC doesn't hang.
+# raw char. Arrows arrive as ESC [ A/B; bash-3.2 `read -t` only takes whole
+# seconds, so the tail read times out at 1s rather than hanging on a lone ESC.
 _tui_read_key() {
     local k rest
     IFS= read -rsn1 k </dev/tty || {
@@ -177,8 +170,8 @@ _tui_choose() {
     printf '%s' "${opts[$cur]}"
 }
 
-# _tui_multiselect — module checkbox picker over MOD_KEYS/MOD_LABELS.
-# default-selected keys... → echoes chosen keys (catalog order).
+# _tui_multiselect — module checkbox picker over MOD_KEYS/MOD_LABELS; default-
+# selected keys... → echoes chosen keys (catalog order).
 _tui_multiselect() {
     local n=${#MOD_KEYS[@]} cur=0 i key mark arrow drawn=0 d idx
     local on=() out=()
@@ -288,9 +281,8 @@ ask_choice() { # message default opt1 opt2 ... → echoes chosen option
     done
 }
 
-# mod_display INDEX — "key  label" line for the gum picker. Commas in labels are
-# swapped for '·' because gum's --selected is comma-separated; results map back
-# by exact-line match. A function so a test can assert the comma-free invariant.
+# mod_display INDEX — "key  label" for the gum picker; commas in labels are
+# swapped for '·' since gum's --selected list is itself comma-separated.
 mod_display() { # index → display line
     printf '%-13s %s' "${MOD_KEYS[$1]}" "${MOD_LABELS[$1]//,/·}"
 }
@@ -333,8 +325,7 @@ select_modules() { # default-selected keys... → echoes chosen keys (catalog or
         _tui_multiselect "$@"
         return
     fi
-    # bash 3.2 lacks associative arrays; track selection in a 0/1 flag array
-    # parallel to MOD_KEYS.
+    # bash 3.2 lacks associative arrays; track selection in a 0/1 flag array.
     local i j k mark line tok out
     local on=()
     for i in "${!MOD_KEYS[@]}"; do on[$i]=0; done
@@ -367,12 +358,10 @@ select_modules() { # default-selected keys... → echoes chosen keys (catalog or
     for i in "${!MOD_KEYS[@]}"; do
         [ "${on[$i]}" = "1" ] && out+=("${MOD_KEYS[$i]}")
     done
-    # ${out[*]:-} guards the empty case: bash 3.2 under set -u errors on a bare
-    # empty-array expansion.
+    # ${out[*]:-}: bash 3.2 under set -u errors on a bare empty-array expansion.
     printf '%s' "${out[*]:-}"
 }
 
-# ─── Module catalog (keys + labels), read once at load ───────────────────────
 MOD_KEYS=() MOD_LABELS=()
 while IFS=$'\t' read -r _k _v; do
     [ -n "$_k" ] || continue
@@ -392,14 +381,13 @@ done < <(awk -F' *= *' '
 # Sourced for its helpers only (tests) — stop before any prompting or apply.
 [ "${WIZARD_LIB_ONLY:-0}" = "1" ] && return 0
 
-# ─── Non-interactive fallback ────────────────────────────────────────────────
 # No terminal → let chezmoi apply its template defaults so automation converges.
 if [ ! -r /dev/tty ]; then
     warn "no terminal detected — accepting default answers (--promptDefaults)"
     run_chezmoi --apply --promptDefaults --source="$SOURCE_DIR" "$@"
 fi
 
-# ─── Current answers become the defaults (nice on a chezreset re-run) ─────────
+# Current answers become the defaults (nice on a chezreset re-run).
 DATA_JSON="$(cm_data_json)"
 def_name="$(cm_data_string "$DATA_JSON" name)"
 def_email="$(cm_data_string "$DATA_JSON" email)"
@@ -409,7 +397,6 @@ def_signkey="$(cm_data_string "$DATA_JSON" signingKey)"
 [ -n "$def_profile" ] || def_profile="personal"
 [ -n "$def_signing" ] || def_signing="1password"
 
-# ─── Ask ─────────────────────────────────────────────────────────────────────
 printf '%s\n' "$BOX_TOP" >/dev/tty
 say "dotfiles setup — answer a few questions, then chezmoi applies." >/dev/tty
 printf '%s\n' "$BOX_BOTTOM" >/dev/tty
@@ -438,7 +425,6 @@ if [ "$signingMode" != "off" ]; then
     signingKey="$(ask_string "$(prompt_msg signingKey)" "$def_signkey")"
 fi
 
-# ─── Confirm ─────────────────────────────────────────────────────────────────
 hr >/dev/tty
 say "Summary:" >/dev/tty
 dim "  name     $name" >/dev/tty
@@ -455,7 +441,6 @@ case "$reply" in
         ;;
 esac
 
-# ─── Hand off to chezmoi with the answers as flags (no TUI) ───────────────────
 mods_slash="$(printf '%s' "$modules" | tr ' ' '/')"
 init_flags=(
     --apply --prompt --source="$SOURCE_DIR"

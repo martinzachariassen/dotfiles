@@ -1,6 +1,5 @@
--- LazyVim bootstrap. Reproducibility comes from the chezmoi-tracked
--- lazy-lock.json, not version pins (`:Lazy restore` on a fresh machine; `:Lazy
--- update` then re-add to bump). See docs/day-to-day.md → "Pinning Neovim plugins".
+-- LazyVim bootstrap. Reproducibility comes from chezmoi-tracked lazy-lock.json, not
+-- version pins — see docs/day-to-day.md → "Pinning Neovim plugins".
 
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
@@ -24,8 +23,7 @@ require("lazy").setup({
   spec = {
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
 
-    -- Language extras (LSP + treesitter + formatters); Mason installs servers on
-    -- first launch. Uncomment more as needed.
+    -- Mason installs servers on first launch; uncomment more extras as needed.
     { import = "lazyvim.plugins.extras.lang.java" },
     { import = "lazyvim.plugins.extras.lang.kotlin" },
     { import = "lazyvim.plugins.extras.lang.typescript" },
