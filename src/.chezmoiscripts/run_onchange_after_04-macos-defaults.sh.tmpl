@@ -30,6 +30,8 @@ if ! tty_reattach; then
     exit 0
 fi
 
-bash "{{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"
+# run_before_00-sudo-cache already keeps sudo warm for this whole apply; tell
+# macos-defaults.sh so it doesn't spawn a second, redundant keeper.
+DOTFILES_SUDO_KEPT_WARM=1 bash "{{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"
 
 echo "✓ macOS defaults applied"

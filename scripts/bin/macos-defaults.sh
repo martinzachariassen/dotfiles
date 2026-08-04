@@ -12,6 +12,8 @@ if [ ! -r "$_MD_DIR/../lib/log.sh" ]; then
 fi
 # shellcheck source=../lib/log.sh
 . "$_MD_DIR/../lib/log.sh"
+# shellcheck source=../lib/sudo.sh
+. "$_MD_DIR/../lib/sudo.sh"
 ui_init_status
 
 printf '%s macOS defaults\n' "$NODE"
@@ -24,22 +26,13 @@ if ! sudo -n true 2>/dev/null; then
 fi
 sudo -v -p "[macos-defaults] sudo password: "
 
-# Keep sudo alive; double-forked + tight poll so the keeper exits within 2s of
-# this script ending.
-PARENT_PID=$$
-(
-    (
-        refresh_in=0
-        while kill -0 "$PARENT_PID" 2>/dev/null; do
-            if [ "$refresh_in" -le 0 ]; then
-                sudo -n true 2>/dev/null || exit
-                refresh_in=240
-            fi
-            sleep 2
-            refresh_in=$((refresh_in - 2))
-        done
-    ) &
-) </dev/null >/dev/null 2>&1
+# Keep sudo alive for the rest of this script — unless a chezmoi apply already
+# has run_before_00-sudo-cache's keeper running for the whole apply lifetime
+# (DOTFILES_SUDO_KEPT_WARM=1, set by the run_onchange_after_04 hook), in which
+# case a second keeper would just be a redundant poller.
+if [ "${DOTFILES_SUDO_KEPT_WARM:-0}" != "1" ]; then
+    sudo_keep_warm "$$"
+fi
 
 # def_write <domain> <key> <-type> <value> — writes only when the value differs,
 # so a re-apply skips settings already correct.
