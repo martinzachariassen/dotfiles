@@ -58,6 +58,11 @@ if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
     . "$_DOCTOR_DIR/../lib/vscode.sh"
 fi
 
+# shellcheck source=../lib/git-signing.sh
+if [ -r "$_DOCTOR_DIR/../lib/git-signing.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/git-signing.sh"
+fi
+
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
     pass "repo at $SOURCE_DIR"
@@ -143,7 +148,7 @@ else
 fi
 
 section "Git signing (1Password SSH agent)"
-SSH_SIGN=/Applications/1Password.app/Contents/MacOS/op-ssh-sign
+SSH_SIGN="$GIT_SIGNING_SSH_SIGN"
 if [ -x "$SSH_SIGN" ]; then
     pass "op-ssh-sign present"
 else
@@ -178,18 +183,11 @@ else
 fi
 # Smoke-test signing in a tmp repo (proves agent is reachable + key matches).
 if [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then
-    tmpdir=$(mktemp -d)
-    if (
-        cd "$tmpdir" &&
-            git init -q -b main &&
-            git -c user.email=doctor@local -c user.name=Doctor commit \
-                --allow-empty --quiet -S -m doctor 2>&1
-    ) >/dev/null 2>&1; then
+    if git_signing_smoke_test; then
         pass "git signing works (commit -S succeeded)"
     else
         warn "git -S commit failed — is 1Password unlocked + SSH agent enabled?"
     fi
-    rm -rf "$tmpdir"
 fi
 
 section "Homebrew packages"
@@ -223,7 +221,7 @@ $active_files
 EOF
     fi
     # Ollama ships in the macApps module, so only check it when that's active.
-    if printf '%s' "$data_json" | jq -e '(.modules // []) | index("macApps")' >/dev/null 2>&1 &&
+    if cm_has_module "$data_json" macApps &&
         command -v ollama >/dev/null 2>&1; then
         if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
             pass "Ollama service running"
@@ -268,7 +266,7 @@ if command -v code >/dev/null 2>&1; then
     else
         # Mirrors the 03-vscode hook's locale guard.
         vsc_exclude=()
-        if ! printf '%s' "$(cm_data_json)" | jq -e '(.modules // []) | index("locale")' >/dev/null 2>&1; then
+        if ! cm_has_module "$(cm_data_json)" locale; then
             vsc_exclude=(streetsidesoftware.code-spell-checker-norwegian-bokmal)
         fi
         vsc_installed="$(code --list-extensions 2>/dev/null || true)"

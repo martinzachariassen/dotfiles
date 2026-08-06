@@ -36,16 +36,9 @@ cm_data_bool() {
     fi
 }
 
-# cm_toml_string FILE KEY — read `key = "value"`; last resort when chezmoi isn't on PATH yet.
-cm_toml_string() {
-    local file="$1" key="$2"
-    [ -f "$file" ] || return 0
-    sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"\(.*\)\"[[:space:]]*$/\1/p" "$file" | tail -1
-}
-
-# cm_toml_bool FILE KEY — read `key = true|false`. ERE for BSD sed.
-cm_toml_bool() {
-    local file="$1" key="$2"
-    [ -f "$file" ] || return 0
-    sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*\$/\1/p" "$file" | tail -1
+# cm_has_module JSON MODULE — true when MODULE is in the `.modules` list.
+cm_has_module() {
+    local json="$1" module="$2"
+    command -v jq >/dev/null 2>&1 || return 1
+    printf '%s\n' "$json" | jq -e --arg m "$module" '(.modules // []) | index($m)' >/dev/null 2>&1
 }

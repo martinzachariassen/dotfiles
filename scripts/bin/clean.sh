@@ -21,14 +21,8 @@ fi
 # shellcheck source=../lib/log.sh
 . "$_DIR/../lib/log.sh"
 ui_init_logging
-
-run() {
-    if [ "$DRY_RUN" = "1" ]; then
-        dim "dry-run \$ $*"
-        return 0
-    fi
-    "$@"
-}
+# shellcheck source=../lib/dry-run.sh
+. "$_DIR/../lib/dry-run.sh"
 
 # ─── pure helpers (unit-tested against stubbed inputs) ────────────────────────
 

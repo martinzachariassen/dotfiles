@@ -56,21 +56,3 @@ setup() {
     run cm_data_bool "$JSON" macApps
     [ "$output" = "false" ]
 }
-
-# ─── cm_toml_string / cm_toml_bool ─────────────────────────────────────────────
-
-@test "cm_toml_string / cm_toml_bool read a chezmoi.toml (BSD+GNU sed)" {
-    cfg="$BATS_TEST_TMPDIR/chezmoi.toml"
-    printf '[data]\n    profile = "personal"\n    useOnePassword = true\n' >"$cfg"
-    run cm_toml_string "$cfg" profile
-    [ "$output" = "personal" ]
-    run cm_toml_bool "$cfg" useOnePassword
-    [ "$output" = "true" ]
-}
-
-@test "cm_toml_* are empty for a missing file" {
-    run cm_toml_string "$BATS_TEST_TMPDIR/nope.toml" profile
-    [ "$output" = "" ]
-    run cm_toml_bool "$BATS_TEST_TMPDIR/nope.toml" useOnePassword
-    [ "$output" = "" ]
-}
