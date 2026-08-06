@@ -5,6 +5,7 @@ chezmoi
 cloudsdktool
 dedup
 Efla
+Einv
 fasterxml
 flywaydb
 fwcd
@@ -14,6 +15,7 @@ hikari
 Hikari
 isready
 javac
+JAXP
 livenessstate
 mockk
 nacked
@@ -24,11 +26,13 @@ pgdata
 processingjob
 readinessstate
 rethrowing
+schematron
 signingkey
 springframework
 stdlib
 temurin
 uitest
+unparseable
 vscjava
 Xjsr
 Zachariassen
