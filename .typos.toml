@@ -13,6 +13,7 @@ extend-exclude = [
 
 # Case-folding is automatic — lowercase `aks` also covers AKS/Aks.
 [default.extend-words]
-aks = "aks"      # Azure Kubernetes Service
-hashi = "hashi"  # typos splits CamelCase "HashiCorp" into Hashi+Corp (Brewfile.work)
-jod = "jod"      # Node.js LTS codename (Node 24 = "Jod")
+aks = "aks"                  # Azure Kubernetes Service
+hashi = "hashi"              # typos splits CamelCase "HashiCorp" into Hashi+Corp (Brewfile.work)
+jod = "jod"                  # Node.js LTS codename (Node 24 = "Jod")
+unparseable = "unparseable"  # valid -eable spelling; typos prefers "unparsable"
