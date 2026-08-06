@@ -375,6 +375,10 @@
 
     "cSpell.language": "{{ if has "locale" (dig "modules" (list) .) }}en-US,nb{{ else }}en-US{{ end }}",
 
+    // Fall back to VS Code's native squiggle (underlines just the unknown word)
+    // instead of cSpell's custom decorations, which colour the whole line.
+    "cSpell.useCustomDecorations": false,
+
     // ~/.config/cspell/personal.txt symlinks into packages/cspell-words.txt, so
     // words added via quick-fix land in `git status` — no settings edit needed.
     "cSpell.customDictionaries": {
