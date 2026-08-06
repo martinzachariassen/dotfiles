@@ -31,3 +31,27 @@ setup() {
 @test "the macos-defaults hook marks sudo as already kept warm before invoking the script" {
     grep -qF 'DOTFILES_SUDO_KEPT_WARM=1 bash' "$HOOK"
 }
+
+# The guard block runs before any macOS-only command, so it's exercisable on Linux.
+@test "macos-defaults.sh fails loudly when log.sh is missing" {
+    iso="$(mktemp -d)"
+    mkdir -p "$iso/scripts/bin" # no scripts/lib ⇒ both siblings unreachable
+    cp "$MD" "$iso/scripts/bin/macos-defaults.sh"
+    run bash "$iso/scripts/bin/macos-defaults.sh"
+    rm -rf "$iso"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing"* ]]
+    [[ "$output" == *"log.sh"* ]]
+}
+
+@test "macos-defaults.sh fails loudly when sudo.sh is missing but log.sh is present" {
+    iso="$(mktemp -d)"
+    mkdir -p "$iso/scripts/bin" "$iso/scripts/lib"
+    cp "$MD" "$iso/scripts/bin/macos-defaults.sh"
+    cp "$REPO_ROOT/scripts/lib/log.sh" "$iso/scripts/lib/log.sh"
+    run bash "$iso/scripts/bin/macos-defaults.sh"
+    rm -rf "$iso"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing"* ]]
+    [[ "$output" == *"sudo.sh"* ]]
+}
