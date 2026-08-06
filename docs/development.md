@@ -19,7 +19,8 @@ and **CI** on every push. Both call the same scripts in
 | Workflow audit | `zizmor` (workflow security; `--offline` locally, online in CI) | ✅ | ✅ |
 | Render matrix | `scripts/ci/render-check.sh` (`chezmoi apply --dry-run` across profile × modules) | | ✅ |
 | Unit tests | `bats tests/` | | ✅ |
-| Homebrew names | `scripts/ci/brew-resolve.sh` + `brew-check-modules.sh` (macOS runner) | | ✅ |
+| Homebrew names | `scripts/ci/brew-resolve.sh` (macOS runner) | | ✅ |
+| Homebrew bundle check (advisory only) | `scripts/ci/brew-check-modules.sh` (macOS runner, `continue-on-error`) | | ✅ |
 | Conventional Commits | `scripts/ci/check-commit-msg.sh` (subject ≤ 72 chars) | ✅ (commit-msg) | ✅ (PR title) |
 
 The CI job matrix lives in

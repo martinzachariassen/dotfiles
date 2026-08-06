@@ -22,7 +22,7 @@ One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, m
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-Works on both a fresh and an existing Mac — the installer snapshots any legacy dotfiles into a timestamped backup before taking over (`SKIP_BACKUP=1` to skip) and runs a [deprecation cleanup](docs/install.md#deprecation-cleanup). When the plain-text wizard finishes, sign in and reload:
+Works on both a fresh and an existing Mac — the installer snapshots any legacy dotfiles into a timestamped backup before taking over (`SKIP_BACKUP=1` to skip) and runs a [deprecation cleanup](docs/install.md#cleaning-up-drift-on-an-existing-mac). When the plain-text wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                                  # skip if disabled

@@ -13,9 +13,13 @@ hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level tooling
 ## The stages
 
 `chezmoi apply` renders the managed files into `$HOME`, then runs the scripts in
-[`src/.chezmoiscripts/`](../src/.chezmoiscripts). Ordering and re-run behavior
-come entirely from the filename prefix; the two-digit `NN` orders within a bucket
-(`02` → `02b` → `02e` → …).
+[`src/.chezmoiscripts/`](../src/.chezmoiscripts). chezmoi sorts scripts
+alphabetically by full filename, so the `when` bucket (`before`, `after`,
+`once_before`, `onchange_after`) always determines order first — the
+two-digit `NN` only orders scripts *within the same bucket* (e.g. `run_after_02`
+→ `run_after_02b`). A `run_after_*` script always runs before every
+`run_onchange_after_*` script regardless of NN, even though today's numbering
+(`02`/`02b` vs. `02e`/`03`/`04`/`05`/`99`) reads like one continuous sequence.
 
 | Prefix | When it runs |
 |---|---|
@@ -135,7 +139,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` (shares `scripts/lib/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
-| Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work}` |
+| Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work,apple-dev}` |
 | Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |
 | Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` |
 
