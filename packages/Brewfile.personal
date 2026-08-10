@@ -3,3 +3,6 @@
 # ─── Automation ───────────────────────────────────────────────────────────────
 brew "cliclick"                 # mouse/keyboard event emulation (UI scripting)
 
+# ─── Apps ──────────────────────────────────────────────────────────────────────
+cask "discord"
+
