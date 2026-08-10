@@ -1,7 +1,8 @@
 # ~/.config/swiftlint/config.yml — global SwiftLint defaults (appleDev module).
-# Unlike SwiftFormat, SwiftLint doesn't auto-discover $HOME configs — the vknabel VS
-# Code extension wires this in via `swiftlint.configSearchPaths`; per-project
-# .swiftlint.yml still wins. CLI: `swiftlint --config ~/.config/swiftlint/config.yml`.
+# Unlike SwiftFormat, SwiftLint doesn't auto-discover $HOME configs and there's no
+# maintained VS Code extension left to wire it in — invoke it explicitly, from an
+# Xcode Run Script build phase or pre-commit: `swiftlint --config ~/.config/swiftlint/config.yml`.
+# Prefer a project's own .swiftlint.yml when present instead of passing --config.
 
 disabled_rules:
   - todo # intentional notes, not violations

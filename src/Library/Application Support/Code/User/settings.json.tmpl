@@ -500,25 +500,30 @@
         }
     },
 
-    // Swift/iOS (appleDev): Swift extension drives SourceKit-LSP, Sweetpad wraps
-    // xcodebuild. SwiftFormat (vknabel) pipes edits via stdin so it never races
-    // VS Code's save; SwiftLint's --fix rewrites on disk so it stays off the save
-    // cycle (run via keybinding or pre-commit). See docs/editors.md.
+    // Swift/iOS (appleDev): Swift extension drives SourceKit-LSP, SweetPad wraps
+    // xcodebuild for build/run/debug/test and owns [swift] formatting. SwiftLint
+    // has no maintained VS Code integration left (see docs/editors.md) — it runs
+    // via an Xcode Run Script build phase and pre-commit instead, not live in the
+    // editor. vknabel's SwiftFormat/SwiftLint extensions were removed 2026-08:
+    // archived upstream (unmaintained) as of 2025-11-19.
 {{ if has "appleDev" (dig "modules" (list) .) -}}
     "[swift]": {
-        "editor.defaultFormatter": "vknabel.vscode-swiftformat",
+        "editor.defaultFormatter": "sweetpad.sweetpad",
         "editor.tabSize": 4,
         "editor.detectIndentation": false,
         // Empty object overrides the global source.organizeImports.
         "editor.codeActionsOnSave": {}
     },
     "swift.backgroundIndexing": true,
-    "swiftformat.path": "/opt/homebrew/bin/swiftformat",
     "sweetpad.build.xcbeautifyEnabled": true,
-    "swiftlint.path": "/opt/homebrew/bin/swiftlint",
-    // SwiftLint doesn't ascend to $HOME; a project's .swiftlint.yml wins if present,
-    // else this chezmoi-deployed config applies.
-    "swiftlint.configSearchPaths": [".swiftlint.yml", "{{ .chezmoi.homeDir }}/.config/swiftlint/config.yml"],
+    // SweetPad's formatter defaults to Xcode's bundled swift-format; point it at
+    // Homebrew SwiftFormat instead so ~/.swiftformat (--maxwidth 120 etc.) applies.
+    // "--quiet" ignores stderr so SweetPad doesn't misread warnings as failures.
+    "sweetpad.format.path": "/opt/homebrew/bin/swiftformat",
+    "sweetpad.format.args": ["--quiet", "${file}"],
+    // No-op unless a workspace has a project.yml at its root; regenerates the
+    // .xcodeproj automatically when Swift files are added/removed.
+    "sweetpad.xcodegen.autogenerate": true,
 {{ end -}}
 
     // ── Performance ──

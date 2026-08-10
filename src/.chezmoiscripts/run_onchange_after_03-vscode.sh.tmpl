@@ -43,7 +43,7 @@ EXCLUDES=()
 EXCLUDES+=("streetsidesoftware.code-spell-checker-norwegian-bokmal") # locale module
 {{ end -}}
 {{ if not (has "appleDev" (dig "modules" (list) .)) -}}
-EXCLUDES+=("swiftlang.swift-vscode" "sweetpad.sweetpad" "vadimcn.vscode-lldb" "vknabel.vscode-swiftformat" "vknabel.vscode-swiftlint") # appleDev module
+EXCLUDES+=("swiftlang.swift-vscode" "sweetpad.sweetpad" "vadimcn.vscode-lldb" "llvm-vs-code-extensions.lldb-dap") # appleDev module
 {{ end -}}
 MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE" ${EXCLUDES[@]+"${EXCLUDES[@]}"})"
 
