@@ -6,8 +6,6 @@
 
 set -uo pipefail
 
-# Repo root, not chezmoi's src/: workingTree is where scripts/ + packages/ live.
-SOURCE_DIR="${DOTFILES_DIR:-$(chezmoi execute-template '{{ .chezmoi.workingTree }}' 2>/dev/null || echo "$HOME/Developer/personal/dotfiles")}"
 ASSUME_YES="${YES:-0}"
 
 # log.sh is a committed sibling; fail loudly if a checkout is missing it.
@@ -20,10 +18,19 @@ fi
 . "$_UI_DIR/../lib/log.sh"
 ui_init_logging
 
+# shellcheck source=../lib/git-signing.sh
+if [ -r "$_UI_DIR/../lib/git-signing.sh" ]; then
+    . "$_UI_DIR/../lib/git-signing.sh"
+fi
+# shellcheck source=../lib/chezmoi-data.sh
+if [ -r "$_UI_DIR/../lib/chezmoi-data.sh" ]; then
+    . "$_UI_DIR/../lib/chezmoi-data.sh"
+fi
+
 # has_module NAME — true when NAME is in the selected .modules list.
 has_module() {
     command -v chezmoi >/dev/null 2>&1 || return 1
-    chezmoi data --format=json 2>/dev/null | jq -e --arg m "$1" '(.modules // []) | index($m)' >/dev/null 2>&1
+    cm_has_module "$(cm_data_json)" "$1"
 }
 
 box_line() {
@@ -189,7 +196,7 @@ fi
 
 if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     step "Git signing smoke test" "Verifies op-ssh-sign + 1Password agent + your git config all line up."
-    SSH_SIGN=/Applications/1Password.app/Contents/MacOS/op-ssh-sign
+    SSH_SIGN="$GIT_SIGNING_SSH_SIGN"
     if [ ! -x "$SSH_SIGN" ]; then
         fail "op-ssh-sign missing - install/launch 1Password and enable the SSH agent"
     elif [ -z "$(git config --global user.signingkey 2>/dev/null)" ]; then
@@ -203,19 +210,12 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     elif [ ! -f "$(git config --global --path gpg.ssh.allowedSignersFile 2>/dev/null)" ]; then
         fail "git allowed signers file missing - run \`chezmoi apply\`"
     else
-        tmpdir=$(mktemp -d)
-        if (
-            cd "$tmpdir" &&
-                git init -q -b main &&
-                git -c user.email=bootstrap@local -c user.name=Bootstrap commit \
-                    --allow-empty --quiet -S -m bootstrap-test 2>&1
-        ) >/dev/null 2>&1; then
+        if git_signing_smoke_test; then
             ok "git -S commit succeeded - signing wired correctly"
         else
             fail "git -S commit failed - is 1Password unlocked? SSH agent enabled?"
             warn "Check: 1Password -> Settings -> Developer -> SSH agent"
         fi
-        rm -rf "$tmpdir"
     fi
 fi
 

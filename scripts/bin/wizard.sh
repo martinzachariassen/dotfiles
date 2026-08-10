@@ -16,6 +16,11 @@ SOURCE_DIR="${DOTFILES_DIR:-$ROOT}"
 TMPL="$ROOT/src/.chezmoi.toml.tmpl"
 MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 
+# log.sh is a committed sibling; fail loudly if a checkout is missing it.
+if [ ! -r "$_DIR/../lib/log.sh" ]; then
+    printf 'wizard: missing %s\n' "$_DIR/../lib/log.sh" >&2
+    exit 1
+fi
 # shellcheck source=../lib/log.sh
 . "$_DIR/../lib/log.sh"
 # shellcheck source=../lib/chezmoi-data.sh

@@ -76,12 +76,14 @@ the chezmoi hooks reach them across the source/root boundary via
 | Lib | Provides | Sourced by |
 |---|---|---|
 | `log.sh` | colors, glyphs, rail + flat status helpers | chezup, bootstrap-auth, setup-ollama, wizard, doctor, macos-defaults, clean |
-| `chezmoi-data.sh` | `cm_data_json/string/bool`, `cm_toml_*` readers | doctor, wizard |
+| `chezmoi-data.sh` | `cm_data_json/string/bool`, `cm_has_module` | doctor, wizard, bootstrap-auth |
 | `tty.sh` | `tty_reattach` (stdin → controlling terminal) | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
 | `sudo.sh` | `sudo_keep_warm` (background sudo-timestamp refresh) | `run_before_00`, macos-defaults |
 | `homebrew.sh` | `homebrew_install` | `run_once_before_01` |
 | `semver.sh` | `semver_extract` / `semver_lt` | doctor |
 | `vscode.sh` | extension set-diff helpers (`vscode_read_manifest`, `vscode_untracked`, `vscode_missing`) | `run_onchange_after_03-vscode`, doctor |
+| `git-signing.sh` | `git_signing_smoke_test` (1Password SSH-signing probe) | doctor, bootstrap-auth |
+| `dry-run.sh` | `run` (DRY_RUN command wrapper) | chezup, clean |
 
 The everyday scripts share the tiny logging library `log.sh`:
 
