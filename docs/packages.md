@@ -107,6 +107,8 @@ The prompts degrade across three tiers to fit the terminal:
   a new module, add the catalog entry to `modules.toml`, its Brewfile mapping
   to `packages.toml`, and mirror the default into `.chezmoi.toml.tmpl`.
 
-CI resolves every Homebrew name on macOS (`scripts/ci/brew-resolve.sh`) and
-checks module wiring (`brew-check-modules.sh`), so a typo'd formula or
-unmapped module fails the build. See [development.md](development.md).
+CI resolves every Homebrew name on macOS (`scripts/ci/brew-resolve.sh`), so a
+typo'd formula fails the build; `brew-check-modules.sh` runs alongside it as
+an advisory-only bundle check. Module wiring itself (every `packages.toml`
+entry pointing at a real Brewfile) is enforced by `tests/data-model.bats`.
+See [development.md](development.md).
