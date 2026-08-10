@@ -12,8 +12,8 @@ setup() {
 
 teardown() { [ -n "${ISO:-}" ] && rm -rf "$ISO"; }
 
-# DOTFILES_DIR is set so bootstrap-auth's SOURCE_DIR line never shells out to
-# chezmoi before reaching the guard.
+# DOTFILES_DIR is set so doctor's SOURCE_DIR line never falls back to the
+# real $HOME/Developer/personal/dotfiles before reaching the guard.
 run_isolated() {
     local rel="$1" name
     name="$(basename "$rel")"
@@ -30,6 +30,13 @@ run_isolated() {
 
 @test "bootstrap-auth.sh fails loudly when log.sh is missing" {
     run_isolated scripts/bin/bootstrap-auth.sh
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing"* ]]
+    [[ "$output" == *"log.sh"* ]]
+}
+
+@test "wizard.sh fails loudly when log.sh is missing" {
+    run_isolated scripts/bin/wizard.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
     [[ "$output" == *"log.sh"* ]]

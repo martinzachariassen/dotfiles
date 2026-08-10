@@ -4,12 +4,15 @@
 
 set -euo pipefail
 
-# log.sh is a committed sibling; fail loudly if a checkout is missing it.
+# log.sh and sudo.sh are committed siblings; fail loudly if a checkout is missing either.
 _MD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_MD_DIR/../lib/log.sh" ]; then
-    printf 'macos-defaults: missing %s\n' "$_MD_DIR/../lib/log.sh" >&2
-    exit 1
-fi
+for _md_lib in log.sh sudo.sh; do
+    if [ ! -r "$_MD_DIR/../lib/$_md_lib" ]; then
+        printf 'macos-defaults: missing %s\n' "$_MD_DIR/../lib/$_md_lib" >&2
+        exit 1
+    fi
+done
+unset _md_lib
 # shellcheck source=../lib/log.sh
 . "$_MD_DIR/../lib/log.sh"
 # shellcheck source=../lib/sudo.sh
@@ -123,18 +126,18 @@ def_write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false # default
 
 # TEXTEDIT
 {
-    defaults write com.apple.TextEdit RichText -int 0
-    defaults write com.apple.TextEdit PlainTextEncoding -int 4
-    defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
+    def_write com.apple.TextEdit RichText -int 0
+    def_write com.apple.TextEdit PlainTextEncoding -int 4
+    def_write com.apple.TextEdit PlainTextEncodingForWrite -int 4
 } 2>/dev/null || s_warn "TextEdit defaults skipped (sandbox)."
 
 # SECURITY & PRIVACY
 # These moved to a Lock Screen pane in newer macOS; writes may be silently ignored.
-defaults write com.apple.screensaver askForPassword -int 1 2>/dev/null || true
-defaults write com.apple.screensaver askForPasswordDelay -int 0 2>/dev/null || true
+def_write com.apple.screensaver askForPassword -int 1 2>/dev/null || true
+def_write com.apple.screensaver askForPasswordDelay -int 0 2>/dev/null || true
 
 # DEVELOPMENT NICETIES
-defaults write com.apple.dt.Xcode ShowBuildOperationDuration -bool true 2>/dev/null || true
+def_write com.apple.dt.Xcode ShowBuildOperationDuration -bool true 2>/dev/null || true
 
 def_write NSGlobalDomain AppleFontSmoothing -int 1 # subpixel AA on non-Retina LCDs
 
