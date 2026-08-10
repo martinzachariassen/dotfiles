@@ -4,8 +4,14 @@
 tap "xcodesorg/made"
 
 # Core: lint, format, Xcode version management, SF Symbols browser
-brew "swiftlint"   # wire in as a Run Script build phase
-brew "swiftformat" # build phase or pre-commit hook
+# No maintained VS Code extension surfaces these live in the editor (vknabel's
+# were archived upstream 2025-11-19) — wire swiftlint into an Xcode Run Script
+# build phase (`swiftlint lint --config ~/.config/swiftlint/config.yml`, or let
+# a project .swiftlint.yml win) so warnings surface via SweetPad's build-log
+# diagnostics; run both via pre-commit too. SwiftFormat runs through SweetPad's
+# formatter instead (see [swift] block in VS Code settings). See docs/editors.md.
+brew "swiftlint"
+brew "swiftformat"
 brew "xcodesorg/made/xcodes"
 brew "aria2"     # for `xcodes install`
 cask "sf-symbols" # SF Symbols browser
@@ -13,6 +19,12 @@ cask "sf-symbols" # SF Symbols browser
 # VS Code as daily driver: generates buildServer.json for SourceKit-LSP,
 # needed by Sweetpad and the Swift extension outside plain SwiftPM.
 brew "xcode-build-server"
+
+# Generates .xcodeproj from a plain-YAML project.yml — the project file is
+# never hand-edited (or merge-conflicted) again. SweetPad runs `xcodegen
+# generate` on command and can auto-regenerate on Swift file add/remove
+# (sweetpad.xcodegen.autogenerate); see docs/editors.md.
+brew "xcodegen"
 
 # CI / terminal builds — kicks in once you build outside Xcode or ship
 brew "xcbeautify" # readable xcodebuild output
@@ -22,7 +34,6 @@ brew "fastlane"   # build/sign/upload automation
 # tap "peripheryapp/periphery"
 # brew "peripheryapp/periphery/periphery" # dead-code detection
 # brew "ios-deploy"                       # install/run on device
-# brew "xcodegen"                         # YAML spec; avoids merge conflicts
 # brew "swiftgen"                         # type-safe assets/strings/colors
 # brew "sourcery"                         # Swift meta-programming / boilerplate
 # cask "proxyman"                         # network/API debugging
