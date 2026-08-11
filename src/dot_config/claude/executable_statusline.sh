@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Claude Code status line. Line 1: model · dir · git · PR. Line 2: context gauge ·
-# tokens · cost · ±lines · quota · time. Written for bash 3.2 (macOS system bash).
+# Claude Code status line.
+#   Line 1 — identity: model + mode flags · dir · git (with diff tally) · PR
+#   Line 2 — budget: context gauge · cost + burn rate · api/wall time · quota + reset countdowns
+# Written for bash 3.2 (macOS system bash).
 set -euo pipefail
 
 input="$(cat)"
@@ -51,6 +53,38 @@ fmt_tokens() {
     fi
 }
 
+# Elapsed duration, coarsest useful unit: 45s, 12m, 1h05m.
+fmt_dur() {
+    local s=$1
+    if ((s >= 3600)); then
+        printf '%dh%02dm' $((s / 3600)) $(((s % 3600) / 60))
+    elif ((s >= 60)); then
+        printf '%dm' $((s / 60))
+    else
+        printf '%ds' "$s"
+    fi
+}
+
+# Countdown to a future instant. Sub-minute collapses to "<1m" so the value stops
+# flickering once it no longer changes any decision.
+fmt_eta() {
+    local s=$1
+    if ((s < 0)); then s=0; fi
+    if ((s >= 86400)); then
+        if (((s % 86400) / 3600 > 0)); then
+            printf '%dd%dh' $((s / 86400)) $(((s % 86400) / 3600))
+        else
+            printf '%dd' $((s / 86400))
+        fi
+    elif ((s >= 3600)); then
+        printf '%dh%02dm' $((s / 3600)) $(((s % 3600) / 60))
+    elif ((s >= 60)); then
+        printf '%dm' $((s / 60))
+    else
+        printf '<1m'
+    fi
+}
+
 # Threshold color for a usage percentage (green <70, yellow <90, red otherwise).
 pct_color() {
     if (($1 >= 90)); then
@@ -62,38 +96,78 @@ pct_color() {
     fi
 }
 
+# Small caps keep the effort level legible without competing with the model name.
+effort_label() {
+    case "$1" in
+        low) printf 'ʟᴏᴡ' ;;
+        medium) printf 'ᴍᴇᴅ' ;;
+        high) printf 'ʜɪɢʜ' ;;
+        xhigh) printf 'xʜɪɢʜ' ;;
+        max) printf 'ᴍᴀx' ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
 # Wrap text in an OSC 8 hyperlink (Cmd/Ctrl-click in supporting terminals).
 osc8() { printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"; }
 
 # --- parse every field in one jq call (jq startup dominates runtime) ---
-# Numbers are stringified so join() accepts them; absent fields still emit a separator, keeping read positions aligned.
+# All float math happens here so bash only ever sees integers or printf-ready values.
+# Numbers are stringified so join() accepts them; absent fields still emit a separator,
+# keeping read positions aligned. Strings are stripped of control characters, which
+# would otherwise break the \037-delimited read.
 fields="$(jq -r '
-    [ (.model.display_name // "?"),
-      (.workspace.current_dir // ""),
-      (.session_id // ""),
-      (.cost.total_cost_usd // 0 | tostring),
-      (.cost.total_duration_ms // 0 | tostring),
-      (.cost.total_lines_added // 0 | tostring),
-      (.cost.total_lines_removed // 0 | tostring),
-      (.context_window.used_percentage // 0 | tostring),
-      (.context_window.total_input_tokens // 0 | tostring),
-      (.context_window.context_window_size // 0 | tostring),
-      (.effort.level // ""),
-      (.workspace.git_worktree // ""),
+    def clean: if . == null then "" else tostring | gsub("[[:cntrl:]]"; " ") end;
+    def num: if . == null then 0 else . end;
+    (.cost.total_duration_ms | num) as $dur |
+    (.cost.total_cost_usd | num) as $cost |
+    [ (.model.display_name // "?" | clean),
+      (.workspace.current_dir // "" | clean),
+      (.session_id // "" | clean),
+      (.session_name // "" | clean),
+      ($cost | tostring),
+      (if $dur > 120000 and $cost > 0 then ($cost * 3600000 / $dur | tostring) else "" end),
+      ($dur | tostring),
+      (.cost.total_api_duration_ms | num | tostring),
+      (.cost.total_lines_added | num | tostring),
+      (.cost.total_lines_removed | num | tostring),
+      (.context_window.used_percentage | num | tostring),
+      (.context_window.total_input_tokens | num | tostring),
+      (.context_window.context_window_size | num | tostring),
+      (.effort.level // "" | clean),
+      (.worktree.name // .workspace.git_worktree // "" | clean),
       (.pr.number // "" | tostring),
-      (.pr.url // ""),
-      (.pr.review_state // ""),
-      (.rate_limits.five_hour.used_percentage // "" | tostring),
-      (.rate_limits.seven_day.used_percentage // "" | tostring)
+      (.pr.url // "" | clean),
+      (.pr.review_state // "" | clean),
+      (if .rate_limits.five_hour then (.rate_limits.five_hour.used_percentage | num | floor | tostring) else "" end),
+      (if .rate_limits.five_hour.resets_at then (.rate_limits.five_hour.resets_at - now | floor | tostring) else "" end),
+      (if .rate_limits.seven_day then (.rate_limits.seven_day.used_percentage | num | floor | tostring) else "" end),
+      (if .rate_limits.seven_day.resets_at then (.rate_limits.seven_day.resets_at - now | floor | tostring) else "" end),
+      (if .fast_mode then "1" else "" end),
+      (if .exceeds_200k_tokens then "1" else "" end),
+      (if .thinking.enabled == false then "1" else "" end),
+      (.agent.name // "" | clean),
+      (.vim.mode // "" | clean),
+      ((.workspace.added_dirs // []) | length | tostring),
+      (.output_style.name // "" | clean)
     ] | join("\u001f")' <<<"$input")"
 
 IFS=$'\037' read -r \
-    MODEL DIR SESSION_ID COST DURATION_MS LINES_ADDED LINES_REMOVED \
-    PCT_RAW USED_TOKENS CTX_SIZE EFFORT WORKTREE \
-    PR_NUMBER PR_URL PR_STATE FIVE_H SEVEN_D <<<"$fields"
+    MODEL DIR SESSION_ID SESSION_NAME COST RATE DURATION_MS API_MS \
+    LINES_ADDED LINES_REMOVED PCT_RAW USED_TOKENS CTX_SIZE EFFORT WORKTREE \
+    PR_NUMBER PR_URL PR_STATE FIVE_H FIVE_H_ETA SEVEN_D SEVEN_D_ETA \
+    FAST_MODE BIG_CTX NO_THINKING AGENT_NAME VIM_MODE ADDED_DIRS OUTPUT_STYLE <<<"$fields"
 
 PCT=${PCT_RAW%%.*}
 PCT=${PCT:-0}
+COST=${COST:-0}
+DURATION_MS=${DURATION_MS:-0}
+API_MS=${API_MS:-0}
+LINES_ADDED=${LINES_ADDED:-0}
+LINES_REMOVED=${LINES_REMOVED:-0}
+USED_TOKENS=${USED_TOKENS:-0}
+CTX_SIZE=${CTX_SIZE:-0}
+ADDED_DIRS=${ADDED_DIRS:-0}
 
 # --- git state, cached per session ---
 CACHE_FILE="${TMPDIR:-/tmp}/claude-statusline-git-${SESSION_ID}"
@@ -133,9 +207,25 @@ STAGED=${STAGED:-0} MODIFIED=${MODIFIED:-0} UNTRACKED=${UNTRACKED:-0}
 AHEAD=${AHEAD:-0} BEHIND=${BEHIND:-0} CONFLICTS=${CONFLICTS:-0}
 
 # ============================ line 1: identity ============================
+# Mode flags render only when they deviate from the default, so the line stays
+# quiet until something is actually worth knowing.
 LINE1="${CYAN}${BOLD}${MODEL}${RESET}"
-[[ -n "$EFFORT" ]] && LINE1+=" ${DIM}${EFFORT}${RESET}"
+[[ -n "$EFFORT" ]] && LINE1+=" ${DIM}$(effort_label "$EFFORT")${RESET}"
+[[ -n "$FAST_MODE" ]] && LINE1+=" ${YELLOW}⚡${RESET}"
+[[ -n "$BIG_CTX" ]] && LINE1+=" ${YELLOW}1M${RESET}" # past 200k: premium-tier pricing
+[[ -n "$NO_THINKING" ]] && LINE1+=" ${DIM}🧠off${RESET}"
+[[ -n "$VIM_MODE" && "$VIM_MODE" != "INSERT" ]] && LINE1+=" ${MAGENTA}${VIM_MODE}${RESET}"
+[[ -n "$AGENT_NAME" ]] && LINE1+=" ${DIM}🤖${AGENT_NAME}${RESET}"
+[[ -n "$OUTPUT_STYLE" && "$OUTPUT_STYLE" != "default" ]] && LINE1+=" ${DIM}${OUTPUT_STYLE}${RESET}"
+
 LINE1+="${SEP}📁 ${BOLD}${DIR##*/}${RESET}"
+((ADDED_DIRS > 0)) && LINE1+=" ${DIM}+${ADDED_DIRS}dir${RESET}"
+[[ -n "$SESSION_NAME" ]] && LINE1+=" ${DIM}🏷 ${SESSION_NAME}${RESET}"
+
+DIFF=""
+if ((LINES_ADDED > 0 || LINES_REMOVED > 0)); then
+    DIFF="${GREEN}+${LINES_ADDED}${RESET}${DIM}/${RESET}${RED}-${LINES_REMOVED}${RESET}"
+fi
 
 if [[ -n "$BRANCH" ]]; then
     if ((${#BRANCH} > 30)); then BRANCH="${BRANCH:0:29}…"; fi
@@ -147,7 +237,10 @@ if [[ -n "$BRANCH" ]]; then
     ((AHEAD > 0)) && GIT+=" ${CYAN}⇡${AHEAD}${RESET}"
     ((BEHIND > 0)) && GIT+=" ${CYAN}⇣${BEHIND}${RESET}"
     [[ -n "$WORKTREE" ]] && GIT+=" ${DIM}⑂${WORKTREE}${RESET}"
+    [[ -n "$DIFF" ]] && GIT+=" ${DIFF}"
     LINE1+="${SEP}${GIT}"
+elif [[ -n "$DIFF" ]]; then
+    LINE1+="${SEP}${DIFF}"
 fi
 
 if [[ -n "$PR_NUMBER" ]]; then
@@ -161,7 +254,7 @@ if [[ -n "$PR_NUMBER" ]]; then
     LINE1+="${SEP}${PR_BODY}"
 fi
 
-# ============================ line 2: vitals ============================
+# ============================ line 2: budget ============================
 BAR_WIDTH=14
 FILLED=$((PCT * BAR_WIDTH / 100))
 if ((FILLED > BAR_WIDTH)); then FILLED=$BAR_WIDTH; fi
@@ -184,25 +277,21 @@ if ((CTX_SIZE > 0)); then
 fi
 
 LINE2+="${SEP}💰 ${YELLOW}$(printf '$%.2f' "$COST")${RESET}"
+# Burn rate stays hidden for the first two minutes, where it is pure noise.
+[[ -n "$RATE" ]] && LINE2+=" ${DIM}$(printf '$%.2f/h' "$RATE")${RESET}"
 
-if ((LINES_ADDED > 0 || LINES_REMOVED > 0)); then
-    LINE2+="${SEP}${GREEN}+${LINES_ADDED}${RESET}${DIM}/${RESET}${RED}-${LINES_REMOVED}${RESET}"
+# api/wall separates "waiting on the model" from "session has been open".
+LINE2+="${SEP}⏱ ${DIM}$(fmt_dur $((API_MS / 1000)))/$(fmt_dur $((DURATION_MS / 1000)))${RESET}"
+
+# Quota percentage answers "how much is left", the countdown answers "for how long" —
+# neither is actionable without the other.
+if [[ -n "$FIVE_H" ]]; then
+    LINE2+="${SEP}5h $(pct_color "$FIVE_H")${FIVE_H}%${RESET}"
+    [[ -n "$FIVE_H_ETA" ]] && LINE2+=" ${DIM}↻$(fmt_eta "$FIVE_H_ETA")${RESET}"
 fi
-
-if [[ -n "$FIVE_H" || -n "$SEVEN_D" ]]; then
-    LINE2+="${SEP}"
-    if [[ -n "$FIVE_H" ]]; then
-        h=${FIVE_H%%.*}
-        LINE2+="5h $(pct_color "${h:-0}")${h:-0}%${RESET}"
-    fi
-    if [[ -n "$SEVEN_D" ]]; then
-        d=${SEVEN_D%%.*}
-        [[ -n "$FIVE_H" ]] && LINE2+=" "
-        LINE2+="7d $(pct_color "${d:-0}")${d:-0}%${RESET}"
-    fi
+if [[ -n "$SEVEN_D" ]]; then
+    LINE2+="${SEP}7d $(pct_color "$SEVEN_D")${SEVEN_D}%${RESET}"
+    [[ -n "$SEVEN_D_ETA" ]] && LINE2+=" ${DIM}↻$(fmt_eta "$SEVEN_D_ETA")${RESET}"
 fi
-
-DURATION_SEC=$((DURATION_MS / 1000))
-LINE2+="${SEP}⏱ $((DURATION_SEC / 60))m $((DURATION_SEC % 60))s"
 
 printf '%s\n%s\n' "$LINE1" "$LINE2"
