@@ -42,7 +42,7 @@ only ever sees integers. Git state is a separate cost, so it's cached per
 session in `$TMPDIR` for 5s.
 
 ```
-Opus 5 ᴍᴀx ⚡ · 📁 dotfiles · 🌿 main ~2 ?1 ⇡1 +120/-34 · PR #94
+Opus 5 MAX ⚡ · 📁 dotfiles · 🌿 main ~2 ?1 ⇡1 +120/-34 · PR #94
 ███████░░░░░░░ 48% 96k/1.0M · 💰 $1.24 $1.59/h · ⏱ 12m/47m · 5h 62% ↻1h42m · 7d 41% ↻4d5h
 ```
 
