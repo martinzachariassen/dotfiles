@@ -23,8 +23,39 @@ teardown() {
 # text a user actually reads.
 render() {
     run env TMPDIR="$ISO_TMP" bash "$STATUSLINE" <<<"$1"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || fail "statusline exited $status: $output"
     output="$(printf '%s' "$output" | perl -pe 's/\e\[[0-9;]*m//g; s/\e\]8;;[^\e]*\e\\//g')"
+    # bats fills `lines` from the raw capture and never refreshes it, so rebuild it
+    # from the stripped text. Otherwise a color escape landing mid-substring — as it
+    # does between "5h " and "62%" — silently defeats every match against a line.
+    lines=()
+    local l
+    while IFS= read -r l; do lines+=("$l"); done <<<"$output"
+}
+
+# Assertions exit rather than return: bats does not apply errexit to test bodies on
+# every version, so a bare failing `[[ ]]` mid-test can be swallowed with only the
+# last assertion deciding the result. Exiting fails the test at the offending line.
+fail() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+has() {
+    [[ "$output" == *"$1"* ]] || fail "expected output to contain: $1"$'\n--- actual ---\n'"$output"
+}
+
+hasnt() {
+    [[ "$output" != *"$1"* ]] || fail "expected output NOT to contain: $1"$'\n--- actual ---\n'"$output"
+}
+
+# 1-indexed for readability: line 1 is identity, line 2 is budget.
+line_has() {
+    [[ "${lines[$(($1 - 1))]}" == *"$2"* ]] || fail "expected line $1 to contain: $2"$'\n--- actual ---\n'"${lines[$(($1 - 1))]}"
+}
+
+line_hasnt() {
+    [[ "${lines[$(($1 - 1))]}" != *"$2"* ]] || fail "expected line $1 NOT to contain: $2"$'\n--- actual ---\n'"${lines[$(($1 - 1))]}"
 }
 
 # A payload with every field the script reads, overridable per test via a jq filter.
@@ -51,8 +82,8 @@ payload() {
         effort: { level: "max" },
         thinking: { enabled: true },
         # Reset offsets sit deliberately off a unit boundary (1h42m30s, 4d6h30m):
-        # jq evaluates now() a shade after $now was captured, and an exact 1h42m00s
-        # would round down to 1h41m on that drift alone.
+        # jq evaluates now() a shade after $now was captured, and an exact 4d6h00m
+        # would round down to 4d5h on that drift alone.
         rate_limits: {
             five_hour: { used_percentage: 62.4, resets_at: ($now + 6150) },
             seven_day: { used_percentage: 41.1, resets_at: ($now + 369000) }
@@ -64,145 +95,150 @@ payload() {
 
 @test "statusline emits exactly two lines" {
     render "$(payload)"
-    [ "${#lines[@]}" -eq 2 ]
+    [ "${#lines[@]}" -eq 2 ] || fail "expected 2 lines, got ${#lines[@]}"
 }
 
 @test "statusline survives an empty JSON object" {
     run env TMPDIR="$ISO_TMP" bash "$STATUSLINE" <<<'{}'
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || fail "exited $status: $output"
 }
 
 @test "statusline survives a payload with every optional field null" {
     render '{"session_id":"bats","model":{"display_name":"X"},"context_window":{"used_percentage":null},"cost":{}}'
-    [[ "$output" == *"X"* ]]
+    has "X"
 }
 
 # ─── line 1: identity and mode flags ────────────────────────────────────────
 
 @test "line 1 shows the model, effort and directory basename" {
     render "$(payload)"
-    [[ "${lines[0]}" == *"Opus 5"* ]]
-    [[ "${lines[0]}" == *"ᴍᴀx"* ]]
-    [[ "${lines[0]}" == *"${NO_GIT_DIR##*/}"* ]]
+    line_has 1 "Opus 5"
+    line_has 1 "ᴍᴀx"
+    line_has 1 "${NO_GIT_DIR##*/}"
 }
 
 @test "mode flags stay hidden while the session runs on defaults" {
     render "$(payload)"
-    [[ "${lines[0]}" != *"⚡"* ]]
-    [[ "${lines[0]}" != *"1M"* ]]
-    [[ "${lines[0]}" != *"off"* ]]
-    [[ "${lines[0]}" != *"🏷"* ]]
+    line_hasnt 1 "⚡"
+    line_hasnt 1 "1M"
+    line_hasnt 1 "off"
+    line_hasnt 1 "🏷"
 }
 
 @test "fast mode raises a flag" {
     render "$(payload '.fast_mode = true')"
-    [[ "${lines[0]}" == *"⚡"* ]]
+    line_has 1 "⚡"
 }
 
 @test "crossing 200k tokens raises the premium-tier flag" {
     render "$(payload '.exceeds_200k_tokens = true')"
-    [[ "${lines[0]}" == *"1M"* ]]
+    line_has 1 "1M"
 }
 
 @test "disabled thinking raises a flag" {
     render "$(payload '.thinking.enabled = false')"
-    [[ "${lines[0]}" == *"🧠off"* ]]
+    line_has 1 "🧠off"
 }
 
 @test "a renamed session is labelled" {
     render "$(payload '.session_name = "refactor-cleanup"')"
-    [[ "${lines[0]}" == *"🏷 refactor-cleanup"* ]]
+    line_has 1 "🏷 refactor-cleanup"
 }
 
 @test "added directories are counted" {
     render "$(payload '.workspace.added_dirs = ["/a","/b"]')"
-    [[ "${lines[0]}" == *"+2dir"* ]]
+    line_has 1 "+2dir"
 }
 
 @test "vim mode shows only outside INSERT" {
     render "$(payload '.vim.mode = "NORMAL"')"
-    [[ "${lines[0]}" == *"NORMAL"* ]]
+    line_has 1 "NORMAL"
     render "$(payload '.vim.mode = "INSERT"')"
-    [[ "${lines[0]}" != *"INSERT"* ]]
+    line_hasnt 1 "INSERT"
 }
 
 @test "a non-default output style is named" {
     render "$(payload '.output_style.name = "Explanatory"')"
-    [[ "${lines[0]}" == *"Explanatory"* ]]
+    line_has 1 "Explanatory"
 }
 
 @test "the diff tally lands on line 1" {
     render "$(payload)"
-    [[ "${lines[0]}" == *"+120"* ]]
-    [[ "${lines[0]}" == *"-34"* ]]
-    [[ "${lines[1]}" != *"+120"* ]]
+    line_has 1 "+120"
+    line_has 1 "-34"
+    line_hasnt 2 "+120"
+}
+
+@test "the diff tally still shows outside a git repo" {
+    render "$(payload)"
+    line_has 1 "+120"
 }
 
 @test "PR review state picks the matching marker" {
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "approved"}')"
-    [[ "${lines[0]}" == *"✓ PR #94"* ]]
+    line_has 1 "✓ PR #94"
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "changes_requested"}')"
-    [[ "${lines[0]}" == *"✗ PR #94"* ]]
+    line_has 1 "✗ PR #94"
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "draft"}')"
-    [[ "${lines[0]}" == *"PR #94 (draft)"* ]]
+    line_has 1 "PR #94 (draft)"
 }
 
 # ─── line 2: budget ─────────────────────────────────────────────────────────
 
 @test "the context gauge reports a truncated percentage and compact token counts" {
     render "$(payload)"
-    [[ "${lines[1]}" == *"48%"* ]]
-    [[ "${lines[1]}" == *"96k/1.0M"* ]]
+    line_has 2 "48%"
+    line_has 2 "96k/1.0M"
 }
 
 @test "cost renders with two decimals" {
     render "$(payload)"
-    [[ "${lines[1]}" == *'$1.24'* ]]
+    line_has 2 '$1.24'
 }
 
 @test "burn rate is derived from cost over wall-clock" {
     # $1.2437 over 47m ≈ $1.59/h
     render "$(payload)"
-    [[ "${lines[1]}" == *'$1.59/h'* ]]
+    line_has 2 '$1.59/h'
 }
 
 @test "burn rate stays hidden for the first two minutes" {
     render "$(payload '.cost.total_duration_ms = 60000')"
-    [[ "${lines[1]}" != *"/h"* ]]
+    line_hasnt 2 "/h"
 }
 
 @test "the clock separates API time from wall-clock" {
     render "$(payload)"
-    [[ "${lines[1]}" == *"12m/47m"* ]]
+    line_has 2 "12m/47m"
 }
 
 @test "durations past an hour switch to h/m" {
     render "$(payload '.cost.total_api_duration_ms = 5400000 | .cost.total_duration_ms = 14400000')"
-    [[ "${lines[1]}" == *"1h30m/4h00m"* ]]
+    line_has 2 "1h30m/4h00m"
 }
 
 @test "quota shows the used percentage next to a reset countdown" {
     render "$(payload)"
-    [[ "${lines[1]}" == *"5h 62%"* ]]
-    [[ "${lines[1]}" == *"↻1h42m"* ]]
-    [[ "${lines[1]}" == *"7d 41%"* ]]
-    [[ "${lines[1]}" == *"↻4d6h"* ]]
+    line_has 2 "5h 62%"
+    line_has 2 "↻1h42m"
+    line_has 2 "7d 41%"
+    line_has 2 "↻4d6h"
 }
 
 @test "a sub-minute reset collapses instead of ticking" {
     render "$(payload '.rate_limits.five_hour.resets_at = (now + 30)')"
-    [[ "${lines[1]}" == *"↻<1m"* ]]
+    line_has 2 "↻<1m"
 }
 
 @test "an elapsed reset never renders as negative" {
     render "$(payload '.rate_limits.five_hour.resets_at = (now - 500)')"
-    [[ "${lines[1]}" != *"↻-"* ]]
+    line_hasnt 2 "↻-"
 }
 
 @test "the quota section disappears without subscription data" {
     render "$(payload 'del(.rate_limits)')"
-    [[ "${lines[1]}" != *"5h "* ]]
-    [[ "${lines[1]}" != *"7d "* ]]
+    line_hasnt 2 "5h "
+    line_hasnt 2 "7d "
 }
 
 # ─── robustness ─────────────────────────────────────────────────────────────
@@ -210,8 +246,8 @@ payload() {
 @test "control characters in a string field cannot desync the field read" {
     # A newline in session_name would otherwise truncate the \037-delimited read.
     render "$(payload '.session_name = "one\ntwo"')"
-    [ "${#lines[@]}" -eq 2 ]
-    [[ "${lines[1]}" == *'$1.24'* ]]
+    [ "${#lines[@]}" -eq 2 ] || fail "expected 2 lines, got ${#lines[@]}"
+    line_has 2 '$1.24'
 }
 
 @test "an overlong branch name is truncated" {
@@ -222,16 +258,15 @@ payload() {
     render "$(payload)"
     local cold="$output"
     render "$(payload)"
-    [ "$output" = "$cold" ]
+    [ "$output" = "$cold" ] || fail "warm render differs:"$'\n'"$cold"$'\n--- vs ---\n'"$output"
 }
 
 @test "a GNU-stat PATH cannot desync the cache age check" {
     # GNU stat accepts -f as --file-system and answers %m with a mount point, so the
     # mtime probe must range-check its result rather than trust the first success.
+    # GNU also answers an unsupported file-system directive with "?" and exit 0.
     local stub
     stub="$(mktemp -d)"
-    # GNU stat answers an unsupported file-system directive with "?" and exit 0,
-    # so the probe cannot lean on the exit status to detect the wrong stat flavour.
     cat >"$stub/stat" <<'STUB'
 #!/usr/bin/env bash
 if [[ "$1" == "-f" ]]; then echo "?"; exit 0; fi
@@ -242,5 +277,6 @@ STUB
     render "$(payload)" # cold: writes the cache
     run env TMPDIR="$ISO_TMP" PATH="$stub:$PATH" bash "$STATUSLINE" <<<"$(payload)"
     rm -rf "$stub"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 0 ] || fail "warm render under GNU stat exited $status: $output"
+    [[ "$output" != *"syntax error"* ]] || fail "arithmetic error leaked: $output"
 }
