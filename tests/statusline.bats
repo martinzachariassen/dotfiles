@@ -13,6 +13,11 @@ setup() {
     # per-session git cache never collides with a real session's.
     NO_GIT_DIR="$(mktemp -d)"
     ISO_TMP="$(mktemp -d)"
+
+    # Pull the Nerd Font icons straight out of the script so the codepoints live in
+    # exactly one place. Asserting on a literal glyph here would mean maintaining a
+    # second copy of every icon, in a file where a private-use character is invisible.
+    eval "$(grep -E "^I_[A-Z_]+=\\\$'" "$STATUSLINE")"
 }
 
 teardown() {
@@ -119,15 +124,15 @@ payload() {
 
 @test "mode flags stay hidden while the session runs on defaults" {
     render "$(payload)"
-    line_hasnt 1 "⚡"
+    line_hasnt 1 "$I_BOLT"
     line_hasnt 1 "1M"
     line_hasnt 1 "off"
-    line_hasnt 1 "🏷"
+    line_hasnt 1 "$I_TAG"
 }
 
 @test "fast mode raises a flag" {
     render "$(payload '.fast_mode = true')"
-    line_has 1 "⚡"
+    line_has 1 "$I_BOLT"
 }
 
 @test "crossing 200k tokens raises the premium-tier flag" {
@@ -137,12 +142,12 @@ payload() {
 
 @test "disabled thinking raises a flag" {
     render "$(payload '.thinking.enabled = false')"
-    line_has 1 "🧠off"
+    line_has 1 "$I_BRAIN off"
 }
 
 @test "a renamed session is labelled" {
     render "$(payload '.session_name = "refactor-cleanup"')"
-    line_has 1 "🏷 refactor-cleanup"
+    line_has 1 "$I_TAG refactor-cleanup"
 }
 
 @test "added directories are counted" {
@@ -176,11 +181,11 @@ payload() {
 
 @test "PR review state picks the matching marker" {
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "approved"}')"
-    line_has 1 "✓ PR #94"
+    line_has 1 "$I_OK #94"
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "changes_requested"}')"
-    line_has 1 "✗ PR #94"
+    line_has 1 "$I_NO #94"
     render "$(payload '.pr = {number: 94, url: "https://example.test/94", review_state: "draft"}')"
-    line_has 1 "PR #94 (draft)"
+    line_has 1 "$I_PR #94 draft"
 }
 
 # ─── line 2: budget ─────────────────────────────────────────────────────────
@@ -220,19 +225,19 @@ payload() {
 @test "quota shows the used percentage next to a reset countdown" {
     render "$(payload)"
     line_has 2 "5h 62%"
-    line_has 2 "↻1h42m"
+    line_has 2 "$I_RESET 1h42m"
     line_has 2 "7d 41%"
-    line_has 2 "↻4d6h"
+    line_has 2 "$I_RESET 4d6h"
 }
 
 @test "a sub-minute reset collapses instead of ticking" {
     render "$(payload '.rate_limits.five_hour.resets_at = (now + 30)')"
-    line_has 2 "↻<1m"
+    line_has 2 "$I_RESET <1m"
 }
 
 @test "an elapsed reset never renders as negative" {
     render "$(payload '.rate_limits.five_hour.resets_at = (now - 500)')"
-    line_hasnt 2 "↻-"
+    line_hasnt 2 "$I_RESET -"
 }
 
 @test "the quota section disappears without subscription data" {
@@ -250,8 +255,75 @@ payload() {
     line_has 2 '$1.24'
 }
 
-@test "an overlong branch name is truncated" {
-    grep -q 'BRANCH:0:29' "$STATUSLINE"
+@test "an overlong text field is clipped with an ellipsis" {
+    # session_name is the one unbounded string a payload fully controls, so it
+    # stands in for the shared trunc helper that also bounds dir, agent and branch.
+    render "$(payload '.session_name = "an extravagantly long session name that would run off any pane"')"
+    line_has 1 "…"
+    line_hasnt 1 "run off any pane"
+}
+
+# ─── width budget ───────────────────────────────────────────────────────────
+# The payload carries no terminal width, so the budget reads COLUMNS. Segments
+# shed by priority: output style, agent, session name, worktree, diff, then PR.
+
+render_at() { # render_at <columns> <payload>
+    run env TMPDIR="$ISO_TMP" COLUMNS="$1" bash "$STATUSLINE" <<<"$2"
+    [ "$status" -eq 0 ] || fail "statusline exited $status: $output"
+    output="$(printf '%s' "$output" | perl -pe 's/\e\[[0-9;]*m//g; s/\e\]8;;[^\e]*\e\\//g')"
+    lines=()
+    local l
+    while IFS= read -r l; do lines+=("$l"); done <<<"$output"
+}
+
+crowded() {
+    payload '.session_name = "a named session"
+           | .agent = {name: "code-reviewer"}
+           | .pr = {number: 1284, url: "https://example.test/1284", review_state: "open"}'
+}
+
+@test "a wide terminal keeps every segment" {
+    render_at 200 "$(crowded)"
+    line_has 1 "code-reviewer"
+    line_has 1 "a named session"
+    line_has 1 "#1284"
+}
+
+@test "a narrow terminal sheds the least important segments first" {
+    render_at 60 "$(crowded)"
+    line_hasnt 1 "code-reviewer"
+    line_hasnt 1 "a named session"
+}
+
+@test "the essentials survive even an absurdly narrow terminal" {
+    render_at 20 "$(crowded)"
+    line_has 1 "Opus 5"
+    line_has 1 "${NO_GIT_DIR##*/}"
+    line_has 2 "48%"
+    line_has 2 '$1.24'
+}
+
+@test "an unset COLUMNS drops nothing" {
+    # Guards the fallback: an undetectable width must mean "unlimited", never 0 cells.
+    run env TMPDIR="$ISO_TMP" COLUMNS="" bash "$STATUSLINE" <<<"$(crowded)"
+    [ "$status" -eq 0 ] || fail "exited $status: $output"
+    [[ "$output" == *"code-reviewer"* ]] || fail "expected no shedding, got: $output"
+}
+
+@test "every icon measures one cell so the budget arithmetic holds" {
+    # The whole width model rests on this: a two-cell glyph would silently make
+    # every line wider than the budget believes it is.
+    local icons
+    icons="$(grep -E "^I_[A-Z_]+=\\\$'" "$STATUSLINE" | sed -E "s/^I_[A-Z_]+=\\\$'(.*)'.*/\1/")"
+    [ -n "$icons" ] || fail "no icons found in $STATUSLINE"
+    printf '%s' "$icons" | python3 -c '
+import sys, unicodedata as u
+bad = [c for c in sys.stdin.read() if c != "\n"
+       and u.east_asian_width(c) in ("W", "F")]
+if bad:
+    print("two-cell glyphs: " + " ".join(f"U+{ord(c):05X}" for c in bad))
+    sys.exit(1)
+' || fail "an icon is not single-width"
 }
 
 @test "a warm git cache renders identically to a cold one" {
