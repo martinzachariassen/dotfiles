@@ -122,14 +122,15 @@ pct_color() {
     fi
 }
 
-# Small caps keep the effort level legible without competing with the model name.
+# Plain uppercase ASCII — small-caps Unicode isn't in every font's cmap and
+# falls back to a mismatched font, which stands out next to the model name.
 effort_label() {
     case "$1" in
-        low) printf 'ʟᴏᴡ' ;;
-        medium) printf 'ᴍᴇᴅ' ;;
-        high) printf 'ʜɪɢʜ' ;;
-        xhigh) printf 'xʜɪɢʜ' ;;
-        max) printf 'ᴍᴀx' ;;
+        low) printf 'LOW' ;;
+        medium) printf 'MED' ;;
+        high) printf 'HIGH' ;;
+        xhigh) printf 'XHIGH' ;;
+        max) printf 'MAX' ;;
         *) printf '%s' "$1" ;;
     esac
 }

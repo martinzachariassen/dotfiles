@@ -118,7 +118,7 @@ payload() {
 @test "line 1 shows the model, effort and directory basename" {
     render "$(payload)"
     line_has 1 "Opus 5"
-    line_has 1 "ᴍᴀx"
+    line_has 1 "MAX"
     line_has 1 "${NO_GIT_DIR##*/}"
 }
 
