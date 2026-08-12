@@ -2,8 +2,35 @@
 # Claude Code status line.
 #   Line 1 — identity: model + mode flags · dir · git (with diff tally) · PR
 #   Line 2 — budget: context gauge · cost + burn rate · api/wall time · quota + reset countdowns
+#
+# Icons are Nerd Font glyphs, matching the vocabulary starship already uses in the
+# prompt directly above. Every glyph occupies exactly one cell, which is what lets
+# the width budget below measure segments with plain ${#var}.
+#
+# Colors are ANSI 16 plus attributes only — no hardcoded hex. The terminal theme
+# (catppuccin-frappe) maps those onto the palette, so the bar follows a theme
+# switch instead of drifting off it.
+#
 # Written for bash 3.2 (macOS system bash).
 set -euo pipefail
+
+# The width budget measures segments with ${#var}, which counts characters only
+# under a UTF-8 ctype; a C locale counts bytes and reads every glyph as three or
+# four cells. Probe with a two-byte character rather than trusting the locale name:
+# macOS spells the charset-only locale "UTF-8" and glibc spells it "C.UTF-8", and
+# assigning one the system lacks makes bash warn on stderr — which the host would
+# render as a third status line.
+UTF8_PROBE='é'
+if ((${#UTF8_PROBE} != 1)); then
+    for loc in C.UTF-8 UTF-8 en_US.UTF-8; do
+        { export LC_CTYPE="$loc"; } 2>/dev/null
+        ((${#UTF8_PROBE} == 1)) && break
+    done
+fi
+# Still counting bytes means no width is trustworthy, so the budget is stood down
+# entirely — an unbudgeted line that wraps beats one shredded by bogus arithmetic.
+UTF8_OK=1
+((${#UTF8_PROBE} == 1)) || UTF8_OK=0
 
 input="$(cat)"
 
@@ -17,29 +44,27 @@ YELLOW=$'\033[33m'
 BLUE=$'\033[34m'
 MAGENTA=$'\033[35m'
 CYAN=$'\033[36m'
-GRAY=$'\033[38;5;240m'
+TRACK=$'\033[90m' # bright black — the gauge's unfilled run
 SEP=" ${DIM}·${RESET} "
+SEP_WIDTH=3
+
+# --- icons (Nerd Font 3.x; each is one cell and always followed by one space) ---
+I_DIR=$''      # fa-folder
+I_BRANCH=$''   # pl-branch — the same glyph starship's git_branch uses
+I_WORKTREE=$'' # oct-repo_forked
+I_TAG=$''      # fa-tag
+I_PR=$''       # oct-git_pull_request
+I_DIFF=$''     # oct-diff — marks session edits, so +N stays unambiguous
+I_AGENT=$'󰚩'    # md-robot
+I_BRAIN=$'󰧑'    # md-brain
+I_BOLT=$''     # fa-bolt
+I_CTX=$'󰍛'      # md-memory
+I_CLOCK=$''    # fa-clock
+I_RESET=$''    # fa-refresh
+I_OK=$''       # fa-check
+I_NO=$''       # fa-times
 
 # --- helpers ---
-
-# Interpolate a green→yellow→red RGB triple for a 0-100 percentage.
-gradient_rgb() {
-    local pct=$1 r g b t
-    if ((pct < 0)); then pct=0; fi
-    if ((pct > 100)); then pct=100; fi
-    if ((pct <= 50)); then
-        t=$((pct * 100 / 50)) # 0..100 across green→yellow
-        r=$((39 + (241 - 39) * t / 100))
-        g=$((174 + (196 - 174) * t / 100))
-        b=$((96 + (15 - 96) * t / 100))
-    else
-        t=$(((pct - 50) * 100 / 50)) # 0..100 across yellow→red
-        r=$((241 + (231 - 241) * t / 100))
-        g=$((196 + (76 - 196) * t / 100))
-        b=$((15 + (60 - 15) * t / 100))
-    fi
-    printf '%d %d %d' "$r" "$g" "$b"
-}
 
 # Compact token count: 1234→1k, 200000→200k, 1000000→1.0M.
 fmt_tokens() {
@@ -85,7 +110,8 @@ fmt_eta() {
     fi
 }
 
-# Threshold color for a usage percentage (green <70, yellow <90, red otherwise).
+# One threshold rule for every percentage on the bar — context, 5h and 7d alike.
+# A shared rule means "yellow" carries the same weight wherever it appears.
 pct_color() {
     if (($1 >= 90)); then
         printf '%s' "$RED"
@@ -108,8 +134,83 @@ effort_label() {
     esac
 }
 
+# Clip an untrusted-length string, reserving a cell for the ellipsis.
+trunc() {
+    local max=$1 s=$2
+    if ((${#s} > max)); then printf '%s…' "${s:0:max-1}"; else printf '%s' "$s"; fi
+}
+
 # Wrap text in an OSC 8 hyperlink (Cmd/Ctrl-click in supporting terminals).
 osc8() { printf '\033]8;;%s\033\\%s\033]8;;\033\\' "$1" "$2"; }
+
+# The payload carries no terminal width, so fall back through the environment and
+# finally to 0, which the budget treats as "unlimited" rather than guessing wrong.
+term_cols() {
+    local c="${COLUMNS:-}"
+    if [[ "$c" =~ ^[0-9]+$ ]] && ((c > 0)); then
+        printf '%s' "$c"
+        return
+    fi
+    c="$(tput cols 2>/dev/null </dev/tty || true)"
+    if [[ "$c" =~ ^[0-9]+$ ]] && ((c > 0)); then
+        printf '%s' "$c"
+        return
+    fi
+    printf '0'
+}
+
+# --- segment assembly ---
+# Parallel arrays because bash 3.2 has no associative arrays. Each segment carries
+# its rendered text, the plain text it measures as, and a drop priority: 0 never
+# drops, higher numbers drop first once the line overruns its budget.
+SEG_TEXT=() SEG_PLAIN=() SEG_PRIO=()
+
+seg() { # seg <priority> <plain> <rendered>
+    SEG_PRIO+=("$1")
+    SEG_PLAIN+=("$2")
+    SEG_TEXT+=("$3")
+}
+
+seg_reset() { SEG_TEXT=() SEG_PLAIN=() SEG_PRIO=(); }
+
+# Join the segments, shedding the least important ones until the line fits.
+fit_line() {
+    local budget=$1 n=${#SEG_TEXT[@]} i prio total=0
+    ((n == 0)) && return 0
+
+    local keep=()
+    for ((i = 0; i < n; i++)); do
+        keep[i]=1
+        total=$((total + ${#SEG_PLAIN[i]}))
+    done
+    total=$((total + (n - 1) * SEP_WIDTH))
+
+    if ((budget > 0)); then
+        # Walk priorities from least to most important; within a priority drop the
+        # rightmost segment first, so what survives keeps its reading order.
+        for ((prio = 9; prio >= 1; prio--)); do
+            for ((i = n - 1; i >= 0; i--)); do
+                ((total <= budget)) && break 2
+                if ((keep[i] == 1 && SEG_PRIO[i] == prio)); then
+                    keep[i]=0
+                    total=$((total - ${#SEG_PLAIN[i]} - SEP_WIDTH))
+                fi
+            done
+        done
+    fi
+
+    local out="" first=1
+    for ((i = 0; i < n; i++)); do
+        ((keep[i] == 0)) && continue
+        if ((first == 1)); then
+            out="${SEG_TEXT[i]}"
+            first=0
+        else
+            out+="${SEP}${SEG_TEXT[i]}"
+        fi
+    done
+    printf '%s' "$out"
+}
 
 # --- parse every field in one jq call (jq startup dominates runtime) ---
 # All float math happens here so bash only ever sees integers or printf-ready values.
@@ -150,7 +251,7 @@ fields="$(jq -r '
       (.vim.mode // "" | clean),
       ((.workspace.added_dirs // []) | length | tostring),
       (.output_style.name // "" | clean)
-    ] | join("\u001f")' <<<"$input")"
+    ] | join("")' <<<"$input")"
 
 IFS=$'\037' read -r \
     MODEL DIR SESSION_ID SESSION_NAME COST RATE DURATION_MS API_MS \
@@ -168,6 +269,12 @@ LINES_REMOVED=${LINES_REMOVED:-0}
 USED_TOKENS=${USED_TOKENS:-0}
 CTX_SIZE=${CTX_SIZE:-0}
 ADDED_DIRS=${ADDED_DIRS:-0}
+
+# Two columns of slack: the host pads the bar, and a line that exactly fills the
+# width still wraps in some terminals.
+COLS="$(term_cols)"
+BUDGET=0
+((UTF8_OK == 1 && COLS > 0)) && BUDGET=$((COLS - 2))
 
 # --- git state, cached per session ---
 CACHE_FILE="${TMPDIR:-/tmp}/claude-statusline-git-${SESSION_ID}"
@@ -213,53 +320,92 @@ AHEAD=${AHEAD:-0} BEHIND=${BEHIND:-0} CONFLICTS=${CONFLICTS:-0}
 
 # ============================ line 1: identity ============================
 # Mode flags render only when they deviate from the default, so the line stays
-# quiet until something is actually worth knowing.
-LINE1="${CYAN}${BOLD}${MODEL}${RESET}"
-[[ -n "$EFFORT" ]] && LINE1+=" ${DIM}$(effort_label "$EFFORT")${RESET}"
-[[ -n "$FAST_MODE" ]] && LINE1+=" ${YELLOW}⚡${RESET}"
-[[ -n "$BIG_CTX" ]] && LINE1+=" ${YELLOW}1M${RESET}" # past 200k: premium-tier pricing
-[[ -n "$NO_THINKING" ]] && LINE1+=" ${DIM}🧠off${RESET}"
-[[ -n "$VIM_MODE" && "$VIM_MODE" != "INSERT" ]] && LINE1+=" ${MAGENTA}${VIM_MODE}${RESET}"
-[[ -n "$AGENT_NAME" ]] && LINE1+=" ${DIM}🤖${AGENT_NAME}${RESET}"
-[[ -n "$OUTPUT_STYLE" && "$OUTPUT_STYLE" != "default" ]] && LINE1+=" ${DIM}${OUTPUT_STYLE}${RESET}"
+# quiet until something is actually worth knowing. They ride along with the model
+# segment, which never drops — each is a couple of cells at most.
+seg_reset
 
-LINE1+="${SEP}📁 ${BOLD}${DIR##*/}${RESET}"
-((ADDED_DIRS > 0)) && LINE1+=" ${DIM}+${ADDED_DIRS}dir${RESET}"
-[[ -n "$SESSION_NAME" ]] && LINE1+=" ${DIM}🏷 ${SESSION_NAME}${RESET}"
+M_PLAIN="$MODEL" M_TEXT="${CYAN}${BOLD}${MODEL}${RESET}"
+if [[ -n "$EFFORT" ]]; then
+    E="$(effort_label "$EFFORT")"
+    M_PLAIN+=" $E" M_TEXT+=" ${DIM}${E}${RESET}"
+fi
+if [[ -n "$FAST_MODE" ]]; then
+    M_PLAIN+=" $I_BOLT" M_TEXT+=" ${YELLOW}${I_BOLT}${RESET}"
+fi
+if [[ -n "$BIG_CTX" ]]; then # past 200k: premium-tier pricing
+    M_PLAIN+=" 1M" M_TEXT+=" ${YELLOW}1M${RESET}"
+fi
+if [[ -n "$NO_THINKING" ]]; then
+    M_PLAIN+=" $I_BRAIN off" M_TEXT+=" ${DIM}${I_BRAIN} off${RESET}"
+fi
+if [[ -n "$VIM_MODE" && "$VIM_MODE" != "INSERT" ]]; then
+    M_PLAIN+=" $VIM_MODE" M_TEXT+=" ${MAGENTA}${VIM_MODE}${RESET}"
+fi
+seg 0 "$M_PLAIN" "$M_TEXT"
 
-DIFF=""
-if ((LINES_ADDED > 0 || LINES_REMOVED > 0)); then
-    DIFF="${GREEN}+${LINES_ADDED}${RESET}${DIM}/${RESET}${RED}-${LINES_REMOVED}${RESET}"
+if [[ -n "$AGENT_NAME" ]]; then
+    A="$(trunc 16 "$AGENT_NAME")"
+    seg 5 "$I_AGENT $A" "${DIM}${I_AGENT} ${A}${RESET}"
+fi
+if [[ -n "$OUTPUT_STYLE" && "$OUTPUT_STYLE" != "default" ]]; then
+    O="$(trunc 16 "$OUTPUT_STYLE")"
+    seg 7 "$O" "${DIM}${O}${RESET}"
 fi
 
+D="$(trunc 24 "${DIR##*/}")"
+D_PLAIN="$I_DIR $D" D_TEXT="${DIM}${I_DIR}${RESET} ${BLUE}${BOLD}${D}${RESET}"
+if ((ADDED_DIRS > 0)); then
+    D_PLAIN+=" +${ADDED_DIRS}dir" D_TEXT+=" ${DIM}+${ADDED_DIRS}dir${RESET}"
+fi
+seg 0 "$D_PLAIN" "$D_TEXT"
+
+if [[ -n "$SESSION_NAME" ]]; then
+    S="$(trunc 28 "$SESSION_NAME")"
+    seg 4 "$I_TAG $S" "${DIM}${I_TAG} ${S}${RESET}"
+fi
+
+# Git counts use starship's notation so the same symbol means the same thing in
+# the prompt and the bar: +staged !modified ?untracked ✗conflict ⇡ahead ⇣behind.
 if [[ -n "$BRANCH" ]]; then
-    if ((${#BRANCH} > 30)); then BRANCH="${BRANCH:0:29}…"; fi
-    GIT="🌿 ${MAGENTA}${BRANCH}${RESET}"
-    ((STAGED > 0)) && GIT+=" ${GREEN}+${STAGED}${RESET}"
-    ((MODIFIED > 0)) && GIT+=" ${YELLOW}~${MODIFIED}${RESET}"
-    ((UNTRACKED > 0)) && GIT+=" ${BLUE}?${UNTRACKED}${RESET}"
-    ((CONFLICTS > 0)) && GIT+=" ${RED}✖${CONFLICTS}${RESET}"
-    ((AHEAD > 0)) && GIT+=" ${CYAN}⇡${AHEAD}${RESET}"
-    ((BEHIND > 0)) && GIT+=" ${CYAN}⇣${BEHIND}${RESET}"
-    [[ -n "$WORKTREE" ]] && GIT+=" ${DIM}⑂${WORKTREE}${RESET}"
-    [[ -n "$DIFF" ]] && GIT+=" ${DIFF}"
-    LINE1+="${SEP}${GIT}"
-elif [[ -n "$DIFF" ]]; then
-    LINE1+="${SEP}${DIFF}"
+    B="$(trunc 32 "$BRANCH")"
+    G_PLAIN="$I_BRANCH $B" G_TEXT="${DIM}${I_BRANCH}${RESET} ${MAGENTA}${B}${RESET}"
+    ((STAGED > 0)) && G_PLAIN+=" +$STAGED" && G_TEXT+=" ${GREEN}+${STAGED}${RESET}"
+    ((MODIFIED > 0)) && G_PLAIN+=" !$MODIFIED" && G_TEXT+=" ${YELLOW}!${MODIFIED}${RESET}"
+    ((UNTRACKED > 0)) && G_PLAIN+=" ?$UNTRACKED" && G_TEXT+=" ${BLUE}?${UNTRACKED}${RESET}"
+    ((CONFLICTS > 0)) && G_PLAIN+=" ✗$CONFLICTS" && G_TEXT+=" ${RED}✗${CONFLICTS}${RESET}"
+    ((AHEAD > 0)) && G_PLAIN+=" ⇡$AHEAD" && G_TEXT+=" ${CYAN}⇡${AHEAD}${RESET}"
+    ((BEHIND > 0)) && G_PLAIN+=" ⇣$BEHIND" && G_TEXT+=" ${CYAN}⇣${BEHIND}${RESET}"
+    seg 0 "$G_PLAIN" "$G_TEXT"
+fi
+
+if [[ -n "$WORKTREE" ]]; then
+    W="$(trunc 20 "$WORKTREE")"
+    seg 3 "$I_WORKTREE $W" "${DIM}${I_WORKTREE} ${W}${RESET}"
+fi
+
+# Session edits carry their own icon: without it, "+120" sits next to git's "+3"
+# meaning something entirely different.
+if ((LINES_ADDED > 0 || LINES_REMOVED > 0)); then
+    seg 2 "$I_DIFF +$LINES_ADDED/-$LINES_REMOVED" \
+        "${DIM}${I_DIFF}${RESET} ${GREEN}+${LINES_ADDED}${RESET}${DIM}/${RESET}${RED}-${LINES_REMOVED}${RESET}"
 fi
 
 if [[ -n "$PR_NUMBER" ]]; then
     case "$PR_STATE" in
-        approved) PR_BODY="${GREEN}✓ PR #${PR_NUMBER}${RESET}" ;;
-        changes_requested) PR_BODY="${RED}✗ PR #${PR_NUMBER}${RESET}" ;;
-        draft) PR_BODY="${DIM}PR #${PR_NUMBER} (draft)${RESET}" ;;
-        *) PR_BODY="${YELLOW}PR #${PR_NUMBER}${RESET}" ;;
+        approved) PR_PLAIN="$I_OK #$PR_NUMBER" PR_TEXT="${GREEN}${I_OK} #${PR_NUMBER}${RESET}" ;;
+        changes_requested) PR_PLAIN="$I_NO #$PR_NUMBER" PR_TEXT="${RED}${I_NO} #${PR_NUMBER}${RESET}" ;;
+        draft) PR_PLAIN="$I_PR #$PR_NUMBER draft" PR_TEXT="${DIM}${I_PR} #${PR_NUMBER} draft${RESET}" ;;
+        *) PR_PLAIN="$I_PR #$PR_NUMBER" PR_TEXT="${YELLOW}${I_PR} #${PR_NUMBER}${RESET}" ;;
     esac
-    if [[ -n "$PR_URL" ]]; then PR_BODY="$(osc8 "$PR_URL" "$PR_BODY")"; fi
-    LINE1+="${SEP}${PR_BODY}"
+    [[ -n "$PR_URL" ]] && PR_TEXT="$(osc8 "$PR_URL" "$PR_TEXT")"
+    seg 1 "$PR_PLAIN" "$PR_TEXT"
 fi
 
+LINE1="$(fit_line "$BUDGET")"
+
 # ============================ line 2: budget ============================
+seg_reset
+
 BAR_WIDTH=14
 FILLED=$((PCT * BAR_WIDTH / 100))
 if ((FILLED > BAR_WIDTH)); then FILLED=$BAR_WIDTH; fi
@@ -273,30 +419,52 @@ if ((EMPTY > 0)); then
     printf -v tmp '%*s' "$EMPTY" ''
     EMPTY_STR="${tmp// /░}"
 fi
-read -r GR GG GB <<<"$(gradient_rgb "$PCT")"
-printf -v BAR_COLOR '\033[38;2;%d;%d;%dm' "$GR" "$GG" "$GB"
+BAR_COLOR="$(pct_color "$PCT")"
 
-LINE2="${BAR_COLOR}${FILLED_STR}${RESET}${GRAY}${EMPTY_STR}${RESET} ${BAR_COLOR}${PCT}%${RESET}"
+# The gauge and its token count are one reading, and so are the cost and its burn
+# rate. Keeping each pair inside a single segment costs 3 cells less than a "·"
+# join and stops the eye from parsing them as unrelated facts.
+X_PLAIN="$I_CTX ${FILLED_STR}${EMPTY_STR} ${PCT}%"
+X_TEXT="${DIM}${I_CTX}${RESET} ${BAR_COLOR}${FILLED_STR}${RESET}${TRACK}${EMPTY_STR}${RESET} ${BAR_COLOR}${PCT}%${RESET}"
 if ((CTX_SIZE > 0)); then
-    LINE2+=" ${DIM}$(fmt_tokens "$USED_TOKENS")/$(fmt_tokens "$CTX_SIZE")${RESET}"
+    T="$(fmt_tokens "$USED_TOKENS")/$(fmt_tokens "$CTX_SIZE")"
+    X_PLAIN+=" $T" X_TEXT+=" ${DIM}${T}${RESET}"
 fi
+seg 0 "$X_PLAIN" "$X_TEXT"
 
-LINE2+="${SEP}💰 ${YELLOW}$(printf '$%.2f' "$COST")${RESET}"
+# The "$" in the amount is the icon — a money glyph in front of it would say it twice.
+C="$(printf '$%.2f' "$COST")"
+C_PLAIN="$C" C_TEXT="${YELLOW}${C}${RESET}"
 # Burn rate stays hidden for the first two minutes, where it is pure noise.
-[[ -n "$RATE" ]] && LINE2+=" ${DIM}$(printf '$%.2f/h' "$RATE")${RESET}"
+if [[ -n "$RATE" ]]; then
+    R="$(printf '$%.2f/h' "$RATE")"
+    C_PLAIN+=" $R" C_TEXT+=" ${DIM}${R}${RESET}"
+fi
+seg 0 "$C_PLAIN" "$C_TEXT"
 
 # api/wall separates "waiting on the model" from "session has been open".
-LINE2+="${SEP}⏱ ${DIM}$(fmt_dur $((API_MS / 1000)))/$(fmt_dur $((DURATION_MS / 1000)))${RESET}"
+CLK="$(fmt_dur $((API_MS / 1000)))/$(fmt_dur $((DURATION_MS / 1000)))"
+seg 5 "$I_CLOCK $CLK" "${DIM}${I_CLOCK} ${CLK}${RESET}"
 
 # Quota percentage answers "how much is left", the countdown answers "for how long" —
 # neither is actionable without the other.
 if [[ -n "$FIVE_H" ]]; then
-    LINE2+="${SEP}5h $(pct_color "$FIVE_H")${FIVE_H}%${RESET}"
-    [[ -n "$FIVE_H_ETA" ]] && LINE2+=" ${DIM}↻$(fmt_eta "$FIVE_H_ETA")${RESET}"
+    Q_PLAIN="5h ${FIVE_H}%" Q_TEXT="5h $(pct_color "$FIVE_H")${FIVE_H}%${RESET}"
+    if [[ -n "$FIVE_H_ETA" ]]; then
+        E="$(fmt_eta "$FIVE_H_ETA")"
+        Q_PLAIN+=" $I_RESET $E" Q_TEXT+=" ${DIM}${I_RESET} ${E}${RESET}"
+    fi
+    seg 1 "$Q_PLAIN" "$Q_TEXT"
 fi
 if [[ -n "$SEVEN_D" ]]; then
-    LINE2+="${SEP}7d $(pct_color "$SEVEN_D")${SEVEN_D}%${RESET}"
-    [[ -n "$SEVEN_D_ETA" ]] && LINE2+=" ${DIM}↻$(fmt_eta "$SEVEN_D_ETA")${RESET}"
+    Q_PLAIN="7d ${SEVEN_D}%" Q_TEXT="7d $(pct_color "$SEVEN_D")${SEVEN_D}%${RESET}"
+    if [[ -n "$SEVEN_D_ETA" ]]; then
+        E="$(fmt_eta "$SEVEN_D_ETA")"
+        Q_PLAIN+=" $I_RESET $E" Q_TEXT+=" ${DIM}${I_RESET} ${E}${RESET}"
+    fi
+    seg 2 "$Q_PLAIN" "$Q_TEXT"
 fi
+
+LINE2="$(fit_line "$BUDGET")"
 
 printf '%s\n%s\n' "$LINE1" "$LINE2"
