@@ -82,6 +82,30 @@ gated extensions plus a handful of Homebrew tools make that work:
   up. This is the biggest lever for staying out of Xcode day-to-day: adding a
   new file is a text edit, not a trip to the project navigator.
 
+**No hover docs and no ⌘-click on any SDK symbol?** A missing
+`buildServer.json` is the cause, and it fails *silently* and *totally*: with
+no compile arguments, SourceKit-LSP can't resolve a single module, so even
+`EmptyView` goes dead alongside anything exotic. That everything fails —
+not just the obscure symbols — is the tell; it's never a missing
+documentation tool. Check for `buildServer.json` at the workspace root,
+then build once and run *"SweetPad: Generate Build Server Config"* (it
+restarts the LSP too; from a shell it's `xcode-build-server config -scheme
+NAME -project NAME.xcodeproj` plus *"Swift: Restart LSP Server"*).
+It goes missing in the first place because
+`sweetpad.build.autoGenerateBuildServerConfig` (default `true`) only
+regenerates on **SweetPad's own** builds — building from Xcode or plain
+`xcodebuild` doesn't — and the file holds machine-local absolute paths, so
+it's gitignored per project and never survives a fresh clone.
+
+The docs themselves are always already on disk: Apple ships a `.swiftdoc`
+next to each `.swiftinterface` in the SDK
+(`…/SwiftUI.framework/Modules/SwiftUI.swiftmodule/`), and that — not the
+`.swiftinterface`, which carries no `///` comments — is where the prose
+SourceKit-LSP shows on hover comes from. So there's nothing to install for
+documentation; `bierner.docs-view` (hover docs pinned in a sidebar panel)
+was considered as a nicety and rejected on the usual bar — untouched
+upstream since January 2024.
+
 **No SwiftLint editor integration.** `vknabel.vscode-swiftformat` and
 `vknabel.vscode-swiftlint` — previously wired up here — were archived
 upstream (unmaintained) on 2025-11-19 and removed 2026-08; there is
