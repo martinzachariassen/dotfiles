@@ -176,7 +176,12 @@ CACHE_MAX_AGE=5
 cache_is_stale() {
     [[ ! -f "$CACHE_FILE" ]] && return 0
     local mtime age
-    mtime=$(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)
+    # BSD stat first (this is a macOS setup), GNU second. The result is range-checked
+    # rather than trusted: GNU stat accepts -f as --file-system and answers %m with a
+    # mount point, so a plain || chain would silently feed "/" to the arithmetic below.
+    mtime=$(stat -f %m "$CACHE_FILE" 2>/dev/null || true)
+    [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || true)
+    [[ "$mtime" =~ ^[0-9]+$ ]] || mtime=0
     age=$(($(date +%s) - mtime))
     ((age > CACHE_MAX_AGE))
 }

@@ -50,9 +50,12 @@ payload() {
         },
         effort: { level: "max" },
         thinking: { enabled: true },
+        # Reset offsets sit deliberately off a unit boundary (1h42m30s, 4d6h30m):
+        # jq evaluates now() a shade after $now was captured, and an exact 1h42m00s
+        # would round down to 1h41m on that drift alone.
         rate_limits: {
-            five_hour: { used_percentage: 62.4, resets_at: ($now + 6120) },
-            seven_day: { used_percentage: 41.1, resets_at: ($now + 367200) }
+            five_hour: { used_percentage: 62.4, resets_at: ($now + 6150) },
+            seven_day: { used_percentage: 41.1, resets_at: ($now + 369000) }
         }
     }' | jq -c "${1:-.}"
 }
@@ -181,9 +184,9 @@ payload() {
 @test "quota shows the used percentage next to a reset countdown" {
     render "$(payload)"
     [[ "${lines[1]}" == *"5h 62%"* ]]
-    [[ "${lines[1]}" == *"↻1h42m"* ]] || [[ "${lines[1]}" == *"↻1h41m"* ]]
+    [[ "${lines[1]}" == *"↻1h42m"* ]]
     [[ "${lines[1]}" == *"7d 41%"* ]]
-    [[ "${lines[1]}" == *"↻4d5h"* ]]
+    [[ "${lines[1]}" == *"↻4d6h"* ]]
 }
 
 @test "a sub-minute reset collapses instead of ticking" {
@@ -213,4 +216,31 @@ payload() {
 
 @test "an overlong branch name is truncated" {
     grep -q 'BRANCH:0:29' "$STATUSLINE"
+}
+
+@test "a warm git cache renders identically to a cold one" {
+    render "$(payload)"
+    local cold="$output"
+    render "$(payload)"
+    [ "$output" = "$cold" ]
+}
+
+@test "a GNU-stat PATH cannot desync the cache age check" {
+    # GNU stat accepts -f as --file-system and answers %m with a mount point, so the
+    # mtime probe must range-check its result rather than trust the first success.
+    local stub
+    stub="$(mktemp -d)"
+    # GNU stat answers an unsupported file-system directive with "?" and exit 0,
+    # so the probe cannot lean on the exit status to detect the wrong stat flavour.
+    cat >"$stub/stat" <<'STUB'
+#!/usr/bin/env bash
+if [[ "$1" == "-f" ]]; then echo "?"; exit 0; fi
+exec /usr/bin/stat "$@"
+STUB
+    chmod +x "$stub/stat"
+
+    render "$(payload)" # cold: writes the cache
+    run env TMPDIR="$ISO_TMP" PATH="$stub:$PATH" bash "$STATUSLINE" <<<"$(payload)"
+    rm -rf "$stub"
+    [ "$status" -eq 0 ]
 }
