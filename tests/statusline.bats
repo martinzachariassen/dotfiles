@@ -326,6 +326,25 @@ if bad:
 ' || fail "an icon is not single-width"
 }
 
+@test "a C locale produces two clean lines and no setlocale warning" {
+    # CI runs without a UTF-8 locale. "UTF-8" is a valid locale name on macOS but not
+    # on glibc, so naming one blindly makes bash warn on stderr and the host renders
+    # the warning as a third status line.
+    run env TMPDIR="$ISO_TMP" LC_ALL=C LC_CTYPE=C LANG=C bash "$STATUSLINE" <<<"$(payload)"
+    [ "$status" -eq 0 ] || fail "exited $status: $output"
+    [[ "$output" != *"setlocale"* ]] || fail "locale warning leaked into output: $output"
+    [[ "$output" != *"warning"* ]] || fail "warning leaked into output: $output"
+    [ "${#lines[@]}" -eq 2 ] || fail "expected 2 lines, got ${#lines[@]}: $output"
+}
+
+@test "a locale that cannot count characters stands the budget down" {
+    # Byte-counting would make every icon read as three or four cells and shed
+    # segments that fit perfectly well, so no budget is better than a wrong one.
+    run env TMPDIR="$ISO_TMP" LC_ALL=C LC_CTYPE=C LANG=C COLUMNS=60 bash "$STATUSLINE" <<<"$(crowded)"
+    [ "$status" -eq 0 ] || fail "exited $status: $output"
+    [[ "$output" == *"code-reviewer"* ]] || fail "budget shed under a C locale: $output"
+}
+
 @test "a warm git cache renders identically to a cold one" {
     render "$(payload)"
     local cold="$output"

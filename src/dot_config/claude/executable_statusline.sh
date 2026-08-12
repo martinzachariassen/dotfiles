@@ -14,9 +14,23 @@
 # Written for bash 3.2 (macOS system bash).
 set -euo pipefail
 
-# ${#var} counts characters only under a UTF-8 ctype; a C locale would count bytes
-# and make every multi-byte glyph read three cells wide.
-export LC_CTYPE="${LC_CTYPE:-UTF-8}"
+# The width budget measures segments with ${#var}, which counts characters only
+# under a UTF-8 ctype; a C locale counts bytes and reads every glyph as three or
+# four cells. Probe with a two-byte character rather than trusting the locale name:
+# macOS spells the charset-only locale "UTF-8" and glibc spells it "C.UTF-8", and
+# assigning one the system lacks makes bash warn on stderr — which the host would
+# render as a third status line.
+UTF8_PROBE='é'
+if ((${#UTF8_PROBE} != 1)); then
+    for loc in C.UTF-8 UTF-8 en_US.UTF-8; do
+        { export LC_CTYPE="$loc"; } 2>/dev/null
+        ((${#UTF8_PROBE} == 1)) && break
+    done
+fi
+# Still counting bytes means no width is trustworthy, so the budget is stood down
+# entirely — an unbudgeted line that wraps beats one shredded by bogus arithmetic.
+UTF8_OK=1
+((${#UTF8_PROBE} == 1)) || UTF8_OK=0
 
 input="$(cat)"
 
@@ -260,7 +274,7 @@ ADDED_DIRS=${ADDED_DIRS:-0}
 # width still wraps in some terminals.
 COLS="$(term_cols)"
 BUDGET=0
-((COLS > 0)) && BUDGET=$((COLS - 2))
+((UTF8_OK == 1 && COLS > 0)) && BUDGET=$((COLS - 2))
 
 # --- git state, cached per session ---
 CACHE_FILE="${TMPDIR:-/tmp}/claude-statusline-git-${SESSION_ID}"
