@@ -162,6 +162,43 @@ if bad:
 PY
 }
 
+@test "no map shadows a sequence an enabled emulated plugin already owns" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _render_ok '["theme"]'
+    # The prefix test above only compares explicit maps against each other, so
+    # it can't see the bindings the emulated plugins claim implicitly. Both of
+    # these shipped broken once: <leader><space> is <space><space>, which is
+    # EasyMotion's whole prefix, and replaceWithRegister owns `gr` — the same
+    # `gr` LazyVim uses for Goto References. Neither prefix is configurable, so
+    # enabling the plugin and mapping the sequence is always a silent conflict.
+    python3 - "$JSON" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+leader = s.get("vim.leader", "\\")
+
+# (setting, sequences that setting claims) — only checked when the setting is on.
+claims = {
+    "vim.easymotion": [[leader, leader]],
+    "vim.replaceWithRegister": [["g", "r"]],
+    "vim.sneak": [["s"], ["S"]],
+    "vim.camelCaseMotion.enable": [[leader, "w"], [leader, "b"], [leader, "e"]],
+}
+bad = []
+for setting, sequences in claims.items():
+    if not s.get(setting):
+        continue
+    for owned in sequences:
+        for mode in ("normal", "visual", "operatorPending"):
+            for m in s.get(f"vim.{mode}ModeKeyBindingsNonRecursive") or []:
+                before = m["before"]
+                # Exact match, or the map sits under the sequence as a prefix.
+                if before[: len(owned)] == owned:
+                    bad.append(f"{mode}: {before} shadows {owned} from {setting}")
+if bad:
+    raise SystemExit("\n".join(bad))
+PY
+}
+
 @test "no leader map re-binds a motion VSCodeVim already emulates natively" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _render_ok '["theme"]'

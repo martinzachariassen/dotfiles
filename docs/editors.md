@@ -76,10 +76,23 @@ view here.
 The inverse rule matters as much: **anything VSCodeVim emulates natively is
 not remapped.** `gd`, `gc`/`gC` (vim-commentary), and `ys`/`cs`/`ds`
 (vim-surround) all ship with the extension, so a `<leader>` alias for them
-would just be a second spelling to keep in sync. `tests/vscode-vim.bats`
-pins that, along with the rule that no key sequence may be a strict prefix of
-another — `<leader>e` next to a hypothetical `<leader>ee` would stall for
-`vim.timeout` (1 s) on every press.
+would just be a second spelling to keep in sync.
+
+Two places where LazyVim parity had to lose, both because an emulated plugin
+claims a sequence and neither prefix is configurable:
+
+- **`<leader><space>` (Find Files in LazyVim) is not mapped.** With
+  `leader = <space>` that sequence *is* `<space><space>`, which is
+  EasyMotion's entire prefix — mapping it silently kills every
+  `<leader><leader>` motion. `<leader>ff` covers the same thing.
+- **`vim.replaceWithRegister` is off.** It owns `gr`, and `gr` is Goto
+  References. References wins; `gr`-as-replace loses.
+
+`tests/vscode-vim.bats` pins both of those as a table of
+plugin → sequences-it-claims, checked only when the plugin is enabled. It
+also pins that no key sequence may be a strict prefix of another —
+`<leader>e` next to a hypothetical `<leader>ee` would stall for `vim.timeout`
+(1 s) on every press.
 
 Four settings that aren't obvious:
 

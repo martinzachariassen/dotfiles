@@ -229,9 +229,10 @@
     // inside the pair. Pays for itself in nested Java/Kotlin generics and calls.
     "vim.targets.enable": true,
 
-    // griw replaces a word with the register without overwriting the register,
-    // so the same yank can be pasted over several places in a row.
-    "vim.replaceWithRegister": true,
+    // `vim.replaceWithRegister` is deliberately OFF: it claims `gr` as the
+    // replace operator, and `gr` is Goto References in LazyVim (mapped below).
+    // The prefix isn't configurable, so the two can't coexist — and jumping to
+    // references is the far more common operation.
 {{ if has "theme" (dig "modules" (list) .) -}}
 
     // EasyMotion ships hard-coded red/orange markers that fight Catppuccin.
@@ -251,11 +252,10 @@
         }
     ],
     "vim.normalModeKeyBindingsNonRecursive": [
-        // ── Find (LazyVim <leader>f / <leader><space>) ──
-        {
-            "before": ["<leader>", "<space>"],
-            "commands": ["workbench.action.quickOpen"]
-        },
+        // ── Find (LazyVim <leader>f) ──
+        // LazyVim's <leader><space> (Find Files) is deliberately NOT mapped:
+        // with leader=<space> that sequence is <space><space>, which is
+        // EasyMotion's entire prefix. <leader>ff covers it.
         {
             "before": ["<leader>", "f", "f"],
             "commands": ["workbench.action.quickOpen"]
