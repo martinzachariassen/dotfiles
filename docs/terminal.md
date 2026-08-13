@@ -1,7 +1,7 @@
 # Terminal
 
 The terminal stack: **Ghostty** (emulator) running **zsh** inside **Zellij**
-(multiplexer), with a **Starship** prompt, all in **Catppuccin Frappé**. The
+(multiplexer), with a **Starship** prompt, all in **Catppuccin Mocha**. The
 zsh layer itself is in [shell.md](shell.md); this doc covers the surrounding
 tools.
 
@@ -29,7 +29,7 @@ Behaviour worth knowing:
 > launch.
 
 The theme is a **local** file
-(`src/dot_config/ghostty/themes/catppuccin-frappe`) rather than a built-in
+(`src/dot_config/ghostty/themes/catppuccin-mocha`) rather than a built-in
 name, for deterministic colors across Ghostty versions. Applied only when the
 `theme` module is selected.
 
@@ -71,7 +71,7 @@ mode, and `Ctrl+G` to lock/unlock Zellij's own bindings when an inner app
 ## Starship
 
 Config: [`src/dot_config/starship.toml`](../src/dot_config/starship.toml),
-palette `catppuccin_frappe`. A two-line prompt: context on line 1, prompt
+palette `catppuccin_mocha`. A two-line prompt: context on line 1, prompt
 character on line 2. Modules cover development and cloud tooling and
 self-disable when irrelevant — directory, git branch/status, language
 versions (Java/Kotlin/Node/Python), Terraform, Docker context, Kubernetes,
@@ -79,7 +79,12 @@ Azure, gcloud, and command duration.
 
 ## Theme
 
-Catppuccin Frappé is applied across Ghostty, Zellij, Starship, and the
+Catppuccin Mocha is applied across Ghostty, Zellij, Starship, and the
 editor when the `theme` module is selected — see
-[packages.md](packages.md#optional-modules). JetBrainsMono Nerd Font (core
-Brewfile) is the shared font across terminal and VS Code.
+[packages.md](packages.md#optional-modules).
+
+JetBrains Mono is the shared typeface, in two builds (both core Brewfile):
+the Nerd Font patch everywhere glyphs are drawn — Ghostty, Zellij's zjstatus
+bar, the Claude statusline, VS Code's integrated terminal — and the unpatched
+`font-jetbrains-mono` in the VS Code editor, whose stock metrics match
+IntelliJ. See [editors.md](editors.md#vs-code).

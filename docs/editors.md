@@ -1,7 +1,7 @@
 # Editors
 
 Two editors are managed: **VS Code** for GUI work and **Neovim** (LazyVim) in
-the terminal, both themed Catppuccin Frappé. IntelliJ is installed for
+the terminal, both themed Catppuccin Mocha. IntelliJ is installed for
 non-trivial Java/Kotlin (via the `macApps` module) but isn't config-managed
 here.
 
@@ -33,6 +33,32 @@ extensions are managed by chezmoi.
   downloading their own. A few entries are **module-gated** in the hook —
   excluded from install *and* prune when the module is off: the Norwegian
   dictionary (`locale`), and the Swift/iOS extensions (`appleDev`, below).
+
+#### Appearance
+
+Four choices in the settings template that aren't self-evident:
+
+- **Catppuccin Mocha** (`catppuccin.catppuccin-vsc`, `theme`-gated) — a
+  published palette with defined lightness relationships rather than
+  hand-picked hex, and it has ports for every other tool here, which is what
+  makes one flavour switch land everywhere ([terminal.md](terminal.md#theme)).
+  Comments are overridden to subtext0 (`#a6adc8`) via
+  `editor.tokenColorCustomizations`: the stock comment colour is too low in
+  contrast to skim past in KDoc/Javadoc-heavy files.
+- **Semantic highlighting on** — without it every token is coloured by
+  TextMate regex, which can't distinguish a field from a parameter from a
+  local. The language server can, and in Java/Kotlin that distinction carries
+  real information.
+- **Fonts** — `JetBrains Mono` (unpatched) in the editor at 14px/weight 500:
+  a high x-height reads well at small sizes, and 500 compensates for macOS
+  grayscale antialiasing thinning Regular on a dark background. The Nerd Font
+  patch is confined to the integrated terminal, where the glyphs are actually
+  used and its wider metrics don't disturb editor column alignment. Letter
+  spacing is left at VS Code's default of 0 — which is IntelliJ's default too;
+  adding tracking would give up the rendering parity the font choice buys.
+- **Ligatures off** — `!=` and `->` should stay distinguishable at review
+  speed. Ghostty keeps `calt`/`liga` on; prose and shell output don't have
+  the same failure mode.
 
 ### Swift / iOS in VS Code (appleDev)
 
@@ -163,7 +189,7 @@ LazyVim, bootstrapped from
 `lua/config/lazy.lua`, with `lazy-lock.json` committed for reproducible
 plugin versions. The only preset override is the colorscheme
 ([`lua/plugins/colorscheme.lua`](../src/dot_config/nvim/lua/plugins/colorscheme.lua)):
-Catppuccin Frappé replacing LazyVim's default tokyonight, with integrations
+Catppuccin Mocha replacing LazyVim's default tokyonight, with integrations
 for cmp, gitsigns, treesitter, telescope, and LSP (undercurl diagnostics).
 
 `n` → `nvim` and it's git's `core.editor`. See [terminal.md](terminal.md) for

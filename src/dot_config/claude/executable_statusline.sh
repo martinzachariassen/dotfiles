@@ -8,7 +8,7 @@
 # the width budget below measure segments with plain ${#var}.
 #
 # Colors are ANSI 16 plus attributes only — no hardcoded hex. The terminal theme
-# (catppuccin-frappe) maps those onto the palette, so the bar follows a theme
+# (catppuccin-mocha) maps those onto the palette, so the bar follows a theme
 # switch instead of drifting off it.
 #
 # Written for bash 3.2 (macOS system bash).

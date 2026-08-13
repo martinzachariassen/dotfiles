@@ -48,7 +48,7 @@ require("lazy").setup({
   },
 
   install = {
-    colorscheme = { "catppuccin-frappe", "tokyonight", "habamax" },
+    colorscheme = { "catppuccin-mocha", "tokyonight", "habamax" },
   },
 
   checker = { enabled = true, notify = false },

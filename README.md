@@ -5,7 +5,7 @@ One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, m
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Frappé](assets/banner.png)
+![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Mocha](assets/banner.png)
 
 **Status:** Personal, single-machine setup. Actively maintained, applied to my Mac most weeks.
 
@@ -45,7 +45,7 @@ chezup    # pull latest → preview the drift → apply
 
 | Area | Baseline |
 | --- | --- |
-| Terminal | [Ghostty](https://ghostty.org), [Zellij](https://zellij.dev), [Starship](https://starship.rs), Catppuccin Frappé, JetBrainsMono Nerd Font |
+| Terminal | [Ghostty](https://ghostty.org), [Zellij](https://zellij.dev), [Starship](https://starship.rs), Catppuccin Mocha, JetBrainsMono Nerd Font |
 | Shell | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases |
 | Editors | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
