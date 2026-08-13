@@ -361,6 +361,13 @@
 {{ end -}}
     "intellij.trace.server": "off",
 
+    // Its first-run prompt writes both of these into this chezmoi-managed file
+    // if they're unset — and the next apply wipes them straight back out, so the
+    // prompt returns forever. Declared here to end that loop; "none" matches the
+    // telemetry opt-outs below.
+    "intellij.region": "europe",
+    "intellij.dataSharing": "none",
+
     "terraform.languageServer.enable": true,
 
     "yaml.validate": true,
