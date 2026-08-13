@@ -1,4 +1,4 @@
--- Catppuccin Frappé to match Ghostty / Zellij / Starship / VS Code.
+-- Catppuccin Mocha to match Ghostty / Zellij / Starship / VS Code.
 
 return {
   {
@@ -7,7 +7,7 @@ return {
     lazy = false,    -- load first so the scheme is ready before other plugins
     priority = 1000,
     opts = {
-      flavour = "frappe",
+      flavour = "mocha",
       transparent_background = false,
       integrations = {
         cmp = true,
@@ -36,7 +36,7 @@ return {
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "catppuccin-frappe",
+      colorscheme = "catppuccin-mocha",
     },
   },
 }

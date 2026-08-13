@@ -2,7 +2,16 @@
     // ── Appearance ──
 
 {{ if has "theme" (dig "modules" (list) .) -}}
-    "workbench.colorTheme": "Catppuccin Frappé",
+    "workbench.colorTheme": "Catppuccin Mocha",
+
+    // Catppuccin's default comment colour (overlay0) sits too low in contrast to
+    // skim in KDoc/Javadoc-heavy files; subtext0 lifts it without turning comments
+    // into foreground noise.
+    "editor.tokenColorCustomizations": {
+        "[Catppuccin Mocha]": {
+            "comments": "#a6adc8"
+        }
+    },
 {{ end -}}
     "workbench.iconTheme": "material-icon-theme",
 
@@ -23,11 +32,22 @@
 
     // ── Font & editor ──
 
-    "editor.fontFamily": "'JetBrainsMono Nerd Font', Menlo, Monaco, 'Courier New', monospace",
+    // Unpatched JetBrains Mono in the editor — the Nerd Font patch ships wider
+    // metrics that throw off column alignment, and nothing in the editor renders
+    // the extra glyphs. The terminal, which does need them, keeps the patched
+    // build (see below). Same family as IntelliJ, so both IDEs render alike.
+    "editor.fontFamily": "'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 14,
-    "editor.fontLigatures": true,
-    "editor.lineHeight": 1.7,
+    // macOS grayscale-antialiases text; Regular goes thin on a dark background.
+    "editor.fontWeight": "500",
+    // Off: `!=` vs `->` should stay distinguishable at review speed.
+    "editor.fontLigatures": false,
+    "editor.lineHeight": 1.6,
     "editor.letterSpacing": 0.3,
+
+    // TextMate regex can't tell a field from a parameter from a local; the
+    // language server can. Real signal in Java/Kotlin.
+    "editor.semanticHighlighting.enabled": true,
 
     "editor.cursorBlinking": "smooth",
     "editor.cursorSmoothCaretAnimation": "on",

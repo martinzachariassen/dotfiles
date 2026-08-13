@@ -1,0 +1,39 @@
+# Ghostty theme: Catppuccin Mocha
+# Official palette: https://github.com/catppuccin/catppuccin#-palette
+#
+# Ghostty resolves `theme = catppuccin-mocha` against:
+#   1. ~/.config/ghostty/themes/catppuccin-mocha   (this file)
+#   2. /Applications/Ghostty.app/Contents/Resources/ghostty/themes/catppuccin-mocha
+# Local file wins. Identical colors to the iterm2-color-schemes upstream.
+
+# Standard ANSI palette
+palette = 0=#45475a
+palette = 1=#f38ba8
+palette = 2=#a6e3a1
+palette = 3=#f9e2af
+palette = 4=#89b4fa
+palette = 5=#f5c2e7
+palette = 6=#94e2d5
+palette = 7=#bac2de
+
+# Bright ANSI palette
+palette = 8=#585b70
+palette = 9=#f38ba8
+palette = 10=#a6e3a1
+palette = 11=#f9e2af
+palette = 12=#89b4fa
+palette = 13=#f5c2e7
+palette = 14=#94e2d5
+palette = 15=#a6adc8
+
+# Foreground / background
+background = #1e1e2e
+foreground = #cdd6f4
+
+# Cursor — Rosewater accent so it pops against the muted background
+cursor-color      = #f5e0dc
+cursor-text       = #1e1e2e
+
+# Selection — invert: dark text on light Rosewater background
+selection-background = #585b70
+selection-foreground = #cdd6f4

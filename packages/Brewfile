@@ -46,12 +46,16 @@ brew "zsh-syntax-highlighting" # source this last
 cask "1password"               # SSH agent + git signing
 cask "1password-cli"           # op CLI; chezmoi secrets
 cask "docker-desktop"          # or colima/podman
-cask "ghostty"                 # Catppuccin Frappé
+cask "ghostty"                 # Catppuccin Mocha
 cask "visual-studio-code"      # chezmoi manages settings
 
 # JDKs come from mise, not Homebrew — see dot_config/mise/config.toml.
 
 # ─── Fonts ────────────────────────────────────────────────────────────────────
-cask "font-jetbrains-mono-nerd-font"   # Ghostty + VS Code
+# Both builds, deliberately: the patched one carries the icon glyphs Ghostty,
+# Zellij's bar and the Claude statusline draw with; the unpatched one keeps the
+# editor on stock metrics. See docs/editors.md.
+cask "font-jetbrains-mono"             # VS Code editor (unpatched)
+cask "font-jetbrains-mono-nerd-font"   # Ghostty + VS Code terminal (patched)
 
 # Mac App Store apps live in the macApps tier — see packages/Brewfile.mac-apps.
