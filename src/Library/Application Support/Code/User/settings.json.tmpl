@@ -391,6 +391,11 @@
         }
     },
 
+    // Error Lens whole-line-highlights every diagnostic regardless of source,
+    // which undoes cSpell.useCustomDecorations above — opt cSpell and
+    // markdownlint (same noisy-line-highlight complaint in .md files) back out.
+    "errorLens.excludeBySource": ["cSpell", "markdownlint"],
+
     // ── Language-specific ──
 
     "[json]": {

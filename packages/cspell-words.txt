@@ -1,6 +1,8 @@
 acks
 allopen
+APPICON
 assertj
+ASSETCATALOG
 chezmoi
 cloudsdktool
 dedup
@@ -13,11 +15,13 @@ gpgsign
 healthcheck
 hikari
 Hikari
+INFOPLIST
 isready
 javac
 JAXP
 livenessstate
 mockk
+Munin
 nacked
 nacking
 nacks
