@@ -5,6 +5,8 @@
 # vknabel.vscode-swiftformat/-swiftlint were removed 2026-08: archived upstream
 # (unmaintained) as of 2025-11-19. SweetPad now owns [swift] formatting instead;
 # see docs/editors.md.
+# eamodio.gitlens was removed 2026-08: VS Code's built-in git/blame/timeline covers
+# what was actually used, and the rest was noise.
 catppuccin.catppuccin-vsc
 anthropic.claude-code
 bierner.markdown-mermaid
@@ -12,7 +14,6 @@ bpruitt-goddard.mermaid-markdown-syntax-highlighting
 charliermarsh.ruff
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
-eamodio.gitlens
 editorconfig.editorconfig
 esbenp.prettier-vscode
 exiasr.hadolint
