@@ -88,8 +88,11 @@
 
     // ── Files ──
 
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000,
+    // NOT "afterDelay": VS Code skips save participants on the delayed-autosave
+    // path, which silently disables editor.formatOnSave and every
+    // codeActionsOnSave below (organizeImports, fixAll.eslint, fixAll.ruff,
+    // java.cleanup.actionsOnSave). "onFocusChange" still autosaves but runs them.
+    "files.autoSave": "onFocusChange",
 
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
@@ -565,6 +568,21 @@
 
     // ── Language-specific ──
 
+    // Languages Prettier cannot parse. Without these, the global
+    // defaultFormatter + formatOnSave pair raises "Extension 'Prettier' is
+    // configured as formatter but it cannot format 'X'-files" on every save.
+    // Each of these is a file type this setup actually opens: build.gradle
+    // (groovy), application.properties (properties/spring-boot-properties),
+    // Makefiles, .gitignore (ignore), and interactive-rebase todo lists.
+    "[groovy]": { "editor.formatOnSave": false },
+    "[properties]": { "editor.formatOnSave": false },
+    "[spring-boot-properties]": { "editor.formatOnSave": false },
+    "[sql]": { "editor.formatOnSave": false },
+    "[plaintext]": { "editor.formatOnSave": false },
+    "[makefile]": { "editor.formatOnSave": false },
+    "[ignore]": { "editor.formatOnSave": false },
+    "[git-rebase]": { "editor.formatOnSave": false },
+
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
     },
@@ -615,6 +633,9 @@
 
     "[spring-boot-properties-yaml]": {
         "yaml.validate": false,
+        // Its own langId, so the [yaml] block above doesn't apply and the
+        // global Prettier default would error on save.
+        "editor.formatOnSave": false,
         "editor.quickSuggestions": {
             "strings": true
         }
@@ -634,9 +655,13 @@
     },
 
     // Prettier formats; ESLint applies its non-format autofixes on save.
+    // A language-scoped editor.codeActionsOnSave *replaces* the global one
+    // rather than merging with it, so source.organizeImports has to be repeated
+    // here — omitting it silently drops import organizing for TS/JS only.
     "[typescript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -644,6 +669,7 @@
     "[javascript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -651,6 +677,7 @@
     "[typescriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -658,6 +685,7 @@
     "[javascriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },

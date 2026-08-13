@@ -111,6 +111,57 @@ _render_ok() {
     grep -q '"vim.easymotion": true' "$BATS_TEST_TMPDIR/rendered.jsonc"
 }
 
+# ─── save participants ──────────────────────────────────────────────────────────
+
+@test "files.autoSave does not disable format/fix on save" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _render_ok '["theme"]'
+    # VS Code skips save participants when files.autoSave is "afterDelay", so
+    # that one value silently voids editor.formatOnSave and every
+    # codeActionsOnSave in the file. Nothing reports it — saves just stop
+    # formatting. This shipped broken until 2026-08.
+    python3 - "$JSON" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+auto = s.get("files.autoSave")
+assert auto != "afterDelay", "files.autoSave=afterDelay disables all save participants"
+assert s.get("editor.formatOnSave") is True, s.get("editor.formatOnSave")
+PY
+}
+
+@test "language-scoped codeActionsOnSave keep the global organizeImports" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _render_ok '["theme"]'
+    # A language block *replaces* the global editor.codeActionsOnSave instead of
+    # merging into it, so any language that sets its own must repeat every
+    # global action it still wants. Swift opts out on purpose with {}.
+    python3 - "$JSON" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+glob = set(s.get("editor.codeActionsOnSave") or {})
+opted_out = {"[swift]"}
+bad = []
+for key, val in s.items():
+    if not (key.startswith("[") and isinstance(val, dict)):
+        continue
+    if key in opted_out:
+        continue
+    local = val.get("editor.codeActionsOnSave")
+    if not local:          # absent -> inherits the global, which is fine
+        continue
+    for action in glob:
+        # Ruff supplies its own source.organizeImports.ruff variant.
+        if action == "source.organizeImports" and any(
+            a.startswith("source.organizeImports") for a in local
+        ):
+            continue
+        if action not in local:
+            bad.append(f"{key} drops {action}")
+if bad:
+    raise SystemExit("\n".join(sorted(bad)))
+PY
+}
+
 # ─── settings that are only correct in pairs ────────────────────────────────────
 
 @test "relative line numbers are configured on both the editor and vim sides" {
