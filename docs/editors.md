@@ -53,7 +53,9 @@ Four choices in the settings template that aren't self-evident:
   a high x-height reads well at small sizes, and 500 compensates for macOS
   grayscale antialiasing thinning Regular on a dark background. The Nerd Font
   patch is confined to the integrated terminal, where the glyphs are actually
-  used and its wider metrics don't disturb editor column alignment.
+  used and its wider metrics don't disturb editor column alignment. Letter
+  spacing is left at VS Code's default of 0 — which is IntelliJ's default too;
+  adding tracking would give up the rendering parity the font choice buys.
 - **Ligatures off** — `!=` and `->` should stay distinguishable at review
   speed. Ghostty keeps `calt`/`liga` on; prose and shell output don't have
   the same failure mode.
