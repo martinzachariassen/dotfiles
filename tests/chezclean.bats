@@ -132,6 +132,19 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" "$@"
 }
 
+# Negative assertions must go through this. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the output contains.
+#
+# no_match_in <text> <extended-regex>
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        echo "unexpected match for: $2"
+        return 1
+    fi
+}
+
 # ─── pure helpers (sourced in a subshell so clean.sh's set -u never leaks) ────
 
 @test "_clean_candidates offers only entries neither managed nor kept" {
@@ -222,8 +235,8 @@ run_clean() { # run_clean [args...] — extra env via caller's `run env` if need
             return 1
         }
     done
-    ! grep -qE '(^| )\.storecode ' <<<"$output"
-    ! grep -qF 'Documents' <<<"$output"
+    no_match_in "$output" '(^| )\.storecode '
+    no_match_in "$output" 'Documents'
     [[ "$output" == *"dry-run"* ]]
     [[ "$output" == *"removed 4 · kept 0"* ]]
     [ -d "$FAKEHOME/.hawtjni" ]

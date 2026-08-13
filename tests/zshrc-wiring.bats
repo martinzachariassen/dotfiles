@@ -16,6 +16,28 @@ setup() {
     ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
 }
 
+# Negative assertions must go through these. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the file contains. Verified: mutating the source under a bare `! grep`
+# left the test green.
+#
+# no_match <extended-regex> <file…>
+no_match() {
+    if grep -qE "$@"; then
+        echo "unexpected match for: $1"
+        return 1
+    fi
+}
+
+# no_match_in <text> <extended-regex>
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        echo "unexpected match for: $2"
+        return 1
+    fi
+}
+
 # ─── ~/.zshenv: must stay in $HOME (zsh reads it before ZDOTDIR is set) ────
 
 @test "zshenv source file exists in the repo" {
@@ -131,14 +153,14 @@ setup() {
     grep -qF '_chez_brew_removals' <<<"$body"
     grep -qF '_chez_brew_uninstall_one' <<<"$body"
     grep -qF 'gum confirm' <<<"$body"
-    ! grep -qF 'brew bundle cleanup --force' <<<"$body"
+    no_match_in "$body" 'brew bundle cleanup --force'
 
     # `brew bundle cleanup` honours only ONE --file; tiers must arrive on
     # stdin (--file=-) or only the last tier would be read.
     grep -qE '^_chez_brew_removals\(\) \{' "$ZSHRC"
     helper="$(sed -n '/^_chez_brew_removals() {/,/^}/p' "$ZSHRC")"
     grep -qF 'brew bundle cleanup --file=-' <<<"$helper"
-    ! grep -qE 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
+    no_match 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
 }
 
 # Wiring only — behaviour is exercised end-to-end in tests/chezclean.bats.
@@ -160,4 +182,95 @@ setup() {
     grep -qE '^_chez_brew_untracked\(\) \{' "$ZSHRC"
     grep -qF 'reconcile (uninstall): chezmirror' "$ZSHRC"
     ! sed -n '/^chez() {/,/^}/p' "$ZSHRC" | grep -qF 'brew bundle cleanup'
+}
+
+# ─── Startup cost ──────────────────────────────────────────────────────────
+# Everything here is a performance property, so nothing surfaces a regression:
+# the shell keeps working, it just gets slower. These pin the structure that
+# makes it fast, not a wall-clock number (which would be flaky in CI).
+
+# Line number of the first match of $1, or empty.
+_line_of() { grep -nF -m1 "$1" "$ZSHRC" | cut -d: -f1; }
+
+@test "the Zellij auto-attach runs before compinit and the tool inits" {
+    # A Ghostty tab that attaches hands the terminal to Zellij, and the shell
+    # inside the pane sources this file again — so every line above the attach
+    # is paid twice per tab. It used to sit at the very bottom.
+    attach="$(_line_of 'zellij attach -c "$_ZJ_SESSION"')"
+    [ -n "$attach" ]
+    for later in 'compinit -d' '_zcache mise' '_zcache starship' '_zcache fzf'; do
+        at="$(_line_of "$later")"
+        [ -n "$at" ] || { echo "not found: $later"; return 1; }
+        [ "$attach" -lt "$at" ] || {
+            echo "'$later' (line $at) runs before the attach (line $attach)"
+            return 1
+        }
+    done
+}
+
+@test "detaching from Zellij falls through to the rest of the shell config" {
+    # The attach must be a plain call: no exec (the tab would die on detach) and
+    # no return/exit after it (the detached shell would have no prompt, no
+    # aliases and no highlighting).
+    block="$(sed -n '/zellij attach -c "\$_ZJ_SESSION"/,/^fi$/p' "$ZSHRC")"
+    # POSIX classes, not \s / \b: BSD grep on macOS doesn't understand those and
+    # would quietly match nothing.
+    no_match '^[[:space:]]*exec zellij' "$ZSHRC"
+    no_match_in "$block" '^[[:space:]]*(return|exit)([[:space:]]|$)'
+    # And the tail of the file must still be reachable.
+    attach="$(_line_of 'zellij attach -c "$_ZJ_SESSION"')"
+    hl="$(_line_of 'zsh-syntax-highlighting.zsh')"
+    [ "$attach" -lt "$hl" ]
+}
+
+@test "_zj_prune stays synchronous in the attach path" {
+    # _zj_pick_session counts *exited* sessions as taken, so the prune has to
+    # have finished before it runs. Backgrounding it (a tempting ~25ms saving)
+    # hands every new tab a "<project>-2" name instead.
+    grep -qE '^[[:space:]]*_zj_prune$' "$ZSHRC"
+    no_match '_zj_prune[[:space:]]*&' "$ZSHRC"
+}
+
+@test "every tool init is memoised through _zcache" {
+    # A bare eval "$(tool init)" is a fork plus a parse on every interactive
+    # shell; five of them measured ~44ms. _zcache writes the generated script
+    # once and byte-compiles it.
+    grep -qE '^_zcache\(\) \{' "$ZSHRC"
+    for tool in mise fzf zoxide starship carapace; do
+        grep -qE "_zcache ${tool} ${tool} " "$ZSHRC" || {
+            echo "$tool is not routed through _zcache"
+            return 1
+        }
+    done
+    # No stragglers left on the slow path.
+    no_match 'eval "\$\((mise|fzf|zoxide|starship|carapace) ' "$ZSHRC"
+}
+
+@test "compinit is not unconditionally -C" {
+    # -C skips the fpath re-scan, so a newly brew-installed completion stays
+    # invisible until the dump is rebuilt. With only `compinit -C` in the file
+    # that never happens on its own.
+    grep -qF 'compinit -C -d' "$ZSHRC"
+    grep -qE '^[[:space:]]*compinit -d "\$ZSH_COMPDUMP"$' "$ZSHRC"
+    # Version-keyed, or a zsh upgrade silently breaks completion.
+    grep -qF 'zcompdump-$ZSH_VERSION' "$ZSHRC"
+}
+
+@test "history is safe for concurrent panes and doesn't self-truncate" {
+    # SHARE_HISTORY + many Zellij panes = interleaved appends without locking.
+    grep -qE '^setopt HIST_FCNTL_LOCK$' "$ZSHRC"
+    grep -qE '^setopt SHARE_HISTORY$' "$ZSHRC"
+    # Dedup/expiry cull the in-memory list, so it needs headroom over SAVEHIST.
+    histsize="$(grep -E '^HISTSIZE=' "$ZSHRC" | tail -1 | cut -d= -f2)"
+    savehist="$(grep -E '^SAVEHIST=' "$ZSHRC" | tail -1 | cut -d= -f2)"
+    [ "$histsize" -gt "$savehist" ]
+}
+
+@test "the zprof guard is paired and cannot leave \$? nonzero" {
+    # zprof must be the last statement to profile everything, and a bare
+    # `[[ ... ]] && zprof` there would exit 1 whenever ZSH_PROFILE is unset —
+    # starship then flags an error on the very first prompt.
+    grep -qF 'zmodload zsh/zprof' "$ZSHRC"
+    grep -qF '} || true' "$ZSHRC"
+    tail -1 "$ZSHRC" | grep -qF 'zprof'
 }

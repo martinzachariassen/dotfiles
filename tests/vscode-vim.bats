@@ -93,6 +93,19 @@ _render_ok() {
     _jsonc_to_json "$BATS_TEST_TMPDIR/rendered.jsonc" > "$JSON"
 }
 
+# Negative assertions must go through this. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the file contains.
+#
+# no_match <extended-regex> <file…>
+no_match() {
+    if grep -qE "$@"; then
+        echo "unexpected match for: $1"
+        return 1
+    fi
+}
+
 # ─── theme gating of the EasyMotion palette ─────────────────────────────────────
 
 @test "theme on: EasyMotion markers use the Catppuccin palette" {
@@ -106,7 +119,7 @@ _render_ok() {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     # _render_ok already fails on a stray comma left by the gated block.
     _render_ok '[]'
-    ! grep -q 'easymotionMarker' "$BATS_TEST_TMPDIR/rendered.jsonc"
+    no_match 'easymotionMarker' "$BATS_TEST_TMPDIR/rendered.jsonc"
     # EasyMotion itself is a motion, not a colour — it survives theme being off.
     grep -q '"vim.easymotion": true' "$BATS_TEST_TMPDIR/rendered.jsonc"
 }

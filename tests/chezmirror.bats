@@ -109,6 +109,27 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
         bash -c "$1"
 }
 
+# Negative assertions must go through these. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the output contains.
+#
+# no_match <extended-regex> <file…>
+no_match() {
+    if grep -qE "$@"; then
+        echo "unexpected match for: $1"
+        return 1
+    fi
+}
+
+# no_match_in <text> <extended-regex>
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        echo "unexpected match for: $2"
+        return 1
+    fi
+}
+
 # ─── _chez_brew_removals: the union + parser (the bug lived here) ────────────
 
 @test "_chez_brew_removals parses cleanup output into <kind><TAB><name> rows" {
@@ -124,9 +145,9 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
     # The cache-prune section must never surface as a removal (parser bug regression).
-    ! grep -q 'Would remove' <<<"$output"
-    ! grep -q 'Caches/Homebrew' <<<"$output"
-    ! grep -q 'brew cleanup' <<<"$output"
+    no_match_in "$output" 'Would remove'
+    no_match_in "$output" 'Caches/Homebrew'
+    no_match_in "$output" 'brew cleanup'
 }
 
 @test "_chez_brew_removals labels the untap section 'tap' without leaking its header" {
@@ -143,7 +164,7 @@ EOF
     [ "${lines[0]}" = "$(printf 'formula\torphan-cli')" ]
     [ "${lines[1]}" = "$(printf 'tap\tacme/formulae')" ]
     [ "${#lines[@]}" -eq 2 ]
-    ! grep -q 'Would untap' <<<"$output" # the header itself must never leak
+    no_match_in "$output" 'Would untap' # the header itself must never leak
 }
 
 @test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
@@ -238,7 +259,7 @@ EOF
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
-    ! grep -qx "bats-core" "$UNINSTALL_LOG"
+    no_match '^bats-core$' "$UNINSTALL_LOG"
     [[ "$output" == *"removed 2 · kept 1"* ]]
 }
 
