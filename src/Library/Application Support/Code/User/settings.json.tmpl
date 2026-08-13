@@ -101,6 +101,14 @@
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
         "**/.gradle/**": true,
+        "**/.idea/**": true,
+        "**/.kotlin/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/.terraform/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
         "**/build/**": true,
         "**/dist/**": true,
         "**/node_modules/**": true,
@@ -112,8 +120,17 @@
         "**/.git": false,
         "**/node_modules": true,
         "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
         "**/dist": true,
-        "**/build": true
+        "**/build": true,
+        "**/target": true
     },
 
     // Highlight chezmoi .tmpl files by base language; a whole-file "go"
@@ -154,7 +171,16 @@
         "**/node_modules": true,
         "**/build": true,
         "**/dist": true,
-        "**/.gradle": true
+        "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/target": true
     },
 
     "search.followSymlinks": false,
@@ -399,8 +425,25 @@
     // queueing behind the Java/Sonar/ErrorLens extensions in the shared host.
     // Upstream's one documented perf lever. Cost: the extension reloads on every
     // settings.json write, which `chezmoi apply` does often.
+    //
+    // Group 2 does the same for the Java/Kotlin/Spring toolchain: JDT LS,
+    // the Kotlin LSP, and SonarLint's analyzer are the heaviest extensions in
+    // this setup, so they get their own host too, away from both the vim host
+    // and the shared default host (ESLint, Copilot, cSpell, ...). Same cost —
+    // one more process to reload on every settings.json write.
     "extensions.experimental.affinity": {
-        "vscodevim.vim": 1
+        "vscodevim.vim": 1,
+        "redhat.java": 2,
+        "vscjava.vscode-gradle": 2,
+        "vscjava.vscode-java-debug": 2,
+        "vscjava.vscode-java-dependency": 2,
+        "vscjava.vscode-java-test": 2,
+        "vscjava.vscode-maven": 2,
+        "vscjava.vscode-spring-boot-dashboard": 2,
+        "vscjava.vscode-spring-initializr": 2,
+        "vmware.vscode-spring-boot": 2,
+        "jetbrains.kotlin-server": 2,
+        "sonarsource.sonarlint-vscode": 2
     },
 
     // ── AI / Copilot ──

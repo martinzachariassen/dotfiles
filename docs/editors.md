@@ -97,11 +97,18 @@ also pins that no key sequence may be a strict prefix of another —
 Four settings that aren't obvious:
 
 - **`extensions.experimental.affinity`** puts VSCodeVim in its own extension
-  host process. It's upstream's one documented performance lever, and it
-  matters here specifically because the shared host also runs the Java LSP,
-  SonarLint, and Error Lens — keystroke handling otherwise queues behind them.
-  The cost is that the extension reloads whenever `settings.json` is written,
-  which `chezmoi apply` does often.
+  host process (group 1). It's upstream's one documented performance lever,
+  and it matters here specifically because the shared (group 0) host also
+  runs Error Lens, ESLint, and Copilot — keystroke handling otherwise queues
+  behind them. The Java/Kotlin/Spring toolchain (`redhat.java`, the
+  `vscjava.*` pack, `vmware.vscode-spring-boot`, `jetbrains.kotlin-server`)
+  and SonarLint get a second group (2), isolating the heaviest extensions in
+  this setup from both the vim host and the shared default host. The cost of
+  each group is the same: the extensions in it reload whenever
+  `settings.json` is written, which `chezmoi apply` does often. Extensions
+  that already run their language server as a separate OS process outside
+  the extension host — ESLint, Terraform, Pylance — don't benefit from
+  affinity and are deliberately left out of group 2.
 - **Relative line numbers** are two settings, not one:
   `editor.lineNumbers: relative` does the rendering and
   `vim.smartRelativeLine` flips back to absolute in insert mode. Either alone
