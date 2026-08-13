@@ -24,6 +24,38 @@ completions), **Starship** (prompt — see [terminal.md](terminal.md)), then
 the brew zsh plugins (`zsh-autosuggestions`, `zsh-completions`, and
 `zsh-syntax-highlighting` sourced **last**).
 
+## Startup cost
+
+Interactive startup is on the critical path of every new pane, so the `.zshrc`
+is ordered and cached around it. Three things carry that:
+
+- **The Zellij auto-attach runs first**, right after the `setopt` block. A
+  Ghostty tab that attaches hands its terminal to Zellij, and the shell inside
+  the pane sources the whole file again — so anything placed above the attach is
+  parsed twice per tab. Only the helpers the attach itself needs live up there;
+  the in-session hooks and `zj`/`zjclean` stay further down. The attach is a
+  plain call, never `exec`, and nothing `return`s after it: detaching falls
+  through to the rest of the file and leaves a fully configured shell.
+- **`_zcache` memoises the `tool init` integrations.** `eval "$(mise activate
+  zsh)"` and friends are a fork plus a parse on every shell (~44 ms for the five
+  of them). `_zcache` writes the generated script to
+  `$XDG_CACHE_HOME/zsh/init-<tool>.zsh`, byte-compiles it in the background, and
+  sources the `.zwc` thereafter. It re-generates when the tool binary or the
+  `.zshrc` is newer than the cache. Homebrew bottles occasionally restore an
+  *older* mtime on upgrade, which defeats that check — `zshcache` clears
+  everything by hand for those cases.
+- **`compinit` rebuilds once a day, not never.** `compinit -C` skips the fpath
+  re-scan and the security audit (~26 ms → ~15 ms), but used unconditionally it
+  also means a newly brew-installed completion never shows up. The dump is
+  rebuilt fully when it's older than 24 h and taken as-is otherwise, and it is
+  keyed on `$ZSH_VERSION` so a zsh upgrade can't silently load an incompatible
+  one.
+
+`ZSH_PROFILE=1 zsh -i -c exit` prints a `zprof` table if you need to attribute a
+regression. `tests/zshrc-wiring.bats` pins the structure above — the ordering,
+the `_zcache` routing, and the non-`exec` attach — because none of it fails
+loudly when it regresses; the shell just gets slower.
+
 ## Modern CLI replacements
 
 Aliased only when present, and only where the replacement is a safe drop-in:

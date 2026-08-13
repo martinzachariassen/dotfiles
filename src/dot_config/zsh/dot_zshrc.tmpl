@@ -1,6 +1,10 @@
 # ~/.config/zsh/.zshrc — interactive shell. Rendered from dot_zshrc.tmpl; edit via
 # `chezmoi edit ~/.config/zsh/.zshrc`. Profile: {{ .profile }}
 
+# Startup profiler, opt-in: `ZSH_PROFILE=1 zsh -i -c exit` prints a per-function
+# cost table. Must be the first thing loaded to see everything below it.
+[[ -n ${ZSH_PROFILE:-} ]] && zmodload zsh/zprof
+
 # ─── Shell options ────────────────────────────────────────────────────────────
 setopt INTERACTIVE_COMMENTS
 setopt AUTO_CD
@@ -9,16 +13,149 @@ setopt PUSHD_IGNORE_DUPS
 setopt CORRECT
 setopt EXTENDED_GLOB
 
+# ─── Zellij auto-attach ───────────────────────────────────────────────────────
+# Deliberately the first real work in this file. A Ghostty tab that is going to
+# attach hands its terminal straight to Zellij, and the shell *inside* the
+# session sources this whole file again — so anything above the attach is paid
+# twice per tab. Only the handful of helpers the attach itself needs live here;
+# the in-session hooks, `zj` and `zjclean` stay further down, where the second
+# shell reaches them anyway.
+#
+# One Ghostty window = one Zellij session: first window in a project gets the
+# project name, later windows get "-2", "-3"… so windows never co-attach to one
+# session. A new window always gets a fresh session; closing one reaps its
+# session (TRAPHUP below). Deliberate resurrection/join is `zj <name>`.
+
+# Session name from arg, else the git repo root name (so every window in a
+# project shares one base); outside a repo, cwd basename ($HOME → "home").
+_zj_session_name() {
+    local name="${1:-}"
+    if [[ -z "$name" ]]; then
+        local root
+        if root="$(command git rev-parse --show-toplevel 2>/dev/null)" && [[ -n "$root" ]]; then
+            name="${root:t}"
+        elif [[ "$PWD" == "$HOME" ]]; then
+            name="home"
+        else
+            name="${PWD:A:t}"
+        fi
+    fi
+    name="${name//\//-}"
+    name="${name// /-}"
+    print -r -- "${(L)name:-home}"
+}
+
+# First unused session name for base $1: "<base>", else "<base>-2"… Exited
+# sessions count as taken too, so `attach -c` never resurrects a stale one.
+_zj_pick_session() {
+    local base="$1" out line name
+    local -A taken=()
+    out="$(command zellij list-sessions --no-formatting 2>/dev/null)" || out=""
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        name="${line%% \[Created*}"
+        taken[$name]=1
+    done <<< "$out"
+    local candidate="$base" n=2
+    while (( ${+taken[$candidate]} )); do
+        candidate="${base}-$((n++))"
+    done
+    print -r -- "$candidate"
+}
+
+# Drop exited sessions so the graveyard can't accumulate. Costs ~25ms and must
+# stay synchronous: _zj_pick_session counts exited sessions as taken, so
+# backgrounding this would hand the next tab "<project>-2" while the prune it
+# depends on is still running.
+_zj_prune() { command zellij delete-all-sessions -y >/dev/null 2>&1; }
+
+# "Open the new tab where we currently are." Zellij doesn't forward the active
+# pane's cwd to Ghostty via OSC 7 (zellij#3811), so a new Ghostty tab always
+# starts at $HOME. We bridge it ourselves: each pane records its cwd, and a fresh
+# tab reads it back before attaching. Scope is "most-recently-active pane" — the
+# last pane to draw a prompt or cd wins, which across windows is the one you just
+# touched.
+_zj_cwd_file="${XDG_STATE_HOME:-$HOME/.local/state}/zellij/last-cwd"
+
+# Print the recorded cwd, but only if it still points at a real directory.
+# Always succeeds (empty output ⇒ nothing to inherit), so callers can chain on it.
+_zj_inherit_cwd() {
+    local target
+    [[ -r "$_zj_cwd_file" ]] || return 0
+    target="$(< "$_zj_cwd_file")"
+    [[ -n "$target" && -d "$target" ]] && print -r -- "$target"
+    return 0
+}
+
+if [[ -z "$ZELLIJ" && "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" \
+      && -z "$VSCODE_INJECTION" && -t 1 ]] && command -v zellij >/dev/null; then
+    # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to
+    # a working shell in the same tab — execution continues past this block and
+    # the rest of this file is sourced then, not before. Escape hatch:
+    # NO_ZELLIJ=1 zsh.
+    _zj_prune
+    # Ghostty starts every new tab at $HOME (Zellij hides the pane cwd from it), so
+    # from there, reopen wherever the last-active pane was — that's the tab we came
+    # from. Names the session after the inherited dir's project, too.
+    if [[ "$PWD" == "$HOME" ]]; then
+        _zj_inherited="$(_zj_inherit_cwd)"
+        [[ -n "$_zj_inherited" ]] && builtin cd -- "$_zj_inherited"
+        unset _zj_inherited
+    fi
+    _ZJ_SESSION="$(_zj_pick_session "$(_zj_session_name)")"
+    # PTY hangup (window close) reaps this window's own session; a manual detach
+    # doesn't HUP and is left alone — resurrect later with `zj <name>`.
+    TRAPHUP() { command zellij kill-session "$_ZJ_SESSION" >/dev/null 2>&1 }
+    zellij attach -c "$_ZJ_SESSION"
+fi
+
 # ─── Tooling ──────────────────────────────────────────────────────────────────
-command -v mise >/dev/null && eval "$(mise activate zsh)"
+# Every `tool init`-style integration below is a fork plus a parse on every
+# interactive shell — measured at ~44ms for the five of them. _zcache memoises
+# the generated script and byte-compiles it, so the steady state is a `source`
+# of a .zwc. Keyed on the tool binary's mtime and on this file, so a `brew
+# upgrade` or an edit here regenerates it automatically.
+#
+# $1 names the cache entry, $2 is the command that must exist, $2… is the
+# command line that prints the init script.
+_zcache() {
+    local name=$1 bin=${commands[$2]} dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+    [[ -n $bin ]] || return 0
+    shift
+    local f="$dir/init-$name.zsh"
+    if [[ ! -s $f || $bin -nt $f || ${ZDOTDIR:-$HOME}/.zshrc -nt $f ]]; then
+        [[ -d $dir ]] || mkdir -p "$dir"
+        "$@" >| "$f" 2>/dev/null || { rm -f "$f"; return 0; }
+        { zcompile -R -- "$f.zwc" "$f" } &!
+    fi
+    source "$f"
+}
+
+# Manual invalidation. Homebrew bottles sometimes restore an *older* mtime on
+# upgrade, which defeats the `$bin -nt $f` check above; if a tool's shell
+# integration ever looks out of date, run this and open a new shell.
+zshcache() {
+    local dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+    command rm -f -- "$dir"/init-*.zsh(N) "$dir"/init-*.zsh.zwc(N) \
+        "$dir"/zcompdump-*(N)
+    print -r -- "zsh caches cleared; open a new shell to rebuild"
+}
+
+_zcache mise mise mise activate zsh
 
 # ─── History ──────────────────────────────────────────────────────────────────
 # macOS /etc/zshrc runs after ~/.zshenv and resets HISTFILE, so re-set it here.
 export HISTFILE="$XDG_STATE_HOME/zsh/history"
 [ -d "${HISTFILE%/*}" ] || mkdir -p "${HISTFILE%/*}"
-HISTSIZE=50000
+# HISTSIZE > SAVEHIST on purpose: the in-memory list is what dedup/expiry culls
+# from, so giving it headroom means a full 50k *unique* entries survive to disk
+# instead of 50k pre-dedup entries shrinking on every write.
+HISTSIZE=60000
 SAVEHIST=50000
 setopt EXTENDED_HISTORY
+# SHARE_HISTORY below has every Zellij pane appending to one file at once;
+# without fcntl locking those writes interleave and corrupt entries.
+setopt HIST_FCNTL_LOCK
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_IGNORE_DUPS
 setopt HIST_IGNORE_SPACE
@@ -29,7 +166,10 @@ setopt HIST_VERIFY
 setopt SHARE_HISTORY
 
 # ─── Completion ───────────────────────────────────────────────────────────────
-ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump"
+# Version-keyed: a dump written by an older zsh is not loadable by a newer one,
+# and the failure is silent — completion just stops working. `brew upgrade zsh`
+# now lands on a fresh filename instead.
+ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/zcompdump-$ZSH_VERSION"
 [ -d "${ZSH_COMPDUMP%/*}" ] || mkdir -p "${ZSH_COMPDUMP%/*}"
 
 # Homebrew completions must be on fpath before compinit.
@@ -41,10 +181,48 @@ if [ -d /opt/homebrew/share/zsh-completions ]; then
 fi
 
 autoload -Uz compinit
-# -C skips the security audit; brew perms are already tightened at install time.
-compinit -C -d "$ZSH_COMPDUMP"
+# -C trusts the existing dump: it skips both the fpath re-scan and the security
+# audit (~26ms → ~15ms), but it also means a newly brew-installed completion
+# stays invisible until something rebuilds. Unconditional -C, which is what this
+# used to do, means "until you delete the cache by hand". So: rebuild fully if
+# the dump is older than a day, take the cheap path otherwise.
+_zcompdump_fresh=("$ZSH_COMPDUMP"(Nmh-24))
+if (( $#_zcompdump_fresh )); then
+    compinit -C -d "$ZSH_COMPDUMP"
+else
+    compinit -d "$ZSH_COMPDUMP"
+    # compinit only rewrites the dump when its contents changed, so stamp it
+    # regardless or an unchanged dump re-audits on every shell, forever.
+    touch "$ZSH_COMPDUMP"
+fi
+unset _zcompdump_fresh
+# Byte-compile out of band; the next shell mmaps the .zwc instead of parsing it.
+if [[ ! -s "$ZSH_COMPDUMP.zwc" || "$ZSH_COMPDUMP" -nt "$ZSH_COMPDUMP.zwc" ]]; then
+    { zcompile -R -- "$ZSH_COMPDUMP.zwc" "$ZSH_COMPDUMP" } &!
+fi
+
 zstyle ':completion:*' menu select
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+# Case-insensitive, then dash/underscore-insensitive, then substring — tried in
+# order, so an exact-case match still wins before the fuzzier passes.
+zstyle ':completion:*' matcher-list \
+    'm:{a-zA-Z}={A-Za-z}' \
+    'r:|[._-]=* r:|=*' \
+    'l:|=* r:|=*'
+# Cache the slow completers (brew, apt-style package lists, cloud CLIs) that
+# shell out to enumerate candidates.
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path "$XDG_CACHE_HOME/zsh/zcompcache"
+# Group matches under their tag and label the group, so a menu of 200 candidates
+# reads as "external command" / "alias" / "directory" instead of one flat wall.
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
+zstyle ':completion:*:descriptions' format $'\e[2;37m%d\e[m'
+zstyle ':completion:*:warnings' format $'\e[33mno matches for %d\e[m'
+# Offer ./ and ../ as completions — needed for `cd ../<tab>`.
+zstyle ':completion:*' special-dirs true
+# Killing by name should show the process table to pick from.
+zstyle ':completion:*:*:kill:*:processes' list-colors '=(#b) #([0-9]#)*=0=01;31'
+zstyle ':completion:*:*:kill:*' menu yes select
 
 # ─── Key bindings ─────────────────────────────────────────────────────────────
 # Force emacs keymap; zsh would otherwise infer vi from $EDITOR=nvim.
@@ -66,20 +244,21 @@ if command -v fd >/dev/null; then
     export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
 fi
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
-command -v fzf >/dev/null && eval "$(fzf --zsh 2>/dev/null)"
+_zcache fzf fzf fzf --zsh
 
 # ─── zoxide ───────────────────────────────────────────────────────────────────
-command -v zoxide >/dev/null && eval "$(zoxide init zsh)"
+_zcache zoxide zoxide zoxide init zsh
 
 # ─── carapace ─────────────────────────────────────────────────────────────────
 if command -v carapace >/dev/null; then
-    export CARAPACE_BRIDGES='zsh,fish,bash,inshellisense'
-    zstyle ':completion:*' format $'\e[2;37mCompleting %d\e[m'
-    source <(carapace _carapace zsh)
+    # No inshellisense bridge: it is not in any Brewfile or mise config, and
+    # carapace pays a lookup per completion for a bridge that can never resolve.
+    export CARAPACE_BRIDGES='zsh,fish,bash'
+    _zcache carapace carapace carapace _carapace zsh
 fi
 
 # ─── Starship prompt ──────────────────────────────────────────────────────────
-command -v starship >/dev/null && eval "$(starship init zsh)"
+_zcache starship starship starship init zsh --print-full-init
 
 # ─── Modern CLI replacements ──────────────────────────────────────────────────
 command -v eza >/dev/null && {
@@ -615,74 +794,15 @@ chezhelp() {
 EOF
 }
 
-# ─── Zellij ───────────────────────────────────────────────────────────────────
-# One Ghostty window = one Zellij session: first window in a project gets the
-# project name, later windows get "-2", "-3"… so windows never co-attach to one
-# session. A new window always gets a fresh session; closing one reaps its
-# session (TRAPHUP below). Deliberate resurrection/join is `zj <name>`.
-
-# Session name from arg, else the git repo root name (so every window in a
-# project shares one base); outside a repo, cwd basename ($HOME → "home").
-_zj_session_name() {
-    local name="${1:-}"
-    if [[ -z "$name" ]]; then
-        local root
-        if root="$(command git rev-parse --show-toplevel 2>/dev/null)" && [[ -n "$root" ]]; then
-            name="${root:t}"
-        elif [[ "$PWD" == "$HOME" ]]; then
-            name="home"
-        else
-            name="${PWD:A:t}"
-        fi
-    fi
-    name="${name//\//-}"
-    name="${name// /-}"
-    print -r -- "${(L)name:-home}"
-}
-
-# First unused session name for base $1: "<base>", else "<base>-2"… Exited
-# sessions count as taken too, so `attach -c` never resurrects a stale one.
-_zj_pick_session() {
-    local base="$1" out line name
-    local -A taken=()
-    out="$(command zellij list-sessions --no-formatting 2>/dev/null)" || out=""
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        name="${line%% \[Created*}"
-        taken[$name]=1
-    done <<< "$out"
-    local candidate="$base" n=2
-    while (( ${+taken[$candidate]} )); do
-        candidate="${base}-$((n++))"
-    done
-    print -r -- "$candidate"
-}
-
-# Drop exited sessions so the graveyard can't accumulate.
-_zj_prune() { command zellij delete-all-sessions -y >/dev/null 2>&1; }
-
-# "Open the new tab where we currently are." Zellij doesn't forward the active
-# pane's cwd to Ghostty via OSC 7 (zellij#3811), so a new Ghostty tab always
-# starts at $HOME. We bridge it ourselves: each pane records its cwd, and a fresh
-# tab reads it back before attaching. Scope is "most-recently-active pane" — the
-# last pane to draw a prompt or cd wins, which across windows is the one you just
-# touched.
-_zj_cwd_file="${XDG_STATE_HOME:-$HOME/.local/state}/zellij/last-cwd"
+# ─── Zellij, in-session ───────────────────────────────────────────────────────
+# The auto-attach and the helpers it needs live at the top of this file, because
+# everything above the attach is parsed twice per Ghostty tab. What's left here
+# only ever runs in a shell that is already inside a pane, or on demand.
 
 # Record $PWD as the active-pane cwd (creating the state dir on first use).
 _zj_record_cwd() {
     [[ -d "${_zj_cwd_file:h}" ]] || command mkdir -p "${_zj_cwd_file:h}" 2>/dev/null || return
     print -r -- "$PWD" > "$_zj_cwd_file" 2>/dev/null
-}
-
-# Print the recorded cwd, but only if it still points at a real directory.
-# Always succeeds (empty output ⇒ nothing to inherit), so callers can chain on it.
-_zj_inherit_cwd() {
-    local target
-    [[ -r "$_zj_cwd_file" ]] || return 0
-    target="$(< "$_zj_cwd_file")"
-    [[ -n "$target" && -d "$target" ]] && print -r -- "$target"
-    return 0
 }
 
 # zj [name]  no arg: attach to a fresh session for cwd. With a name: attach even
@@ -714,24 +834,6 @@ if [[ -n "$ZELLIJ" ]]; then
     add-zsh-hook chpwd   _zj_record_cwd
     _zj_rename_tab
     _zj_record_cwd
-elif [[ "$TERM_PROGRAM" == "ghostty" && -z "$NO_ZELLIJ" && -z "$VSCODE_INJECTION" \
-        && -t 1 ]] && command -v zellij >/dev/null; then
-    # Auto-attach only in Ghostty. Plain call (not exec): detaching drops back to
-    # a working shell in the same tab. Escape hatch: NO_ZELLIJ=1 zsh.
-    _zj_prune
-    # Ghostty starts every new tab at $HOME (Zellij hides the pane cwd from it), so
-    # from there, reopen wherever the last-active pane was — that's the tab we came
-    # from. Names the session after the inherited dir's project, too.
-    if [[ "$PWD" == "$HOME" ]]; then
-        _zj_inherited="$(_zj_inherit_cwd)"
-        [[ -n "$_zj_inherited" ]] && builtin cd -- "$_zj_inherited"
-        unset _zj_inherited
-    fi
-    _ZJ_SESSION="$(_zj_pick_session "$(_zj_session_name)")"
-    # PTY hangup (window close) reaps this window's own session; a manual detach
-    # doesn't HUP and is left alone — resurrect later with `zj <name>`.
-    TRAPHUP() { command zellij kill-session "$_ZJ_SESSION" >/dev/null 2>&1 }
-    zellij attach -c "$_ZJ_SESSION"
 fi
 
 {{ if eq .profile "work" -}}
@@ -751,6 +853,11 @@ fi
 # ─── zsh-autosuggestions ──────────────────────────────────────────────────────
 if [ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+    # Fetch suggestions asynchronously — otherwise every keystroke blocks on a
+    # history lookup, which is very visible with a 50k-entry HISTFILE.
+    ZSH_AUTOSUGGEST_USE_ASYNC=1
+    # Don't try to suggest for a pasted or otherwise huge buffer.
+    ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=80
 {{ if has "theme" (dig "modules" (list) .) -}}
     # Catppuccin Mocha overlay0 — readable but unmistakably suggestion-grey.
     ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6c7086'
@@ -761,3 +868,8 @@ fi
 if [ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]; then
     source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
+
+# Counterpart to the zmodload at the top; prints only when ZSH_PROFILE is set.
+# `|| true` because this is the last statement: without it the unset case leaves
+# $? = 1 and starship paints an error indicator on the very first prompt.
+{ [[ -n ${ZSH_PROFILE:-} ]] && zprof } || true
