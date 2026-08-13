@@ -7,6 +7,13 @@
 # see docs/editors.md.
 # eamodio.gitlens was removed 2026-08: VS Code's built-in git/blame/timeline covers
 # what was actually used, and the rest was noise.
+# ms-python.debugpy and ms-python.vscode-pylance are auto-installed by
+# ms-python.python; they must be listed or the prune step uninstalls them on every
+# apply and VS Code reinstalls them on next launch. Same for the lldb pair below.
+# GitHub Copilot is deliberately absent: github.copilot was deprecated in VS Code
+# 1.109 (auto-uninstalled on upgrade), and Copilot Chat has been a built-in system
+# extension since 1.116 — built-ins never appear in `code --list-extensions`, so
+# there is nothing here to track or prune.
 catppuccin.catppuccin-vsc
 anthropic.claude-code
 bierner.markdown-mermaid
@@ -32,7 +39,9 @@ mermaidchart.vscode-mermaid-chart
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
+ms-python.debugpy
 ms-python.python
+ms-python.vscode-pylance
 ms-vscode-remote.remote-containers
 oderwat.indent-rainbow
 pkief.material-icon-theme

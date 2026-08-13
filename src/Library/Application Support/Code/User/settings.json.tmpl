@@ -88,8 +88,11 @@
 
     // ── Files ──
 
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000,
+    // NOT "afterDelay": VS Code skips save participants on the delayed-autosave
+    // path, which silently disables editor.formatOnSave and every
+    // codeActionsOnSave below (organizeImports, fixAll.eslint, fixAll.ruff,
+    // java.cleanup.actionsOnSave). "onFocusChange" still autosaves but runs them.
+    "files.autoSave": "onFocusChange",
 
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
@@ -98,6 +101,14 @@
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
         "**/.gradle/**": true,
+        "**/.idea/**": true,
+        "**/.kotlin/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/.terraform/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
         "**/build/**": true,
         "**/dist/**": true,
         "**/node_modules/**": true,
@@ -109,8 +120,17 @@
         "**/.git": false,
         "**/node_modules": true,
         "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
         "**/dist": true,
-        "**/build": true
+        "**/build": true,
+        "**/target": true
     },
 
     // Highlight chezmoi .tmpl files by base language; a whole-file "go"
@@ -151,7 +171,16 @@
         "**/node_modules": true,
         "**/build": true,
         "**/dist": true,
-        "**/.gradle": true
+        "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/target": true
     },
 
     "search.followSymlinks": false,
@@ -396,8 +425,25 @@
     // queueing behind the Java/Sonar/ErrorLens extensions in the shared host.
     // Upstream's one documented perf lever. Cost: the extension reloads on every
     // settings.json write, which `chezmoi apply` does often.
+    //
+    // Group 2 does the same for the Java/Kotlin/Spring toolchain: JDT LS,
+    // the Kotlin LSP, and SonarLint's analyzer are the heaviest extensions in
+    // this setup, so they get their own host too, away from both the vim host
+    // and the shared default host (ESLint, Copilot, cSpell, ...). Same cost —
+    // one more process to reload on every settings.json write.
     "extensions.experimental.affinity": {
-        "vscodevim.vim": 1
+        "vscodevim.vim": 1,
+        "redhat.java": 2,
+        "vscjava.vscode-gradle": 2,
+        "vscjava.vscode-java-debug": 2,
+        "vscjava.vscode-java-dependency": 2,
+        "vscjava.vscode-java-test": 2,
+        "vscjava.vscode-maven": 2,
+        "vscjava.vscode-spring-boot-dashboard": 2,
+        "vscjava.vscode-spring-initializr": 2,
+        "vmware.vscode-spring-boot": 2,
+        "jetbrains.kotlin-server": 2,
+        "sonarsource.sonarlint-vscode": 2
     },
 
     // ── AI / Copilot ──
@@ -565,6 +611,21 @@
 
     // ── Language-specific ──
 
+    // Languages Prettier cannot parse. Without these, the global
+    // defaultFormatter + formatOnSave pair raises "Extension 'Prettier' is
+    // configured as formatter but it cannot format 'X'-files" on every save.
+    // Each of these is a file type this setup actually opens: build.gradle
+    // (groovy), application.properties (properties/spring-boot-properties),
+    // Makefiles, .gitignore (ignore), and interactive-rebase todo lists.
+    "[groovy]": { "editor.formatOnSave": false },
+    "[properties]": { "editor.formatOnSave": false },
+    "[spring-boot-properties]": { "editor.formatOnSave": false },
+    "[sql]": { "editor.formatOnSave": false },
+    "[plaintext]": { "editor.formatOnSave": false },
+    "[makefile]": { "editor.formatOnSave": false },
+    "[ignore]": { "editor.formatOnSave": false },
+    "[git-rebase]": { "editor.formatOnSave": false },
+
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
     },
@@ -615,6 +676,9 @@
 
     "[spring-boot-properties-yaml]": {
         "yaml.validate": false,
+        // Its own langId, so the [yaml] block above doesn't apply and the
+        // global Prettier default would error on save.
+        "editor.formatOnSave": false,
         "editor.quickSuggestions": {
             "strings": true
         }
@@ -634,9 +698,13 @@
     },
 
     // Prettier formats; ESLint applies its non-format autofixes on save.
+    // A language-scoped editor.codeActionsOnSave *replaces* the global one
+    // rather than merging with it, so source.organizeImports has to be repeated
+    // here — omitting it silently drops import organizing for TS/JS only.
     "[typescript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -644,6 +712,7 @@
     "[javascript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -651,6 +720,7 @@
     "[typescriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -658,6 +728,7 @@
     "[javascriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },

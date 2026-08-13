@@ -16,9 +16,9 @@
         "args": { "commands": ["sweetpad.build.clean", "sweetpad.build.launch"] },
         "when": "editorLangId == swift"
     },
-    { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" },
-
-    // Off the save cycle — swiftlint --fix would race the save; SwiftFormat
-    // handles on-save formatting separately.
-    { "key": "cmd+ctrl+l", "command": "swiftlint.fixDocument", "when": "editorLangId == swift" }
+    { "key": "cmd+ctrl+r", "command": "sweetpad.build.stop", "when": "editorLangId == swift" }
+    // cmd+ctrl+l was bound to swiftlint.fixDocument until 2026-08. That command
+    // came from vknabel.vscode-swiftlint, which was dropped as unmaintained, so
+    // the binding was a no-op. SwiftLint now runs via an Xcode build phase and
+    // pre-commit; see docs/editors.md.
 ]
