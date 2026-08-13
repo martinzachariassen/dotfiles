@@ -24,11 +24,23 @@ not_lists() { ! grep -Fxq "$1" "$EXT"; }
     lists streetsidesoftware.code-spell-checker-norwegian-bokmal
 }
 
-# ─── Negative invariants: extensions the mirror should prune ────────────────────
-# ms-python.python extensionPack members: reseeded by the pack but not re-tracked after removal, so they must stay out of the manifest.
+# ─── ms-python.python pack members ──────────────────────────────────────────────
+# Reversal of the #49 decision to let the mirror prune these. Leaving them out
+# doesn't prune them, it thrashes: ms-python.python declares both as
+# extensionDependencies, so `code --uninstall-extension` refuses, the hook falls
+# back to remove_extension_on_disk, and VS Code reseeds them on next launch —
+# every apply, forever, re-downloading Pylance each time. Tracking them ends the
+# loop and is what the manifest already does for the lldb pair.
 
-@test "does NOT list ms-python.vscode-pylance" { not_lists ms-python.vscode-pylance; }
-@test "does NOT list ms-python.debugpy" { not_lists ms-python.debugpy; }
+@test "lists ms-python.vscode-pylance (pack member; pruning it only thrashes)" {
+    lists ms-python.vscode-pylance
+}
+@test "lists ms-python.debugpy (pack member; pruning it only thrashes)" {
+    lists ms-python.debugpy
+}
+
+# Not a dependency of ms-python.python — an optional companion the pack does not
+# reseed, so the mirror can prune it cleanly. Stays out.
 @test "does NOT list ms-python.vscode-python-envs" { not_lists ms-python.vscode-python-envs; }
 
 # ─── Structural invariants ──────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
-# Pin the global mise runtime declarations (Java 25, Node LTS, Python, Maven,
-# Gradle). Nothing else in CI guards these — render-check only parses
+# Pin the global mise runtime declarations (Java 25, Kotlin, Node LTS, Python,
+# Maven, Gradle). Nothing else in CI guards these — render-check only parses
 # templates, lint-config only validates TOML — so a silent drop while editing
 # config.toml would break per-project builds on the next apply undetected.
 #
@@ -89,6 +89,16 @@ PY
 }
 
 # ─── JVM build tools: managed by mise, not Homebrew ────────────────────────
+
+@test "mise declares Kotlin" {
+    # The jvmStack module advertises Kotlin (modules.toml, docs/packages.md) and
+    # the editors assume kotlinc is on PATH — starship's [kotlin] module, nvim's
+    # Kotlin LSP extra, and jetbrains.kotlin-server. It was missing from this
+    # file until 2026-08 precisely because nothing asserted it.
+    kotlin="$(_mise_get tools.kotlin)"
+    [ -n "$kotlin" ]
+    [ "$kotlin" != '""' ]
+}
 
 @test "mise declares Maven" {
     maven="$(_mise_get tools.maven)"

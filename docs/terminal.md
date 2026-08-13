@@ -16,8 +16,11 @@ Behaviour worth knowing:
 - `copy-on-select = clipboard` — selecting text copies to the system
   clipboard, matching Zellij's `copy_on_select` so it's consistent inside and
   outside a session.
-- `macos-option-as-alt = false` — keeps Option free for macOS Unicode/dead-key
-  input such as `å`.
+- `macos-option-as-alt = right` — the **left** Option key stays a macOS compose
+  key, so the Norwegian layout's Option-dependent characters (`[ ] { } | \ @ $
+  ~`) and dead-key input keep working. The **right** Option key sends Alt, which
+  fzf's `ALT-C`, Zellij's `Alt+n` / `Alt+hjkl` / `Alt+[` / `Alt+]`, and zsh's
+  `alt-b` / `alt-f` word motions all need.
 - `shell-integration = zsh` is injected automatically; nothing extra in
   `.zshrc`.
 - Keybinds: `Cmd+K` clear, `Cmd+Enter` fullscreen, `Cmd+Shift+.` inspector;
