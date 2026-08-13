@@ -79,6 +79,10 @@
     "editor.acceptSuggestionOnEnter": "smart",
     "editor.rulers": [100, 120],
     "editor.cursorSurroundingLines": 4,
+    // Relative numbers make vim's count motions (5j, 3dd, d7k) readable instead
+    // of guesswork; `vim.smartRelativeLine` below flips back to absolute in
+    // insert mode, where the count is irrelevant and the real line number isn't.
+    "editor.lineNumbers": "relative",
     "editor.linkedEditing": true,
     "editor.accessibilitySupport": "off",
 
@@ -194,14 +198,52 @@
 
     // ── Vim ──
 
+    // Leader maps below mirror LazyVim's defaults key-for-key, because this repo
+    // manages both editors and both use <space> as leader — see docs/editors.md.
+    // Anything VSCodeVim already emulates natively is deliberately NOT remapped:
+    // gd/gc/gC/ys/cs/ds all work out of the box, and a leader alias for them
+    // would only be a second way to do the same thing.
     "vim.leader": "<space>",
-    "vim.useSystemClipboard": true,
     "vim.hlsearch": true,
     "vim.incsearch": true,
     "vim.smartcase": true,
     "vim.ignorecase": true,
-    "vim.easymotion": true,
     "vim.surround": true,
+    "vim.easymotion": true,
+
+    // Every delete/change also clobbers the macOS clipboard — the cost of not
+    // having to type "+y for the common case. Named registers ("ayiw) still
+    // bypass it when something needs to survive a d/c.
+    "vim.useSystemClipboard": true,
+
+    // The only feedback that a yank in normal mode did anything at all.
+    "vim.highlightedyank.enable": true,
+    "vim.highlightedyank.color": "rgba(249, 226, 175, 0.25)",
+    "vim.highlightedyank.duration": 250,
+
+    // Relative numbers in normal/visual, absolute in insert — see
+    // editor.lineNumbers above.
+    "vim.smartRelativeLine": true,
+
+    // targets.vim: ci( / da, from anywhere on the line rather than only from
+    // inside the pair. Pays for itself in nested Java/Kotlin generics and calls.
+    "vim.targets.enable": true,
+
+    // griw replaces a word with the register without overwriting the register,
+    // so the same yank can be pasted over several places in a row.
+    "vim.replaceWithRegister": true,
+{{ if has "theme" (dig "modules" (list) .) -}}
+
+    // EasyMotion ships hard-coded red/orange markers that fight Catppuccin.
+    // Mocha equivalents: red / peach / yellow markers on base, dimmed to
+    // overlay0 so the jump targets are the only thing with saturation left.
+    "vim.easymotionMarkerBackgroundColor": "#1e1e2e",
+    "vim.easymotionMarkerForegroundColorOneChar": "#f38ba8",
+    "vim.easymotionMarkerForegroundColorTwoCharFirst": "#fab387",
+    "vim.easymotionMarkerForegroundColorTwoCharSecond": "#f9e2af",
+    "vim.easymotionIncSearchForegroundColor": "#a6e3a1",
+    "vim.easymotionDimColor": "#6c7086",
+{{ end }}
     "vim.insertModeKeyBindings": [
         {
             "before": ["j", "k"],
@@ -209,53 +251,154 @@
         }
     ],
     "vim.normalModeKeyBindingsNonRecursive": [
+        // ── Find (LazyVim <leader>f / <leader><space>) ──
         {
-            "before": ["<leader>", "w"],
-            "commands": ["workbench.action.files.save"]
-        },
-        {
-            "before": ["<leader>", "p"],
+            "before": ["<leader>", "<space>"],
             "commands": ["workbench.action.quickOpen"]
         },
         {
-            "before": ["<leader>", "f"],
+            "before": ["<leader>", "f", "f"],
+            "commands": ["workbench.action.quickOpen"]
+        },
+        {
+            "before": ["<leader>", "f", "r"],
+            "commands": ["workbench.action.openRecent"]
+        },
+        {
+            "before": ["<leader>", "f", "t"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+
+        // ── Search (LazyVim <leader>s, plus <leader>/ for grep) ──
+        {
+            "before": ["<leader>", "/"],
             "commands": ["workbench.action.findInFiles"]
         },
+        {
+            "before": ["<leader>", "s", "g"],
+            "commands": ["workbench.action.findInFiles"]
+        },
+        {
+            "before": ["<leader>", "s", "s"],
+            "commands": ["workbench.action.gotoSymbol"]
+        },
+        {
+            "before": ["<leader>", "s", "S"],
+            "commands": ["workbench.action.showAllSymbols"]
+        },
+        {
+            "before": ["<leader>", "s", "d"],
+            "commands": ["workbench.actions.view.problems"]
+        },
+
+        // ── Code / LSP (LazyVim <leader>c) ──
+        {
+            "before": ["<leader>", "c", "a"],
+            "commands": ["editor.action.quickFix"]
+        },
+        {
+            "before": ["<leader>", "c", "r"],
+            "commands": ["editor.action.rename"]
+        },
+        {
+            "before": ["<leader>", "c", "f"],
+            "commands": ["editor.action.formatDocument"]
+        },
+
+        // ── Buffers & windows (LazyVim <leader>b / <leader>- / <leader>|) ──
+        {
+            "before": ["<leader>", "b", "d"],
+            "commands": ["workbench.action.closeActiveEditor"]
+        },
+        {
+            "before": ["<leader>", "b", "b"],
+            "commands": ["workbench.action.openPreviousRecentlyUsedEditorInGroup"]
+        },
+        {
+            "before": ["<leader>", "-"],
+            "commands": ["workbench.action.splitEditorDown"]
+        },
+        {
+            "before": ["<leader>", "|"],
+            "commands": ["workbench.action.splitEditor"]
+        },
+        {
+            "before": ["<leader>", "w", "d"],
+            "commands": ["workbench.action.closeGroup"]
+        },
+
+        // ── Git (LazyVim <leader>g; <leader>gg is lazygit there, SCM view here) ──
+        {
+            "before": ["<leader>", "g", "g"],
+            "commands": ["workbench.view.scm"]
+        },
+        {
+            "before": ["<leader>", "g", "d"],
+            "commands": ["git.openChange"]
+        },
+
+        // ── Explorer & UI toggles (LazyVim <leader>e / <leader>u) ──
         {
             "before": ["<leader>", "e"],
             "commands": ["workbench.view.explorer"]
         },
         {
-            "before": ["<leader>", "g"],
-            "commands": ["workbench.view.scm"]
+            "before": ["<leader>", "u", "r"],
+            "commands": [":nohl"]
         },
         {
-            "before": ["<leader>", "d"],
-            "commands": ["editor.action.revealDefinition"]
+            "before": ["<leader>", "u", "w"],
+            "commands": ["editor.action.toggleWordWrap"]
+        },
+
+        // ── Goto (LazyVim gr/gI/gy; gd is native to VSCodeVim) ──
+        {
+            "before": ["g", "r"],
+            "commands": ["editor.action.goToReferences"]
         },
         {
-            "before": ["<leader>", "r", "n"],
-            "commands": ["editor.action.rename"]
+            "before": ["g", "I"],
+            "commands": ["editor.action.goToImplementation"]
         },
         {
-            "before": ["<leader>", "a"],
-            "commands": ["editor.action.quickFix"]
+            "before": ["g", "y"],
+            "commands": ["editor.action.goToTypeDefinition"]
+        },
+
+        // ── Diagnostics (LazyVim ]d / [d) — the payoff for ErrorLens+SonarLint ──
+        {
+            "before": ["]", "d"],
+            "commands": ["editor.action.marker.next"]
         },
         {
-            "before": ["<leader>", "/"],
-            "commands": ["editor.action.commentLine"]
-        },
-        {
-            "before": ["<leader>", "q"],
-            "commands": ["workbench.action.closeActiveEditor"]
+            "before": ["[", "d"],
+            "commands": ["editor.action.marker.prev"]
         }
     ],
     "vim.visualModeKeyBindingsNonRecursive": [
         {
-            "before": ["<leader>", "/"],
-            "commands": ["editor.action.commentLine"]
+            "before": ["<leader>", "c", "f"],
+            "commands": ["editor.action.formatSelection"]
+        },
+        // Keep the selection after reindenting so >>> is one keypress each,
+        // matching LazyVim. Stock vim drops back to normal mode after one shift.
+        {
+            "before": [">"],
+            "after": [">", "g", "v"]
+        },
+        {
+            "before": ["<"],
+            "after": ["<", "g", "v"]
         }
     ],
+
+    // Run VSCodeVim in its own extension host process: keystroke handling stops
+    // queueing behind the Java/Sonar/ErrorLens extensions in the shared host.
+    // Upstream's one documented perf lever. Cost: the extension reloads on every
+    // settings.json write, which `chezmoi apply` does often.
+    "extensions.experimental.affinity": {
+        "vscodevim.vim": 1
+    },
 
     // ── AI / Copilot ──
 

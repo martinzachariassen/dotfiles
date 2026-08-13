@@ -60,6 +60,52 @@ Four choices in the settings template that aren't self-evident:
   speed. Ghostty keeps `calt`/`liga` on; prose and shell output don't have
   the same failure mode.
 
+#### Vim
+
+`vscodevim.vim` with `<space>` as leader. The organising rule is that **the
+leader maps mirror LazyVim's defaults key-for-key** — this repo manages both
+editors, both use `<space>`, and muscle memory is the only thing that makes
+two editors cheaper than one. So `<leader>ff` opens files, `<leader>/` greps,
+`<leader>ca`/`<leader>cr`/`<leader>cf` are code action / rename / format,
+`<leader>bd` closes the buffer, `<leader>e` is the explorer, `]d`/`[d` walk
+diagnostics, and `gr`/`gI`/`gy` are references / implementation / type
+definition. Where LazyVim maps something VS Code has no equivalent for,
+the nearest thing takes the slot: `<leader>gg` is lazygit there and the SCM
+view here.
+
+The inverse rule matters as much: **anything VSCodeVim emulates natively is
+not remapped.** `gd`, `gc`/`gC` (vim-commentary), and `ys`/`cs`/`ds`
+(vim-surround) all ship with the extension, so a `<leader>` alias for them
+would just be a second spelling to keep in sync. `tests/vscode-vim.bats`
+pins that, along with the rule that no key sequence may be a strict prefix of
+another — `<leader>e` next to a hypothetical `<leader>ee` would stall for
+`vim.timeout` (1 s) on every press.
+
+Four settings that aren't obvious:
+
+- **`extensions.experimental.affinity`** puts VSCodeVim in its own extension
+  host process. It's upstream's one documented performance lever, and it
+  matters here specifically because the shared host also runs the Java LSP,
+  SonarLint, and Error Lens — keystroke handling otherwise queues behind them.
+  The cost is that the extension reloads whenever `settings.json` is written,
+  which `chezmoi apply` does often.
+- **Relative line numbers** are two settings, not one:
+  `editor.lineNumbers: relative` does the rendering and
+  `vim.smartRelativeLine` flips back to absolute in insert mode. Either alone
+  is wrong, so a bats test asserts both.
+- **`vim.useSystemClipboard: true`** is a deliberate trade: every `d`/`c`/`x`
+  also overwrites the macOS clipboard, in exchange for never typing `"+y`.
+  Named registers (`"ayiw`) still bypass it when something has to survive a
+  delete.
+- **The EasyMotion palette is `theme`-gated.** EasyMotion's stock markers are
+  hard-coded red/orange that clash with Catppuccin, so the marker, dim, and
+  incsearch colours are overridden to Mocha — inside the same
+  `{{ if has "theme" … }}` guard as the colour theme itself, and nowhere else.
+
+`keybindings.json` stays reserved for editor chrome that vim has no concept of
+(moving editors between groups, the Sweetpad build loop); every vim-side
+binding lives in `settings.json` so there's one place to look.
+
 ### Swift / iOS in VS Code (appleDev)
 
 The goal is to keep VS Code as the daily driver — for iOS, macOS, watchOS,
