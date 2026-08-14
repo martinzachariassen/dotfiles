@@ -125,10 +125,22 @@ _zcache() {
     local f="$dir/init-$name.zsh"
     if [[ ! -s $f || $bin -nt $f || ${ZDOTDIR:-$HOME}/.zshrc -nt $f ]]; then
         [[ -d $dir ]] || mkdir -p "$dir"
-        "$@" >| "$f" 2>/dev/null || { rm -f "$f"; return 0; }
-        { zcompile -R -- "$f.zwc" "$f" } &!
+        local tmp="$f.$$"
+        # Generate to a temp file and only swap it in on success, so a failure
+        # can't leave a half-written init behind. Empty stdout counts as failure:
+        # a malformed argv makes most tools exit 0 while printing nothing, and
+        # caching that no-op would disable the integration until the next
+        # `zshcache` — silently, since the real error went to /dev/null.
+        if "$@" >| "$tmp" 2>/dev/null && [[ -s $tmp ]]; then
+            command mv -f -- "$tmp" "$f"
+            { zcompile -R -- "$f.zwc" "$f" } &!
+        else
+            command rm -f -- "$tmp"
+            print -ru2 -- "zsh: could not generate $name init (\`$*\`); fix it, then run zshcache"
+        fi
     fi
-    source "$f"
+    # Keep the last known-good init if regeneration just failed.
+    [[ -s $f ]] && source "$f"
 }
 
 # Manual invalidation. Homebrew bottles sometimes restore an *older* mtime on
@@ -141,7 +153,7 @@ zshcache() {
     print -r -- "zsh caches cleared; open a new shell to rebuild"
 }
 
-_zcache mise mise mise activate zsh
+_zcache mise mise activate zsh
 
 # ─── History ──────────────────────────────────────────────────────────────────
 # macOS /etc/zshrc runs after ~/.zshenv and resets HISTFILE, so re-set it here.
@@ -244,21 +256,21 @@ if command -v fd >/dev/null; then
     export FZF_ALT_C_COMMAND='fd --type d --hidden --strip-cwd-prefix --exclude .git'
 fi
 export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
-_zcache fzf fzf fzf --zsh
+_zcache fzf fzf --zsh
 
 # ─── zoxide ───────────────────────────────────────────────────────────────────
-_zcache zoxide zoxide zoxide init zsh
+_zcache zoxide zoxide init zsh
 
 # ─── carapace ─────────────────────────────────────────────────────────────────
 if command -v carapace >/dev/null; then
     # No inshellisense bridge: it is not in any Brewfile or mise config, and
     # carapace pays a lookup per completion for a bridge that can never resolve.
     export CARAPACE_BRIDGES='zsh,fish,bash'
-    _zcache carapace carapace carapace _carapace zsh
+    _zcache carapace carapace _carapace zsh
 fi
 
 # ─── Starship prompt ──────────────────────────────────────────────────────────
-_zcache starship starship starship init zsh --print-full-init
+_zcache starship starship init zsh --print-full-init
 
 # ─── Modern CLI replacements ──────────────────────────────────────────────────
 command -v eza >/dev/null && {
