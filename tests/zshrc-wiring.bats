@@ -70,6 +70,65 @@ no_match_in() {
     grep -qE '^export VISUAL=' "$ZSHENV"
 }
 
+# ─── ~/.config/zsh/.zprofile: what GUI-launched apps actually get ──────────
+#
+# A macOS app started from the Dock inherits launchd's PATH, and VS Code widens
+# it by resolving a *non-interactive login* zsh — .zshenv + .zprofile, never
+# .zshrc. So `mise activate` (interactive-only, by design) cannot be what puts a
+# runtime in an editor's PATH: that is this file's job, via the shims. When it
+# regressed, VS Code's Kotlin LSP failed with `Cannot run program "mvn"`.
+#
+# These run a real login-shell PATH build against a fake shims dir, because the
+# regression that motivated them (a line that grep would still match) was an
+# ordering/guard bug, and CI has no mise to test against.
+
+# Source $ZPROFILE in a pristine zsh with $1 as XDG_DATA_HOME, then run $2.
+_zprofile_path() {
+    zsh -f -c "
+        typeset -U path
+        HOME='$BATS_TEST_TMPDIR/home'
+        XDG_DATA_HOME='$1'
+        PATH=/usr/bin:/bin
+        source '$ZPROFILE'
+        $2
+    "
+}
+
+@test "a login shell gets mise's shims on PATH (no .zshrc involved)" {
+    mkdir -p "$BATS_TEST_TMPDIR/data/mise/shims"
+    printf '#!/bin/sh\n' >"$BATS_TEST_TMPDIR/data/mise/shims/mvn"
+    chmod +x "$BATS_TEST_TMPDIR/data/mise/shims/mvn"
+
+    run _zprofile_path "$BATS_TEST_TMPDIR/data" 'command -v mvn'
+    [ "$status" -eq 0 ]
+    [ "$output" = "$BATS_TEST_TMPDIR/data/mise/shims/mvn" ]
+}
+
+@test "shims outrank /usr/bin, so mise's JDK beats the macOS java stub" {
+    # /usr/bin/java exists on every Mac and only prints "no Java runtime".
+    # Appending the shims instead of prepending would hand editors that stub.
+    mkdir -p "$BATS_TEST_TMPDIR/data/mise/shims"
+    run _zprofile_path "$BATS_TEST_TMPDIR/data" 'print -rl -- $path'
+    [ "$status" -eq 0 ]
+    shims_at="$(grep -nxF "$BATS_TEST_TMPDIR/data/mise/shims" <<<"$output" | cut -d: -f1)"
+    usr_at="$(grep -nxF /usr/bin <<<"$output" | cut -d: -f1)"
+    [ -n "$shims_at" ]
+    [ "$shims_at" -lt "$usr_at" ]
+}
+
+@test "no shims dir yet (pre-first-install) leaves PATH clean" {
+    # An unguarded prepend puts a non-existent dir on every login shell's PATH.
+    run _zprofile_path "$BATS_TEST_TMPDIR/absent" 'print -rl -- $path'
+    [ "$status" -eq 0 ]
+    no_match_in "$output" 'mise/shims'
+}
+
+@test "zprofile keeps Homebrew ahead of /usr/bin" {
+    # The shims prepend sits next to this; a bad edit could reorder it.
+    grep -qF '/opt/homebrew/bin' "$ZPROFILE"
+    grep -qF '$HOME/.local/bin' "$ZPROFILE"
+}
+
 # ─── ~/.config/zsh/.zshrc wiring ───────────────────────────────────────────
 
 @test "zshrc template source file exists" {

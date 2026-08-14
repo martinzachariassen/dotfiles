@@ -97,6 +97,19 @@ mise installs to stable paths
 anchors to a non-churning JDK path — see [editors.md](editors.md). Runtime
 convergence runs on every apply via the `run_after_02b-mise-install` hook.
 
+**Two ways in, on purpose.** Interactive shells get `mise activate` from
+`.zshrc`, which swaps the real install dirs onto `PATH` on every `cd` — that's
+what makes per-project versions and `JAVA_HOME` work. GUI apps never see it:
+macOS starts them from launchd, and VS Code widens their `PATH` by resolving a
+*non-interactive login* zsh (`.zshenv` + `.zprofile`, no `.zshrc`). So
+[`.zprofile`](../src/dot_config/zsh/dot_zprofile) also prepends mise's shim dir
+(`~/.local/share/mise/shims`), which needs no activate hook. Without it an
+editor's language servers get a `PATH` with no JVM tooling on it at all and die
+on spawn — VS Code's Kotlin LSP fails with `Cannot run program "mvn"`. Changing
+a runtime version therefore needs no editor change, but **an editor already
+running when this landed must be fully quit and relaunched** — the resolved env
+is captured once, at app start.
+
 ## git
 
 Config: [`src/dot_config/git/config.tmpl`](../src/dot_config/git/config.tmpl)
