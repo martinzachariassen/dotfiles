@@ -246,6 +246,43 @@ _line_of() { grep -nF -m1 "$1" "$ZSHRC" | cut -d: -f1; }
     no_match 'eval "\$\((mise|fzf|zoxide|starship|carapace) ' "$ZSHRC"
 }
 
+@test "each _zcache line passes a command line that really prints an init script" {
+    # _zcache's argv is <cache-name> <cmd…>, where <cmd> doubles as the binary
+    # it probes — so the tool name appears exactly twice, not three times.
+    # `_zcache mise mise mise activate zsh` ran `mise mise activate zsh`, which
+    # prints nothing, and the old _zcache swallowed the error: mise never
+    # activated, so GUI-launched editors lost every mise-managed runtime from
+    # PATH (no mvn/java) while interactive shells that predated the change
+    # looked fine. Grepping for the string can't see this — we run it.
+    while read -r line; do
+        # Word-splitting is the point: rebuild _zcache's argv from the source.
+        # shellcheck disable=SC2086
+        set -- $line
+        shift 2 # drop "_zcache" and the cache name; $@ is what _zcache execs
+        command -v "$1" >/dev/null 2>&1 || continue # tool absent in this env
+        out="$("$@" </dev/null 2>/dev/null)" || {
+            echo "\`$*\` exited non-zero; _zcache would cache nothing"
+            return 1
+        }
+        [ -n "$out" ] || {
+            echo "\`$*\` printed no init script; _zcache would cache a no-op"
+            return 1
+        }
+    done < <(grep -E '^[[:space:]]*_zcache [a-z]' "$ZSHRC" | sed 's/^[[:space:]]*//')
+}
+
+@test "_zcache never caches an empty init and never sources a stale temp file" {
+    # The empty-output guard is what turns a broken argv into a visible error
+    # instead of a permanently disabled integration ([ -s ] is true at 1 byte,
+    # so "not empty" alone was not enough to notice carapace printing "\n").
+    body="$(sed -n '/^_zcache() {/,/^}/p' "$ZSHRC")"
+    grep -qF '&& [[ -s $tmp ]]' <<<"$body"
+    # Failures must be reported, not routed to /dev/null and forgotten.
+    grep -qF 'could not generate' <<<"$body"
+    # And a failed regeneration must not clobber the last known-good init.
+    no_match_in "$body" 'rm -f "\$f"'
+}
+
 @test "compinit is not unconditionally -C" {
     # -C skips the fpath re-scan, so a newly brew-installed completion stays
     # invisible until the dump is rebuilt. With only `compinit -C` in the file
