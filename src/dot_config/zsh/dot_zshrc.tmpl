@@ -202,7 +202,12 @@ _zcompdump_fresh=("$ZSH_COMPDUMP"(Nmh-24))
 if (( $#_zcompdump_fresh )); then
     compinit -C -d "$ZSH_COMPDUMP"
 else
-    compinit -d "$ZSH_COMPDUMP"
+    # -u: Homebrew makes /opt/homebrew group-writable by design (any `admin`
+    # user can `brew install` without sudo), which compinit's security audit
+    # always flags. On a single-admin-user machine that's not a real threat,
+    # so skip the audit instead of hitting an insecure-directories prompt
+    # once a day forever.
+    compinit -u -d "$ZSH_COMPDUMP"
     # compinit only rewrites the dump when its contents changed, so stamp it
     # regardless or an unchanged dump re-audits on every shell, forever.
     touch "$ZSH_COMPDUMP"
