@@ -257,7 +257,7 @@ _line_of() { grep -nF -m1 "$1" "$ZSHRC" | cut -d: -f1; }
     # is paid twice per tab. It used to sit at the very bottom.
     attach="$(_line_of 'zellij attach -c "$_ZJ_SESSION"')"
     [ -n "$attach" ]
-    for later in 'compinit -d' '_zcache mise' '_zcache starship' '_zcache fzf'; do
+    for later in 'compinit -u -d' '_zcache mise' '_zcache starship' '_zcache fzf'; do
         at="$(_line_of "$later")"
         [ -n "$at" ] || { echo "not found: $later"; return 1; }
         [ "$attach" -lt "$at" ] || {
@@ -347,7 +347,7 @@ _line_of() { grep -nF -m1 "$1" "$ZSHRC" | cut -d: -f1; }
     # invisible until the dump is rebuilt. With only `compinit -C` in the file
     # that never happens on its own.
     grep -qF 'compinit -C -d' "$ZSHRC"
-    grep -qE '^[[:space:]]*compinit -d "\$ZSH_COMPDUMP"$' "$ZSHRC"
+    grep -qE '^[[:space:]]*compinit -u -d "\$ZSH_COMPDUMP"$' "$ZSHRC"
     # Version-keyed, or a zsh upgrade silently breaks completion.
     grep -qF 'zcompdump-$ZSH_VERSION' "$ZSHRC"
 }
