@@ -30,6 +30,13 @@
     "workbench.editor.limit.value": 10,
     "workbench.editor.limit.perEditorGroup": true,
 
+    // Markdown is read far more often than it's edited here (docs/, READMEs), so
+    // open it rendered. Unrelated to `editor.enablePreview` above — that's the
+    // italic-tab kind. To edit: right-click → Open With… → Text Editor.
+    "workbench.editorAssociations": {
+        "*.md": "vscode.markdown.preview.editor"
+    },
+
     // ── Font & editor ──
 
     // Unpatched JetBrains Mono in the editor — the Nerd Font patch ships wider
