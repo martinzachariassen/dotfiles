@@ -25,6 +25,8 @@ fi
 . "$_DIR/../lib/log.sh"
 # shellcheck source=../lib/chezmoi-data.sh
 . "$_DIR/../lib/chezmoi-data.sh"
+# shellcheck source=../lib/prompt-meta.sh
+. "$_DIR/../lib/prompt-meta.sh"
 ui_init_logging
 
 # `read … || fallback` swallows an interrupted read and marches on, so trap
@@ -50,19 +52,6 @@ run_chezmoi() {
         exit 0
     fi
     exec chezmoi init "$@"
-}
-
-# prompt_msg KEY — the message chezmoi shows for a prompt*Once KEY; reading it
-# here (vs. hardcoding) keeps the flag text and the template in sync.
-prompt_msg() {
-    sed -nE "s/.*prompt(String|Choice|Multichoice)Once \. \"$1\"[[:space:]]+\"([^\"]*)\".*/\2/p" \
-        "$TMPL" | head -n1
-}
-
-# prompt_choices KEY — the (list "a" "b" ...) options for a promptChoiceOnce KEY.
-prompt_choices() {
-    sed -nE "s/.*promptChoiceOnce \. \"$1\"[[:space:]]+\"[^\"]*\"[[:space:]]+\(list ([^)]*)\).*/\1/p" \
-        "$TMPL" | head -n1 | grep -oE '"[^"]+"' | tr -d '"'
 }
 
 # profile_defaults PROFILE — space-separated default module keys: (inherit ?
@@ -108,6 +97,15 @@ existing_modules() {
 # capable: gum → bash TUI arrow/space picker → numbered menu (dumb terminal).
 
 use_gum() { [ "${WIZARD_NO_GUM:-0}" != "1" ] && command -v gum >/dev/null 2>&1; }
+
+# signing_agent_present — true when an SSH agent is already handing out keys, so
+# "set the key now" is a realistic answer. False on a just-wiped Mac.
+signing_agent_present() {
+    local sock="${WIZARD_AGENT_SOCK:-$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock}"
+    [ -S "$sock" ] || sock="${SSH_AUTH_SOCK:-}"
+    [ -n "$sock" ] && [ -S "$sock" ] || return 1
+    SSH_AUTH_SOCK="$sock" ssh-add -L >/dev/null 2>&1
+}
 
 # use_tui — pure-bash arrow/space picker; gated out for TERM=dumb / no rw /dev/tty.
 use_tui() {
@@ -427,7 +425,20 @@ modules="$(select_modules $mod_default)"
 signingMode="$(ask_choice "$(prompt_msg signingMode)" "$def_signing" $(prompt_choices signingMode))"
 signingKey=""
 if [ "$signingMode" != "off" ]; then
-    signingKey="$(ask_string "$(prompt_msg signingKey)" "$def_signkey")"
+    # Chicken-and-egg on a fresh Mac: the signing key lives in 1Password, which
+    # Homebrew hasn't installed yet. Offer to defer rather than demand a paste;
+    # default to whichever is actually possible right now.
+    key_now="now — paste or pick the public key"
+    key_later="later — not available on this Mac yet (finish with: chezsign)"
+    key_when="$key_now"
+    if [ -z "$def_signkey" ]; then
+        key_default="$key_later"
+        signing_agent_present && key_default="$key_now"
+        key_when="$(ask_choice "When do you want to set the signing key?" "$key_default" "$key_now" "$key_later")"
+    fi
+    if [ "$key_when" = "$key_now" ]; then
+        signingKey="$(ask_string "$(prompt_msg signingKey)" "$def_signkey")"
+    fi
 fi
 
 hr >/dev/tty
@@ -435,7 +446,11 @@ say "Summary:" >/dev/tty
 dim "  name     $name" >/dev/tty
 dim "  email    $email" >/dev/tty
 dim "  profile  $profile" >/dev/tty
-dim "  signing  $signingMode${signingKey:+ ($signingKey)}" >/dev/tty
+if [ "$signingMode" != "off" ] && [ -z "$signingKey" ]; then
+    dim "  signing  $signingMode (key deferred — run \`chezsign\` later)" >/dev/tty
+else
+    dim "  signing  $signingMode${signingKey:+ ($signingKey)}" >/dev/tty
+fi
 dim "  modules  ${modules:-<none>}" >/dev/tty
 printf 'Apply this setup? [Y/n] ' >/dev/tty
 IFS= read -r reply </dev/tty || reply=""

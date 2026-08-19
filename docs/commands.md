@@ -72,6 +72,7 @@ Change your profile, optional modules, or signing with `chezsetup`:
 ```sh
 chezsetup               # fill in any newly-added setup keys; keeps existing answers
 chezsetup --reset       # re-ask profile / modules / signing, then apply
+chezsign                # set only the git signing key; keeps every other answer
 ```
 
 The default mode runs plain `chezmoi init`, which — via chezmoi's
@@ -90,6 +91,7 @@ wizard works.
 | `dotfiles` | Jump to the source repo (with args, points you at `chezsetup` / `chezhelp`). |
 | `chezapply` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
 | `chezstatus` | Read-only drift report: plain-language file drift (what `chezapply` would push, and what you edited locally in `$HOME`) **and** untracked-package drift, in one report. `chezstatus PATH` or `chezstatus -v` drops to raw `chezmoi diff`. |
+| `chezsign` | Set **only** the git signing key, keeping profile, modules and identity exactly as they are. Exists because of a bootstrap chicken-and-egg: the signing key lives in 1Password, which Homebrew doesn't install until *after* the wizard has already asked for it, so a fresh Mac has to defer the answer. Offers the keys the SSH agent is already holding (1Password's socket first, else `$SSH_AUTH_SOCK`) so there's nothing to paste — or takes a key as an argument: `chezsign "ssh-ed25519 AAAA…"`. Strips any trailing agent comment, since `allowed_signers` is `<email> <key>` per line. No-ops when the key is already set, refuses when `signingMode` is `off` (that's a `chezsetup --reset`), and finishes with a real signed commit as a smoke test. `DRY_RUN=1` prints the `chezmoi init` it would run; `YES=1` takes a lone offered key unprompted. |
 | `chezsetup` | Configure profile/modules/signing. Default fills in **newly added** setup keys only, keeping existing answers. `--reset`/`-r` sets this Mac up **as new**: resets chezmoi's persistent state so `run_once_*`/`run_onchange_*` hooks fire again, re-asks the full wizard (overriding saved answers), then applies. Confirm-gated in `--reset` mode; never uninstalls packages or deletes files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
 | `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (all tiers — formulae, casks, orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after one confirmation, `--dry-run`/`-n` (or `DRY_RUN=1`) to preview only, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY for the confirm gate. **Removal only** — installs happen via `chezapply`/`chezup`; `chezreconcile` runs both. |

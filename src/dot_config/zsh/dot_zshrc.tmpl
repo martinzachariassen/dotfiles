@@ -359,6 +359,9 @@ dotfiles() {
         echo "Or just fill in newly-added setup keys (keeps current answers):"
         echo "    chezsetup"
         echo
+        echo "Just set the git signing key (once 1Password is running):"
+        echo "    chezsign"
+        echo
         echo "List every dotfiles command:"
         echo "    chezhelp"
     fi
@@ -551,6 +554,13 @@ chezsetup() {
     echo "chezsetup: filling in any new/unanswered setup keys only."
     echo "           to re-choose profile/modules/signing, run: chezsetup --reset"
     chezmoi init && chezapply "${rest[@]}"
+}
+
+# Set the git signing key on a machine that deferred it during setup (the key
+# lives in 1Password, which isn't installed until after the wizard runs). Offers
+# the SSH agent's keys, changes nothing else, then proves it with a signed commit.
+chezsign() {
+    _chez_run scripts/bin/signing.sh "$@"
 }
 
 # Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
@@ -814,6 +824,8 @@ chezhelp() {
   Change your setup (re-run the wizard)
     chezsetup        Fill in newly-added setup keys; keeps existing answers.
                        --reset/-r  set up as new: reset run-once state, re-ask everything.
+    chezsign         Set the git signing key on its own; keeps every other answer.
+                       Run this after 1Password is up if setup deferred the key.
 
   Maintenance (packages & drift)
     chezapply        Apply without pulling. Flags drift; never uninstalls.
