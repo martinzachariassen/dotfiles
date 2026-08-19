@@ -20,7 +20,6 @@ cask "font-ia-writer-quattro"   # Obsidian editor font
 cask "google-chrome"            # what web tooling assumes
 
 # ─── Media ────────────────────────────────────────────────────────────────────
-cask "obs"                      # screen recording / streaming
 cask "spotify"
 cask "vlc"
 
