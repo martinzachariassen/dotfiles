@@ -473,8 +473,11 @@ if [ "$signingMode" != "off" ]; then
     # Chicken-and-egg on a fresh Mac: the signing key lives in 1Password, which
     # Homebrew hasn't installed yet. Offer to defer rather than demand a paste;
     # default to whichever is actually possible right now.
-    key_now="now — paste or pick the public key"
-    key_later="later — not available on this Mac yet (finish with: chezsign)"
+    # Kept short: ask_choice echoes the chosen option back as the default in the
+    # "[...]" prompt, and a sentence-long label makes that line unreadable. The
+    # explanation lives in the ask_sub block above instead.
+    key_now="now"
+    key_later="later"
     key_when="$key_now"
     if [ -z "$def_signkey" ]; then
         key_default="$key_later"
