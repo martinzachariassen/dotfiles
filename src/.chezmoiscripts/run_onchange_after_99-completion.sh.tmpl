@@ -7,6 +7,7 @@ set -euo pipefail
 PROFILE="{{ .profile }}"
 SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
+SIGNKEY="{{ dig "signingKey" "" . }}"
 
 EXTRAS=""
 {{ range $m := (dig "modules" (list) .) -}}
@@ -21,6 +22,18 @@ if [ -t 1 ]; then
     R=$'\033[0m'
 else
     B="";D="";G="";C="";Y="";M="";R=""
+fi
+
+# Setup can defer the signing key: on a fresh Mac it's still locked in 1Password,
+# which Homebrew only just installed. Surface the one-shot fix rather than
+# letting the machine sit silently unsigned.
+SIGN_STEP=""
+if [ "$SIGNING" != "off" ] && [ -z "$SIGNKEY" ]; then
+    SIGN_STEP="
+    ${M}4.${R} ${C}chezsign${R}
+       ${Y}Signing is deferred${R} — no key is set yet, so commits are unsigned.
+       Run this once 1Password is signed in and its SSH agent is on; it offers
+       the agent's keys and changes nothing else about your setup."
 fi
 
 cat <<EOF
@@ -44,6 +57,7 @@ ${C}╰────────────────────────�
 
     ${M}3.${R} ${C}chezdoctor${R}
        Run a health check after auth is done.
+${SIGN_STEP}
 
   ${B}Daily commands${R}
     ${C}chezup${R}      converge this Mac to the repo (pull, apply, install packages)

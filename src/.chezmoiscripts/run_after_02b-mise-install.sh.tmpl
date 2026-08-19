@@ -29,8 +29,12 @@ if [ -z "$(cd "$HOME" && mise ls --missing 2>/dev/null)" ]; then
     exit 0
 fi
 
-echo "→ Installing global runtimes from ~/.config/mise/config.toml"
-echo "  (java + node; downloads only what's missing, idempotent)"
+# A real count, from mise itself — not a guess. mise renders its own per-tool
+# progress below, so this only frames it rather than wrapping it in a second bar.
+missing="$(cd "$HOME" && mise ls --missing 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
+missing_n="$(printf '%s' "$missing" | wc -w | tr -d ' ')"
+echo "→ Installing $missing_n missing runtime(s): $missing"
+echo "  Downloads only what's missing; mise shows its own progress per tool."
 
 if (cd "$HOME" && mise install); then
     echo "✓ mise runtimes installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
