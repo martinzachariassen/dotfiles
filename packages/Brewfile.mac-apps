@@ -49,3 +49,5 @@ brew "mas"                      # backs the `mas` lines below
 #   mas "Xcode", id: 497799835
 #   mas "The Unarchiver", id: 425424353
 #   mas "Wipr 2", id: 1662217862
+
+mas "Toggl Track", id: 1291898086
