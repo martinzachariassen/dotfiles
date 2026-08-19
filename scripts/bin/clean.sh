@@ -324,6 +324,14 @@ _clean_main() {
         return 1
     fi
 
+    echo
+    printf '%s%s%s  %sUntracked dotfiles%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
+    explain \
+        "Looks for dotfiles in ~ and ~/.config that this repo does not manage," \
+        "then offers to delete them one at a time." \
+        "Config belonging to a tool you still have installed is kept automatically." \
+        "Nothing is removed without your confirmation."
+
     # keepHome guards $HOME's top level, so an unreadable keep-list is fail-closed.
     local keep_home keep_config
     keep_home="$(_clean_keep_home)"

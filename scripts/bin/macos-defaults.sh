@@ -20,7 +20,10 @@ unset _md_lib
 ui_init_status
 
 printf '%s macOS defaults\n' "$NODE"
-echo "  Applying Finder, Dock, keyboard, screenshots, security, and developer preferences."
+explain \
+    "Sets Finder, Dock, keyboard, screenshot, security and developer preferences." \
+    "Only writes settings that differ, so a re-run is quiet and cheap." \
+    "Needs your password once; a few settings need a logout to take effect."
 
 # Under chezmoi apply the pre-auth hook already cached creds (no-op here); the
 # sleep works around a first-keystroke-eaten TTY race on GPU terminals.

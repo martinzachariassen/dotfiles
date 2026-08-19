@@ -90,7 +90,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Starting the setup wizard"* ]]
+    [[ "$output" == *"Setup wizard"* ]]
     [[ "$output" == *"WIZARD RAN"* ]]
     # No args ⇒ it must NOT go straight to chezmoi init.
     [ ! -s "$CHEZMOI_LOG" ]
@@ -102,7 +102,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL" --promptDefaults
     [ "$status" -eq 0 ]
-    [[ "$output" == *"handing off directly to chezmoi init"* ]]
+    [[ "$output" == *"handing off to chezmoi init"* ]]
     [[ "$output" == *"CHEZMOI INIT"* ]]
     [[ "$output" != *"WIZARD RAN"* ]]
     grep -q -- '--apply' "$CHEZMOI_LOG"
@@ -137,7 +137,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Repo already present"* ]]
+    [[ "$output" == *"already cloned"* ]]
     [ ! -f "$GIT_LOG" ] || ! grep -q 'clone' "$GIT_LOG"
 }
 
@@ -146,7 +146,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Cloning"* ]]
+    [[ "$output" == *"cloning into"* ]]
     grep -q 'clone' "$GIT_LOG"
 }
 
@@ -167,8 +167,8 @@ EOF
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Installing Xcode Command Line Tools"* ]]
-    [[ "$output" == *"Xcode Command Line Tools present"* ]]
+    [[ "$output" == *"opening Apple's installer"* ]]
+    [[ "$output" == *"Xcode Command Line Tools"* ]]
     [[ "$output" == *"WIZARD RAN"* ]]
     [ -f "$STUBS/xcode.installed" ]  # --install was actually invoked
 }
