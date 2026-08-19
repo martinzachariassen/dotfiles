@@ -14,7 +14,10 @@ setup() {
 }
 teardown() { rm -rf "$FIX"; }
 
-lib() { printf '. "%s"; . "%s"; ui_init_logging;' "$LOG" "$BP"; }
+# Glyphs depend on the locale, so pin it — same convention as tests/log-lib.bats.
+# Without this these tests assert Unicode while ui_init_glyphs may correctly pick
+# the ASCII fallback, and they pass or fail on the runner's environment.
+lib() { printf 'export LC_ALL=en_US.UTF-8; . "%s"; . "%s"; ui_init_logging;' "$LOG" "$BP"; }
 
 # ─── the bar itself ───────────────────────────────────────────────────────────
 
