@@ -2,11 +2,11 @@
 
 The everyday surface is **two verbs plus a health check**. Both verbs end in the
 same `chezmoi apply`, which reconciles *real installed state* on every run, so it
-always installs what the Brewfile declares. It never *uninstalls*: `chez` only
+always installs what the Brewfile declares. It never *uninstalls*: `chezapply` only
 flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles
 that removal direction on demand. `chezmirror` is **removal-only** — the install
-direction is what every `chez`/`chezup` already does; `chezsync` chains the two
-(`chezup` then `chezmirror`) when you want a full both-directions package
+direction is what every `chezapply`/`chezup` already does; `chezreconcile` chains
+the two (`chezup` then `chezmirror`) when you want a full both-directions package
 reconcile in one step.
 
 The verbs are defined in
@@ -67,33 +67,33 @@ provider-agnostic fallback is `chezmoi apply && exec zsh` (`chezmoi` is on
 
 ## Changing your setup
 
-Change your profile, optional modules, or signing by re-running the plain-text
-wizard, which overrides your saved answers:
+Change your profile, optional modules, or signing with `chezsetup`:
 
 ```sh
-chezreset               # re-ask profile / modules / signing, then apply
+chezsetup               # fill in any newly-added setup keys; keeps existing answers
+chezsetup --reset       # re-ask profile / modules / signing, then apply
 ```
 
-`chezreinit` is different: it runs plain `chezmoi init`, which — via chezmoi's
+The default mode runs plain `chezmoi init`, which — via chezmoi's
 `prompt*Once` functions — keeps every answer you've given and only asks for
 setup keys still blank. So it fills in newly added questions but never lets you
-re-choose existing ones; reach for `chezreset` for that. See
-[packages.md](packages.md#the-wizard) for how the wizard works.
+re-choose existing ones; pass `--reset`/`-r` for that (it also resets chezmoi's
+persistent state so `run_once_*`/`run_onchange_*` hooks fire again — confirm-gated,
+never uninstalls anything). See [packages.md](packages.md#the-wizard) for how the
+wizard works.
 
 ## Advanced / occasional helpers
 
 | Command | What it does |
 |---|---|
 | `chezhelp` | Print every dotfiles verb, grouped, one line each. Static text — instant, no subprocesses. The entry point when you forget a command. |
-| `dotfiles` | Jump to the source repo (with args, points you at `chezreset` / `chezreinit` / `chezhelp`). |
-| `chez` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
-| `chezdiff` | Plain-language drift explainer: translates `chezmoi status` into two labelled sections — what `chez` would push (repo → `$HOME`) and managed files you edited locally (`$HOME` drift). Read-only. `chezdiff PATH` or `chezdiff -v` drops to raw `chezmoi diff`. |
-| `chezreinit` | Pull, run plain `chezmoi init` to fill in **newly added** data-model keys, then apply. Keeps existing answers — use after wizard/data-model changes, not to re-choose. |
-| `chezreset` | Set up this Mac **as new**: reset chezmoi's persistent state so `run_once_*` (and `run_onchange_*`) hooks fire again, re-ask the full wizard (overriding saved answers), then apply. Confirm-gated; doesn't uninstall packages or delete files. |
+| `dotfiles` | Jump to the source repo (with args, points you at `chezsetup` / `chezhelp`). |
+| `chezapply` | Apply without pulling — the building block `chezup` calls. Flags Brewfile drift (packages installed but untracked); never uninstalls. |
+| `chezstatus` | Read-only drift report: plain-language file drift (what `chezapply` would push, and what you edited locally in `$HOME`) **and** untracked-package drift, in one report. `chezstatus PATH` or `chezstatus -v` drops to raw `chezmoi diff`. |
+| `chezsetup` | Configure profile/modules/signing. Default fills in **newly added** setup keys only, keeping existing answers. `--reset`/`-r` sets this Mac up **as new**: resets chezmoi's persistent state so `run_once_*`/`run_onchange_*` hooks fire again, re-asks the full wizard (overriding saved answers), then applies. Confirm-gated in `--reset` mode; never uninstalls packages or deletes files. |
 | `chezbump` | Routine dependency upgrade (`brew update && brew upgrade` + `mise upgrade`). |
-| `chezaudit` | List Homebrew packages installed locally but not tracked in any Brewfile (reports only). |
-| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (all tiers — formulae, casks, orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after one confirmation, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY either way. **Removal only** — installs happen via `chez`/`chezup`; `chezsync` runs both. |
-| `chezsync` | **Full package reconcile in one step:** `chezup` (converge + install what the Brewfiles declare) then `chezmirror` (uninstall what they don't). `chezup` only adds and `chezmirror` only removes; `chezsync` does both directions. Untracked *files* stay separate — that's `chezclean`. Honours `DRY_RUN=1` (previews both directions, using `chezaudit` for the removal side so nothing is touched) and `YES=1` (skips both confirm gates); trailing args pass through to `chezup` → `chezmoi apply`. |
+| `chezmirror` | Enforce the Brewfile as truth in the removal direction: preview the untracked items (all tiers — formulae, casks, orphaned taps), then confirm each removal **one at a time** (via `gum` when installed); casks go through `--cask`, taps through `brew untap`. Pass `--all` (aliases `-a`, `--yes`, `-y`) to remove the **whole** set after one confirmation, `--dry-run`/`-n` (or `DRY_RUN=1`) to preview only, or `YES=1 chezmirror` to accept-all with no prompt. Requires a TTY for the confirm gate. **Removal only** — installs happen via `chezapply`/`chezup`; `chezreconcile` runs both. |
+| `chezreconcile` | **Full package reconcile in one step:** `chezup` (converge + install what the Brewfiles declare) then `chezmirror` (uninstall what they don't). `chezup` only adds and `chezmirror` only removes; `chezreconcile` does both directions. Untracked *files* stay separate — that's `chezclean`. Honours `DRY_RUN=1` (previews both directions, using `chezmirror -n` for the removal side so nothing is touched) and `YES=1` (skips both confirm gates); trailing args pass through to `chezup` → `chezmoi apply`. |
 | `chezclean` | The **file** analogue of `chezmirror`: reconcile untracked dotfiles to what chezmoi manages, across two scopes — the top level of `$HOME` (keep-list `cleanup.keepHome`) and `~/.config` (keep-list `cleanup.keepConfig`), both in [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml). Lists the untracked entries — everything that chezmoi neither manages nor a keep-list spares — then removes only what you confirm **one at a time** (via `gum` when installed). **Tool-aware:** config whose owning tool is still present is kept automatically — the union of three signals: the tool's brew package is installed, its command is on PATH (mise/gcloud tools count too), **or** its owning VS Code extension is in `code --list-extensions`; uninstall the tool (or drop the extension) and its config re-surfaces as removable. Most tools are matched by a stem heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the `cleanup.owners` map holds only the aliases where the dir name and the command/package/extension diverge (`.kube`→`kubectl`, `.m2`→`mvn`, `.sonarlint`→`sonarsource.sonarlint-vscode`). Offered entries are labelled `orphan` (a known tool, now gone) or `untracked` (no known owner); `-v`/`--verbose` also lists what tool-ownership kept. Pass `--all` (`-a`/`--yes`/`-y`) to remove the whole set after one confirmation, or `YES=1 chezclean` to accept-all; both need a TTY. `DRY_RUN=1` (or `-n`/`--dry-run`) previews and works headless. **Safe by construction:** only names beginning with `.` are ever considered (so `~/Library`, `~/Documents`, … are structurally out of scope), it never descends past an immediate child, and it removes nothing without a controlling terminal. Keep an entry for good by adding it to `cleanup.keepHome`/`cleanup.keepConfig` (or, if it's a tool whose dir name diverges from its command, map it in `cleanup.owners`). |
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so

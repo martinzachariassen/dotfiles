@@ -108,7 +108,7 @@ if command -v chezmoi >/dev/null 2>&1; then
     if [ "$drift" = "0" ]; then
         pass "no drift between source and \$HOME"
     else
-        warn "$drift file(s) drifted — run \`chez\` to apply or \`chezmoi diff\` to inspect"
+        warn "$drift file(s) drifted — run \`chezapply\` to apply or \`chezmoi diff\` to inspect"
     fi
 else
     fail "chezmoi not installed — re-run install.sh"
@@ -117,7 +117,7 @@ fi
 section "XDG layout"
 for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
     if [ -f "$legacy" ]; then
-        fail "legacy $legacy present — would shadow XDG-managed config. Run \`chez\` to remove."
+        fail "legacy $legacy present — would shadow XDG-managed config. Run \`chezapply\` to remove."
     else
         pass "no legacy $(basename "$legacy")"
     fi
@@ -240,7 +240,7 @@ EOF
     rm -f "$leaves_tmp"
     if [ -n "$untracked" ]; then
         n=$(echo "$untracked" | wc -l | tr -d ' ')
-        warn "$n brew package(s) installed but not in any Brewfile (run \`chezaudit\` for the list)"
+        warn "$n brew package(s) installed but not in any Brewfile (run \`chezstatus\` for the list)"
     else
         pass "no untracked brew packages"
     fi
@@ -316,7 +316,7 @@ if command -v mise >/dev/null 2>&1; then
         warn "node not installed via mise — run: mise install"
     fi
 else
-    fail "mise missing — language runtimes (java, node, …) won't activate. Run: chez"
+    fail "mise missing — language runtimes (java, node, …) won't activate. Run: chezapply"
 fi
 # Legacy guard: direnv was replaced by mise.
 if command -v direnv >/dev/null 2>&1; then

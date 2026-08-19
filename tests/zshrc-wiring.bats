@@ -187,15 +187,15 @@ _zprofile_path() {
     grep -qE '^dotfiles\(\) \{' "$ZSHRC"
 }
 
-@test "zshrc defines the chez wrapper around chezmoi apply" {
-    grep -qE '^chez\(\) \{' "$ZSHRC"
+@test "zshrc defines the chezapply wrapper around chezmoi apply" {
+    grep -qE '^chezapply\(\) \{' "$ZSHRC"
 }
 
 # chezhelp's listing must stay in sync with the actual verbs.
 @test "zshrc defines chezhelp and it lists every verb" {
     grep -qE '^chezhelp\(\) \{' "$ZSHRC"
     body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
-    for verb in chezup chezdoctor chezreset chezreinit chez chezdiff chezbump chezaudit chezmirror chezsync chezclean dotfiles; do
+    for verb in chezup chezdoctor chezsetup chezapply chezstatus chezbump chezmirror chezreconcile chezclean dotfiles; do
         grep -qE "^ +${verb} " <<<"$body" || {
             echo "chezhelp is missing an entry for: ${verb}"
             return 1
@@ -228,19 +228,19 @@ _zprofile_path() {
     sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/clean.sh'
 }
 
-# chezsync must compose chezup (install) + chezmirror (removal), never
-# re-implement either. Behaviour is exercised in tests/chezsync.bats.
-@test "zshrc defines chezsync composing chezup then chezmirror" {
-    grep -qE '^chezsync\(\) \{' "$ZSHRC"
-    body="$(sed -n '/^chezsync() {/,/^}/p' "$ZSHRC")"
+# chezreconcile must compose chezup (install) + chezmirror (removal), never
+# re-implement either. Behaviour is exercised in tests/chezreconcile.bats.
+@test "zshrc defines chezreconcile composing chezup then chezmirror" {
+    grep -qE '^chezreconcile\(\) \{' "$ZSHRC"
+    body="$(sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC")"
     grep -qF 'chezup' <<<"$body"
     grep -qF 'chezmirror' <<<"$body"
 }
 
-@test "chez surfaces Brewfile drift but never auto-uninstalls" {
-    grep -qE '^_chez_brew_untracked\(\) \{' "$ZSHRC"
+@test "chezapply surfaces Brewfile drift but never auto-uninstalls" {
+    grep -qE '^_chez_brew_removals\(\) \{' "$ZSHRC"
     grep -qF 'reconcile (uninstall): chezmirror' "$ZSHRC"
-    ! sed -n '/^chez() {/,/^}/p' "$ZSHRC" | grep -qF 'brew bundle cleanup'
+    ! sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -qF 'brew bundle cleanup'
 }
 
 # ─── Startup cost ──────────────────────────────────────────────────────────

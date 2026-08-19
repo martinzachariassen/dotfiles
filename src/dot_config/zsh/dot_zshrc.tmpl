@@ -354,10 +354,10 @@ dotfiles() {
         cd "$src" || return
     else
         echo "Re-choose your setup (profile, modules, signing):"
-        echo "    chezreset                  # plain-text wizard, then applies"
+        echo "    chezsetup --reset          # plain-text wizard, then applies"
         echo
         echo "Or just fill in newly-added setup keys (keeps current answers):"
-        echo "    chezreinit"
+        echo "    chezsetup"
         echo
         echo "List every dotfiles command:"
         echo "    chezhelp"
@@ -366,7 +366,8 @@ dotfiles() {
 
 # `chezmoi apply --force`, with one upfront confirm when managed files in $HOME
 # have drifted (avoids colliding with later sudo prompts). -v for per-file diffs.
-chez() {
+chezapply() {
+    local src={{ .chezmoi.workingTree | quote }}
     local status_output response
     status_output=$(chezmoi status --exclude scripts 2>&1)
     if [ -n "$status_output" ]; then
@@ -380,12 +381,12 @@ chez() {
         echo "  Status codes:"
         echo "    A add   M modify   D remove"
         echo "    left column = your \$HOME edits (drift), right column = repo → \$HOME (apply)"
-        echo "    plain-language breakdown: \`chezdiff\`"
+        echo "    plain-language breakdown: \`chezstatus\`"
         echo
         echo "  Choices:"
         echo "    y + Enter      apply now with \`chezmoi apply --force\`"
         echo "                   this overwrites drift in managed \$HOME files"
-        echo "    n or Enter     abort; inspect first with \`chezdiff\` (plain) or \`chezmoi diff\` (raw)"
+        echo "    n or Enter     abort; inspect first with \`chezstatus\` (plain) or \`chezmoi diff\` (raw)"
         echo
         printf "Apply these managed dotfile changes now? [y/N] "
         read -r response < /dev/tty
@@ -396,27 +397,27 @@ chez() {
     fi
     chezmoi apply --force "$@"
     local rc=$?
-    # Flag untracked packages so `chez` never silently uninstalls.
+    # Flag untracked packages so `chezapply` never silently uninstalls.
     if command -v brew >/dev/null 2>&1; then
         local untracked
-        untracked=$(_chez_brew_untracked)
+        untracked=$(_chez_brew_removals "$src")
         if [ -n "$untracked" ]; then
             echo
             echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but in no Brewfile."
-            echo "    review: chezaudit   ·   reconcile (uninstall): chezmirror"
+            echo "    review: chezstatus   ·   reconcile (uninstall): chezmirror"
         fi
     fi
     return $rc
 }
 
-# Read-only drift explainer: plain-language version of `chezmoi status`'s codes.
-# Never applies or pulls.
-chezdiff() {
+# Read-only drift explainer: plain-language file drift (repo ↔ $HOME) AND
+# untracked-package drift, in one report. Never applies, pulls, or removes.
+chezstatus() {
     case "${1:-}" in
         -h | --help)
-            echo "usage: chezdiff [-v|--verbose] [PATH …]"
-            echo "  (no args)   plain-language summary of pending changes + local drift"
-            echo "  PATH        raw \`chezmoi diff\` for a file (e.g. chezdiff ~/.zshrc)"
+            echo "usage: chezstatus [-v|--verbose] [PATH …]"
+            echo "  (no args)   plain-language summary: pending changes, local drift, untracked packages"
+            echo "  PATH        raw \`chezmoi diff\` for a file (e.g. chezstatus ~/.zshrc)"
             echo "  -v          raw \`chezmoi diff\` for everything"
             return 0
             ;;
@@ -431,52 +432,63 @@ chezdiff() {
             ;;
     esac
 
+    local src={{ .chezmoi.workingTree | quote }}
     local status_output
     status_output=$(chezmoi status --exclude scripts 2>&1) || {
-        print -ru2 -- "chezdiff: \`chezmoi status\` failed:"
+        print -ru2 -- "chezstatus: \`chezmoi status\` failed:"
         print -ru2 -- "$status_output"
         return 1
     }
     if [ -z "$status_output" ]; then
         echo "  ✓ in sync — no pending changes, nothing edited locally"
-        echo "    (package drift is tracked separately: chezaudit)"
-        return 0
+    else
+        # right column → "apply would write", left column → "you edited locally".
+        local pending drift line col1 col2 path
+        pending=""
+        drift=""
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            col1=${line:0:1}
+            col2=${line:1:1}
+            path=${line:3}
+            case "$col2" in
+                A) pending+="    add      ~/$path"$'\n' ;;
+                M) pending+="    modify   ~/$path"$'\n' ;;
+                D) pending+="    remove   ~/$path"$'\n' ;;
+            esac
+            case "$col1" in
+                A) drift+="    added    ~/$path"$'\n' ;;
+                M) drift+="    edited   ~/$path"$'\n' ;;
+                D) drift+="    deleted  ~/$path"$'\n' ;;
+            esac
+        done <<<"$status_output"
+
+        if [ -n "$pending" ]; then
+            echo "── Repo → \$HOME · what \`chezapply\` would write ───────────────"
+            printf '%s' "$pending"
+            echo
+        fi
+        if [ -n "$drift" ]; then
+            echo "── Local drift · managed files you edited in \$HOME ───────────"
+            printf '%s' "$drift"
+            echo "  ⚠ \`chezapply\` overwrites these. Keep an edit instead: chezmoi re-add ~/…"
+            echo
+        fi
     fi
 
-    # right column → "apply would write", left column → "you edited locally".
-    local pending drift line col1 col2 path
-    pending=""
-    drift=""
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        col1=${line:0:1}
-        col2=${line:1:1}
-        path=${line:3}
-        case "$col2" in
-            A) pending+="    add      ~/$path"$'\n' ;;
-            M) pending+="    modify   ~/$path"$'\n' ;;
-            D) pending+="    remove   ~/$path"$'\n' ;;
-        esac
-        case "$col1" in
-            A) drift+="    added    ~/$path"$'\n' ;;
-            M) drift+="    edited   ~/$path"$'\n' ;;
-            D) drift+="    deleted  ~/$path"$'\n' ;;
-        esac
-    done <<<"$status_output"
+    if command -v brew >/dev/null 2>&1; then
+        local removals
+        removals=$(_chez_brew_removals "$src")
+        if [ -n "$removals" ]; then
+            echo "── Untracked Homebrew packages (in no Brewfile tier) ──────────"
+            printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
+            echo "  reconcile (uninstall): chezmirror"
+            echo
+        fi
+    fi
 
-    if [ -n "$pending" ]; then
-        echo "── Repo → \$HOME · what \`chez\` would write ───────────────────"
-        printf '%s' "$pending"
-        echo
-    fi
-    if [ -n "$drift" ]; then
-        echo "── Local drift · managed files you edited in \$HOME ───────────"
-        printf '%s' "$drift"
-        echo "  ⚠ \`chez\` overwrites these. Keep an edit instead: chezmoi re-add ~/…"
-        echo
-    fi
-    echo "  See a file's exact lines:  chezdiff ~/path   ·   all:  chezdiff -v"
-    echo "  Apply now:                 chez              ·   packages:  chezaudit"
+    echo "  See a file's exact lines:  chezstatus ~/path   ·   all:  chezstatus -v"
+    echo "  Apply now:                 chezapply"
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
@@ -492,38 +504,53 @@ chezdoctor() {
 }
 
 # ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
-# Fill in newly-added setup keys only; keeps existing answers. To re-choose
-# everything, use `chezreset`.
-chezreinit() {
+# Configure this machine's profile/modules/signing. Default: fill in any
+# newly-added setup keys, keeping existing answers. --reset/-r: replay
+# first-time setup instead — reset chezmoi's persistent state so run_once_*/
+# run_onchange_* hooks re-fire, then re-ask everything, overriding saved
+# answers. Neither mode uninstalls anything; --reset is confirm-gated.
+chezsetup() {
     local src={{ .chezmoi.workingTree | quote }}
-    (cd "$src" && git pull --ff-only) || return $?
-    echo "chezreinit: filling in any new/unanswered setup keys only."
-    echo "            to re-choose profile/modules/signing, run: chezreset"
-    chezmoi init && chez "$@"
-}
-
-# Set this Mac up "as new": reset chezmoi's persistent state so run_once_*/
-# run_onchange_* hooks re-fire, re-ask the wizard, then apply. Doesn't uninstall
-# anything. Confirm-gated.
-chezreset() {
-    local src reply
-    src={{ .chezmoi.workingTree | quote }}
-    # Self-heal a stale wizard path before the destructive state reset below.
-    [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "$@"; return; }
-    (cd "$src" && git pull --ff-only) || return $?
-    if [ -r /dev/tty ]; then
-        printf 'chezreset: replay first-time setup (reset run-once state, re-ask the wizard)? [y/N] '
-        IFS= read -r reply </dev/tty || reply=""
-        case "$reply" in
-            y | Y | yes | YES) ;;
-            *)
-                echo "aborted — nothing changed"
+    local reset=0 reply arg
+    local -a rest
+    for arg in "$@"; do
+        case "$arg" in
+            -r | --reset) reset=1 ;;
+            -h | --help)
+                echo "usage: chezsetup [--reset|-r]"
+                echo "  (no flag)      fill in newly-added setup keys only; keeps existing answers"
+                echo "  --reset, -r    replay first-time setup: reset run-once state, re-ask everything"
                 return 0
                 ;;
+            *) rest+=("$arg") ;;
         esac
+    done
+
+    if [ "$reset" -eq 1 ]; then
+        # Self-heal a stale wizard path before the destructive state reset below.
+        [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "${rest[@]}"; return; }
+        (cd "$src" && git pull --ff-only) || return $?
+        # `[ -r /dev/tty ]` is unreliable, so actually try to open it.
+        if { : </dev/tty; } 2>/dev/null; then
+            printf 'chezsetup --reset: replay first-time setup (reset run-once state, re-ask the wizard)? [y/N] '
+            IFS= read -r reply </dev/tty || reply=""
+            case "$reply" in
+                y | Y | yes | YES) ;;
+                *)
+                    echo "aborted — nothing changed"
+                    return 0
+                    ;;
+            esac
+        fi
+        chezmoi state reset --force || return $?
+        bash "$src/scripts/bin/wizard.sh" "${rest[@]}"
+        return
     fi
-    chezmoi state reset --force || return $?
-    bash "$src/scripts/bin/wizard.sh" "$@"
+
+    (cd "$src" && git pull --ff-only) || return $?
+    echo "chezsetup: filling in any new/unanswered setup keys only."
+    echo "           to re-choose profile/modules/signing, run: chezsetup --reset"
+    chezmoi init && chezapply "${rest[@]}"
 }
 
 # Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
@@ -550,19 +577,6 @@ chezbump() {
     echo "Now: cd $src && git diff   to review, then commit."
 }
 
-# `brew leaves` formulae installed locally but in no Brewfile tier, bare name
-# only (so tap-qualified formulae like hashicorp/tap/terraform aren't flagged).
-_chez_brew_untracked() {
-    local src={{ .chezmoi.workingTree | quote }}
-    local tracked
-    tracked=$(grep -h '^\(brew\|cask\) ' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null \
-        | sed -E 's/^(brew|cask) "([^"]+)".*/\2/' \
-        | awk -F/ '{print $NF}' \
-        | sort -u)
-    comm -23 <(brew leaves 2>/dev/null | awk -F/ '{print $NF}' | sort -u) \
-        <(printf '%s\n' "$tracked")
-}
-
 # "<kind>\t<name>" (cask | formula | tap) for every Homebrew item in no Brewfile
 # tier — the removal set chezmirror acts on. $1 is the repo root; pure/testable.
 # The tier set comes from the `Brewfile.*` glob, not a hardcoded list, so new
@@ -570,8 +584,32 @@ _chez_brew_untracked() {
 # --file, so tiers are concatenated onto stdin (--file=-).
 _chez_brew_removals() {
     local src=$1
-    cat "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null |
-        brew bundle cleanup --file=- 2>/dev/null | awk '
+
+    # Homebrew 6.0 refuses to even load a Brewfile referencing an untrusted
+    # non-official tap — `brew bundle cleanup` then errors out with nothing on
+    # stdout, which used to look identical to "nothing to remove". Trust every
+    # declared tap first, same as run_after_02-brew-bundle.sh.tmpl does for installs.
+    local taprepo
+    while IFS= read -r taprepo; do
+        [ -n "$taprepo" ] || continue
+        brew trust --tap "$taprepo" >/dev/null 2>&1
+    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null)
+
+    # brew's stderr routinely carries benign noise (API-cache refresh,
+    # deprecation notices) even on success, so only surface lines using
+    # brew's own convention for a fatal error (`Error: …`) — that's the
+    # untrusted-tap failure's exact signature, not a generic "any stderr" check.
+    local out err
+    err=$(mktemp)
+    out=$(cat "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null |
+        brew bundle cleanup --file=- 2>"$err")
+    if grep -q '^Error:' "$err" 2>/dev/null; then
+        echo "  ! brew bundle cleanup reported errors — removal set may be incomplete:" >&2
+        grep '^Error:' "$err" | sed 's/^/      /' >&2
+    fi
+    rm -f "$err"
+
+    printf '%s\n' "$out" | awk '
             /^Would uninstall casks:/    { kind = "cask";    next }
             /^Would uninstall formulae:/ { kind = "formula"; next }
             /^Would untap:/              { kind = "tap";     next }
@@ -592,39 +630,27 @@ _chez_brew_uninstall_one() {
     fi
 }
 
-# Report brew packages installed locally but tracked in no Brewfile.
-chezaudit() {
-    local untracked
-    untracked=$(_chez_brew_untracked)
-    if [ -z "$untracked" ]; then
-        echo "  ✓ no untracked brew packages"
-    else
-        echo "── Untracked (installed locally, not in any Brewfile) ────────"
-        echo "$untracked"
-        echo
-        echo "Add to the right Brewfile (packages/Brewfile / packages/Brewfile.mac-apps /"
-        echo "packages/Brewfile.personal / packages/Brewfile.work),"
-        echo "or reconcile with \`chezmirror\` to uninstall everything untracked."
-    fi
-}
-
 # Removal direction of the Brewfile: uninstall untracked packages, then prune
-# orphaned dependencies. Not wired into `chez` — a routine apply should never
-# silently uninstall. `chezsync` chains chezup (install) + this (remove).
+# orphaned dependencies. Not wired into `chezapply` — a routine apply should
+# never silently uninstall. `chezreconcile` chains chezup (install) + this
+# (remove). `chezstatus` is the read-only preview for this same removal set.
 chezmirror() {
     local src={{ .chezmoi.workingTree | quote }}
 
-    local all=0 bulk_confirm=1 arg
+    local all=0 bulk_confirm=1 dry=0 arg
     [ "${YES:-}" = 1 ] && { all=1; bulk_confirm=0; }
+    [ "${DRY_RUN:-}" = 1 ] && dry=1
     for arg in "$@"; do
         case "$arg" in
             -a | --all | -y | --yes) all=1 ;;
+            -n | --dry-run) dry=1 ;;
             -h | --help)
-                echo "usage: chezmirror [--all|-a | --yes|-y]"
-                echo "  removal only — installs happen via chezup/chez; chezsync does both."
-                echo "  (no flag)   confirm each untracked package individually"
-                echo "  --all, -a   uninstall the whole untracked set after ONE confirmation"
-                echo "  --yes, -y   alias of --all;  YES=1 chezmirror skips that confirmation"
+                echo "usage: chezmirror [--all|-a | --yes|-y] [--dry-run|-n]"
+                echo "  removal only — installs happen via chezup/chezapply; chezreconcile does both."
+                echo "  (no flag)      confirm each untracked package individually"
+                echo "  --all, -a      uninstall the whole untracked set after ONE confirmation"
+                echo "  --yes, -y      alias of --all;  YES=1 chezmirror skips that confirmation"
+                echo "  --dry-run, -n  preview the untracked set only, remove nothing;  DRY_RUN=1 chezmirror does the same"
                 return 0
                 ;;
             *)
@@ -645,6 +671,11 @@ chezmirror() {
     echo "── Untracked (installed locally, in no Brewfile tier) ────────"
     printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
     echo
+
+    if [ "$dry" -eq 1 ]; then
+        echo "  DRY_RUN — nothing removed. Re-run without --dry-run to uninstall."
+        return 0
+    fi
 
     # `[ -r /dev/tty ]` is unreliable, so actually try to open it.
     if ! { : </dev/tty; } 2>/dev/null; then
@@ -748,12 +779,12 @@ chezmirror() {
 # Full reconcile: chezup (install what the repo declares) then chezmirror
 # (remove what it no longer tracks). Untracked *files* are a separate step
 # (`chezclean`). Honours DRY_RUN=1 and YES=1. Trailing args pass to chezup.
-chezsync() {
+chezreconcile() {
     chezup "$@" || return $?
     echo
     if [ "${DRY_RUN:-}" = 1 ]; then
         echo "── Package removals chezmirror would reconcile (preview) ──────"
-        chezaudit
+        chezmirror -n
         echo "  (DRY_RUN=1 — re-run without it to prune, or run \`chezmirror\`.)"
         return 0
     fi
@@ -781,23 +812,23 @@ chezhelp() {
     chezdoctor       Read-only health check (repo, brew, auth, mise, shell).
 
   Change your setup (re-run the wizard)
-    chezreset        Set up as new: reset run-once state, re-ask wizard, apply.
-    chezreinit       Fill in newly-added setup keys; keeps existing answers.
+    chezsetup        Fill in newly-added setup keys; keeps existing answers.
+                       --reset/-r  set up as new: reset run-once state, re-ask everything.
 
   Maintenance (packages & drift)
-    chez             Apply without pulling. Flags drift; never uninstalls.
-    chezdiff         Explain pending changes + local drift in plain words (read-only).
+    chezapply        Apply without pulling. Flags drift; never uninstalls.
+    chezstatus       Explain pending file + package drift in plain words (read-only).
     chezbump         Upgrade deps: brew upgrade + mise upgrade.
-    chezaudit        List locally-installed packages in no Brewfile (report).
     chezmirror       Uninstall untracked packages (removal only), confirming each.
-                       --all/-a  uninstall the whole set after one confirmation.
-    chezsync         Full package reconcile: chezup (install) + chezmirror (remove).
+                       --all/-a      uninstall the whole set after one confirmation.
+                       --dry-run/-n  preview only, remove nothing.
+    chezreconcile    Full package reconcile: chezup (install) + chezmirror (remove).
     chezclean        Remove untracked top-level ~/.* entries, confirming each.
                        --all/-a  remove the whole set after one confirmation.
     dotfiles         cd into the source repo.
 
   Add something new to the repo
-    new brew pkg     add the line to packages/Brewfile* → chez  (apply installs it)
+    new brew pkg     add the line to packages/Brewfile* → chezapply  (apply installs it)
     new dotfile      chezmoi add ~/.foo   ·   update tracked: chezmoi re-add ~/.foo
 
   Under the hood
@@ -805,8 +836,9 @@ chezhelp() {
     macos-defaults   (Re-)apply macOS system defaults on their own.
     chezhelp         Show this list.
 
-  Knobs (chezup / chez / chezsync / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
-  YES=1 chezmirror / chezclean:  accept-all — remove everything untracked, no prompts
+  Knobs (chezup / chezapply / chezreconcile / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  chezmirror also honors DRY_RUN=1 / -n (preview only) and YES=1 (accept-all, no prompts)
+  YES=1 chezclean:  accept-all — remove everything untracked, no prompts
   Deeper docs:  run `dotfiles`, then see docs/commands.md
 EOF
 }

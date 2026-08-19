@@ -60,7 +60,7 @@ Package convergence uses Homebrew's native `brew bundle`: the
 runs `brew bundle --no-upgrade` to converge *presence*, not freshness. It
 only *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling
 packages the Brewfile no longer lists) is `chezmirror`'s: an apply must never
-silently uninstall, so `chez` flags untracked packages and `chezmirror`
+silently uninstall, so `chezapply` flags untracked packages and `chezmirror`
 reconciles them behind a confirm. VS Code extensions are the deliberate
 exception: they carry no data and are trivial to reinstall, so
 `run_onchange_after_03-vscode` mirrors them outright — installing what
@@ -113,11 +113,11 @@ from mise, `.sonarlint`→the `sonarsource.sonarlint-vscode` extension).
 Dropped **Homebrew packages** are reconciled the same way, by hand:
 `chezmirror` runs `brew bundle cleanup` to uninstall anything no longer in a
 Brewfile, then `brew autoremove` to prune orphaned dependencies, while
-`chezaudit`/`chezdoctor` report the drift read-only. Nothing about removal is
+`chezstatus`/`chezdoctor` report the drift read-only. Nothing about removal is
 automatic: if a machine drifts, its owner runs `chezmirror` and `chezclean`
 to bring it back in line. To do both package directions in one step —
 install what the Brewfiles declare, then remove what they don't —
-`chezsync` chains `chezup` and `chezmirror` (files stay with `chezclean`).
+`chezreconcile` chains `chezup` and `chezmirror` (files stay with `chezclean`).
 
 ## Where each piece lives
 
@@ -130,7 +130,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `scripts/lib/homebrew.sh`) |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
-| Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezaudit` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
+| Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezstatus` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
 | Untracked dotfile cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
 | chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |

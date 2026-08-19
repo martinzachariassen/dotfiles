@@ -392,7 +392,7 @@ if [ ! -r /dev/tty ]; then
     run_chezmoi --apply --promptDefaults --source="$SOURCE_DIR" "$@"
 fi
 
-# Current answers become the defaults (nice on a chezreset re-run).
+# Current answers become the defaults (nice on a `chezsetup --reset` re-run).
 DATA_JSON="$(cm_data_json)"
 def_name="$(cm_data_string "$DATA_JSON" name)"
 def_email="$(cm_data_string "$DATA_JSON" email)"

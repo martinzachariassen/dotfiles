@@ -56,6 +56,7 @@ if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
     shift 2
     printf 'cleanup %s\n' "\$*" >>"$ARGS_LOG"
     cat >"$STDIN_LOG"          # capture the piped-in union
+    [ -n "\${BREW_CLEANUP_STDERR:-}" ] && printf '%s\n' "\$BREW_CLEANUP_STDERR" >&2
     cat "$CANNED" 2>/dev/null  # emit the canned preview
     exit 0
 fi
@@ -105,7 +106,7 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
-        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" BREW_CLEANUP_STDERR="${BREW_CLEANUP_STDERR:-}" \
         bash -c "$1"
 }
 
@@ -208,6 +209,26 @@ EOF
     [ -z "$output" ]
 }
 
+@test "_chez_brew_removals warns on a genuine brew Error: but still returns the removal set" {
+    # Regression: an untrusted-tap load failure (or any other real brew
+    # failure) writes `Error: …` to stderr. Must surface as a loud warning,
+    # not silently look identical to \"nothing to remove\".
+    BREW_CLEANUP_STDERR='Error: Refusing to load formula acme/tap/thing from untrusted tap acme/tap.' \
+        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reported errors"* ]]
+    [[ "$output" == *"Error: Refusing to load formula"* ]]
+}
+
+@test "_chez_brew_removals stays silent on benign brew stderr noise (cache refresh, warnings)" {
+    # brew routinely writes non-fatal progress/deprecation notices to stderr
+    # even on a fully successful run — these must never trigger the warning.
+    BREW_CLEANUP_STDERR='==> Downloading Homebrew API data' \
+        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"reported errors"* ]]
+}
+
 # ─── _chez_brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
 
 @test "_chez_brew_uninstall_one routes casks through --cask, formulae plain" {
@@ -271,6 +292,26 @@ EOF
     [[ "$output" == *"usage: chezmirror"* ]]
     [[ "$output" == *"--all"* ]]
     [ ! -s "$UNINSTALL_LOG" ] # help path never touches brew
+}
+
+@test "chezmirror --dry-run previews the untracked set and removes nothing" {
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --dry-run"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"orphan-app"* ]]
+    [[ "$output" == *"DRY_RUN"* ]]
+    [ ! -s "$UNINSTALL_LOG" ] # dry-run never touches brew
+}
+
+@test "DRY_RUN=1 chezmirror previews the same as --dry-run/-n" {
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" DRY_RUN=1 \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"orphan-app"* ]]
+    [[ "$output" == *"DRY_RUN"* ]]
+    [ ! -s "$UNINSTALL_LOG" ]
 }
 
 @test "chezmirror rejects an unknown option (exit 2, no uninstall)" {
