@@ -1,7 +1,7 @@
 {
     // ── Appearance ──
 
-{{ if has "theme" (dig "modules" (list) .) -}}
+{{- if has "theme" (dig "modules" (list) .) }}
     "workbench.colorTheme": "Catppuccin Mocha",
 
     // Catppuccin's default comment colour (overlay0) sits too low in contrast to
@@ -12,7 +12,7 @@
             "comments": "#a6adc8"
         }
     },
-{{ end -}}
+{{- end }}
     "workbench.iconTheme": "material-icon-theme",
 
     "window.commandCenter": true,
@@ -269,7 +269,7 @@
     // replace operator, and `gr` is Goto References in LazyVim (mapped below).
     // The prefix isn't configurable, so the two can't coexist — and jumping to
     // references is the far more common operation.
-{{ if has "theme" (dig "modules" (list) .) -}}
+{{- if has "theme" (dig "modules" (list) .) }}
 
     // EasyMotion ships hard-coded red/orange markers that fight Catppuccin.
     // Mocha equivalents: red / peach / yellow markers on base, dimmed to
@@ -280,7 +280,7 @@
     "vim.easymotionMarkerForegroundColorTwoCharSecond": "#f9e2af",
     "vim.easymotionIncSearchForegroundColor": "#a6e3a1",
     "vim.easymotionDimColor": "#6c7086",
-{{ end }}
+{{- end }}
     "vim.insertModeKeyBindings": [
         {
             "before": ["j", "k"],
@@ -488,6 +488,10 @@
 
     "chat.editor.fontSize": 14,
 
+    // Claude Code docks in the panel rather than the sidebar — it shares the
+    // terminal's horizontal space instead of squeezing the file tree.
+    "claudeCode.preferredLocation": "panel",
+
     // ── Backend / infra ──
 
     "java.configuration.updateBuildConfiguration": "automatic",
@@ -497,7 +501,7 @@
 
     // Pin the editor JDK to mise's version-named install path, a durable anchor
     // across runtime updates.
-{{ if has "jvmStack" (dig "modules" (list) .) -}}
+{{- if has "jvmStack" (dig "modules" (list) .) }}
     "java.jdt.ls.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.import.gradle.java.home": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
     "java.configuration.runtimes": [
@@ -507,7 +511,7 @@
             "default": true
         }
     ],
-{{ end -}}
+{{- end }}
 
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx2G -Xms100m",
     "java.import.gradle.wrapper.enabled": true,
@@ -550,9 +554,9 @@
     // JetBrains Kotlin LSP (Alpha, JVM-only); `intellij.*` because the server is
     // IntelliJ's engine repackaged. serverPort -1 uses the VSIX-bundled server.
     "intellij.dev.serverPort": -1,
-{{ if has "jvmStack" (dig "modules" (list) .) -}}
+{{- if has "jvmStack" (dig "modules" (list) .) }}
     "intellij.jdkForSymbolResolution": "{{ .chezmoi.homeDir }}/.local/share/mise/installs/java/temurin-25/Contents/Home",
-{{ end -}}
+{{- end }}
     "intellij.trace.server": "off",
 
     // Its first-run prompt writes both of these into this chezmoi-managed file
@@ -756,7 +760,7 @@
     // via an Xcode Run Script build phase and pre-commit instead, not live in the
     // editor. vknabel's SwiftFormat/SwiftLint extensions were removed 2026-08:
     // archived upstream (unmaintained) as of 2025-11-19.
-{{ if has "appleDev" (dig "modules" (list) .) -}}
+{{- if has "appleDev" (dig "modules" (list) .) }}
     "[swift]": {
         "editor.defaultFormatter": "sweetpad.sweetpad",
         "editor.tabSize": 4,
@@ -774,7 +778,7 @@
     // No-op unless a workspace has a project.yml at its root; regenerates the
     // .xcodeproj automatically when Swift files are added/removed.
     "sweetpad.xcodegen.autogenerate": true,
-{{ end -}}
+{{- end }}
 
     // ── Performance ──
 

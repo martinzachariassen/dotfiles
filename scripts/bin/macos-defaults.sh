@@ -103,7 +103,7 @@ chflags nohidden "${HOME}/Library" 2>/dev/null || true # Apple hides it by defau
 sudo chflags nohidden /Volumes 2>/dev/null || true
 
 # DOCK
-def_write com.apple.dock tilesize -int 42
+def_write com.apple.dock tilesize -int 25
 def_write com.apple.dock autohide -bool true
 def_write com.apple.dock autohide-delay -float 0           # no delay before showing
 def_write com.apple.dock autohide-time-modifier -float 0.4 # faster show/hide animation
