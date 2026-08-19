@@ -401,12 +401,49 @@ def_signkey="$(cm_data_string "$DATA_JSON" signingKey)"
 [ -n "$def_signing" ] || def_signing="1password"
 
 printf '%s\n' "$BOX_TOP" >/dev/tty
-say "dotfiles setup — answer a few questions, then chezmoi applies." >/dev/tty
+say "Setup — 4 quick questions, then this Mac gets configured." >/dev/tty
 printf '%s\n' "$BOX_BOTTOM" >/dev/tty
+{
+    echo
+    explain \
+        "Nothing is permanent: every answer is saved and can be changed later" \
+        "with \`chezsetup\`, and applying never uninstalls anything." \
+        "" \
+        "Press Enter to accept the value shown in [brackets]."
+} >/dev/tty
 
+# ask_step N TITLE WHY… — question header + why it is being asked.
+QSTEP=0
+QTOTAL=4
+ask_step() {
+    QSTEP=$((QSTEP + 1))
+    _ask_header "$(printf '%s[%d/%d]%s' "$DIM" "$QSTEP" "$QTOTAL" "$RESET")" "$@"
+}
+
+# ask_sub — a follow-up to the current question; no number of its own.
+ask_sub() { _ask_header "$(printf '%s   %s%s' "$DIM" "$SUB_MARK" "$RESET")" "$@"; }
+
+_ask_header() {
+    local lead="$1" title="$2"
+    shift 2
+    {
+        echo
+        printf '%s%s%s  %s %s%s%s\n' "$CYAN" "$NODE" "$RESET" "$lead" "$BOLD" "$title" "$RESET"
+        explain "$@"
+    } >/dev/tty
+}
+
+ask_step "Who you are" \
+    "Goes into ~/.config/git/config as your commit author." \
+    "Use your GitHub noreply address if you'd rather not publish a real one."
 name="$(ask_string "$(prompt_msg name)" "$def_name")"
 email="$(ask_string "$(prompt_msg email)" "$def_email")"
 
+ask_step "Profile" \
+    "Picks which set of packages this Mac installs." \
+    "  personal   everything, including Swift/iOS tooling" \
+    "  work       adds cloud CLIs (az, gcloud) instead" \
+    "  minimal    the neutral base only — no extras"
 # shellcheck disable=SC2046  # word-splitting of the choice list is intentional
 profile="$(ask_choice "$(prompt_msg profile)" "$def_profile" $(prompt_choices profile))"
 
@@ -418,9 +455,17 @@ if [ -n "$existing" ] && [ "$profile" = "$def_profile" ]; then
 else
     mod_default="$(profile_defaults "$profile")"
 fi
+ask_step "Optional modules" \
+    "Extras on top of the profile — each one is independent." \
+    "The defaults below are the usual pick for your profile; adjust if you like."
 # shellcheck disable=SC2086  # mod_default is a space-separated key list
 modules="$(select_modules $mod_default)"
 
+ask_step "Commit signing" \
+    "Signs your git commits so GitHub shows them as Verified." \
+    "  1password  sign via the 1Password app's SSH agent" \
+    "  ssh-key    sign with a plain SSH key you already have" \
+    "  off        don't sign at all"
 # shellcheck disable=SC2046
 signingMode="$(ask_choice "$(prompt_msg signingMode)" "$def_signing" $(prompt_choices signingMode))"
 signingKey=""
@@ -428,12 +473,19 @@ if [ "$signingMode" != "off" ]; then
     # Chicken-and-egg on a fresh Mac: the signing key lives in 1Password, which
     # Homebrew hasn't installed yet. Offer to defer rather than demand a paste;
     # default to whichever is actually possible right now.
-    key_now="now — paste or pick the public key"
-    key_later="later — not available on this Mac yet (finish with: chezsign)"
+    # Kept short: ask_choice echoes the chosen option back as the default in the
+    # "[...]" prompt, and a sentence-long label makes that line unreadable. The
+    # explanation lives in the ask_sub block above instead.
+    key_now="now"
+    key_later="later"
     key_when="$key_now"
     if [ -z "$def_signkey" ]; then
         key_default="$key_later"
         signing_agent_present && key_default="$key_now"
+        ask_sub "Signing key" \
+            "On a fresh Mac this key is still inside 1Password, which Homebrew" \
+            "hasn't installed yet — so \"later\" is the normal answer here." \
+            "Commits just stay unsigned until you run \`chezsign\`."
         key_when="$(ask_choice "When do you want to set the signing key?" "$key_default" "$key_now" "$key_later")"
     fi
     if [ "$key_when" = "$key_now" ]; then
@@ -441,8 +493,10 @@ if [ "$signingMode" != "off" ]; then
     fi
 fi
 
-hr >/dev/tty
-say "Summary:" >/dev/tty
+{
+    echo
+    printf '%s%s%s  %sYour setup%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
+} >/dev/tty
 dim "  name     $name" >/dev/tty
 dim "  email    $email" >/dev/tty
 dim "  profile  $profile" >/dev/tty
@@ -452,6 +506,18 @@ else
     dim "  signing  $signingMode${signingKey:+ ($signingKey)}" >/dev/tty
 fi
 dim "  modules  ${modules:-<none>}" >/dev/tty
+{
+    echo
+    explain \
+        "Saying yes will:" \
+        "  · write these config files into your home folder" \
+        "  · install the packages your profile declares (the slow part)" \
+        "  · apply macOS defaults, if you kept that module" \
+        "" \
+        "It never uninstalls anything, and it is safe to re-run." \
+        "Expect 10-20 min on a fresh Mac; you may be asked for your password."
+    echo
+} >/dev/tty
 printf 'Apply this setup? [Y/n] ' >/dev/tty
 IFS= read -r reply </dev/tty || reply=""
 case "$reply" in
@@ -473,5 +539,11 @@ init_flags=(
 if [ "$signingMode" != "off" ]; then
     init_flags+=(--promptString "$(prompt_msg signingKey)=$signingKey")
 fi
+
+{
+    echo
+    info "applying — chezmoi takes over from here"
+    explain "Progress prints per step; nothing else is needed from you unless prompted."
+} >/dev/tty
 
 run_chezmoi "${init_flags[@]}" "$@"

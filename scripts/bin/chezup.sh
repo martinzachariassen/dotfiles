@@ -21,6 +21,12 @@ ui_init_logging
 # shellcheck source=../lib/dry-run.sh
 . "$_DIR/../lib/dry-run.sh"
 
+echo
+printf '%s%s%s  %sConverging this Mac to the repo%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
+explain \
+    "Pull the latest config, show what would change, then apply it." \
+    "Installs what's missing; it never uninstalls or downgrades anything."
+
 # ─── 1. Update repo ──────────────────────────────────────────────────────────
 if [ ! -d "$SOURCE_DIR/.git" ]; then
     fail "no git repo at $SOURCE_DIR — run install.sh, or set DOTFILES_DIR"

@@ -1,18 +1,80 @@
 #!/usr/bin/env bash
 # install.sh — bootstraps a fresh macOS (Apple Silicon) machine, then hands off to
 # `chezmoi init --apply`. Idempotent; safe to re-run.
-# Env: DOTFILES_REPO=<url>, DOTFILES_DIR=<path>. Extra args forward to chezmoi init.
+# Env: DOTFILES_REPO=<url>, DOTFILES_DIR=<path>, QUIET=1 (results only).
+# Extra args skip the wizard and forward to chezmoi init.
 
 set -euo pipefail
 
 REPO="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
+# ── UI ────────────────────────────────────────────────────────────────────────
+# Deliberately duplicated from scripts/lib/log.sh: this file runs via
+# `curl | bash` before the repo exists on disk, so there is nothing to source.
+# Keep the vocabulary identical so the handoff to the wizard is seamless.
+if [ -t 1 ]; then
+    BOLD=$'\033[1m' DIM=$'\033[2m' GREEN=$'\033[32m' YELLOW=$'\033[33m'
+    BLUE=$'\033[34m' RED=$'\033[31m' CYAN=$'\033[36m' RESET=$'\033[0m'
+else
+    BOLD="" DIM="" GREEN="" YELLOW="" BLUE="" RED="" CYAN="" RESET=""
+fi
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *UTF-8* | *utf8* | *UTF8*)
+        BAR="│" NODE="◆" OK_MARK="✓" ARROW_MARK="→" FAIL_MARK="✗"
+        BOX_TOP="╭────────────────────────────────────────────────────────────╮"
+        BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
+        ;;
+    *)
+        BAR="|" NODE="*" OK_MARK="OK" ARROW_MARK=">" FAIL_MARK="X"
+        BOX_TOP="+------------------------------------------------------------+"
+        BOX_BOTTOM="+------------------------------------------------------------+"
+        ;;
+esac
+
+rail() { printf '%s%s%s' "$CYAN" "$BAR" "$RESET"; }
+say() { printf '%s  %s\n' "$(rail)" "$1"; }
+ok() { printf '%s  %s%s%s %s\n' "$(rail)" "$GREEN" "$OK_MARK" "$RESET" "$1"; }
+info() { printf '%s  %s%s%s %s\n' "$(rail)" "$BLUE" "$ARROW_MARK" "$RESET" "$1"; }
+warn() { printf '%s  %s!%s %s\n' "$(rail)" "$YELLOW" "$RESET" "$1" >&2; }
+dim() { printf '%s  %s%s%s\n' "$(rail)" "$DIM" "$1" "$RESET"; }
 die() {
-    printf '\033[1;31merror:\033[0m %s\n' "$*" >&2
+    printf '%s  %s%s%s %s\n' "$(rail)" "$RED" "$FAIL_MARK" "$RESET" "$1" >&2
     exit 1
+}
+explain() {
+    [ "${QUIET:-0}" = "1" ] && return 0
+    local line
+    for line in "$@"; do
+        if [ -z "$line" ]; then printf '%s\n' "$(rail)"; else dim "$line"; fi
+    done
+    return 0
+}
+
+STEP_TOTAL=5
+STEP_INDEX=0
+STEP_T0=0
+now() { date +%s 2>/dev/null || echo 0; }
+elapsed() {
+    local delta=$(($(now) - STEP_T0))
+    [ "$STEP_T0" -gt 0 ] && [ "$delta" -ge 3 ] || return 0
+    if [ "$delta" -lt 60 ]; then printf '%ds' "$delta"; else printf '%dm%02ds' "$((delta / 60))" "$((delta % 60))"; fi
+}
+step() {
+    STEP_INDEX=$((STEP_INDEX + 1))
+    STEP_T0="$(now)"
+    echo
+    printf '%s%s%s  %s[%d/%d]%s %s%s%s\n' \
+        "$CYAN" "$NODE" "$RESET" "$DIM" "$STEP_INDEX" "$STEP_TOTAL" "$RESET" "$BOLD" "$1" "$RESET"
+}
+step_ok() {
+    local t
+    t="$(elapsed)"
+    if [ -n "$t" ]; then
+        printf '%s  %s%s%s %s %s(%s)%s\n' "$(rail)" "$GREEN" "$OK_MARK" "$RESET" "$1" "$DIM" "$t" "$RESET"
+    else
+        ok "$1"
+    fi
 }
 
 # The wizard/chezmoi exec later replaces this handler with its own.
@@ -41,56 +103,107 @@ load_brew() {
 [ "$(id -u)" -ne 0 ] || die "run this as your normal user, not with sudo."
 [ "$(uname -m)" = "arm64" ] || warn "this repo targets Apple Silicon; continuing on $(uname -m)."
 
+# --- Overview -------------------------------------------------------------
+# Say upfront what this will do, how long it takes, and what it will ask for —
+# the install is mostly silent downloads, and an unexplained wait reads as a hang.
+echo
+printf '%s%s%s\n' "$CYAN" "$BOX_TOP" "$RESET"
+printf '%s%s%s  %sSetting up this Mac%s%*s%s%s%s\n' \
+    "$CYAN" "$BAR" "$RESET" "$BOLD" "$RESET" 39 "" "$CYAN" "$BAR" "$RESET"
+printf '%s%s%s\n' "$CYAN" "$BOX_BOTTOM" "$RESET"
+explain \
+    "" \
+    "This installs your tools and config from scratch. It is safe to re-run:" \
+    "every step checks first and skips what is already done." \
+    "" \
+    "Roughly 15-25 minutes, almost all of it downloading." \
+    "You will be asked for: your macOS password (once, for Homebrew)," \
+    "then a few short setup questions." \
+    "" \
+    "  1. Xcode Command Line Tools   Apple's compilers — Homebrew needs them" \
+    "  2. Homebrew                   the package manager everything else uses" \
+    "  3. chezmoi                    renders this repo into your home folder" \
+    "  4. Clone the dotfiles repo    into $SOURCE_DIR" \
+    "  5. Setup wizard, then apply   asks your preferences, then installs"
+
 # --- 1. Xcode Command Line Tools -----------------------------------------
-if ! xcode-select -p >/dev/null 2>&1; then
-    info "Installing Xcode Command Line Tools — accept Apple's dialog when it opens."
+step "Xcode Command Line Tools"
+if xcode-select -p >/dev/null 2>&1; then
+    step_ok "already installed"
+else
+    explain "Apple ships these separately and only via a GUI installer."
+    info "opening Apple's installer — accept the dialog when it appears"
     xcode-select --install 2>/dev/null || true
-    # Bounded wait (~30 min) for the GUI installer.
-    for _ in $(seq 1 360); do
+    # Bounded wait (~30 min) for the GUI installer. Tick visibly: a silent poll
+    # for half an hour is indistinguishable from a hung script.
+    waited=0
+    while [ "$waited" -lt 1800 ]; do
         xcode-select -p >/dev/null 2>&1 && break
         sleep 5
+        waited=$((waited + 5))
+        # Reassure every 30s, on one rewritten line so it doesn't flood.
+        if [ $((waited % 30)) -eq 0 ] && [ -t 1 ]; then
+            printf '\r%s  %swaiting for Apple'"'"'s installer… %dm%02ds%s' \
+                "$(rail)" "$DIM" "$((waited / 60))" "$((waited % 60))" "$RESET"
+        fi
     done
+    [ -t 1 ] && printf '\r\033[K'
     xcode-select -p >/dev/null 2>&1 || die "Xcode CLT still missing — re-run once Apple's installer finishes."
+    step_ok "installed"
 fi
-info "Xcode Command Line Tools present."
 
 # --- 2. Homebrew ----------------------------------------------------------
 # Inlined rather than shared with scripts/lib/homebrew.sh: this runs before the
 # repo is cloned (step 4 below), so there's nothing local to source yet.
-if ! load_brew; then
-    info "Installing Homebrew. It needs administrator access on a fresh Mac."
+step "Homebrew"
+if load_brew; then
+    step_ok "already installed — $(command -v brew)"
+else
+    explain \
+        "Homebrew installs every CLI and app this setup uses." \
+        "It needs administrator access once, to create /opt/homebrew."
     if [ -r /dev/tty ]; then
         sudo -v -p "Enter your macOS password (for Homebrew): " || die "could not obtain admin access for Homebrew."
     fi
+    info "installing Homebrew — this is the long step, 5-10 min"
     NONINTERACTIVE=1 /bin/bash -c \
         "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     load_brew || die "Homebrew installed but 'brew' is not on PATH."
+    step_ok "installed"
 fi
-info "Homebrew at $(command -v brew)."
 
 # --- 3. chezmoi -----------------------------------------------------------
-if ! command -v chezmoi >/dev/null 2>&1; then
-    info "Installing chezmoi…"
+step "chezmoi"
+if command -v chezmoi >/dev/null 2>&1; then
+    step_ok "already installed — $(chezmoi --version | head -n1 | cut -d, -f1)"
+else
+    explain "chezmoi turns this repo into the real files in your home folder."
+    info "installing chezmoi via Homebrew"
     brew install chezmoi
+    step_ok "installed — $(chezmoi --version | head -n1 | cut -d, -f1)"
 fi
-info "Using $(chezmoi --version | head -n 1)."
 
 # --- 4. Clone the repo (idempotent) --------------------------------------
+step "Dotfiles repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
-    info "Repo already present at $SOURCE_DIR."
+    step_ok "already cloned — $SOURCE_DIR"
 else
-    # Braces required: bash 3.2 absorbs the trailing "…" into the var name under set -u.
-    info "Cloning $REPO into ${SOURCE_DIR}…"
+    explain "Your config lives here from now on; edit it, then run \`chezup\`."
+    info "cloning into $SOURCE_DIR"
     mkdir -p "$(dirname "$SOURCE_DIR")"
     git clone "$REPO" "$SOURCE_DIR"
+    step_ok "cloned"
 fi
 
 # --- 5. Hand off to the setup wizard -------------------------------------
 # Wizard reads /dev/tty directly, so it works under `curl | bash` (chezmoi's raw-mode
 # TUI doesn't). Extra args skip it and go straight to chezmoi.
+step "Setup wizard"
 if [ "$#" -eq 0 ]; then
-    info "Starting the setup wizard, then applying."
+    explain \
+        "A few questions about how you want this Mac set up." \
+        "Every answer is changeable later with \`chezsetup\`."
     exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"
 fi
-info "Extra args given — handing off directly to chezmoi init."
+info "extra args given — skipping the wizard, handing off to chezmoi init"
 exec chezmoi init --apply --source="$SOURCE_DIR" "$@"

@@ -98,6 +98,28 @@ wizard works.
 | `chezreconcile` | **Full package reconcile in one step:** `chezup` (converge + install what the Brewfiles declare) then `chezmirror` (uninstall what they don't). `chezup` only adds and `chezmirror` only removes; `chezreconcile` does both directions. Untracked *files* stay separate — that's `chezclean`. Honours `DRY_RUN=1` (previews both directions, using `chezmirror -n` for the removal side so nothing is touched) and `YES=1` (skips both confirm gates); trailing args pass through to `chezup` → `chezmoi apply`. |
 | `chezclean` | The **file** analogue of `chezmirror`: reconcile untracked dotfiles to what chezmoi manages, across two scopes — the top level of `$HOME` (keep-list `cleanup.keepHome`) and `~/.config` (keep-list `cleanup.keepConfig`), both in [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml). Lists the untracked entries — everything that chezmoi neither manages nor a keep-list spares — then removes only what you confirm **one at a time** (via `gum` when installed). **Tool-aware:** config whose owning tool is still present is kept automatically — the union of three signals: the tool's brew package is installed, its command is on PATH (mise/gcloud tools count too), **or** its owning VS Code extension is in `code --list-extensions`; uninstall the tool (or drop the extension) and its config re-surfaces as removable. Most tools are matched by a stem heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the `cleanup.owners` map holds only the aliases where the dir name and the command/package/extension diverge (`.kube`→`kubectl`, `.m2`→`mvn`, `.sonarlint`→`sonarsource.sonarlint-vscode`). Offered entries are labelled `orphan` (a known tool, now gone) or `untracked` (no known owner); `-v`/`--verbose` also lists what tool-ownership kept. Pass `--all` (`-a`/`--yes`/`-y`) to remove the whole set after one confirmation, or `YES=1 chezclean` to accept-all; both need a TTY. `DRY_RUN=1` (or `-n`/`--dry-run`) previews and works headless. **Safe by construction:** only names beginning with `.` are ever considered (so `~/Library`, `~/Documents`, … are structurally out of scope), it never descends past an immediate child, and it removes nothing without a controlling terminal. Keep an entry for good by adding it to `cleanup.keepHome`/`cleanup.keepConfig` (or, if it's a tool whose dir name diverges from its command, map it in `cleanup.owners`). |
 
+### Output and quietness
+
+Every verb opens with a short plain-language note: what it is about to do, and
+what it will never do (`chezmirror` removes packages; nothing else does). Long
+steps are numbered `[2/5]` and print elapsed time once they pass a few seconds,
+so a slow install reads as *working* rather than *hung*.
+
+Set `QUIET=1` on any verb — including `install.sh` — to drop the explanations and
+keep only results:
+
+```sh
+QUIET=1 chezup
+```
+
+The vocabulary lives in [`scripts/lib/log.sh`](../scripts/lib/log.sh)
+(`explain`, `ui_init_steps`, `step_begin`, `ui_elapsed`). `install.sh` mirrors it
+by hand rather than sourcing it: it runs via `curl | bash` **before the repo
+exists on disk**, so there is nothing to source yet — `tests/setup-ux.bats`
+guards that it never grows a `source scripts/lib/…` line, and that neither file
+uses a `printf '\uXXXX'` escape, which bash 3.2 (what a fresh Mac ships) prints
+literally.
+
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so
 > it only *adds* presence. Freshness is `chezbump`'s job; *removal* is
 > `chezmirror`'s, always behind a confirm. See

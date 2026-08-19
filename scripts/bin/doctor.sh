@@ -17,6 +17,12 @@ fi
 . "$_DOCTOR_DIR/../lib/log.sh"
 ui_init_status
 
+echo
+printf '%s%s%s %sHealth check%s\n' "$BOLD" "$BLUE" "$NODE" "$BOLD" "$RESET"
+explain \
+    "Checks the repo, Homebrew, auth, signing, runtimes and shell layout." \
+    "Read-only: it reports problems and how to fix them, and changes nothing."
+
 PASS=0
 ACTION=0
 INFOCOUNT=0
