@@ -22,11 +22,13 @@ fi
 case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
     *UTF-8* | *utf8* | *UTF8*)
         BAR="│" NODE="◆" OK_MARK="✓" ARROW_MARK="→" FAIL_MARK="✗"
+        BAR_FULL="█" BAR_EMPTY="░"
         BOX_TOP="╭────────────────────────────────────────────────────────────╮"
         BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
         ;;
     *)
         BAR="|" NODE="*" OK_MARK="OK" ARROW_MARK=">" FAIL_MARK="X"
+        BAR_FULL="#" BAR_EMPTY="-"
         BOX_TOP="+------------------------------------------------------------+"
         BOX_BOTTOM="+------------------------------------------------------------+"
         ;;
@@ -60,12 +62,29 @@ elapsed() {
     [ "$STEP_T0" -gt 0 ] && [ "$delta" -ge 3 ] || return 0
     if [ "$delta" -lt 60 ]; then printf '%ds' "$delta"; else printf '%dm%02ds' "$((delta / 60))" "$((delta % 60))"; fi
 }
+# bar DONE TOTAL — built by appending; bash substring arithmetic is byte-based
+# and would slice a multi-byte block glyph in half.
+bar() {
+    local done="$1" total="$2" width=16 filled i out=""
+    filled=$((done * width / total))
+    i=0
+    while [ "$i" -lt "$filled" ]; do
+        out="$out$BAR_FULL"
+        i=$((i + 1))
+    done
+    while [ "$i" -lt "$width" ]; do
+        out="$out$BAR_EMPTY"
+        i=$((i + 1))
+    done
+    printf '%s' "$out"
+}
 step() {
     STEP_INDEX=$((STEP_INDEX + 1))
     STEP_T0="$(now)"
     echo
-    printf '%s%s%s  %s[%d/%d]%s %s%s%s\n' \
-        "$CYAN" "$NODE" "$RESET" "$DIM" "$STEP_INDEX" "$STEP_TOTAL" "$RESET" "$BOLD" "$1" "$RESET"
+    printf '%s%s%s  %s%s%s %s[%d/%d]%s %s%s%s\n' \
+        "$CYAN" "$NODE" "$RESET" "$DIM" "$(bar "$((STEP_INDEX - 1))" "$STEP_TOTAL")" "$RESET" \
+        "$DIM" "$STEP_INDEX" "$STEP_TOTAL" "$RESET" "$BOLD" "$1" "$RESET"
 }
 step_ok() {
     local t
