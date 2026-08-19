@@ -5,7 +5,7 @@ One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, m
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Frappé](assets/banner.png)
+![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Mocha](assets/banner.png)
 
 **Status:** Personal, single-machine setup. Actively maintained, applied to my Mac most weeks.
 
@@ -45,7 +45,7 @@ chezup    # pull latest → preview the drift → apply
 
 | Area | Baseline |
 | --- | --- |
-| Terminal | [Ghostty](https://ghostty.org), [Zellij](https://zellij.dev), [Starship](https://starship.rs), Catppuccin Frappé, JetBrainsMono Nerd Font |
+| Terminal | [Ghostty](https://ghostty.org), [Zellij](https://zellij.dev), [Starship](https://starship.rs), Catppuccin Mocha, JetBrainsMono Nerd Font |
 | Shell | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases |
 | Editors | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
@@ -63,10 +63,10 @@ Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](sr
 | --- | --- |
 | `chezup` | **Converge this Mac to the repo.** Pull latest → preview the drift → apply. The one you run most. |
 | `chezdoctor` | Read-only **health check**: repo, chezmoi, brew, auth, signing, mise, shell layout. Fixes nothing. |
-| `chezreset` / `chezreinit` | Re-run the setup wizard to change profile/modules, or fill in newly added setup keys only. |
-| `chez` / `chezdiff` | Apply without pulling, or explain pending drift in plain words. Both read the same `chezmoi status`. |
+| `chezsetup` | Re-run the setup wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added setup keys (default). |
+| `chezapply` / `chezstatus` | Apply without pulling, or explain pending file + package drift in plain words. Both read the same `chezmoi status`. |
 | `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. An apply never uninstalls — this is the deliberate, manual undo. |
-| `chezsync` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
+| `chezreconcile` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
 
 Full reference, including `DRY_RUN=1`/`YES=1` flags and what each verb touches: [docs/commands.md](docs/commands.md).
 

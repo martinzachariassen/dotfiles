@@ -10,6 +10,7 @@ bun = "latest"
 python = "latest"
 
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
+kotlin = "latest"
 maven = "latest"
 gradle = "latest"
 {{ end -}}

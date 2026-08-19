@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioural tests for `chezsync`, which orchestrates chezup/chezmirror/chezaudit
+# Behavioural tests for `chezreconcile`, which orchestrates chezup/chezmirror
 # (install, removal, DRY_RUN preview). Extracts the real body from the committed
 # template and runs it under zsh with the composed verbs stubbed.
 
@@ -17,14 +17,13 @@ extract() {
 # chezup echoes its args (passthrough) and honors CHEZUP_RC (fail-fast).
 STUBS='
 chezup()     { echo "CHEZUP $*"; return ${CHEZUP_RC:-0}; }
-chezmirror() { echo "CHEZMIRROR"; }
-chezaudit()  { echo "CHEZAUDIT"; }
+chezmirror() { echo "CHEZMIRROR $*"; }
 '
 
-@test "chezsync runs chezup then chezmirror, in that order" {
+@test "chezreconcile runs chezup then chezmirror, in that order" {
     run zsh -c "$STUBS
-$(extract chezsync)
-chezsync"
+$(extract chezreconcile)
+chezreconcile"
     [ "$status" -eq 0 ]
     [[ "$output" == *CHEZUP* ]]
     [[ "$output" == *CHEZMIRROR* ]]
@@ -32,30 +31,28 @@ chezsync"
     [[ "${output%%CHEZMIRROR*}" == *CHEZUP* ]]
 }
 
-@test "chezsync forwards trailing args to chezup (→ chezmoi apply)" {
+@test "chezreconcile forwards trailing args to chezup (→ chezmoi apply)" {
     run zsh -c "$STUBS
-$(extract chezsync)
-chezsync -v"
+$(extract chezreconcile)
+chezreconcile -v"
     [ "$status" -eq 0 ]
     [[ "$output" == *"CHEZUP -v"* ]]
 }
 
-@test "chezsync under DRY_RUN previews via chezaudit and never calls chezmirror" {
+@test "chezreconcile under DRY_RUN previews via chezmirror -n and never removes" {
     run zsh -c "$STUBS
-$(extract chezsync)
-DRY_RUN=1 chezsync"
+$(extract chezreconcile)
+DRY_RUN=1 chezreconcile"
     [ "$status" -eq 0 ]
     [[ "$output" == *CHEZUP* ]]
-    [[ "$output" == *CHEZAUDIT* ]]
-    [[ "$output" != *CHEZMIRROR* ]]
+    [[ "$output" == *"CHEZMIRROR -n"* ]]
 }
 
-@test "chezsync aborts before chezmirror when chezup fails" {
+@test "chezreconcile aborts before chezmirror when chezup fails" {
     run zsh -c "$STUBS
-$(extract chezsync)
-CHEZUP_RC=4 chezsync"
+$(extract chezreconcile)
+CHEZUP_RC=4 chezreconcile"
     [ "$status" -eq 4 ]
     [[ "$output" == *CHEZUP* ]]
     [[ "$output" != *CHEZMIRROR* ]]
-    [[ "$output" != *CHEZAUDIT* ]]
 }

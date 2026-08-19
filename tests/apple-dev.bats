@@ -94,6 +94,19 @@ json.loads(src)
 PY
 }
 
+# Negative assertions must go through this. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the output contains.
+#
+# no_match_in <text> <extended-regex>
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        echo "unexpected match for: $2"
+        return 1
+    fi
+}
+
 # ─── .chezmoiignore gating (the empty-dir regression) ───────────────────────────
 
 @test "appleDev on: ~/.swiftformat and the swiftlint config are deployed" {
@@ -111,8 +124,8 @@ PY
     run _managed
     [ "$status" -eq 0 ]
     # The directory must be unmanaged too, else chezmoi creates an empty one.
-    ! echo "$output" | grep -q "swiftformat"
-    ! echo "$output" | grep -q "swiftlint"
+    no_match_in "$output" "swiftformat"
+    no_match_in "$output" "swiftlint"
 }
 
 # ─── VS Code [swift] settings block ─────────────────────────────────────────────
@@ -132,7 +145,7 @@ PY
     _stub_config '["macApps"]'
     run _render "$SETTINGS"
     [ "$status" -eq 0 ]
-    ! echo "$output" | grep -q '"\[swift\]"'
+    no_match_in "$output" '"\[swift\]"'
     printf '%s\n' "$output" > "$BATS_TEST_TMPDIR/rendered.jsonc"
     _assert_valid_jsonc "$BATS_TEST_TMPDIR/rendered.jsonc"
 }
@@ -153,7 +166,7 @@ PY
     _stub_config '["macApps","appleDev"]'
     run _render "$VSCODE_HOOK"
     [ "$status" -eq 0 ]
-    ! echo "$output" | grep -qE 'EXCLUDES\+=\(.*swiftlang\.swift-vscode'
+    no_match_in "$output" 'EXCLUDES\+=\(.*swiftlang\.swift-vscode'
 }
 
 # ─── SwiftFormat / SwiftLint coordination invariant ─────────────────────────────

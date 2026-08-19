@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
 # Tests for the zsh dotfiles meta-commands not covered by chezmirror.bats:
-#   _chez_run          — self-heal wrapper behind chezup/chezdoctor/macos-defaults
-#   _chez_brew_untracked / chezaudit — read-only "what did I install off-book?" report
-#   chez               — the smart `chezmoi apply` wrapper (status gate + apply + drift notice)
+#   chezapply   — the smart `chezmoi apply` wrapper (status gate + apply + drift notice)
+#   chezstatus  — read-only file-drift + untracked-package report
+#   dotfiles    — the no-arg control panel
+#   chezbump    — routine dependency-bump previewer
 #
 # These extract the real function bodies from the committed template and run
 # them (under zsh) against stubbed chezmoi/brew, repointing the apply-time
@@ -16,8 +17,8 @@ setup() {
 
     FAKE="$(mktemp -d)"
     mkdir -p "$FAKE/packages" "$FAKE/scripts/bin"
-    # All four tiers must exist — zsh's NOMATCH would abort _chez_brew_untracked's
-    # `Brewfile.*` glob read otherwise. One tracked formula (git).
+    # All four tiers must exist — zsh's NOMATCH would abort _chez_brew_removals's
+    # `Brewfile.*` glob read otherwise.
     printf 'brew "git"\n' >"$FAKE/packages/Brewfile"
     : >"$FAKE/packages/Brewfile.mac-apps"
     : >"$FAKE/packages/Brewfile.personal"
@@ -28,7 +29,7 @@ setup() {
     DIFF_LOG="$STUBS/diff.log"
 
     # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and honours
-    # CHEZMOI_APPLY_RC; diff records args (chezdiff's raw-passthrough path).
+    # CHEZMOI_APPLY_RC; diff records args (chezstatus's raw-passthrough path).
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then printf '%s' "\${CHEZMOI_STATUS:-}"; exit 0; fi
@@ -36,11 +37,10 @@ if [ "\$1" = apply ]; then shift; printf 'apply %s\n' "\$*" >>"$APPLY_LOG"; exit
 if [ "\$1" = diff ]; then shift; printf 'diff %s\n' "\$*" >>"$DIFF_LOG"; exit 0; fi
 exit 0
 EOF
-    # brew stub: leaves prints BREW_LEAVES; bundle cleanup consumes the piped
-    # tier union and echoes BREW_CLEANUP_OUT; update/upgrade are no-ops.
+    # brew stub: bundle cleanup consumes the piped tier union and echoes
+    # BREW_CLEANUP_OUT; trust/update/upgrade are no-ops.
     cat >"$STUBS/brew" <<'EOF'
 #!/usr/bin/env bash
-if [ "$1" = leaves ]; then printf '%s\n' ${BREW_LEAVES:-}; exit 0; fi
 if [ "$1" = bundle ] && [ "$2" = cleanup ]; then
     cat >/dev/null                                   # swallow the piped tiers
     [ -n "${BREW_CLEANUP_OUT:-}" ] && [ -f "$BREW_CLEANUP_OUT" ] && cat "$BREW_CLEANUP_OUT"
@@ -69,7 +69,7 @@ extract() {
 # Run a zsh snippet with the stub PATH and log paths exported.
 run_zsh() {
     run env PATH="$STUBS:$PATH" APPLY_LOG="$APPLY_LOG" DIFF_LOG="$DIFF_LOG" \
-        BREW_LEAVES="${BREW_LEAVES:-}" BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
+        BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
         CHEZMOI_STATUS="${CHEZMOI_STATUS:-}" CHEZMOI_APPLY_RC="${CHEZMOI_APPLY_RC:-0}" \
         zsh -c "$1"
 }
@@ -98,107 +98,74 @@ EOF
     [ ! -s "$APPLY_LOG" ]  # never applied
 }
 
-# ─── _chez_brew_untracked / chezaudit: read-only drift report ────────────────
+# ─── chezapply: the smart apply wrapper ─────────────────────────────────────
 
-@test "_chez_brew_untracked lists leaves that are in no Brewfile" {
-    BREW_LEAVES=$'git\njq\nripgrep' \
-        run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
-    [ "$status" -eq 0 ]
-    # git is tracked (in the fake Brewfile); jq + ripgrep are not.
-    [[ "$output" != *git* ]]
-    [[ "$output" == *jq* ]]
-    [[ "$output" == *ripgrep* ]]
-}
-
-@test "_chez_brew_untracked treats a tap-qualified leaf as tracked (both sides normalised)" {
-    # Regression: `brew leaves` reports tap formulae tap-qualified; the tracked
-    # side was reduced to the bare leaf but the leaves side wasn't, so every
-    # tap-installed-and-tracked package was a phantom "untracked" hit. Azure
-    # also proves case doesn't matter (Azure/… vs azure/… both collapse).
-    printf 'brew "hashicorp/tap/terraform"\nbrew "Azure/kubelogin/kubelogin"\n' \
-        >>"$FAKE/packages/Brewfile.work"
-    BREW_LEAVES=$'git\nhashicorp/tap/terraform\nazure/kubelogin/kubelogin' \
-        run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *terraform* ]]
-    [[ "$output" != *kubelogin* ]]
-}
-
-@test "_chez_brew_untracked still flags a tap leaf that is in no Brewfile" {
-    # Normalisation must not swallow genuine drift.
-    BREW_LEAVES=$'git\nhashicorp/tap/packer' \
-        run_zsh "$(extract _chez_brew_untracked); _chez_brew_untracked"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *packer* ]]
-    [[ "$output" != *hashicorp* ]]  # reported as the bare leaf, not the tap path
-}
-
-@test "chezaudit reports a clean machine when every leaf is tracked" {
-    BREW_LEAVES=$'git' \
-        run_zsh "$(extract chezaudit _chez_brew_untracked); chezaudit"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"no untracked brew packages"* ]]
-}
-
-@test "chezaudit lists the untracked packages and points at chezmirror" {
-    BREW_LEAVES=$'git\njq' \
-        run_zsh "$(extract chezaudit _chez_brew_untracked); chezaudit"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Untracked"* ]]
-    [[ "$output" == *"jq"* ]]
-    [[ "$output" == *"chezmirror"* ]]
-}
-
-# ─── chez: the smart apply wrapper ──────────────────────────────────────────
-
-@test "chez applies without prompting when there is no drift" {
+@test "chezapply applies without prompting when there is no drift" {
     # Empty status ⇒ straight to `chezmoi apply --force`, no confirmation gate.
-    CHEZMOI_STATUS="" BREW_LEAVES=$'git' \
-        run_zsh "$(extract chez _chez_brew_untracked); chez"
+    CHEZMOI_STATUS="" \
+        run_zsh "$(extract chezapply _chez_brew_removals); chezapply"
     [ "$status" -eq 0 ]
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chez surfaces a Brewfile-removal drift notice after applying" {
-    # Notice names chezmirror as the reconcile path; chez itself never uninstalls.
-    CHEZMOI_STATUS="" BREW_LEAVES=$'git\njq' \
-        run_zsh "$(extract chez _chez_brew_untracked); chez"
+@test "chezapply surfaces a Brewfile-removal drift notice after applying, including casks" {
+    # Notice names chezmirror as the reconcile path; chezapply itself never
+    # uninstalls. Regression: the notice must use _chez_brew_removals (brew
+    # bundle cleanup), not a `brew leaves`-only check — that older approach
+    # missed casks entirely.
+    cat >"$STUBS/cleanup.out" <<'OUT'
+Would uninstall casks:
+discord
+Run `brew bundle cleanup --force` to make these changes.
+OUT
+    CHEZMOI_STATUS="" BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
+        run_zsh "$(extract chezapply _chez_brew_removals); chezapply"
     [ "$status" -eq 0 ]
     [[ "$output" == *"in no Brewfile"* ]]
     [[ "$output" == *"chezmirror"* ]]
 }
 
-@test "chez does not raise a phantom drift notice for a tracked tap leaf" {
-    # End-to-end guard for the tap-normalisation logic above.
-    printf 'brew "hashicorp/tap/terraform"\n' >>"$FAKE/packages/Brewfile.work"
-    CHEZMOI_STATUS="" BREW_LEAVES=$'git\nhashicorp/tap/terraform' \
-        run_zsh "$(extract chez _chez_brew_untracked); chez"
-    [ "$status" -eq 0 ]
-    [[ "$output" != *"in no Brewfile"* ]]
-}
-
-@test "chez propagates a failing apply's exit code" {
-    CHEZMOI_STATUS="" CHEZMOI_APPLY_RC=3 BREW_LEAVES=$'git' \
-        run_zsh "$(extract chez _chez_brew_untracked); chez"
+@test "chezapply propagates a failing apply's exit code" {
+    CHEZMOI_STATUS="" CHEZMOI_APPLY_RC=3 \
+        run_zsh "$(extract chezapply _chez_brew_removals); chezapply"
     [ "$status" -eq 3 ]
 }
 
-# ─── chezdiff: read-only drift explainer ────────────────────────────────────
+# ─── chezstatus: read-only file + package drift explainer ──────────────────
 # The status codes are two columns (left = local $HOME drift, right = repo →
-# $HOME apply). chezdiff splits them into two labelled sections; these tests
+# $HOME apply). chezstatus splits them into two labelled sections; these tests
 # feed the stub a fixed CHEZMOI_STATUS and assert the plain-language grouping.
 
-@test "chezdiff reports in-sync when the status is empty" {
-    CHEZMOI_STATUS="" run_zsh "$(extract chezdiff); chezdiff"
+@test "chezstatus reports in-sync and no untracked packages when everything is clean" {
+    CHEZMOI_STATUS="" \
+        run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
     [[ "$output" == *"in sync"* ]]
+    [[ "$output" != *"Untracked Homebrew"* ]]
 }
 
-@test "chezdiff groups repo → \$HOME changes under the apply section with plain verbs" {
-    # Right column drives the 'what chez would write' list: ' M' → modify,
+@test "chezstatus flags untracked casks, not just formulae, and points at chezmirror" {
+    # Regression: the old chezaudit used `brew leaves`, which is formula-only
+    # and silently missed untracked casks. chezstatus must not repeat that.
+    cat >"$STUBS/cleanup.out" <<'OUT'
+Would uninstall casks:
+obs
+Run `brew bundle cleanup --force` to make these changes.
+OUT
+    CHEZMOI_STATUS="" BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
+        run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Untracked Homebrew"* ]]
+    [[ "$output" == *"cask"* ]]
+    [[ "$output" == *"obs"* ]]
+    [[ "$output" == *"chezmirror"* ]]
+}
+
+@test "chezstatus groups repo → \$HOME changes under the apply section with plain verbs" {
+    # Right column drives the 'what chezapply would write' list: ' M' → modify,
     # ' A' → add. No local drift (left column blank) ⇒ no drift section.
     CHEZMOI_STATUS=$' M .config/zsh/.zshrc\n A .config/foo/bar' \
-        run_zsh "$(extract chezdiff); chezdiff"
+        run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Repo → \$HOME"* ]]
     [[ "$output" == *"modify"* ]]
@@ -208,11 +175,11 @@ EOF
     [[ "$output" != *"Local drift"* ]]  # nothing edited locally
 }
 
-@test "chezdiff surfaces local drift and the re-add hint" {
+@test "chezstatus surfaces local drift and the re-add hint" {
     # 'MM' = edited locally (left col) AND repo differs (right col): it must
     # appear under BOTH sections, and the drift section warns about overwrite.
     CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
-        run_zsh "$(extract chezdiff); chezdiff"
+        run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Repo → \$HOME"* ]]
     [[ "$output" == *"Local drift"* ]]
@@ -220,26 +187,26 @@ EOF
     [[ "$output" == *"re-add"* ]]
 }
 
-@test "chezdiff -v hands off to the raw \`chezmoi diff\`" {
+@test "chezstatus -v hands off to the raw \`chezmoi diff\`" {
     # Verbose (and any path arg) must bypass the summary entirely and shell out
     # to `chezmoi diff` — recorded in DIFF_LOG by the stub.
     CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
-        run_zsh "$(extract chezdiff); chezdiff -v"
+        run_zsh "$(extract chezstatus); chezstatus -v"
     [ "$status" -eq 0 ]
     [[ "$output" != *"Repo → \$HOME"* ]]  # took the passthrough, not the summary
     grep -q '^diff' "$DIFF_LOG"
 }
 
-@test "chezdiff PATH forwards the path to \`chezmoi diff\`" {
-    run_zsh "$(extract chezdiff); chezdiff ~/.zshrc"
+@test "chezstatus PATH forwards the path to \`chezmoi diff\`" {
+    run_zsh "$(extract chezstatus); chezstatus ~/.zshrc"
     [ "$status" -eq 0 ]
     grep -q 'diff .*\.zshrc' "$DIFF_LOG"
 }
 
-@test "chezdiff --help prints usage without touching chezmoi" {
-    run_zsh "$(extract chezdiff); chezdiff --help"
+@test "chezstatus --help prints usage without touching chezmoi" {
+    run_zsh "$(extract chezstatus); chezstatus --help"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezdiff"* ]]
+    [[ "$output" == *"usage: chezstatus"* ]]
     [ ! -s "$DIFF_LOG" ]  # help path shells out to nothing
 }
 
@@ -253,11 +220,11 @@ EOF
     [ "${lines[$((${#lines[@]} - 1))]}" = "$FAKE" ]
 }
 
-@test "dotfiles with an argument prints reset/reinit guidance without cd-ing" {
+@test "dotfiles with an argument prints chezsetup guidance without cd-ing" {
     run_zsh "$(extract dotfiles); cd '$STUBS'; dotfiles help; pwd"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"chezreset"* ]]
-    [[ "$output" == *"chezreinit"* ]]
+    [[ "$output" == *"chezsetup"* ]]
+    [[ "$output" == *"chezsetup --reset"* ]]
     [ "${lines[$((${#lines[@]} - 1))]}" = "$STUBS" ]  # argument path must NOT cd
 }
 

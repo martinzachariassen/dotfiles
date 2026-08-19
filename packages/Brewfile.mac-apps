@@ -12,14 +12,14 @@ cask "stats"                    # menu bar resource monitor
 # Vault lives at ~/TheArchive (its own git repo, not chezmoi-managed).
 cask "obsidian"
 cask "font-inter"               # Obsidian interface font
-cask "font-jetbrains-mono"      # Obsidian monospace font
 cask "font-ia-writer-quattro"   # Obsidian editor font
+# Obsidian's monospace font is font-jetbrains-mono — declared in the core
+# Brewfile (VS Code's editor font), so it's not repeated here.
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
 cask "google-chrome"            # what web tooling assumes
 
 # ─── Media ────────────────────────────────────────────────────────────────────
-cask "obs"                      # screen recording / streaming
 cask "spotify"
 cask "vlc"
 
@@ -48,3 +48,5 @@ brew "mas"                      # backs the `mas` lines below
 #   mas "Xcode", id: 497799835
 #   mas "The Unarchiver", id: 425424353
 #   mas "Wipr 2", id: 1662217862
+
+mas "Toggl Track", id: 1291898086

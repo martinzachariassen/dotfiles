@@ -2,7 +2,16 @@
     // ── Appearance ──
 
 {{ if has "theme" (dig "modules" (list) .) -}}
-    "workbench.colorTheme": "Catppuccin Frappé",
+    "workbench.colorTheme": "Catppuccin Mocha",
+
+    // Catppuccin's default comment colour (overlay0) sits too low in contrast to
+    // skim in KDoc/Javadoc-heavy files; subtext0 lifts it without turning comments
+    // into foreground noise.
+    "editor.tokenColorCustomizations": {
+        "[Catppuccin Mocha]": {
+            "comments": "#a6adc8"
+        }
+    },
 {{ end -}}
     "workbench.iconTheme": "material-icon-theme",
 
@@ -21,13 +30,30 @@
     "workbench.editor.limit.value": 10,
     "workbench.editor.limit.perEditorGroup": true,
 
+    // Markdown is read far more often than it's edited here (docs/, READMEs), so
+    // open it rendered. Unrelated to `editor.enablePreview` above — that's the
+    // italic-tab kind. To edit: right-click → Open With… → Text Editor.
+    "workbench.editorAssociations": {
+        "*.md": "vscode.markdown.preview.editor"
+    },
+
     // ── Font & editor ──
 
-    "editor.fontFamily": "'JetBrainsMono Nerd Font', Menlo, Monaco, 'Courier New', monospace",
+    // Unpatched JetBrains Mono in the editor — the Nerd Font patch ships wider
+    // metrics that throw off column alignment, and nothing in the editor renders
+    // the extra glyphs. The terminal, which does need them, keeps the patched
+    // build (see below). Same family as IntelliJ, so both IDEs render alike.
+    "editor.fontFamily": "'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
     "editor.fontSize": 14,
-    "editor.fontLigatures": true,
-    "editor.lineHeight": 1.7,
-    "editor.letterSpacing": 0.3,
+    // macOS grayscale-antialiases text; Regular goes thin on a dark background.
+    "editor.fontWeight": "500",
+    // Off: `!=` vs `->` should stay distinguishable at review speed.
+    "editor.fontLigatures": false,
+    "editor.lineHeight": 1.6,
+
+    // TextMate regex can't tell a field from a parameter from a local; the
+    // language server can. Real signal in Java/Kotlin.
+    "editor.semanticHighlighting.enabled": true,
 
     "editor.cursorBlinking": "smooth",
     "editor.cursorSmoothCaretAnimation": "on",
@@ -60,13 +86,20 @@
     "editor.acceptSuggestionOnEnter": "smart",
     "editor.rulers": [100, 120],
     "editor.cursorSurroundingLines": 4,
+    // Relative numbers make vim's count motions (5j, 3dd, d7k) readable instead
+    // of guesswork; `vim.smartRelativeLine` below flips back to absolute in
+    // insert mode, where the count is irrelevant and the real line number isn't.
+    "editor.lineNumbers": "relative",
     "editor.linkedEditing": true,
     "editor.accessibilitySupport": "off",
 
     // ── Files ──
 
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000,
+    // NOT "afterDelay": VS Code skips save participants on the delayed-autosave
+    // path, which silently disables editor.formatOnSave and every
+    // codeActionsOnSave below (organizeImports, fixAll.eslint, fixAll.ruff,
+    // java.cleanup.actionsOnSave). "onFocusChange" still autosaves but runs them.
+    "files.autoSave": "onFocusChange",
 
     "files.trimTrailingWhitespace": true,
     "files.insertFinalNewline": true,
@@ -75,6 +108,14 @@
         "**/.git/objects/**": true,
         "**/.git/subtree-cache/**": true,
         "**/.gradle/**": true,
+        "**/.idea/**": true,
+        "**/.kotlin/**": true,
+        "**/.mypy_cache/**": true,
+        "**/.pytest_cache/**": true,
+        "**/.ruff_cache/**": true,
+        "**/.terraform/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
         "**/build/**": true,
         "**/dist/**": true,
         "**/node_modules/**": true,
@@ -86,8 +127,17 @@
         "**/.git": false,
         "**/node_modules": true,
         "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
         "**/dist": true,
-        "**/build": true
+        "**/build": true,
+        "**/target": true
     },
 
     // Highlight chezmoi .tmpl files by base language; a whole-file "go"
@@ -128,7 +178,16 @@
         "**/node_modules": true,
         "**/build": true,
         "**/dist": true,
-        "**/.gradle": true
+        "**/.gradle": true,
+        "**/.idea": true,
+        "**/.kotlin": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true,
+        "**/.ruff_cache": true,
+        "**/.terraform": true,
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/target": true
     },
 
     "search.followSymlinks": false,
@@ -148,11 +207,9 @@
     "git.pruneOnFetch": true,
     "git.rebaseWhenSync": true,
     "git.mergeEditor": true,
-    "gitlens.currentLine.enabled": false,
-    // Turn off VS Code's built-in inline blame (default-on, looks like GitLens).
+    // Turn off VS Code's built-in inline blame (default-on, noisy).
     "git.blame.editorDecoration.enabled": false,
     "git.blame.statusBarItem.enabled": false,
-    "gitlens.codeLens.enabled": false,
 
     "scm.defaultViewMode": "tree",
     "diffEditor.ignoreTrimWhitespace": false,
@@ -177,14 +234,53 @@
 
     // ── Vim ──
 
+    // Leader maps below mirror LazyVim's defaults key-for-key, because this repo
+    // manages both editors and both use <space> as leader — see docs/editors.md.
+    // Anything VSCodeVim already emulates natively is deliberately NOT remapped:
+    // gd/gc/gC/ys/cs/ds all work out of the box, and a leader alias for them
+    // would only be a second way to do the same thing.
     "vim.leader": "<space>",
-    "vim.useSystemClipboard": true,
     "vim.hlsearch": true,
     "vim.incsearch": true,
     "vim.smartcase": true,
     "vim.ignorecase": true,
-    "vim.easymotion": true,
     "vim.surround": true,
+    "vim.easymotion": true,
+
+    // Every delete/change also clobbers the macOS clipboard — the cost of not
+    // having to type "+y for the common case. Named registers ("ayiw) still
+    // bypass it when something needs to survive a d/c.
+    "vim.useSystemClipboard": true,
+
+    // The only feedback that a yank in normal mode did anything at all.
+    "vim.highlightedyank.enable": true,
+    "vim.highlightedyank.color": "rgba(249, 226, 175, 0.25)",
+    "vim.highlightedyank.duration": 250,
+
+    // Relative numbers in normal/visual, absolute in insert — see
+    // editor.lineNumbers above.
+    "vim.smartRelativeLine": true,
+
+    // targets.vim: ci( / da, from anywhere on the line rather than only from
+    // inside the pair. Pays for itself in nested Java/Kotlin generics and calls.
+    "vim.targets.enable": true,
+
+    // `vim.replaceWithRegister` is deliberately OFF: it claims `gr` as the
+    // replace operator, and `gr` is Goto References in LazyVim (mapped below).
+    // The prefix isn't configurable, so the two can't coexist — and jumping to
+    // references is the far more common operation.
+{{ if has "theme" (dig "modules" (list) .) -}}
+
+    // EasyMotion ships hard-coded red/orange markers that fight Catppuccin.
+    // Mocha equivalents: red / peach / yellow markers on base, dimmed to
+    // overlay0 so the jump targets are the only thing with saturation left.
+    "vim.easymotionMarkerBackgroundColor": "#1e1e2e",
+    "vim.easymotionMarkerForegroundColorOneChar": "#f38ba8",
+    "vim.easymotionMarkerForegroundColorTwoCharFirst": "#fab387",
+    "vim.easymotionMarkerForegroundColorTwoCharSecond": "#f9e2af",
+    "vim.easymotionIncSearchForegroundColor": "#a6e3a1",
+    "vim.easymotionDimColor": "#6c7086",
+{{ end }}
     "vim.insertModeKeyBindings": [
         {
             "before": ["j", "k"],
@@ -192,53 +288,170 @@
         }
     ],
     "vim.normalModeKeyBindingsNonRecursive": [
+        // ── Find (LazyVim <leader>f) ──
+        // LazyVim's <leader><space> (Find Files) is deliberately NOT mapped:
+        // with leader=<space> that sequence is <space><space>, which is
+        // EasyMotion's entire prefix. <leader>ff covers it.
         {
-            "before": ["<leader>", "w"],
-            "commands": ["workbench.action.files.save"]
-        },
-        {
-            "before": ["<leader>", "p"],
+            "before": ["<leader>", "f", "f"],
             "commands": ["workbench.action.quickOpen"]
         },
         {
-            "before": ["<leader>", "f"],
+            "before": ["<leader>", "f", "r"],
+            "commands": ["workbench.action.openRecent"]
+        },
+        {
+            "before": ["<leader>", "f", "t"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+
+        // ── Search (LazyVim <leader>s, plus <leader>/ for grep) ──
+        {
+            "before": ["<leader>", "/"],
             "commands": ["workbench.action.findInFiles"]
         },
+        {
+            "before": ["<leader>", "s", "g"],
+            "commands": ["workbench.action.findInFiles"]
+        },
+        {
+            "before": ["<leader>", "s", "s"],
+            "commands": ["workbench.action.gotoSymbol"]
+        },
+        {
+            "before": ["<leader>", "s", "S"],
+            "commands": ["workbench.action.showAllSymbols"]
+        },
+        {
+            "before": ["<leader>", "s", "d"],
+            "commands": ["workbench.actions.view.problems"]
+        },
+
+        // ── Code / LSP (LazyVim <leader>c) ──
+        {
+            "before": ["<leader>", "c", "a"],
+            "commands": ["editor.action.quickFix"]
+        },
+        {
+            "before": ["<leader>", "c", "r"],
+            "commands": ["editor.action.rename"]
+        },
+        {
+            "before": ["<leader>", "c", "f"],
+            "commands": ["editor.action.formatDocument"]
+        },
+
+        // ── Buffers & windows (LazyVim <leader>b / <leader>- / <leader>|) ──
+        {
+            "before": ["<leader>", "b", "d"],
+            "commands": ["workbench.action.closeActiveEditor"]
+        },
+        {
+            "before": ["<leader>", "b", "b"],
+            "commands": ["workbench.action.openPreviousRecentlyUsedEditorInGroup"]
+        },
+        {
+            "before": ["<leader>", "-"],
+            "commands": ["workbench.action.splitEditorDown"]
+        },
+        {
+            "before": ["<leader>", "|"],
+            "commands": ["workbench.action.splitEditor"]
+        },
+        {
+            "before": ["<leader>", "w", "d"],
+            "commands": ["workbench.action.closeGroup"]
+        },
+
+        // ── Git (LazyVim <leader>g; <leader>gg is lazygit there, SCM view here) ──
+        {
+            "before": ["<leader>", "g", "g"],
+            "commands": ["workbench.view.scm"]
+        },
+        {
+            "before": ["<leader>", "g", "d"],
+            "commands": ["git.openChange"]
+        },
+
+        // ── Explorer & UI toggles (LazyVim <leader>e / <leader>u) ──
         {
             "before": ["<leader>", "e"],
             "commands": ["workbench.view.explorer"]
         },
         {
-            "before": ["<leader>", "g"],
-            "commands": ["workbench.view.scm"]
+            "before": ["<leader>", "u", "r"],
+            "commands": [":nohl"]
         },
         {
-            "before": ["<leader>", "d"],
-            "commands": ["editor.action.revealDefinition"]
+            "before": ["<leader>", "u", "w"],
+            "commands": ["editor.action.toggleWordWrap"]
+        },
+
+        // ── Goto (LazyVim gr/gI/gy; gd is native to VSCodeVim) ──
+        {
+            "before": ["g", "r"],
+            "commands": ["editor.action.goToReferences"]
         },
         {
-            "before": ["<leader>", "r", "n"],
-            "commands": ["editor.action.rename"]
+            "before": ["g", "I"],
+            "commands": ["editor.action.goToImplementation"]
         },
         {
-            "before": ["<leader>", "a"],
-            "commands": ["editor.action.quickFix"]
+            "before": ["g", "y"],
+            "commands": ["editor.action.goToTypeDefinition"]
+        },
+
+        // ── Diagnostics (LazyVim ]d / [d) — the payoff for ErrorLens+SonarLint ──
+        {
+            "before": ["]", "d"],
+            "commands": ["editor.action.marker.next"]
         },
         {
-            "before": ["<leader>", "/"],
-            "commands": ["editor.action.commentLine"]
-        },
-        {
-            "before": ["<leader>", "q"],
-            "commands": ["workbench.action.closeActiveEditor"]
+            "before": ["[", "d"],
+            "commands": ["editor.action.marker.prev"]
         }
     ],
     "vim.visualModeKeyBindingsNonRecursive": [
         {
-            "before": ["<leader>", "/"],
-            "commands": ["editor.action.commentLine"]
+            "before": ["<leader>", "c", "f"],
+            "commands": ["editor.action.formatSelection"]
+        },
+        // Keep the selection after reindenting so >>> is one keypress each,
+        // matching LazyVim. Stock vim drops back to normal mode after one shift.
+        {
+            "before": [">"],
+            "after": [">", "g", "v"]
+        },
+        {
+            "before": ["<"],
+            "after": ["<", "g", "v"]
         }
     ],
+
+    // Run VSCodeVim in its own extension host process: keystroke handling stops
+    // queueing behind the Java/Sonar/ErrorLens extensions in the shared host.
+    // Upstream's one documented perf lever. Cost: the extension reloads on every
+    // settings.json write, which `chezmoi apply` does often.
+    //
+    // Group 2 does the same for the Java/Kotlin/Spring toolchain: JDT LS,
+    // the Kotlin LSP, and SonarLint's analyzer are the heaviest extensions in
+    // this setup, so they get their own host too, away from both the vim host
+    // and the shared default host (ESLint, Copilot, cSpell, ...). Same cost —
+    // one more process to reload on every settings.json write.
+    "extensions.experimental.affinity": {
+        "vscodevim.vim": 1,
+        "redhat.java": 2,
+        "vscjava.vscode-gradle": 2,
+        "vscjava.vscode-java-debug": 2,
+        "vscjava.vscode-java-dependency": 2,
+        "vscjava.vscode-java-test": 2,
+        "vscjava.vscode-maven": 2,
+        "vscjava.vscode-spring-boot-dashboard": 2,
+        "vscjava.vscode-spring-initializr": 2,
+        "vmware.vscode-spring-boot": 2,
+        "jetbrains.kotlin-server": 2,
+        "sonarsource.sonarlint-vscode": 2
+    },
 
     // ── AI / Copilot ──
 
@@ -342,6 +555,13 @@
 {{ end -}}
     "intellij.trace.server": "off",
 
+    // Its first-run prompt writes both of these into this chezmoi-managed file
+    // if they're unset — and the next apply wipes them straight back out, so the
+    // prompt returns forever. Declared here to end that loop; "none" matches the
+    // telemetry opt-outs below.
+    "intellij.region": "europe",
+    "intellij.dataSharing": "none",
+
     "terraform.languageServer.enable": true,
 
     "yaml.validate": true,
@@ -391,7 +611,27 @@
         }
     },
 
+    // Error Lens whole-line-highlights every diagnostic regardless of source,
+    // which undoes cSpell.useCustomDecorations above — opt cSpell and
+    // markdownlint (same noisy-line-highlight complaint in .md files) back out.
+    "errorLens.excludeBySource": ["cSpell", "markdownlint"],
+
     // ── Language-specific ──
+
+    // Languages Prettier cannot parse. Without these, the global
+    // defaultFormatter + formatOnSave pair raises "Extension 'Prettier' is
+    // configured as formatter but it cannot format 'X'-files" on every save.
+    // Each of these is a file type this setup actually opens: build.gradle
+    // (groovy), application.properties (properties/spring-boot-properties),
+    // Makefiles, .gitignore (ignore), and interactive-rebase todo lists.
+    "[groovy]": { "editor.formatOnSave": false },
+    "[properties]": { "editor.formatOnSave": false },
+    "[spring-boot-properties]": { "editor.formatOnSave": false },
+    "[sql]": { "editor.formatOnSave": false },
+    "[plaintext]": { "editor.formatOnSave": false },
+    "[makefile]": { "editor.formatOnSave": false },
+    "[ignore]": { "editor.formatOnSave": false },
+    "[git-rebase]": { "editor.formatOnSave": false },
 
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
@@ -443,6 +683,9 @@
 
     "[spring-boot-properties-yaml]": {
         "yaml.validate": false,
+        // Its own langId, so the [yaml] block above doesn't apply and the
+        // global Prettier default would error on save.
+        "editor.formatOnSave": false,
         "editor.quickSuggestions": {
             "strings": true
         }
@@ -462,9 +705,13 @@
     },
 
     // Prettier formats; ESLint applies its non-format autofixes on save.
+    // A language-scoped editor.codeActionsOnSave *replaces* the global one
+    // rather than merging with it, so source.organizeImports has to be repeated
+    // here — omitting it silently drops import organizing for TS/JS only.
     "[typescript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -472,6 +719,7 @@
     "[javascript]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -479,6 +727,7 @@
     "[typescriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -486,6 +735,7 @@
     "[javascriptreact]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
         }
     },
@@ -500,25 +750,30 @@
         }
     },
 
-    // Swift/iOS (appleDev): Swift extension drives SourceKit-LSP, Sweetpad wraps
-    // xcodebuild. SwiftFormat (vknabel) pipes edits via stdin so it never races
-    // VS Code's save; SwiftLint's --fix rewrites on disk so it stays off the save
-    // cycle (run via keybinding or pre-commit). See docs/editors.md.
+    // Swift/iOS (appleDev): Swift extension drives SourceKit-LSP, SweetPad wraps
+    // xcodebuild for build/run/debug/test and owns [swift] formatting. SwiftLint
+    // has no maintained VS Code integration left (see docs/editors.md) — it runs
+    // via an Xcode Run Script build phase and pre-commit instead, not live in the
+    // editor. vknabel's SwiftFormat/SwiftLint extensions were removed 2026-08:
+    // archived upstream (unmaintained) as of 2025-11-19.
 {{ if has "appleDev" (dig "modules" (list) .) -}}
     "[swift]": {
-        "editor.defaultFormatter": "vknabel.vscode-swiftformat",
+        "editor.defaultFormatter": "sweetpad.sweetpad",
         "editor.tabSize": 4,
         "editor.detectIndentation": false,
         // Empty object overrides the global source.organizeImports.
         "editor.codeActionsOnSave": {}
     },
     "swift.backgroundIndexing": true,
-    "swiftformat.path": "/opt/homebrew/bin/swiftformat",
     "sweetpad.build.xcbeautifyEnabled": true,
-    "swiftlint.path": "/opt/homebrew/bin/swiftlint",
-    // SwiftLint doesn't ascend to $HOME; a project's .swiftlint.yml wins if present,
-    // else this chezmoi-deployed config applies.
-    "swiftlint.configSearchPaths": [".swiftlint.yml", "{{ .chezmoi.homeDir }}/.config/swiftlint/config.yml"],
+    // SweetPad's formatter defaults to Xcode's bundled swift-format; point it at
+    // Homebrew SwiftFormat instead so ~/.swiftformat (--maxwidth 120 etc.) applies.
+    // "--quiet" ignores stderr so SweetPad doesn't misread warnings as failures.
+    "sweetpad.format.path": "/opt/homebrew/bin/swiftformat",
+    "sweetpad.format.args": ["--quiet", "${file}"],
+    // No-op unless a workspace has a project.yml at its root; regenerates the
+    // .xcodeproj automatically when Swift files are added/removed.
+    "sweetpad.xcodegen.autogenerate": true,
 {{ end -}}
 
     // ── Performance ──
@@ -526,7 +781,6 @@
     "extensions.ignoreRecommendations": true,
     "telemetry.telemetryLevel": "off",
     "redhat.telemetry.enabled": false,
-    "gitlens.telemetry.enabled": false,
 
     "update.mode": "manual",
 

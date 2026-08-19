@@ -59,7 +59,7 @@ gate on membership with sprig `has`, e.g.
 | `macosDefaults` | macOS system defaults (needs sudo) — see [macos.md](macos.md). |
 | `cloudAuth` | Cloud CLIs and auth walkthrough (gh, az, gcloud, op). |
 | `claudePersona` | Claude global defaults at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |
-| `theme` | Catppuccin Frappé across terminal and editor (see [terminal.md](terminal.md)). |
+| `theme` | Catppuccin Mocha across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
 | `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcodes, xcbeautify, fastlane, SF Symbols). On by default for `personal`. |
@@ -95,9 +95,9 @@ The prompts degrade across three tiers to fit the terminal:
 
 `WIZARD_NO_GUM=1` skips the first tier, `WIZARD_NO_TUI=1` the first two.
 
-`bash scripts/bin/wizard.sh` (or `chezreset`) is the "change the setup" path;
-`chezreset` also replays first-time setup. See
-[commands.md](commands.md#changing-your-setup) for how reset/reinit differ.
+`bash scripts/bin/wizard.sh` (or `chezsetup`) is the "change the setup" path;
+`chezsetup --reset` also replays first-time setup. See
+[commands.md](commands.md#changing-your-setup) for how the two modes differ.
 
 ## Adding a package
 

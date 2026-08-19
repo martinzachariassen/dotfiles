@@ -190,7 +190,7 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
         warn "no git signing key configured yet"
         info "Set it by re-running the wizard, then applying:"
         dim "    chezmoi init --prompt      # choose signingMode, paste the public key"
-        dim "    chez"
+        dim "    chezapply"
     fi
 fi
 

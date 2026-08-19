@@ -1,8 +1,19 @@
 # Marketplace extensions installed by .chezmoiscripts/run_onchange_after_03-vscode.sh.tmpl.
 # A few entries are module-gated in that hook (excluded from install/prune when the
 # module is off): the Norwegian dictionary (locale); swiftlang.swift-vscode,
-# sweetpad.sweetpad, vadimcn.vscode-lldb, vknabel.vscode-swiftformat,
-# vknabel.vscode-swiftlint (appleDev).
+# sweetpad.sweetpad, vadimcn.vscode-lldb, llvm-vs-code-extensions.lldb-dap (appleDev).
+# vknabel.vscode-swiftformat/-swiftlint were removed 2026-08: archived upstream
+# (unmaintained) as of 2025-11-19. SweetPad now owns [swift] formatting instead;
+# see docs/editors.md.
+# eamodio.gitlens was removed 2026-08: VS Code's built-in git/blame/timeline covers
+# what was actually used, and the rest was noise.
+# ms-python.debugpy and ms-python.vscode-pylance are auto-installed by
+# ms-python.python; they must be listed or the prune step uninstalls them on every
+# apply and VS Code reinstalls them on next launch. Same for the lldb pair below.
+# GitHub Copilot is deliberately absent: github.copilot was deprecated in VS Code
+# 1.109 (auto-uninstalled on upgrade), and Copilot Chat has been a built-in system
+# extension since 1.116 — built-ins never appear in `code --list-extensions`, so
+# there is nothing here to track or prune.
 catppuccin.catppuccin-vsc
 anthropic.claude-code
 bierner.markdown-mermaid
@@ -10,7 +21,6 @@ bpruitt-goddard.mermaid-markdown-syntax-highlighting
 charliermarsh.ruff
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
-eamodio.gitlens
 editorconfig.editorconfig
 esbenp.prettier-vscode
 exiasr.hadolint
@@ -24,11 +34,14 @@ hashicorp.terraform
 humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
+llvm-vs-code-extensions.lldb-dap
 mermaidchart.vscode-mermaid-chart
 ms-azuretools.vscode-containers
 ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
+ms-python.debugpy
 ms-python.python
+ms-python.vscode-pylance
 ms-vscode-remote.remote-containers
 oderwat.indent-rainbow
 pkief.material-icon-theme
@@ -46,8 +59,6 @@ timonwong.shellcheck
 usernamehw.errorlens
 vadimcn.vscode-lldb
 vivaxy.vscode-conventional-commits
-vknabel.vscode-swiftformat
-vknabel.vscode-swiftlint
 vscjava.vscode-gradle
 vscjava.vscode-java-debug
 vscjava.vscode-java-dependency

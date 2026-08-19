@@ -1,7 +1,7 @@
 // Zellij config — managed by chezmoi. https://zellij.dev/documentation/configuration
 
 // ─── Theme ────────────────────────────────────────────────────────────────
-theme "catppuccin-frappe"
+theme "catppuccin-mocha"
 
 // ─── Behavior ─────────────────────────────────────────────────────────────
 scrollback_lines     100000             // match Ghostty's buffer

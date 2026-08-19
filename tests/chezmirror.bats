@@ -56,6 +56,7 @@ if [ "\$1" = bundle ] && [ "\$2" = cleanup ]; then
     shift 2
     printf 'cleanup %s\n' "\$*" >>"$ARGS_LOG"
     cat >"$STDIN_LOG"          # capture the piped-in union
+    [ -n "\${BREW_CLEANUP_STDERR:-}" ] && printf '%s\n' "\$BREW_CLEANUP_STDERR" >&2
     cat "$CANNED" 2>/dev/null  # emit the canned preview
     exit 0
 fi
@@ -105,8 +106,29 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
-        UNINSTALL_LOG="$UNINSTALL_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" BREW_CLEANUP_STDERR="${BREW_CLEANUP_STDERR:-}" \
         bash -c "$1"
+}
+
+# Negative assertions must go through these. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no matter
+# what the output contains.
+#
+# no_match <extended-regex> <file…>
+no_match() {
+    if grep -qE "$@"; then
+        echo "unexpected match for: $1"
+        return 1
+    fi
+}
+
+# no_match_in <text> <extended-regex>
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        echo "unexpected match for: $2"
+        return 1
+    fi
 }
 
 # ─── _chez_brew_removals: the union + parser (the bug lived here) ────────────
@@ -124,9 +146,9 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
     # The cache-prune section must never surface as a removal (parser bug regression).
-    ! grep -q 'Would remove' <<<"$output"
-    ! grep -q 'Caches/Homebrew' <<<"$output"
-    ! grep -q 'brew cleanup' <<<"$output"
+    no_match_in "$output" 'Would remove'
+    no_match_in "$output" 'Caches/Homebrew'
+    no_match_in "$output" 'brew cleanup'
 }
 
 @test "_chez_brew_removals labels the untap section 'tap' without leaking its header" {
@@ -143,7 +165,7 @@ EOF
     [ "${lines[0]}" = "$(printf 'formula\torphan-cli')" ]
     [ "${lines[1]}" = "$(printf 'tap\tacme/formulae')" ]
     [ "${#lines[@]}" -eq 2 ]
-    ! grep -q 'Would untap' <<<"$output" # the header itself must never leak
+    no_match_in "$output" 'Would untap' # the header itself must never leak
 }
 
 @test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
@@ -185,6 +207,26 @@ EOF
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
+}
+
+@test "_chez_brew_removals warns on a genuine brew Error: but still returns the removal set" {
+    # Regression: an untrusted-tap load failure (or any other real brew
+    # failure) writes `Error: …` to stderr. Must surface as a loud warning,
+    # not silently look identical to \"nothing to remove\".
+    BREW_CLEANUP_STDERR='Error: Refusing to load formula acme/tap/thing from untrusted tap acme/tap.' \
+        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"reported errors"* ]]
+    [[ "$output" == *"Error: Refusing to load formula"* ]]
+}
+
+@test "_chez_brew_removals stays silent on benign brew stderr noise (cache refresh, warnings)" {
+    # brew routinely writes non-fatal progress/deprecation notices to stderr
+    # even on a fully successful run — these must never trigger the warning.
+    BREW_CLEANUP_STDERR='==> Downloading Homebrew API data' \
+        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"reported errors"* ]]
 }
 
 # ─── _chez_brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
@@ -238,7 +280,7 @@ EOF
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
-    ! grep -qx "bats-core" "$UNINSTALL_LOG"
+    no_match '^bats-core$' "$UNINSTALL_LOG"
     [[ "$output" == *"removed 2 · kept 1"* ]]
 }
 
@@ -250,6 +292,26 @@ EOF
     [[ "$output" == *"usage: chezmirror"* ]]
     [[ "$output" == *"--all"* ]]
     [ ! -s "$UNINSTALL_LOG" ] # help path never touches brew
+}
+
+@test "chezmirror --dry-run previews the untracked set and removes nothing" {
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --dry-run"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"orphan-app"* ]]
+    [[ "$output" == *"DRY_RUN"* ]]
+    [ ! -s "$UNINSTALL_LOG" ] # dry-run never touches brew
+}
+
+@test "DRY_RUN=1 chezmirror previews the same as --dry-run/-n" {
+    run env \
+        PATH="$STUBS:$PATH" \
+        CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
+        UNINSTALL_LOG="$UNINSTALL_LOG" DRY_RUN=1 \
+        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"orphan-app"* ]]
+    [[ "$output" == *"DRY_RUN"* ]]
+    [ ! -s "$UNINSTALL_LOG" ]
 }
 
 @test "chezmirror rejects an unknown option (exit 2, no uninstall)" {

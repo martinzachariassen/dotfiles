@@ -15,3 +15,18 @@ fi
 
 # Set here, not .zshenv: /etc/zprofile's path_helper runs in between and would sink this below /usr/bin.
 path=("$HOME/.local/bin" $path)
+
+# mise's shims, for every shell that never reaches .zshrc. `mise activate` is an
+# interactive-shell thing, but a GUI-launched editor is started by launchd and
+# resolves its environment with a *non-interactive login* zsh — .zshenv and this
+# file, no .zshrc. That environment had no mise runtime on PATH at all, so the
+# editor's language servers failed to spawn one: VS Code's Kotlin LSP died with
+# `Cannot run program "mvn" … error=2`. Shims need no activate hook, so they fix
+# the login-shell case without slowing it down with a `mise activate` fork.
+#
+# Ahead of /usr/bin so mise's JDK wins over the macOS `java` stub; interactive
+# shells still prefer the real install dirs, which `mise activate` prepends
+# later, leaving the shims as an unused tail.
+if [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims" ]; then
+    path=("${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims" $path)
+fi

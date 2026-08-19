@@ -4,7 +4,7 @@
 # ─── Theme ────────────────────────────────────────────────────────────────────
 # Local theme file (chezmoi-managed) for version-independent colors.
 {{ if has "theme" (dig "modules" (list) .) -}}
-theme = catppuccin-frappe
+theme = catppuccin-mocha
 {{ end -}}
 
 # ─── Font ─────────────────────────────────────────────────────────────────────
@@ -29,8 +29,13 @@ background-opacity = 0.97
 
 # ─── macOS-specific ───────────────────────────────────────────────────────────
 macos-titlebar-style = transparent
-# Keep Option available for macOS Unicode/dead-key input such as å.
-macos-option-as-alt = false
+# `right`, not `false`: the left Option key stays a macOS compose key, so the
+# Norwegian layout's Option-dependent characters ([ ] { } | \ @ $ ~) and
+# dead-key input still work. The right Option key becomes Alt, which the whole
+# stack below the terminal needs — fzf's ALT-C widget, Zellij's Alt+n /
+# Alt+hjkl / Alt+[ / Alt+] (including the swap layouts in layouts/main.kdl),
+# and zsh's alt-b / alt-f word motions are all unreachable with `false`.
+macos-option-as-alt = right
 macos-non-native-fullscreen = true
 
 # ─── Cursor ───────────────────────────────────────────────────────────────────
