@@ -8,6 +8,11 @@ Homebrew, chezmoi, and the repo clone — then hands off to the setup wizard
 questions and runs `chezmoi init --apply`. See [lifecycle.md](lifecycle.md) for
 what `apply` does. Every step is idempotent and safe to re-run.
 
+The installer narrates itself: five numbered steps, an upfront estimate, and a
+visible tick while Apple's GUI installer runs (that step can take many minutes
+and used to look like a hang). The wizard then asks four questions, each with a
+line or two on why it matters. `QUIET=1` drops the prose and keeps the results.
+
 ## Scenarios
 
 ### Brand-new Mac
