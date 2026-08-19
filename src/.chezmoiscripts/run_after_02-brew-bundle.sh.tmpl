@@ -15,6 +15,8 @@ exit 0
 . "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
 # shellcheck source=../../scripts/lib/log.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/log.sh"
+# shellcheck source=../../scripts/lib/brew-progress.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/brew-progress.sh"
 ui_init_logging
 tty_reattach || warn "no terminal available; casks needing sudo may ask later"
 
@@ -33,9 +35,6 @@ FILES=(
     "{{ .chezmoi.workingTree }}/{{ $profileFile }}"
 {{- end }}
 )
-
-# pkg_count FILE — declared formulae/casks/App Store apps, for a sense of scale.
-pkg_count() { grep -cE '^[[:space:]]*(brew|cask|mas)[[:space:]]' "$1" 2>/dev/null || echo 0; }
 
 echo
 printf '%s%s%s  %sHomebrew packages%s %s(profile: {{ .profile }})%s\n' \
@@ -78,22 +77,38 @@ cache_dir="$(brew --cache 2>/dev/null)/downloads"
 export HOMEBREW_NO_INSTALL_CLEANUP=1
 
 # ─── Install missing entries (continue-on-error) ──────────────────────────────
-failures=()
-total="${#FILES[@]}"
-idx=0
-start_all="$(ui_now)"
+# The denominator is real: `brew bundle` prints exactly one line per entry —
+# "Using <name>" when already present, or "<verb> <name>" (Installing/Upgrading/
+# Tapping) when it acts. So total = declared entries, and each such line is one
+# entry genuinely finished. Nothing here animates on a timer.
+total=0
 for f in "${FILES[@]}"; do
-    idx=$((idx + 1))
+    [ -f "$f" ] || continue
+    total=$((total + $(brew_pkg_count "$f")))
+done
+
+BUNDLE_DONE="__bundle_done_$$__"
+BREW_LOG="$(mktemp -t brewbundle 2>/dev/null || echo "/tmp/brewbundle.$$")"
+RC_FILE="$(mktemp -t brewrc 2>/dev/null || echo "/tmp/brewrc.$$")"
+failures=()
+start_all="$(ui_now)"
+
+ui_progress_start "$total" "packages"
+for f in "${FILES[@]}"; do
     if [ ! -f "$f" ]; then
         warn "Brewfile missing: $f"
         continue
     fi
-    start_one="$(ui_now)"
-    info "[$idx/$total] $(basename "$f") — $(pkg_count "$f") declared"
-    brew bundle install --no-upgrade --file="$f" || failures+=("$(basename "$f")")
-    took="$(ui_elapsed "$start_one")"
-    [ -n "$took" ] && dim "    done in $took"
+    printf '1\n' >"$RC_FILE"
+    {
+        brew bundle install --no-upgrade --file="$f"
+        printf '%s\n' "$?" >"$RC_FILE"
+        printf '%s\n' "$BUNDLE_DONE"
+    } 2>&1 | tee -a "$BREW_LOG" | brew_progress_consume "$BUNDLE_DONE"
+    [ "$(cat "$RC_FILE" 2>/dev/null || echo 1)" = "0" ] || failures+=("$(basename "$f")")
 done
+ui_progress_finish ""
+rm -f "$RC_FILE" 2>/dev/null || true
 
 # Strip group/other-write bits brew leaves on $fpath dirs, which make compinit warn.
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
@@ -101,8 +116,16 @@ chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
 if [ "${#failures[@]}" -gt 0 ]; then
     warn "${#failures[@]} Brewfile(s) had install failures — everything else installed:"
     for f in "${failures[@]}"; do dim "    $FAIL_MARK $f"; done
+    # Output was captured to drive the bar, so surface enough to diagnose.
+    dim "    last lines from Homebrew:"
+    grep -v "$BUNDLE_DONE" "$BREW_LOG" 2>/dev/null | tail -n 15 | sed 's/^/      /'
+    dim "    full log: $BREW_LOG"
     explain "Usually a transient download. Re-run \`chezup\` to retry —" \
         "already-installed packages are skipped, so it picks up where it left off."
     exit 0
 fi
-ok "Homebrew packages up to date$(t="$(ui_elapsed "$start_all")"; [ -n "$t" ] && printf ' (%s)' "$t")"
+rm -f "$BREW_LOG" 2>/dev/null || true
+ok "Homebrew packages up to date$(
+    t="$(ui_elapsed "$start_all")"
+    [ -n "$t" ] && printf ' (%s)' "$t"
+)"

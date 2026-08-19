@@ -98,6 +98,31 @@ wizard works.
 | `chezreconcile` | **Full package reconcile in one step:** `chezup` (converge + install what the Brewfiles declare) then `chezmirror` (uninstall what they don't). `chezup` only adds and `chezmirror` only removes; `chezreconcile` does both directions. Untracked *files* stay separate — that's `chezclean`. Honours `DRY_RUN=1` (previews both directions, using `chezmirror -n` for the removal side so nothing is touched) and `YES=1` (skips both confirm gates); trailing args pass through to `chezup` → `chezmoi apply`. |
 | `chezclean` | The **file** analogue of `chezmirror`: reconcile untracked dotfiles to what chezmoi manages, across two scopes — the top level of `$HOME` (keep-list `cleanup.keepHome`) and `~/.config` (keep-list `cleanup.keepConfig`), both in [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml). Lists the untracked entries — everything that chezmoi neither manages nor a keep-list spares — then removes only what you confirm **one at a time** (via `gum` when installed). **Tool-aware:** config whose owning tool is still present is kept automatically — the union of three signals: the tool's brew package is installed, its command is on PATH (mise/gcloud tools count too), **or** its owning VS Code extension is in `code --list-extensions`; uninstall the tool (or drop the extension) and its config re-surfaces as removable. Most tools are matched by a stem heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the `cleanup.owners` map holds only the aliases where the dir name and the command/package/extension diverge (`.kube`→`kubectl`, `.m2`→`mvn`, `.sonarlint`→`sonarsource.sonarlint-vscode`). Offered entries are labelled `orphan` (a known tool, now gone) or `untracked` (no known owner); `-v`/`--verbose` also lists what tool-ownership kept. Pass `--all` (`-a`/`--yes`/`-y`) to remove the whole set after one confirmation, or `YES=1 chezclean` to accept-all; both need a TTY. `DRY_RUN=1` (or `-n`/`--dry-run`) previews and works headless. **Safe by construction:** only names beginning with `.` are ever considered (so `~/Library`, `~/Documents`, … are structurally out of scope), it never descends past an immediate child, and it removes nothing without a controlling terminal. Keep an entry for good by adding it to `cleanup.keepHome`/`cleanup.keepConfig` (or, if it's a tool whose dir name diverges from its command, map it in `cleanup.owners`). |
 
+### Progress
+
+Where a real denominator exists, you get a real bar:
+
+```
+│  ████████████░░░░░░░░░░░░  50%  34/67  docker-desktop  4m18s
+```
+
+The number is not an estimate. `brew bundle` prints exactly one line per
+Brewfile entry — `Using <name>` when it is already present, or
+`<verb> <name>` (Installing / Upgrading / Tapping) when it acts — so the total is
+the count of declared entries and each line is one entry genuinely resolved. The
+parsing lives in [`scripts/lib/brew-progress.sh`](../scripts/lib/brew-progress.sh)
+and is pinned by `tests/progress.bats`.
+
+The bar redraws on a 1-second timeout as well as on new output, so during a
+single large cask download the clock keeps moving instead of looking frozen.
+
+**Where there is no denominator, there is no bar.** Apple's Command Line Tools
+installer exposes no progress data, so that step gets an elapsed timer only —
+`ui_wait_tick`, not `ui_progress_*`. mise renders its own per-tool progress, so
+the hook reports how many runtimes are missing and then stays out of the way.
+A bar that is not backed by data is worse than none, because it invites you to
+trust it.
+
 ### Output and quietness
 
 Every verb opens with a short plain-language note: what it is about to do, and

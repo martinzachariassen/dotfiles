@@ -39,6 +39,8 @@ ui_init_glyphs() {
             FAIL_MARK="✗"
             NOTE="•"
             SUB_MARK="↳"
+            BAR_FULL="█"
+            BAR_EMPTY="░"
             RULE="──"
             BOX_TOP="╭────────────────────────────────────────────────────────────╮"
             BOX_BOTTOM="╰────────────────────────────────────────────────────────────╯"
@@ -51,6 +53,8 @@ ui_init_glyphs() {
             FAIL_MARK="X"
             NOTE="-"
             SUB_MARK="\\_"
+            BAR_FULL="#"
+            BAR_EMPTY="-"
             RULE="--"
             BOX_TOP="+------------------------------------------------------------+"
             BOX_BOTTOM="+------------------------------------------------------------+"
@@ -160,4 +164,110 @@ ui_init_steps() {
     }
     step_skip() { dim "$1"; }
     step_fail() { fail "$1"; }
+}
+
+# ── Progress ──────────────────────────────────────────────────────────────────
+# A bar is only honest when there is a real denominator. These helpers take an
+# explicit TOTAL and are ticked once per genuinely-completed item; nothing here
+# animates on a timer or interpolates. Where no denominator exists (Apple's GUI
+# installer, a single download), use ui_wait_tick instead — elapsed time only.
+#
+# Counter state lives in a temp file, not a variable: the producer is usually a
+# `cmd | while read` pipeline, whose body bash runs in a subshell.
+
+UI_PROGRESS_WIDTH="${UI_PROGRESS_WIDTH:-24}"
+
+# _ui_bar DONE TOTAL — "████████░░░░░░░░". Built by appending, because bash
+# substring arithmetic is byte-based and would slice a multi-byte block glyph.
+_ui_bar() {
+    local done="$1" total="$2" filled i out=""
+    [ "$total" -gt 0 ] 2>/dev/null || total=1
+    filled=$((done * UI_PROGRESS_WIDTH / total))
+    [ "$filled" -gt "$UI_PROGRESS_WIDTH" ] && filled="$UI_PROGRESS_WIDTH"
+    [ "$filled" -lt 0 ] && filled=0
+    i=0
+    while [ "$i" -lt "$filled" ]; do
+        out="$out$BAR_FULL"
+        i=$((i + 1))
+    done
+    while [ "$i" -lt "$UI_PROGRESS_WIDTH" ]; do
+        out="$out$BAR_EMPTY"
+        i=$((i + 1))
+    done
+    printf '%s' "$out"
+}
+
+# ui_progress_start TOTAL [LABEL] — begin a run of TOTAL items.
+ui_progress_start() {
+    UI_PROGRESS_TOTAL="${1:-0}"
+    UI_PROGRESS_LABEL="${2:-}"
+    UI_PROGRESS_T0="$(ui_now)"
+    UI_PROGRESS_STATE="$(mktemp -t uiprog 2>/dev/null || echo "/tmp/uiprog.$$")"
+    printf '0\n' >"$UI_PROGRESS_STATE"
+    export UI_PROGRESS_TOTAL UI_PROGRESS_LABEL UI_PROGRESS_T0 UI_PROGRESS_STATE
+    ui_progress_render ""
+}
+
+ui_progress_count() { cat "$UI_PROGRESS_STATE" 2>/dev/null || echo 0; }
+
+# ui_progress_render ITEM — draw without advancing (e.g. to show a phase change).
+ui_progress_render() {
+    local item="${1:-}" done total pct t line
+    done="$(ui_progress_count)"
+    total="${UI_PROGRESS_TOTAL:-0}"
+    [ "$total" -gt 0 ] 2>/dev/null || total=1
+    pct=$((done * 100 / total))
+    t="$(ui_elapsed "${UI_PROGRESS_T0:-0}")"
+    if [ ! -t 1 ]; then
+        # No terminal: one plain line per item, so CI logs stay readable.
+        [ -n "$item" ] && printf '  [%d/%d] %s\n' "$done" "$total" "$item"
+        return 0
+    fi
+    line="$(printf '%s  %s %s%3d%%%s  %s%d/%d%s' \
+        "$(line_prefix)" "$(_ui_bar "$done" "$total")" \
+        "$BOLD" "$pct" "$RESET" "$DIM" "$done" "$total" "$RESET")"
+    [ -n "$t" ] && line="$line $(printf '%s%s%s' "$DIM" "$t" "$RESET")"
+    [ -n "$item" ] && line="$line  $(printf '%s%s%s' "$DIM" "$item" "$RESET")"
+    printf '\r\033[K%s' "$line"
+}
+
+# ui_progress_tick ITEM — one item finished; advance and redraw.
+ui_progress_tick() {
+    local n
+    n="$(($(ui_progress_count) + 1))"
+    printf '%s\n' "$n" >"$UI_PROGRESS_STATE"
+    ui_progress_render "${1:-}"
+}
+
+# ui_progress_finish MSG — clear the bar and leave one settled line behind.
+ui_progress_finish() {
+    local done total t
+    done="$(ui_progress_count)"
+    total="${UI_PROGRESS_TOTAL:-0}"
+    t="$(ui_elapsed "${UI_PROGRESS_T0:-0}")"
+    [ -t 1 ] && printf '\r\033[K'
+    rm -f "$UI_PROGRESS_STATE" 2>/dev/null || true
+    if [ -n "${1:-}" ]; then
+        if [ -n "$t" ]; then
+            printf '%s  %s%s%s %s %s(%d/%d in %s)%s\n' "$(line_prefix)" \
+                "$GREEN" "$OK_MARK" "$RESET" "$1" "$DIM" "$done" "$total" "$t" "$RESET"
+        else
+            ok "$1 ($done/$total)"
+        fi
+    fi
+    unset UI_PROGRESS_STATE UI_PROGRESS_TOTAL UI_PROGRESS_T0 UI_PROGRESS_LABEL
+}
+
+# ui_wait_tick START MSG — for work with no denominator: elapsed time only, on a
+# single rewritten line. Deliberately not a bar; there is nothing to measure.
+ui_wait_tick() {
+    local start="$1" msg="${2:-working}" delta
+    [ -t 1 ] || return 0
+    delta=$(($(ui_now) - start))
+    printf '\r\033[K%s  %s%s… %dm%02ds%s' "$(line_prefix)" "$DIM" "$msg" \
+        "$((delta / 60))" "$((delta % 60))" "$RESET"
+}
+ui_wait_clear() {
+    [ -t 1 ] && printf '\r\033[K'
+    return 0
 }
