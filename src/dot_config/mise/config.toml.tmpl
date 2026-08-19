@@ -6,6 +6,9 @@ java = ["temurin-25"]
 {{ end -}}
 
 node = "lts"
+# pnpm was previously installed via `npm -g` into node's install dir, which a
+# runtime upgrade would silently drop; mise owns it now.
+pnpm = "latest"
 bun = "latest"
 python = "latest"
 

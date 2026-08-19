@@ -20,7 +20,7 @@
   "effortLevel": "high",
   "theme": "dark-ansi",
   "verbose": false,
-  "model": "sonnet",
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "~/.config/claude/statusline.sh",
@@ -30,5 +30,7 @@
   "attribution": {
     "commit": ""
   },
-  "remoteControlAtStartup": true
+  "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": true
 }
