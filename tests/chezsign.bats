@@ -75,12 +75,14 @@ run_sign() { # extra env is set by the caller
 @test "an explicit key is replayed with every other answer preserved" {
     FAKE_DATA="$DATA_FULL" run_sign "$KEY_B"
     [ "$status" -eq 0 ]
-    # DRY_RUN prints the command it would run.
-    [[ "$output" == *"Ada L"* ]]
-    [[ "$output" == *"ada@example.com"* ]]
-    [[ "$output" == *"personal"* ]]
-    [[ "$output" == *"theme/jvmStack"* ]]
-    [[ "$output" == *"BBBBKEYBBB"* ]]
+    # DRY_RUN prints the command it would run, through printf %q — so spaces
+    # arrive backslash-escaped ("Ada\ L"). Strip the escaping before matching.
+    local plain="${output//\\/}"
+    [[ "$plain" == *"Ada L"* ]]
+    [[ "$plain" == *"ada@example.com"* ]]
+    [[ "$plain" == *"Profile=personal"* ]]
+    [[ "$plain" == *"theme/jvmStack"* ]]
+    [[ "$plain" == *"BBBBKEYBBB"* ]]
 }
 
 @test "the signing mode is replayed unchanged, never reset to a default" {
