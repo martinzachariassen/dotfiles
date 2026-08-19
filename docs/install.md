@@ -8,6 +8,11 @@ Homebrew, chezmoi, and the repo clone — then hands off to the setup wizard
 questions and runs `chezmoi init --apply`. See [lifecycle.md](lifecycle.md) for
 what `apply` does. Every step is idempotent and safe to re-run.
 
+The installer narrates itself: five numbered steps, an upfront estimate, and a
+visible tick while Apple's GUI installer runs (that step can take many minutes
+and used to look like a hang). The wizard then asks four questions, each with a
+line or two on why it matters. `QUIET=1` drops the prose and keeps the results.
+
 ## Scenarios
 
 ### Brand-new Mac
@@ -18,15 +23,29 @@ One command bootstraps everything and applies:
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
+> **The signing key is a chicken-and-egg.** The wizard asks for your git signing
+> key, but on a just-wiped Mac that key is still inside 1Password — which
+> Homebrew only installs a few steps *later*. So when the wizard asks *when* you
+> want to set the key, answer **later**. Signing is simply omitted from the
+> rendered gitconfig until a key exists (git works fine, commits are just
+> unsigned), and the closing summary reminds you to finish with `chezsign`.
+
 When the wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                                 # skip if disabled
-bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # finishes git signing
+                                                                  # → Settings → Developer → enable the SSH agent
+chezsign                                                          # set the signing key deferred above
+bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # sign in to gh / cloud CLIs
 exec zsh                                                          # reload the managed shell
 chezdoctor                                                        # verify everything is healthy
 sudo shutdown -r now                                              # reboot to finish macOS defaults
 ```
+
+`chezsign` reads the keys the 1Password agent is already holding, so there's
+nothing to copy-paste — pick one and it replays every other setup answer
+untouched, then proves it worked with a real signed commit. It re-asks nothing
+else, so you never have to walk the whole wizard again just to supply a key.
 
 ### Existing Mac with an older setup
 

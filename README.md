@@ -64,6 +64,7 @@ Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](sr
 | `chezup` | **Converge this Mac to the repo.** Pull latest → preview the drift → apply. The one you run most. |
 | `chezdoctor` | Read-only **health check**: repo, chezmoi, brew, auth, signing, mise, shell layout. Fixes nothing. |
 | `chezsetup` | Re-run the setup wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added setup keys (default). |
+| `chezsign` | Set **only** the git signing key, keeping every other answer. For the fresh-Mac case where the key was still locked in 1Password when the wizard asked. |
 | `chezapply` / `chezstatus` | Apply without pulling, or explain pending file + package drift in plain words. Both read the same `chezmoi status`. |
 | `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. An apply never uninstalls — this is the deliberate, manual undo. |
 | `chezreconcile` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |

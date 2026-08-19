@@ -344,6 +344,19 @@ _chez_run() {
     print -ru2 -- "  synced — open a new shell (or run: exec zsh)."
 }
 
+# Plain-language preamble for the zsh-native verbs; the bash scripts get the same
+# from scripts/lib/log.sh's `explain`. QUIET=1 drops back to results only.
+_chez_explain() {
+    [[ ${QUIET:-0} == 1 ]] && return 0
+    local bar='│' dim=$'\e[2m' cyan=$'\e[36m' bold=$'\e[1m' reset=$'\e[0m' line
+    [[ -t 1 ]] || { dim=''; cyan=''; bold=''; reset='' }
+    print -r -- ""
+    print -r -- "${cyan}◆${reset}  ${bold}$1${reset}"
+    shift
+    for line in "$@"; do print -r -- "${cyan}${bar}${reset}  ${dim}${line}${reset}"; done
+    return 0
+}
+
 # Not auto-run by `chezmoi apply` — invoke on a fresh Mac or after resetting a pref pane.
 alias macos-defaults='_chez_run scripts/bin/macos-defaults.sh'
 
@@ -359,6 +372,9 @@ dotfiles() {
         echo "Or just fill in newly-added setup keys (keeps current answers):"
         echo "    chezsetup"
         echo
+        echo "Just set the git signing key (once 1Password is running):"
+        echo "    chezsign"
+        echo
         echo "List every dotfiles command:"
         echo "    chezhelp"
     fi
@@ -369,6 +385,10 @@ dotfiles() {
 chezapply() {
     local src={{ .chezmoi.workingTree | quote }}
     local status_output response
+    _chez_explain "Applying config" \
+        "Writes this repo's files into your home folder and installs anything" \
+        "your profile declares that is missing. Never uninstalls." \
+        "Local edits to managed files are overwritten — you get one confirm first."
     status_output=$(chezmoi status --exclude scripts 2>&1)
     if [ -n "$status_output" ]; then
         echo
@@ -553,6 +573,13 @@ chezsetup() {
     chezmoi init && chezapply "${rest[@]}"
 }
 
+# Set the git signing key on a machine that deferred it during setup (the key
+# lives in 1Password, which isn't installed until after the wizard runs). Offers
+# the SSH agent's keys, changes nothing else, then proves it with a signed commit.
+chezsign() {
+    _chez_run scripts/bin/signing.sh "$@"
+}
+
 # Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
 chezbump() {
     local src={{ .chezmoi.workingTree | quote }}
@@ -659,6 +686,11 @@ chezmirror() {
                 ;;
         esac
     done
+
+    _chez_explain "Untracked packages" \
+        "Finds Homebrew packages installed on this Mac that no Brewfile declares," \
+        "then offers to uninstall them. This is the only verb that removes packages;" \
+        "apply and chezup never do. Each removal is confirmed separately."
 
     local parsed
     parsed=$(_chez_brew_removals "$src")
@@ -780,6 +812,9 @@ chezmirror() {
 # (remove what it no longer tracks). Untracked *files* are a separate step
 # (`chezclean`). Honours DRY_RUN=1 and YES=1. Trailing args pass to chezup.
 chezreconcile() {
+    _chez_explain "Full package reconcile" \
+        "Two passes: chezup installs what the Brewfiles declare, then chezmirror" \
+        "offers to remove what they don't. Together they make this Mac match the repo."
     chezup "$@" || return $?
     echo
     if [ "${DRY_RUN:-}" = 1 ]; then
@@ -814,6 +849,8 @@ chezhelp() {
   Change your setup (re-run the wizard)
     chezsetup        Fill in newly-added setup keys; keeps existing answers.
                        --reset/-r  set up as new: reset run-once state, re-ask everything.
+    chezsign         Set the git signing key on its own; keeps every other answer.
+                       Run this after 1Password is up if setup deferred the key.
 
   Maintenance (packages & drift)
     chezapply        Apply without pulling. Flags drift; never uninstalls.
@@ -837,6 +874,7 @@ chezhelp() {
     chezhelp         Show this list.
 
   Knobs (chezup / chezapply / chezreconcile / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
+  QUIET=1 on any verb (and install.sh) drops the explanations, leaving just results
   chezmirror also honors DRY_RUN=1 / -n (preview only) and YES=1 (accept-all, no prompts)
   YES=1 chezclean:  accept-all — remove everything untracked, no prompts
   Deeper docs:  run `dotfiles`, then see docs/commands.md
