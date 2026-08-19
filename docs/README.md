@@ -9,7 +9,7 @@ detail behind it.
 | Doc | Covers |
 |---|---|
 | [install.md](install.md) | Bootstrapping a Mac — the three scenarios, `install.sh` flags, the deprecation cleanup, migrating off the old direnv stack. |
-| [commands.md](commands.md) | The everyday verbs (`chezup`, `chezdoctor`) and the full set of occasional helpers (`chezreset`, `chezreinit`, `chezmirror`, …). |
+| [commands.md](commands.md) | The everyday verbs (`chezup`, `chezdoctor`) and the full set of occasional helpers (`chezsetup`, `chezmirror`, …). |
 | [packages.md](packages.md) | Package tiers (core + profile + module Brewfiles), profiles, the optional-module catalog, and the plain-text setup wizard. |
 
 ## Internals

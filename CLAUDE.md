@@ -70,8 +70,8 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 3. Run the quality gates below.
 4. Open a PR.
 
-Day-to-day apply/drift runs through the `chez*` shell verbs (`chezup`, `chez`,
-`chezdiff`, `chezdoctor`, …) — see [`docs/commands.md`](docs/commands.md). An apply
+Day-to-day apply/drift runs through the `chez*` shell verbs (`chezup`, `chezapply`,
+`chezstatus`, `chezdoctor`, …) — see [`docs/commands.md`](docs/commands.md). An apply
 never uninstalls packages.
 
 ## Shell & runtimes

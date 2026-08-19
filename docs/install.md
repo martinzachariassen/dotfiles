@@ -91,7 +91,7 @@ stack, there's nothing to reconcile.
 On the **work** profile the apply also ensures `storecode` — an internal
 security tool that guards shell commands — is installed. It ships via its
 **own** installer, not Homebrew, so it's never a Brewfile entry and
-`chezaudit`/`chezmirror` never flag it; `~/.storecode` sits on the cleanup
+`chezstatus`/`chezmirror` never flag it; `~/.storecode` sits on the cleanup
 keep-list (`cleanup.keepHome`), so `chezclean` never offers to remove it. The
 installer command is data-driven in
 [`src/.chezmoidata/storecode.toml`](../src/.chezmoidata/storecode.toml)

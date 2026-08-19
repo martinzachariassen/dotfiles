@@ -95,9 +95,9 @@ The prompts degrade across three tiers to fit the terminal:
 
 `WIZARD_NO_GUM=1` skips the first tier, `WIZARD_NO_TUI=1` the first two.
 
-`bash scripts/bin/wizard.sh` (or `chezreset`) is the "change the setup" path;
-`chezreset` also replays first-time setup. See
-[commands.md](commands.md#changing-your-setup) for how reset/reinit differ.
+`bash scripts/bin/wizard.sh` (or `chezsetup`) is the "change the setup" path;
+`chezsetup --reset` also replays first-time setup. See
+[commands.md](commands.md#changing-your-setup) for how the two modes differ.
 
 ## Adding a package
 
