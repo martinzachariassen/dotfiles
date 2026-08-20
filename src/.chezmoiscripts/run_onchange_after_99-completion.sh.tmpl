@@ -24,17 +24,59 @@ else
     B="";D="";G="";C="";Y="";M="";R=""
 fi
 
+# Steps 1-3 are unconditional; the two below are appended only when they apply,
+# so the numbering is counted rather than hardcoded.
+NEXT=4
+STEPS=""
+
+# add_step BODY — append an optional step, carrying its own blank line above it.
+# STEPS is spliced onto the end of step 3's last line rather than sitting on its
+# own heredoc line, so when no optional step applies it contributes nothing at
+# all instead of an orphan blank.
+add_step() {
+    STEPS="${STEPS}
+
+${1}"
+    NEXT=$((NEXT + 1))
+}
+
 # Setup can defer the signing key: on a fresh Mac it's still locked in 1Password,
 # which Homebrew only just installed. Surface the one-shot fix rather than
 # letting the machine sit silently unsigned.
-SIGN_STEP=""
 if [ "$SIGNING" != "off" ] && [ -z "$SIGNKEY" ]; then
-    SIGN_STEP="
-    ${M}4.${R} ${C}chezsign${R}
+    add_step "    ${M}${NEXT}.${R} ${C}chezsign${R}
        ${Y}Signing is deferred${R} — no key is set yet, so commits are unsigned.
        Run this once 1Password is signed in and its SSH agent is on; it offers
        the agent's keys and changes nothing else about your setup."
 fi
+
+# An apply installs the Swift tooling but never Xcode itself — install.sh only
+# gets you the Command Line Tools, and `xcodes install` needs an Apple ID with
+# 2FA, so it can't run unattended from here. Without this prompt the machine
+# looks finished while still unable to build a single iOS app.
+{{ if has "appleDev" (dig "modules" (list) .) -}}
+# shellcheck source=../../scripts/lib/xcode.sh
+if [ -r "{{ .chezmoi.workingTree }}/scripts/lib/xcode.sh" ]; then
+    . "{{ .chezmoi.workingTree }}/scripts/lib/xcode.sh"
+    # Cheap probes only — this runs at the end of every apply, so the slower
+    # xcodebuild round-trips are left to `chezxcode --check` and `chezdoctor`.
+    if ! xcode_app_path >/dev/null 2>&1; then
+        XCODE_MSG="${Y}No Xcode is installed${R} — the Swift CLIs are in place, but"$'\n'"       nothing can build an iOS app yet."
+    elif ! xcode_selected_is_full; then
+        XCODE_MSG="${Y}The Command Line Tools are still the active toolchain${R} —"$'\n'"       xcodebuild resolves to them, not to Xcode."
+    elif ! xcode_has_ios_runtime; then
+        XCODE_MSG="${Y}No iOS simulator runtime is downloaded${R} — since Xcode 16 it"$'\n'"       ships separately, so there is nothing to run an app on."
+    else
+        XCODE_MSG=""
+    fi
+    if [ -n "$XCODE_MSG" ]; then
+        add_step "    ${M}${NEXT}.${R} ${C}chezxcode${R}
+       ${XCODE_MSG}
+       Installs Xcode, selects it, accepts the licence and fetches a simulator
+       runtime. Needs your Apple ID; budget ~40 GB. Check state: chezxcode --check"
+    fi
+fi
+{{ end -}}
 
 cat <<EOF
 
@@ -56,8 +98,7 @@ ${C}╰────────────────────────�
        Sign in to gh, optional cloud CLIs, and verify git signing.
 
     ${M}3.${R} ${C}chezdoctor${R}
-       Run a health check after auth is done.
-${SIGN_STEP}
+       Run a health check after auth is done.${STEPS}
 
   ${B}Daily commands${R}
     ${C}chezup${R}      converge this Mac to the repo (pull, apply, install packages)

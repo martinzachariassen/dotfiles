@@ -56,6 +56,15 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   command) add an `owners` alias; `keepConfig`/`keepHome`/`owners` all live in
   `cleanup.toml` so they can't drift. Full model in
   [docs/lifecycle.md](docs/lifecycle.md).
+- **Xcode is out-of-band, by design.** `install.sh` installs only the Xcode
+  *Command Line Tools* (Homebrew's prerequisite), and the `appleDev` module's
+  Brewfile installs only the Swift *tooling*. Xcode.app itself, the selected
+  developer dir, the licence, first-launch components and the iOS simulator
+  runtime come from the confirm-gated `chezxcode` verb
+  (`scripts/bin/xcode.sh`), because `xcodes install` needs an Apple ID with 2FA
+  and ~40 GB — don't move it into an apply hook or a Brewfile. Its read-only
+  probes live in `scripts/lib/xcode.sh` and are shared with `chezdoctor` so the
+  two can't disagree; add checks there, not in either caller.
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in
   `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and

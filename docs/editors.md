@@ -133,10 +133,17 @@ tvOS, and visionOS targets alike — and drop into Xcode only when something
 genuinely needs it (Interface Builder, asset catalogs, signing UI). Four
 gated extensions plus a handful of Homebrew tools make that work:
 
+**Xcode.app is still a hard prerequisite for all of it**, even though you rarely
+open it: SourceKit-LSP, the SDKs, `xcodebuild` and Simulator.app all live inside
+it, so without one nothing below functions. It doesn't arrive with an apply —
+run [`chezxcode`](commands.md#advanced--occasional-helpers) once, which installs
+it, selects it, accepts the licence and downloads a simulator runtime.
+
 - **`swiftlang.swift-vscode`** — the official Swift extension; drives
   SourceKit-LSP for completion, diagnostics, and jump-to-def.
   SourceKit-LSP itself ships inside Xcode and follows `xcode-select`, so
-  keep an Xcode selected via `xcodes`. It declares
+  keep an Xcode selected — `chezxcode` does it, and `chezdoctor` fails loudly
+  when the Command Line Tools have taken the slot back. It declares
   **`llvm-vs-code-extensions.lldb-dap`** as a hard `extensionDependency`
   (VS Code auto-installs it) — tracked explicitly in the manifest so the
   extension-sync hook doesn't fight that install by trying to prune it as
