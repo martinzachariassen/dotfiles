@@ -66,10 +66,20 @@ if [ "\$1" = init ]; then
 fi
 exit 0
 EOF
-    # git: record every call so we can prove clone is/ isn't invoked.
+    # git: record every call so we can prove clone is/ isn't invoked. `clone`
+    # also materialises a minimal checkout at its destination, so the clone path
+    # can start from a genuinely empty dir and still reach the wizard hand-off.
     cat >"$STUBS/git" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$GIT_LOG"
+if [ "\$1" = clone ]; then
+    dest="\${3:-}"
+    if [ -n "\$dest" ]; then
+        mkdir -p "\$dest/.git" "\$dest/scripts/bin"
+        printf '#!/usr/bin/env bash\necho "WIZARD RAN args=[\$*]"\n' >"\$dest/scripts/bin/wizard.sh"
+        chmod +x "\$dest/scripts/bin/wizard.sh"
+    fi
+fi
 exit 0
 EOF
     # sudo/curl exist only so the (skipped) Homebrew branch can't accidentally
@@ -144,13 +154,34 @@ teardown() {
     [ ! -f "$GIT_LOG" ] || ! grep -q 'clone' "$GIT_LOG"
 }
 
-@test "install clones the repo when it is missing" {
-    rm -rf "$REPO/.git"
-    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
+@test "install clones the repo when the target path does not exist" {
+    local fresh="$STUBS/fresh-clone"   # never created — install.sh must mkdir -p
+    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$fresh" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
     [[ "$output" == *"cloning into"* ]]
     grep -q 'clone' "$GIT_LOG"
+}
+
+@test "install clones into an existing but empty target dir" {
+    local empty="$STUBS/empty-target"
+    mkdir -p "$empty"
+    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$empty" \
+        GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cloning into"* ]]
+}
+
+# Without this guard `git clone` dies into the non-empty dir and `set -e` kills
+# the installer with a raw git error and no hint about what to do.
+@test "install refuses a target dir that has content but is not a checkout" {
+    rm -rf "$REPO/.git"   # leaves scripts/bin/wizard.sh behind
+    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
+        GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not a git checkout"* ]]
+    [[ "$output" == *"DOTFILES_DIR"* ]]
+    [ ! -f "$GIT_LOG" ] || ! grep -q 'clone' "$GIT_LOG"
 }
 
 # ─── Xcode Command Line Tools install ───────────────────────────────────────

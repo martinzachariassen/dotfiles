@@ -32,7 +32,11 @@
      as [""], so normalise it back to an empty list. */ -}}
 {{- $modules = without $modules "" -}}
 
-sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote }}
+{{/* Derive from the checkout chezmoi was actually initialised against, so a
+     DOTFILES_DIR clone (honoured by install.sh, wizard.sh, chezup.sh and
+     doctor.sh) doesn't end up writing a config that points somewhere else.
+     workingTree is the git root; .chezmoiroot puts the source under src/. */ -}}
+sourceDir = {{ .chezmoi.workingTree | quote }}
 
 [data]
     name        = {{ $name | quote }}

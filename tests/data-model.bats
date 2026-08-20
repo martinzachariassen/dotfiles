@@ -71,3 +71,34 @@ setup() {
         [ -f "$REPO_ROOT/$path" ] || { echo "missing Brewfile: $path"; false; }
     done
 }
+
+# ─── sourceDir must follow the clone, not a hardcoded path ──────────────────
+# install.sh, wizard.sh, chezup.sh and doctor.sh all honour DOTFILES_DIR, and
+# docs/install.md advertises it. A hardcoded sourceDir made the wizard write a
+# config pointing at a directory that need not exist, breaking every later bare
+# `chezmoi` call on a non-default clone.
+@test "sourceDir is derived from the checkout, not hardcoded" {
+    grep -qF 'sourceDir = {{ .chezmoi.workingTree | quote }}' "$TMPL"
+    ! grep -qE 'sourceDir.*Developer/personal/dotfiles' "$TMPL"
+}
+
+# ─── Docs must not promise behaviour install.sh does not have ───────────────
+# README and docs/install.md described a timestamped backup of legacy dotfiles
+# and a SKIP_BACKUP=1 escape hatch. Neither ever existed, while the first apply
+# really does delete ~/.zshrc, ~/.gitconfig and friends via the remove_* entries.
+@test "no doc advertises an install.sh backup that does not exist" {
+    if grep -rqF 'SKIP_BACKUP' "$REPO_ROOT/install.sh"; then
+        skip "install.sh implements SKIP_BACKUP — the docs may describe it"
+    fi
+    ! grep -rqF 'SKIP_BACKUP' "$REPO_ROOT/README.md" "$REPO_ROOT/docs"
+}
+
+# The remove_* sources are what makes the "no backup" warning load-bearing.
+@test "the legacy dotfiles the docs name are really declared for removal" {
+    for f in dot_zshrc dot_gitconfig dot_bash_profile dot_bashrc dot_profile dot_zprofile; do
+        [ -f "$REPO_ROOT/src/remove_$f" ] || {
+            echo "docs/install.md names ~/.${f#dot_} as removed, but src/remove_$f is gone"
+            return 1
+        }
+    done
+}
