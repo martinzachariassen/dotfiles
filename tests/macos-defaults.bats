@@ -55,3 +55,13 @@ setup() {
     [[ "$output" == *"missing"* ]]
     [[ "$output" == *"sudo.sh"* ]]
 }
+
+# run_before_00-sudo-cache is explicitly allowed to give up on caching sudo, so
+# arriving here cold is a supported state. Under `set -e` a bare `sudo -v` would
+# then kill the script, the hook, and the rest of the apply.
+@test "macos-defaults.sh treats an unobtainable sudo as a skip, not a failure" {
+    grep -qE '^\s*if ! sudo -v' "$MD"
+    grep -qF 'skipping macOS defaults' "$MD"
+    # No bare `sudo -v` left at the start of a line under set -e.
+    ! grep -qE '^\s*sudo -v ' "$MD"
+}
