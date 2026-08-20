@@ -20,7 +20,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 ## chezmoi conventions
 
 - Edit source files under `src/`, **never the rendered copies in `$HOME`** —
-  `chezmoi apply` overwrites local drift (`apply.force = true`). Use
+  every apply entry point passes `--force`, so it overwrites local drift. Use
   `chezmoi edit ~/.X` to edit a source, or `chezmoi re-add ~/.X` to capture a live
   edit back into source.
 - Preserve the attribute prefixes/suffixes — they change how a file deploys:

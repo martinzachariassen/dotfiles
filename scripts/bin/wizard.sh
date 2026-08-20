@@ -387,7 +387,7 @@ done < <(awk -F' *= *' '
 # No terminal → let chezmoi apply its template defaults so automation converges.
 if [ ! -r /dev/tty ]; then
     warn "no terminal detected — accepting default answers (--promptDefaults)"
-    run_chezmoi --apply --promptDefaults --source="$SOURCE_DIR" "$@"
+    run_chezmoi --apply --force --promptDefaults --source="$SOURCE_DIR" "$@"
 fi
 
 # Current answers become the defaults (nice on a `chezsetup --reset` re-run).
@@ -528,8 +528,12 @@ case "$reply" in
 esac
 
 mods_slash="$(printf '%s' "$modules" | tr ' ' '/')"
+# --force: without it chezmoi stops on every target that changed since it last
+# wrote it and asks diff/overwrite/all-overwrite/skip/quit. The single
+# "Apply this setup? [Y/n]" above is the confirmation gate; from there the
+# apply runs to completion. (`force` is flag-only — there is no config key.)
 init_flags=(
-    --apply --prompt --source="$SOURCE_DIR"
+    --apply --force --prompt --source="$SOURCE_DIR"
     --promptString "$(prompt_msg name)=$name"
     --promptString "$(prompt_msg email)=$email"
     --promptChoice "$(prompt_msg profile)=$profile"

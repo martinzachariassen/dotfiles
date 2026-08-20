@@ -331,12 +331,12 @@ _chez_run() {
     fi
     print -ru2 -- "dotfiles: $src/$rel is missing — this shell's config predates a repo change."
     if ! command -v chezmoi >/dev/null 2>&1; then
-        print -ru2 -- "  chezmoi isn't on PATH; fix by hand: cd ${(q)src} && git pull && chezmoi apply && exec zsh"
+        print -ru2 -- "  chezmoi isn't on PATH; fix by hand: cd ${(q)src} && git pull && chezmoi apply --force && exec zsh"
         return 1
     fi
     print -ru2 -- "  re-syncing this machine (git pull + chezmoi apply)…"
     (cd "$src" && git pull --ff-only) 2>/dev/null
-    chezmoi apply || return 1
+    chezmoi apply --force || return 1
     if [[ -o interactive ]]; then
         print -ru2 -- "  synced — reloading your shell. Re-run your command."
         exec zsh

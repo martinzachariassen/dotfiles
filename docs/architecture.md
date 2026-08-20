@@ -13,7 +13,9 @@ at the repo **root** (`scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`,
 Two rules follow:
 
 1. **Edit source files, never the rendered copies in `$HOME`.** `chezmoi apply`
-   overwrites local drift (`apply.force = true`). Edit via
+   overwrites local drift — every entry point (`install.sh`, the wizard,
+   `chezup`/`chezapply`) passes `--force`, since chezmoi has no config key for
+   it and would otherwise prompt per changed file. Edit via
    `chezmoi edit ~/.X`, or capture a live edit back into source with
    `chezmoi re-add ~/.X`.
 2. **Inside a hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`.** So

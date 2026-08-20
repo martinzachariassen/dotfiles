@@ -122,3 +122,19 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     run wiz 'trap -p TERM'
     [[ "$output" == *on_interrupt* ]]
 }
+
+# Regression: chezmoi has no `apply.force` config key (verified v2.72.0 — it was
+# silently ignored), so a handoff without --force stops mid-install on
+# "X has changed since chezmoi last wrote it (diff/overwrite/…)?". The wizard's
+# own "Apply this setup? [Y/n]" is the only gate a fresh install should show.
+@test "every chezmoi handoff passes --force" {
+    local all missing
+    all="$(grep -c -- '--apply' "$WIZ" || true)"
+    missing="$(grep -- '--apply' "$WIZ" | grep -vc -- '--force' || true)"
+    [ "$all" -ge 2 ]
+    [ "$missing" -eq 0 ]
+}
+
+@test "the config template does not claim a force key chezmoi ignores" {
+    ! grep -qE '^\s*force\s*=' "$REPO_ROOT/src/.chezmoi.toml.tmpl"
+}

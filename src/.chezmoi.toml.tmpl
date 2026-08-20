@@ -46,6 +46,8 @@ sourceDir = {{ printf "%s/Developer/personal/dotfiles" .chezmoi.homeDir | quote 
 [diff]
     pager = "delta"
 
-# Force apply (no per-file prompt); the `chezapply` wrapper shows a y/N first as the safety net.
-[apply]
-    force = true
+# No `[apply] force` here: chezmoi has no such config key — `--force` is flag-only
+# (verified against v2.72.0; `chezmoi dump-config` has no `apply` section, and the
+# key was silently ignored). Every entry point passes `--force` explicitly instead:
+# install.sh, wizard.sh, signing.sh, and the `chezapply`/`chezup` wrappers — each
+# gates on its own y/N first.
