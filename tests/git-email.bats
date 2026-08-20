@@ -86,15 +86,47 @@ EOF
     [ "$output" = "2" ]
 }
 
+# stub_config NAME [EMAIL] — a chezmoi config carrying just enough [data] to
+# render git/config.tmpl. Self-contained on purpose: an earlier version of these
+# two tests rendered against whatever the *running machine* had configured, so
+# they passed locally (blank email) and failed in CI (no data at all).
+stub_config() {
+    local out="$FIX/$1.toml"
+    {
+        echo '[data]'
+        echo '    name        = "Ada L"'
+        [ -n "${2:-}" ] && printf '    email       = "%s"\n' "$2"
+        echo '    profile     = "personal"'
+        echo '    signingMode = "off"'
+        echo '    signingKey  = ""'
+        echo '    modules     = []'
+    } >"$out"
+    printf '%s' "$out"
+}
+
+render_gitconfig() {
+    chezmoi execute-template --config="$1" --source="$REPO_ROOT/src" <"$GITCFG"
+}
+
 @test "rendering with no email produces a config git will refuse to use" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
-    run bash -c "cd '$REPO_ROOT' && chezmoi execute-template --source='$REPO_ROOT/src' <'$GITCFG'"
+    run render_gitconfig "$(stub_config noemail)"
     [ "$status" -eq 0 ]
-    # This machine is the one that hit the bug, so its data still has email = "".
-    if [[ "$output" != *"useConfigOnly"* ]]; then
-        skip "this machine has a real email set; the empty branch is covered above"
-    fi
-    [[ "$output" != *"email = "* ]]
+    [[ "$output" == *"useConfigOnly = true"* ]]
+    # No *active* email line — the bytes that produced "Ada L <>". Comments are
+    # stripped first: the explanatory comment quotes "email =" itself.
+    local active
+    active="$(printf '%s\n' "$output" | grep -vE '^[[:space:]]*#' |
+        grep -cE '^[[:space:]]*email[[:space:]]*=' || true)"
+    [ "$active" -eq 0 ]
+}
+
+@test "rendering with an email produces a normal config and no guard" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    run render_gitconfig "$(stub_config withemail ada@example.com)"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"email = ada@example.com"* ]]
+    [[ "$output" != *"useConfigOnly"* ]]
 }
 
 # ─── the wizard ───────────────────────────────────────────────────────────────
