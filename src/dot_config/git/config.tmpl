@@ -3,9 +3,24 @@
      block when a mode is active AND a key is set, so key-less users aren't broken. */ -}}
 {{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
 {{- $signing := and (ne $signingMode "off") .signingKey -}}
+{{/* `dig`, not `.email`: setup no longer stores the key at all when the answer
+     was left blank, so that `chezsetup` re-asks instead of treating "" as a
+     final answer. A bare `.email` would abort the whole apply on those
+     machines with "map has no entry for key". */ -}}
+{{- $email := dig "email" "" . -}}
 [user]
     name = {{ .name }}
-    email = {{ .email }}
+{{- if $email }}
+    email = {{ $email }}
+{{- else }}
+    # No email is set yet — run `chezsetup` to fill it in.
+    #
+    # useConfigOnly makes git *refuse* to commit rather than invent an address.
+    # Emitting `email =` with nothing after it was worse than useless: git
+    # accepted it and authored every commit as "Your Name <>", which GitHub
+    # cannot attribute to anyone and which only history rewriting undoes.
+    useConfigOnly = true
+{{- end }}
 {{- if $signing }}
     signingkey = {{ .signingKey }}
 {{- end }}

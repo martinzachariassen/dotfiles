@@ -435,9 +435,29 @@ _ask_header() {
 
 ask_step "Who you are" \
     "Goes into ~/.config/git/config as your commit author." \
-    "Use your GitHub noreply address if you'd rather not publish a real one."
+    "Use your GitHub noreply address if you'd rather not publish a real one" \
+    "(github.com → Settings → Emails → keep my email address private)." \
+    "" \
+    "Don't know it yet? Leave the email blank and run \`chezsetup\` later;" \
+    "until then git refuses to commit rather than guess an address."
 name="$(ask_string "$(prompt_msg name)" "$def_name")"
 email="$(ask_string "$(prompt_msg email)" "$def_email")"
+
+# Say it at the moment it happens, not only in the summary. A blank email used
+# to sail through and then author every commit as "Name <>" — invisible until
+# someone noticed GitHub attributing nothing.
+if [ -z "$email" ]; then
+    {
+        warn "no email set — git will refuse to commit until you add one."
+        explain \
+            "That is deliberate: the alternative is commits authored as" \
+            "\"$name <>\", which GitHub cannot attribute and only a history" \
+            "rewrite undoes." \
+            "" \
+            "Fix it any time with \`chezsetup\` — it re-asks this one question." \
+            "Your GitHub noreply address is on github.com → Settings → Emails."
+    } >/dev/tty
+fi
 
 ask_step "Profile" \
     "Picks which set of packages this Mac installs." \
@@ -498,7 +518,9 @@ fi
     printf '%s%s%s  %sYour setup%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
 } >/dev/tty
 dim "  name     $name" >/dev/tty
-dim "  email    $email" >/dev/tty
+# Never print an empty value as if it were an answer — that blank line is
+# exactly what made a missing email easy to walk past on a real install.
+dim "  email    ${email:-<not set — run \`chezsetup\` to add one>}" >/dev/tty
 dim "  profile  $profile" >/dev/tty
 if [ "$signingMode" != "off" ] && [ -z "$signingKey" ]; then
     dim "  signing  $signingMode (key deferred — run \`chezsign\` later)" >/dev/tty

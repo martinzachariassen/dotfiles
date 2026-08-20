@@ -4,7 +4,22 @@
      private values. Prompted answers use a namespace disjoint from .chezmoidata. */ -}}
 
 {{- $name  := promptStringOnce . "name"  "Full name for git commits" -}}
+
+{{/* Email gets asked twice on purpose. promptStringOnce treats a saved "" as a
+     real answer, so a blank first run stuck permanently: `chezsetup` skipped the
+     key forever, git wrote every commit as "Name <>", and nothing said so. The
+     re-ask makes an empty value mean "not answered yet" on this run *and* on
+     machines that already saved one. Non-interactive runs (--promptDefaults, CI)
+     get the empty default back and fall through to the useConfigOnly guard in
+     dot_config/git/config.tmpl. */ -}}
 {{- $email := promptStringOnce . "email" "Email for git commits" -}}
+{{- if not $email -}}
+{{/* Same message as above on purpose: wizard.sh answers this non-interactively
+     with --promptString "Email for git commits=…", and chezmoi keys that flag by
+     the prompt text. A different string here would make the wizard fall through
+     to chezmoi's raw-mode TUI, which cannot run under `curl | bash`. */ -}}
+{{-   $email = promptString "Email for git commits" -}}
+{{- end -}}
 
 {{/* personal = my full stack · work = work extras · minimal = neutral base */ -}}
 {{- $profile := promptChoiceOnce . "profile" "Profile" (list "personal" "work" "minimal") "personal" -}}
@@ -40,7 +55,9 @@ sourceDir = {{ .chezmoi.workingTree | quote }}
 
 [data]
     name        = {{ $name | quote }}
+{{- if $email }}
     email       = {{ $email | quote }}
+{{- end }}
     profile     = {{ $profile | quote }}
     signingMode = {{ $signingMode | quote }}
     signingKey  = {{ $signingKey | quote }}
