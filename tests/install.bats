@@ -107,6 +107,9 @@ teardown() {
     [[ "$output" != *"WIZARD RAN"* ]]
     grep -q -- '--apply' "$CHEZMOI_LOG"
     grep -q -- '--promptDefaults' "$CHEZMOI_LOG"
+    # Without --force chezmoi stops on every drifted target and asks
+    # diff/overwrite/all-overwrite/skip/quit — there is no config key for it.
+    grep -q -- '--force' "$CHEZMOI_LOG"
 }
 
 # ─── Guards ─────────────────────────────────────────────────────────────────

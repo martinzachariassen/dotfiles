@@ -165,7 +165,7 @@ else
 fi
 
 init_flags=(
-    --apply --prompt --source="$SOURCE_DIR"
+    --apply --force --prompt --source="$SOURCE_DIR"
     --promptString "$(prompt_msg name)=$name"
     --promptString "$(prompt_msg email)=$email"
     --promptChoice "$(prompt_msg profile)=$profile"

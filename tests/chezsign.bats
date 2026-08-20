@@ -85,6 +85,12 @@ run_sign() { # extra env is set by the caller
     [[ "$plain" == *"BBBBKEYBBB"* ]]
 }
 
+@test "the replayed init passes --force so it cannot stall on a drift prompt" {
+    FAKE_DATA="$DATA_FULL" run_sign "$KEY_B"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--force"* ]]
+}
+
 @test "the signing mode is replayed unchanged, never reset to a default" {
     FAKE_DATA='{"name":"A","email":"a@b.c","profile":"work","signingMode":"ssh-key","signingKey":"","modules":[]}'
     run_sign "$KEY_B"

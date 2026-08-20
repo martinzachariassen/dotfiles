@@ -225,4 +225,4 @@ if [ "$#" -eq 0 ]; then
     exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"
 fi
 info "extra args given — skipping the wizard, handing off to chezmoi init"
-exec chezmoi init --apply --source="$SOURCE_DIR" "$@"
+exec chezmoi init --apply --force --source="$SOURCE_DIR" "$@"
