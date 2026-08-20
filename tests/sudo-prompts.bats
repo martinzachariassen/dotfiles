@@ -127,6 +127,48 @@ EOF
     [ "$(wc -l <"$CALLS" | tr -d ' ')" -le 4 ]
 }
 
+@test "the refresh deadline is wall-clock, not a loop counter" {
+    # The countdown form decremented by 2 per `sleep 2` iteration and refreshed
+    # after 120 of them. An iteration also forks `kill -0`, so under the I/O load
+    # of a 65-package brew bundle it costs more than 2s — at a 2.5s average the
+    # "240s" refresh fired at 300s, exactly when the ticket had already expired.
+    grep -q 'now="$(date +%s' "$SUDO_LIB"
+    grep -q 'next=$((now + refresh_secs))' "$SUDO_LIB"
+    # No decrementing counter left behind.
+    ! grep -q 'refresh_in=$((refresh_in - 2))' "$SUDO_LIB"
+}
+
+@test "the default refresh leaves real margin inside sudo's 5-minute cache" {
+    # 120s, not 240s: a no-op `sudo -n true` every two minutes costs nothing, and
+    # the margin covers a machine that sleeps or stalls.
+    grep -q 'refresh_secs="${2:-120}"' "$SUDO_LIB"
+}
+
+@test "refreshes keep firing on schedule even when each poll is slow" {
+    # Drives the real keeper with a deliberately slow `sudo` stub. With a
+    # wall-clock deadline the refresh count tracks elapsed time; with the old
+    # counter it would lag behind by however long each iteration overran.
+    STUB="$BATS_TEST_TMPDIR/stub"
+    CALLS="$BATS_TEST_TMPDIR/calls3"
+    mkdir -p "$STUB"
+    printf '#!/usr/bin/env bash
+sleep 1
+echo "$*" >> "%s"
+exit 0
+' "$CALLS" >"$STUB/sudo"
+    chmod +x "$STUB/sudo"
+
+    sleep 30 &
+    watch_pid=$!
+    # refresh every 2s of wall clock, while each call itself burns 1s
+    PATH="$STUB:$PATH" bash -c "source '$SUDO_LIB'; sudo_keep_warm $watch_pid 2"
+    sleep 9
+    kill "$watch_pid" 2>/dev/null || true
+
+    # ~9s at a 2s cadence is 4-5 refreshes; assert a floor well clear of noise.
+    [ "$(wc -l <"$CALLS" | tr -d ' ')" -ge 3 ]
+}
+
 @test "the miss limit is configurable and defaults to something small" {
     grep -q 'SUDO_KEEP_WARM_MAX_MISSES' "$SUDO_LIB"
     grep -q 'max_misses="${SUDO_KEEP_WARM_MAX_MISSES:-3}"' "$SUDO_LIB"
