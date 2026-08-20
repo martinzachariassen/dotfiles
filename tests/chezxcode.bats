@@ -26,6 +26,18 @@ setup() {
     MARKER="$BATS_TEST_TMPDIR/xcodes-was-invoked"
     mkdir -p "$STUBS" "$APPS"
 
+    # The script guards on `uname -s` = Darwin, and CI runs Ubuntu — stub it the
+    # same way tests/install.bats does, so these tests exercise the real logic on
+    # either platform. UNAME_S flips it back to test the guard itself.
+    cat >"$STUBS/uname" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+    -s) echo "${UNAME_S:-Darwin}" ;;
+    -m) echo "${UNAME_M:-arm64}" ;;
+    *) echo "Darwin" ;;
+esac
+EOF
+
     # A fresh Mac straight out of install.sh: CLT selected, no Xcode.app.
     cat >"$STUBS/xcode-select" <<'EOF'
 #!/usr/bin/env bash
@@ -164,4 +176,15 @@ EOF
     assert_no_download
     [ "$status" -eq 0 ]
     [[ "$output" == *"already ready"* ]]
+}
+
+# ─── Platform guard ────────────────────────────────────────────────────────────
+# Pins why the uname stub above exists: without it every test below runs against
+# the guard's early exit rather than the logic it means to check.
+
+@test "refuses to run off macOS" {
+    run env UNAME_S=Linux bash "$SCRIPT" </dev/null
+    assert_no_download
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"only exists on macOS"* ]]
 }
