@@ -223,3 +223,51 @@ run_doctor_xcode() {
     [[ "$output" != *"Xcode / iOS"* ]]
     [[ "$output" != *"chezxcode"* ]]
 }
+
+# ─── Brewfile resolution ────────────────────────────────────────────────────
+# doctor.sh picks the active Brewfiles out of chezmoi data with a jq filter.
+# A wrong filter doesn't fail loudly — it errors to /dev/null, yields an empty
+# list, and degrades the whole "are my packages installed?" section to a single
+# "could not resolve active Brewfiles" warning. It sat broken that way, so the
+# filter is extracted from the script and exercised against fixture data here
+# rather than merely grepped for.
+
+# doctor_brewfile_filter — the jq program doctor.sh actually runs.
+doctor_brewfile_filter() {
+    sed -n "/active_files=/,/\.\[\]'/p" "$DOCTOR" |
+        sed "1s/.*jq -r '//" |
+        sed "\$s/' 2>\/dev\/null)\"\$//"
+}
+
+@test "doctor.sh resolves core + selected-module + profile Brewfiles" {
+    command -v jq >/dev/null 2>&1 || skip "jq not installed"
+    local filter data
+    filter="$(doctor_brewfile_filter)"
+    [ -n "$filter" ]
+    data='{"profile":"work","modules":["macApps"],"brewfiles":{
+        "core":"packages/Brewfile",
+        "byModule":{"macApps":"packages/Brewfile.mac-apps","appleDev":"packages/Brewfile.apple-dev"},
+        "byProfile":{"personal":"packages/Brewfile.personal","work":"packages/Brewfile.work"}}}'
+    run jq -rn --argjson d "$data" "\$d | $filter"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"packages/Brewfile"* ]]
+    [[ "$output" == *"packages/Brewfile.mac-apps"* ]]
+    [[ "$output" == *"packages/Brewfile.work"* ]]
+    # appleDev wasn't selected; personal isn't the profile.
+    [[ "$output" != *"apple-dev"* ]]
+    [[ "$output" != *"Brewfile.personal"* ]]
+}
+
+@test "doctor.sh's Brewfile filter survives a profile with no Brewfile of its own" {
+    command -v jq >/dev/null 2>&1 || skip "jq not installed"
+    local filter data
+    filter="$(doctor_brewfile_filter)"
+    # minimal has no byProfile entry — the lookup is null and must be dropped,
+    # not emitted as the string "null" nor blow up the whole filter.
+    data='{"profile":"minimal","modules":[],"brewfiles":{
+        "core":"packages/Brewfile","byModule":{"macApps":"packages/Brewfile.mac-apps"},
+        "byProfile":{"personal":"packages/Brewfile.personal"}}}'
+    run jq -rn --argjson d "$data" "\$d | $filter"
+    [ "$status" -eq 0 ]
+    [ "$output" = "packages/Brewfile" ]
+}

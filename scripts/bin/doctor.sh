@@ -158,15 +158,34 @@ else
     fail "~/.config/claude/CLAUDE.md missing — run: chezmoi apply"
 fi
 
-section "Git signing (1Password SSH agent)"
-SSH_SIGN="$GIT_SIGNING_SSH_SIGN"
-if [ -x "$SSH_SIGN" ]; then
+# Read once here; the signing, locale, appleDev and Homebrew sections all key
+# off it. chezmoi-data.sh is sourced conditionally above, so degrade to empty
+# data rather than dying on a missing helper.
+if command -v cm_data_json >/dev/null 2>&1; then
+    DATA_JSON="$(cm_data_json)"
+    SIGNING_MODE="$(cm_data_string "$DATA_JSON" "signingMode")"
+else
+    DATA_JSON='{}'
+    SIGNING_MODE=""
+fi
+
+section "Git signing (${SIGNING_MODE:-1password})"
+SSH_SIGN="${GIT_SIGNING_SSH_SIGN:-}"
+if [ "$SIGNING_MODE" = "off" ]; then
+    note "signing disabled in setup (signingMode = off) — nothing to check"
+elif [ "$SIGNING_MODE" = "ssh-key" ]; then
+    note "signing uses a plain SSH key (signingMode = ssh-key), not the 1Password agent"
+elif [ -z "$SSH_SIGN" ]; then
+    warn "scripts/lib/git-signing.sh not readable — skipping the signing checks"
+elif [ -x "$SSH_SIGN" ]; then
     pass "op-ssh-sign present"
 else
     fail "op-ssh-sign missing — install 1Password app and enable SSH agent in Settings → Developer"
 fi
 gitkey=$(git config --global user.signingkey 2>/dev/null || true)
-if [ -n "$gitkey" ]; then
+if [ "$SIGNING_MODE" = "off" ]; then
+    : # nothing configured by design
+elif [ -n "$gitkey" ]; then
     pass "git signing key configured"
     if [ "$(git config --global commit.gpgsign 2>/dev/null || true)" = "true" ]; then
         pass "git commit signing enabled"
@@ -178,7 +197,11 @@ if [ -n "$gitkey" ]; then
     else
         warn "git gpg.format is not ssh — run \`chezmoi apply\`"
     fi
-    if [ "$(git config --global gpg.ssh.program 2>/dev/null || true)" = "$SSH_SIGN" ]; then
+    # gpg.ssh.program is emitted only for signingMode = 1password (see
+    # src/dot_config/git/config.tmpl); under ssh-key it is absent by design.
+    if [ "$SIGNING_MODE" = "ssh-key" ]; then
+        note "gpg.ssh.program not set — correct for signingMode = ssh-key"
+    elif [ "$(git config --global gpg.ssh.program 2>/dev/null || true)" = "$SSH_SIGN" ]; then
         pass "git 1Password SSH signer configured"
     else
         warn "git gpg.ssh.program is not op-ssh-sign — run \`chezmoi apply\`"
@@ -193,7 +216,9 @@ else
     warn "no git signing key set — run bootstrap-auth.sh after signing in to 1Password"
 fi
 # Smoke-test signing in a tmp repo (proves agent is reachable + key matches).
-if [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then
+# 1password mode only: the other modes have no agent to reach.
+if [ "$SIGNING_MODE" != "ssh-key" ] && [ "$SIGNING_MODE" != "off" ] &&
+    [ -n "$SSH_SIGN" ] && [ -x "$SSH_SIGN" ] && [ -n "$gitkey" ]; then
     if git_signing_smoke_test; then
         pass "git signing works (commit -S succeeded)"
     else
@@ -206,13 +231,17 @@ if command -v brew >/dev/null 2>&1; then
     pass "brew installed"
     # Resolves the same Brewfile map as the brew hook; --no-upgrade keeps this a
     # presence check (freshness is chezbump's job).
-    data_json="$(cm_data_json)"
-    active_files="$(printf '%s' "$data_json" | jq -r '
+    # `.key as $k` first: inside `select`, the input to `index` is $mods (an
+    # array), so a bare `index(.key)` looks up ".key" on the array and errors —
+    # which silently reduced this whole check to the warning below.
+    active_files="$(printf '%s' "$DATA_JSON" | jq -r '
         (.modules // []) as $mods
         | (.profile // "") as $prof
         | ([.brewfiles.core]
-           + (.brewfiles.byModule | to_entries | map(select($mods | index(.key))) | map(.value))
+           + (.brewfiles.byModule | to_entries
+              | map(select(.key as $k | $mods | index($k))) | map(.value))
            + ([.brewfiles.byProfile[$prof]] | map(select(. != null))))
+        | map(select(. != null))
         | .[]' 2>/dev/null)"
     if [ -z "$active_files" ]; then
         warn "could not resolve active Brewfiles from chezmoi data"
@@ -268,7 +297,7 @@ if command -v code >/dev/null 2>&1; then
     else
         # Mirrors the 03-vscode hook's locale guard.
         vsc_exclude=()
-        if ! cm_has_module "$(cm_data_json)" locale; then
+        if ! cm_has_module "$DATA_JSON" locale; then
             vsc_exclude=(streetsidesoftware.code-spell-checker-norwegian-bokmal)
         fi
         vsc_installed="$(code --list-extensions 2>/dev/null || true)"
@@ -328,7 +357,7 @@ fi
 # Only meaningful with appleDev on. `brew bundle check` above already covers the
 # swiftlint/xcodes/sweetpad tier; none of it can build an iOS app, so this
 # section checks the Xcode layer underneath — which nothing in an apply installs.
-if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$(cm_data_json)" appleDev; then
+if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" appleDev; then
     section "Xcode / iOS (appleDev)"
     if ! command -v xcode_ready >/dev/null 2>&1; then
         warn "scripts/lib/xcode.sh missing — Xcode checks skipped"
