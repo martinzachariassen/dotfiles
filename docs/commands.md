@@ -17,7 +17,7 @@ delegate to the scripts in [`scripts/bin/`](../scripts/bin).
 
 | Command | What it does |
 |---|---|
-| `chezup` | **Converge this Mac to the repo:** pull the latest changes, preview the drift, then apply. The everyday command. |
+| `chezup` | **Converge this Mac to the repo:** pull the latest changes, preview file drift and pending hooks, then apply. The everyday command, and the way to retry a partial install. |
 | `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood — see [install.md](install.md)). |
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
@@ -27,8 +27,13 @@ delegate to the scripts in [`scripts/bin/`](../scripts/bin).
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many
    commits arrived.
-2. **Review pending changes** — `chezmoi status` lists the drift between repo
-   and `$HOME` (`A` add, `M` modify, `D` remove). Stops here if nothing drifted.
+2. **Review pending changes** — two questions, because they fail
+   independently: `chezmoi status --exclude scripts` lists file drift between
+   repo and `$HOME` (`A` add, `M` modify, `D` remove), and
+   `chezmoi status --include scripts` lists pending apply hooks. Stops here only
+   when **both** are empty. A partial install (a brew bundle that died mid-way)
+   leaves no file drift at all, so gating on files alone would make `chezup` a
+   no-op exactly when a retry is needed.
 3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
 
 ## When a command says its script is missing

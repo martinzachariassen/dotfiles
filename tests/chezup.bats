@@ -39,13 +39,19 @@ case "\$args" in
 esac
 EOF
 
-    # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and
-    # honours CHEZMOI_APPLY_RC.
+    # chezmoi stub: `status --exclude scripts` prints CHEZMOI_STATUS (file
+    # drift), `status --include scripts` prints CHEZMOI_STATUS_SCRIPTS (pending
+    # hooks) — chezup asks both, and the two answers drive different branches.
+    # apply records args and honours CHEZMOI_APPLY_RC.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then
-    printf '%s' "\${CHEZMOI_STATUS:-}"
-    [ -n "\${CHEZMOI_STATUS:-}" ] && echo
+    case "\$*" in
+        *--include*scripts*) out="\${CHEZMOI_STATUS_SCRIPTS:-}" ;;
+        *)                   out="\${CHEZMOI_STATUS:-}" ;;
+    esac
+    printf '%s' "\$out"
+    [ -n "\$out" ] && echo
     exit 0
 fi
 if [ "\$1" = apply ]; then
@@ -103,16 +109,40 @@ run_chezup() {
 # ─── Clean tree ─────────────────────────────────────────────────────────────
 
 @test "chezup reports in-sync and exits 0 when nothing drifted" {
-    run_chezup "CHEZMOI_STATUS="
+    run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
     [[ "$output" == *"up to date"* ]]
     [[ "$output" == *"already in sync"* ]]
     [ ! -s "$APPLY_LOG" ]  # in sync ⇒ no apply
 }
 
+# ─── Pending hooks with no file drift ───────────────────────────────────────
+# The recovery case: a partial install (brew bundle died mid-way) leaves every
+# managed file correct, so file drift is empty while the run_after hooks are
+# still pending. chezup must apply anyway — every hook that fails tells the
+# user to re-run chezup, and that advice is only true if this branch applies.
+# (Stub values carry no spaces: run_chezup word-splits its env string.)
+
+@test "chezup applies when only hooks are pending (no file drift)" {
+    run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no managed files drifted"* ]]
+    [[ "$output" == *"hook(s) pending"* ]]
+    [[ "$output" != *"already in sync"* ]]
+    grep -q 'apply --force' "$APPLY_LOG"
+}
+
+@test "chezup counts file drift and pending hooks separately" {
+    run_chezup "CHEZMOI_STATUS=M_dot_zshrc CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 managed file(s) drifted"* ]]
+    [[ "$output" == *"1 apply hook(s) pending"* ]]
+    grep -q 'apply --force' "$APPLY_LOG"
+}
+
 @test "chezup reports how many commits it pulled when the repo advanced" {
     # before != after ⇒ the 'pulled N commit(s)' branch instead of 'up to date'.
-    run_chezup "GIT_ADVANCE=1 GIT_PULLED_COUNT=3 CHEZMOI_STATUS="
+    run_chezup "GIT_ADVANCE=1 GIT_PULLED_COUNT=3 CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
     [[ "$output" == *"pulled 3 commit"* ]]
     [[ "$output" != *"up to date"* ]]
