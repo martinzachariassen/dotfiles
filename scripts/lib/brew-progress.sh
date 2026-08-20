@@ -28,14 +28,39 @@ brew_pkg_count() {
     printf '%s\n' "$n"
 }
 
-# brew_entry_name LINE — the entry a status line refers to, ANSI stripped.
-# "Using jq" → jq · "✔ Installing ripgrep" → ripgrep · "✔ Tapping a/b" → a/b
+# brew_strip_ansi LINE — the line with colour escapes and any leading status
+# glyph removed, so the matchers below can anchor on the first real word.
 # -E (ERE) is required: macOS ships BSD sed, where `\|` alternation is a GNU
 # extension and silently matches a literal pipe instead.
+brew_strip_ansi() {
+    printf '%s\n' "$1" |
+        sed -E -e "s/$(printf '\033')\[[0-9;]*[A-Za-z]//g" \
+            -e 's/^[^A-Za-z=]*//'
+}
+
+# brew_is_entry_line CLEAN — 0 when CLEAN is `brew bundle`'s own one-per-entry
+# status line, which is the only thing the denominator counts.
+#
+# Anchored deliberately. Homebrew narrates its *internal* work with the same
+# verbs — "==> Installing dependencies for xcodes: openssl@3", "==> Installing
+# xcodes dependency: openssl@3" — and a substring match ticked once per
+# transitive dependency, which is how a 65-package run reported 66/65 at 101%.
+# Bundle's lines (Library/Homebrew/bundle/installer.rb) are printed bare, so
+# "starts with the verb" separates them from "==> " chatter exactly.
+brew_is_entry_line() {
+    case "$1" in
+        "Using "* | "Installing "* | "Upgrading "* | "Tapping "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# brew_entry_name CLEAN — the entry an already-matched status line refers to.
+# "Using jq" → jq · "Installing ripgrep" → ripgrep · "Tapping a/b" → a/b
 brew_entry_name() {
     printf '%s\n' "$1" |
         sed -E -e "s/$(printf '\033')\[[0-9;]*[A-Za-z]//g" \
-            -e 's/.*(Using|Installing|Upgrading|Tapping) //' \
+            -e 's/^[^A-Za-z]*//' \
+            -e 's/^(Using|Installing|Upgrading|Tapping) //' \
             -e 's/[ .].*//'
 }
 
@@ -61,30 +86,63 @@ brew_fetch_label() {
 # loop cannot tell "still downloading" from "finished", and either exits early or
 # hangs. The 1s timeout is what keeps the clock moving during a long single
 # download, when no new line arrives for minutes.
+#
+# BREW_PROGRESS_STALL is the other half of that timeout. After this many silent
+# seconds the bar is *parked*: cleared once, explained, and then not repainted
+# until Homebrew speaks again. Casks write `sudo` prompts straight to /dev/tty,
+# which a 1Hz `\r\033[K` redraw erases — so a machine waiting for a password
+# looked identical to one downloading, and the install sat there until the
+# prompt timed out. Parking costs a frozen elapsed clock during long downloads;
+# an erased password prompt costs the package.
 brew_progress_consume() {
-    local sentinel="$1" line current="" idle=0 max_idle="${BREW_PROGRESS_MAX_IDLE:-3600}"
+    local sentinel="$1" line clean current="" idle=0 parked=0
+    local max_idle="${BREW_PROGRESS_MAX_IDLE:-3600}"
+    local stall="${BREW_PROGRESS_STALL:-90}"
     while :; do
         if IFS= read -r -t 1 line; then
             idle=0
             [ "$line" = "$sentinel" ] && break
-            case "$line" in
-                *"Using "* | *"Installing "* | *"Upgrading "* | *"Tapping "*)
-                    current="$(brew_entry_name "$line")"
-                    ui_progress_tick "$current"
-                    ;;
-                *"==> Fetching"* | *"==> Downloading"*)
+            # Coming back from a park: the note stays, the bar resumes below it.
+            parked=0
+            clean="$(brew_strip_ansi "$line")"
+            case "$clean" in
+                "==> Fetching"* | "==> Downloading"*)
                     # Homebrew bulk-fetches before resolving any entry; show that
                     # rather than sitting at 0/N with no explanation.
-                    ui_progress_render "$(brew_fetch_label "$line")"
+                    ui_progress_render "$(brew_fetch_label "$clean")"
+                    ;;
+                "==>"*) ;; # Homebrew's own narration — never a bundle entry.
+                *)
+                    if brew_is_entry_line "$clean"; then
+                        current="$(brew_entry_name "$clean")"
+                        ui_progress_tick "$current"
+                    fi
                     ;;
             esac
         else
-            # Timeout or EOF — indistinguishable on bash 3.2. Redraw so elapsed
-            # advances; the sentinel ends the loop, and this cap only catches a
-            # producer killed mid-stream.
+            # Timeout or EOF — indistinguishable on bash 3.2. The sentinel ends
+            # the loop; this cap only catches a producer killed mid-stream.
             idle=$((idle + 1))
             [ "$idle" -gt "$max_idle" ] && break
-            ui_progress_render "$current"
+            if [ "$idle" -eq "$stall" ]; then
+                parked=1
+                ui_progress_pause "$(brew_stall_note "$current" "$stall")"
+            elif [ "$parked" -eq 0 ]; then
+                ui_progress_render "$current"
+            fi
         fi
     done
+}
+
+# brew_stall_note ITEM SECONDS — what to leave on screen when the bar parks.
+# Deliberately does not claim a password is being asked for: a big cask download
+# is silent for the same reason. It names both possibilities and gets out of the
+# way so whichever one it is can show itself.
+brew_stall_note() {
+    local item="${1:-}" secs="${2:-90}"
+    if [ -n "$item" ]; then
+        printf 'no output from Homebrew for %ss on "%s" — it is on a long download, or waiting for a password prompt below.' "$secs" "$item"
+    else
+        printf 'no output from Homebrew for %ss — it is on a long download, or waiting for a password prompt below.' "$secs"
+    fi
 }

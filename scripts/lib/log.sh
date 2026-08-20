@@ -219,8 +219,13 @@ ui_progress_render() {
     pct=$((done * 100 / total))
     t="$(ui_elapsed "${UI_PROGRESS_T0:-0}")"
     if [ ! -t 1 ]; then
-        # No terminal: one plain line per item, so CI logs stay readable.
-        [ -n "$item" ] && printf '  [%d/%d] %s\n' "$done" "$total" "$item"
+        # No terminal: one plain line per item, so CI logs stay readable. Only
+        # on a *change* — the caller also redraws on a timer to keep the elapsed
+        # clock moving, which without this printed the same line once a second.
+        if [ -n "$item" ] && [ "$done|$item" != "${UI_PROGRESS_LAST:-}" ]; then
+            UI_PROGRESS_LAST="$done|$item"
+            printf '  [%d/%d] %s\n' "$done" "$total" "$item"
+        fi
         return 0
     fi
     line="$(printf '%s  %s %s%3d%%%s  %s%d/%d%s' \
@@ -237,6 +242,23 @@ ui_progress_tick() {
     n="$(($(ui_progress_count) + 1))"
     printf '%s\n' "$n" >"$UI_PROGRESS_STATE"
     ui_progress_render "${1:-}"
+}
+
+# ui_progress_pause MSG — clear the bar and leave MSG behind as a settled line,
+# so the cursor ends up on a *fresh* line the caller will not repaint.
+#
+# This exists for one failure mode: a child process (a Homebrew cask, say) can
+# write a `sudo` password prompt straight to /dev/tty, which the next
+# `\r\033[K` redraw erases. The result looks exactly like a hang — an install
+# sitting at the same count for minutes with nothing on screen to explain it.
+# A caller that has gone quiet parks the bar here and stops rendering; whatever
+# prompt arrives next survives, because nothing is overwriting that line.
+#
+# The counter is untouched, so ui_progress_render/_tick resume cleanly.
+ui_progress_pause() {
+    [ -t 1 ] && printf '\r\033[K'
+    [ -n "${1:-}" ] && dim "$1"
+    return 0
 }
 
 # ui_progress_finish MSG — clear the bar and leave one settled line behind.
