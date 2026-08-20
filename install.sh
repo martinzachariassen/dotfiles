@@ -136,8 +136,8 @@ explain \
     "every step checks first and skips what is already done." \
     "" \
     "Roughly 15-25 minutes, almost all of it downloading." \
-    "You will be asked for: your macOS password (once, for Homebrew)," \
-    "then a few short setup questions." \
+    "You will be asked for: your macOS password (for Homebrew now, and again" \
+    "later for app installs and macOS settings), then a few setup questions." \
     "" \
     "  1. Xcode Command Line Tools   Apple's compilers — Homebrew needs them" \
     "  2. Homebrew                   the package manager everything else uses" \
@@ -180,11 +180,28 @@ if load_brew; then
 else
     explain \
         "Homebrew installs every CLI and app this setup uses." \
-        "It needs administrator access once, to create /opt/homebrew."
+        "It needs administrator access to create /opt/homebrew."
     if [ -r /dev/tty ]; then
-        sudo -v -p "Enter your macOS password (for Homebrew): " || die "could not obtain admin access for Homebrew."
+        # Say what is about to happen before sudo takes the line. sudo writes its
+        # prompt to /dev/tty at column 0, outside this script's rail, so without
+        # a lead-in it reads as an unexplained password box in the middle of an
+        # install — and nothing on screen says the typing is invisible.
+        #
+        # `info`, not `explain`: QUIET=1 drops prose, and a password prompt is
+        # the one thing that must never arrive unannounced.
+        info "macOS will ask for your login password — nothing appears as you type"
+        explain "If you have Touch ID for sudo enabled, just tap the sensor instead."
+        # %u so it names the account, matching what macOS shows elsewhere.
+        sudo -v -p "    macOS password for %u: " || die "could not obtain admin access for Homebrew."
+        ok "admin access granted"
     fi
     info "installing Homebrew — this is the long step, 5-10 min"
+    # Homebrew's installer echoes every privileged command it runs. Twenty lines
+    # of raw "/usr/bin/sudo /bin/mkdir -p …" immediately after a password prompt
+    # look like something went wrong; they are simply what it always prints.
+    explain \
+        "Homebrew now prints each command it runs as administrator." \
+        "A wall of \`/usr/bin/sudo …\` lines here is normal, not an error."
     NONINTERACTIVE=1 /bin/bash -c \
         "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     load_brew || die "Homebrew installed but 'brew' is not on PATH."

@@ -27,13 +27,14 @@ else
   Some later steps need admin access for Homebrew casks and macOS
   defaults. Enter the password once here, before the noisy install output.
 
+  Nothing appears as you type — that is sudo, not a frozen terminal.
   If Touch ID for sudo is already enabled, just tap your finger.
 EOF
 
     # Let pending output drain before sudo flips the line discipline (first-keystroke race).
     sleep 0.2
 
-    if ! sudo -v -p "[chezmoi] sudo password: "; then
+    if ! sudo -v -p "  macOS password for %u: "; then
         echo "! sudo was not cached; steps that need admin access may skip or ask again"
         exit 0
     fi

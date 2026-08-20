@@ -13,6 +13,16 @@ visible tick while Apple's GUI installer runs (that step can take many minutes
 and used to look like a hang). The wizard then asks four questions, each with a
 line or two on why it matters. `QUIET=1` drops the prose and keeps the results.
 
+**About the password prompts.** You are asked for your macOS login password
+more than once: `install.sh` needs it to create `/opt/homebrew`, the apply
+pre-authorises it again for Homebrew casks (several link binaries into
+`/usr/local/bin`), and `macos-defaults` needs it if that session has since
+expired. Each ask says why it is happening and that nothing echoes as you type;
+if **Touch ID for sudo** is enabled ([macos.md](macos.md#touch-id-for-sudo-sonoma-14),
+applied by the `macosDefaults` module) you can tap instead. Immediately after
+the first one, Homebrew's own installer prints a long wall of `/usr/bin/sudo …`
+lines — that is what it always does, not a failure.
+
 **"Xcode Command Line Tools" is not Xcode.** Step 1 installs Apple's compilers
 because Homebrew needs them, and nothing more: no iOS SDK, no Simulator, no
 SourceKit-LSP. Selecting the `appleDev` module gets you the Swift *tooling*
