@@ -138,6 +138,67 @@ lib() { printf 'export LC_ALL=en_US.UTF-8; . "%s"; . "%s"; ui_init_logging;' "$L
     [ "$output" = "5" ]
 }
 
+@test "Homebrew's own dependency narration never ticks the counter" {
+    # The 101% bug: "==> Installing <formula> dependency: <dep>" uses the same
+    # verb as bundle's own per-entry lines, so a substring match counted every
+    # transitive dependency and overshot the real denominator.
+    run bash -c "$(lib) ui_progress_start 2 p >/dev/null
+        { printf 'Installing xcodes\n'
+          printf '==> Installing dependencies for xcodes: openssl@3, ruby\n'
+          printf '==> Installing xcodes dependency: openssl@3\n'
+          printf '==> Installing xcodes dependency: ruby\n'
+          printf '==> Installing xcodes from xcodesorg/made\n'
+          printf 'Using aria2\n'
+          printf 'SENT\n'; } | brew_progress_consume SENT >/dev/null
+        printf '%s' \"\$(ui_progress_count)\""
+    [ "$output" = "2" ]
+}
+
+@test "a run of real Brewfile output lands exactly on the declared total" {
+    # End-to-end shape of the failing install: declared entries plus Homebrew
+    # chatter must finish at N/N, never N+1/N.
+    run bash -c "$(lib) ui_progress_start 3 p >/dev/null
+        { printf '==> Downloading https://ghcr.io/v2/homebrew/core/x\n'
+          printf 'Installing stats\n'
+          printf '==> Installing dependencies for stats: a\n'
+          printf 'Installing obsidian\n'
+          printf '==> Fetching intellij-idea\n'
+          printf 'Installing intellij-idea\n'
+          printf '\`brew bundle\` complete! 3 Brewfile dependencies now installed.\n'
+          printf 'SENT\n'; } | brew_progress_consume SENT >/dev/null
+        printf '%s' \"\$(ui_progress_count)\""
+    [ "$output" = "3" ]
+}
+
+@test "the bar parks when Homebrew goes silent, so a password prompt survives" {
+    # A cask writes its sudo prompt straight to /dev/tty; the 1Hz redraw used to
+    # erase it. After BREW_PROGRESS_STALL silent seconds the bar must clear
+    # itself, say why, and stop repainting.
+    run bash -c "$(lib) export BREW_PROGRESS_STALL=2; ui_progress_start 2 p >/dev/null
+        { printf 'Installing docker-desktop\n'; sleep 4; printf 'SENT\n'; } |
+            brew_progress_consume SENT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no output from Homebrew"* ]]
+    [[ "$output" == *"docker-desktop"* ]]
+    [[ "$output" == *"waiting for a password prompt"* ]]
+}
+
+@test "the stall note never claims a password is being asked for" {
+    # It cannot know: a large download is silent for the same reason. Naming
+    # both possibilities is the honest form.
+    run bash -c "$(lib) brew_stall_note 'docker-desktop' 90"
+    [[ "$output" == *"long download"* ]]
+    [[ "$output" == *"or waiting for a password"* ]]
+}
+
+@test "parking happens once, not on every idle second" {
+    run bash -c "$(lib) export BREW_PROGRESS_STALL=2; ui_progress_start 1 p >/dev/null
+        { printf 'Installing x\n'; sleep 5; printf 'SENT\n'; } |
+            brew_progress_consume SENT"
+    count="$(printf '%s' "$output" | grep -c 'no output from Homebrew' || true)"
+    [ "$count" = "1" ]
+}
+
 @test "the consumer stops at the sentinel instead of hanging" {
     # macOS bash 3.2 returns 1 from `read -t` for BOTH timeout and EOF, so the
     # loop cannot tell them apart — hence the sentinel. Without it this hangs.
