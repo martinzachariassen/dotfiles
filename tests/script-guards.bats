@@ -41,3 +41,10 @@ run_isolated() {
     [[ "$output" == *"missing"* ]]
     [[ "$output" == *"log.sh"* ]]
 }
+
+@test "xcode.sh fails loudly when log.sh is missing" {
+    run_isolated scripts/bin/xcode.sh
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing"* ]]
+    [[ "$output" == *"log.sh"* ]]
+}

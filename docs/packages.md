@@ -62,7 +62,7 @@ gate on membership with sprig `has`, e.g.
 | `theme` | Catppuccin Mocha across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
-| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcodes, xcbeautify, fastlane, SF Symbols). On by default for `personal`. |
+| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcodes, xcbeautify, fastlane, SF Symbols). On by default for `personal`. Installs the *tooling* only — Xcode.app, its licence and an iOS simulator runtime come from [`chezxcode`](commands.md#advanced--occasional-helpers), which needs an Apple ID and so can't run during an apply. |
 
 The per-profile defaults the wizard pre-checks live in the `[profileDefaults]`
 table of `modules.toml`. That table **must** mirror the `$defaults` blocks in

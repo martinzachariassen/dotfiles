@@ -177,3 +177,80 @@ no_match_in() {
     grep -qE '^--maxwidth[[:space:]]+120\b' "$SRC_DIR/dot_swiftformat"
     grep -qE '^[[:space:]]*warning:[[:space:]]*120\b' "$SRC_DIR/dot_config/swiftlint/config.yml"
 }
+
+# ─── chezxcode wiring ───────────────────────────────────────────────────────────
+# The Xcode layer is the one thing an apply can't install (Apple ID + 2FA, ~40 GB),
+# so it ships as a verb the setup points at. Three surfaces have to agree with the
+# module gate, or a machine either loses the verb it needs or grows one it can't use.
+
+@test "appleDev on: the zshrc defines chezxcode and lists it in chezhelp" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _stub_config '["macApps","appleDev"]'
+    run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qF '_chez_run scripts/bin/xcode.sh'
+    echo "$output" | grep -qE '^chezxcode\(\) \{'
+    echo "$output" | grep -q 'chezxcode        Install Xcode'
+}
+
+@test "appleDev off: the zshrc has no chezxcode at all" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _stub_config '["macApps"]'
+    run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
+    [ "$status" -eq 0 ]
+    no_match_in "$output" 'chezxcode'
+}
+
+@test "the rendered zshrc stays valid zsh with appleDev on" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
+    _stub_config '["macApps","appleDev"]'
+    _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl" > "$BATS_TEST_TMPDIR/zshrc"
+    run zsh -n "$BATS_TEST_TMPDIR/zshrc"
+    [ "$status" -eq 0 ]
+}
+
+@test "appleDev on: the completion hook probes Xcode readiness" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _stub_config '["macApps","appleDev"]'
+    run _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qF 'scripts/lib/xcode.sh'
+    echo "$output" | grep -qF 'chezxcode'
+}
+
+@test "appleDev off: the completion hook never mentions Xcode" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _stub_config '["macApps"]'
+    run _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
+    [ "$status" -eq 0 ]
+    no_match_in "$output" 'chezxcode'
+    no_match_in "$output" 'xcode\.sh'
+}
+
+# The hook counts step numbers rather than hardcoding them, so the two optional
+# steps must not collide when both apply — a duplicated "4." in the closing
+# summary is the visible symptom.
+@test "completion hook: chezsign and chezxcode get distinct step numbers" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _stub_config '["macApps","appleDev"]'
+    _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl" \
+        > "$BATS_TEST_TMPDIR/completion.sh"
+    # Force both optional steps on regardless of this machine's real state: stub
+    # the Xcode probes to report "no Xcode", turn signing on and blank its key.
+    # (_stub_config sets useOnePassword=false, so signing renders as "off".)
+    cat > "$BATS_TEST_TMPDIR/fake-xcode-lib.sh" <<'EOF'
+xcode_app_path() { return 1; }
+xcode_selected_is_full() { return 1; }
+xcode_has_ios_runtime() { return 1; }
+EOF
+    sed -i.bak "s|\. \".*/scripts/lib/xcode.sh\"|. \"$BATS_TEST_TMPDIR/fake-xcode-lib.sh\"|" \
+        "$BATS_TEST_TMPDIR/completion.sh"
+    sed -i.bak -e 's|^SIGNKEY=.*|SIGNKEY=""|' -e 's|^SIGNING=.*|SIGNING="1password"|' \
+        "$BATS_TEST_TMPDIR/completion.sh"
+
+    run bash "$BATS_TEST_TMPDIR/completion.sh"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qE '^ *4\. chezsign'
+    echo "$output" | grep -qE '^ *5\. chezxcode'
+}
