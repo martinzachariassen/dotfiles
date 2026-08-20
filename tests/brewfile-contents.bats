@@ -93,10 +93,6 @@ not_declares() {
 @test "mac-apps Brewfile exists" {
     [ -f "$MAC_APPS" ]
 }
-@test "mac-apps Brewfile declares ollama" {
-    # Doctor checks for the running service.
-    declares "$MAC_APPS" brew ollama
-}
 @test "mac-apps Brewfile declares the Claude desktop app" {
     declares "$MAC_APPS" cask claude
 }

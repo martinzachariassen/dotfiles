@@ -55,7 +55,7 @@ gate on membership with sprig `has`, e.g.
 
 | Module | What it adds |
 |---|---|
-| `macApps` | GUI and AI apps (Raycast, Chrome, Claude, Ollama) plus `mas` for App Store apps (see [above](#mac-app-store-apps-mas)). |
+| `macApps` | GUI and AI apps (Raycast, Chrome, Claude) plus `mas` for App Store apps (see [above](#mac-app-store-apps-mas)). |
 | `macosDefaults` | macOS system defaults (needs sudo) — see [macos.md](macos.md). |
 | `cloudAuth` | Cloud CLIs and auth walkthrough (gh, az, gcloud, op). |
 | `claudePersona` | Claude global defaults at `~/.config/claude/CLAUDE.md` (see [ai.md](ai.md)). |

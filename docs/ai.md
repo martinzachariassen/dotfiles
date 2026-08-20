@@ -8,10 +8,6 @@ assistant on the same page. Most of this rides on the `macApps` and
 
 Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
 
-- **Ollama** (`brew "ollama"`) — a local model runner/server. Installed but
-  pulls **no models**. Start it with
-  [`scripts/bin/setup-ollama.sh`](../scripts/bin/setup-ollama.sh) (registers
-  it as a brew service), then `ollama pull <model>` for the ones you want.
 - **Claude** (`cask "claude"`) — the Anthropic desktop app.
 - **Claude Code** (`cask "claude-code"`) — the Anthropic CLI. The
   `anthropic.claude-code` VS Code extension is in the

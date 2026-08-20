@@ -51,7 +51,7 @@ chezup    # pull latest → preview the drift → apply
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
 | Runtimes | [mise](https://mise.jdx.dev) for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml` |
 | iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols — [details](docs/packages.md#optional-modules) |
-| Local AI | Default `macApps` module: Ollama (brew service) plus the Claude and Claude Code apps |
+| AI | Default `macApps` module: the Claude and Claude Code apps |
 | Apps | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md) |
 

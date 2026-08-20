@@ -58,7 +58,7 @@ Grouped by *who invokes each script*, so the entry points are obvious:
 
 - **[`scripts/bin/`](../scripts/bin)** — user-facing verbs run by hand or via
   the zsh functions: `chezup`, `doctor`, `bootstrap-auth`, `wizard`,
-  `setup-ollama`, `macos-defaults`, `clean`. Documented in
+  `macos-defaults`, `clean`. Documented in
   [commands.md](commands.md).
 - **[`scripts/ci/`](../scripts/ci)** — checks wired into CI and the
   pre-commit hooks: `lint-config`, `render-check`, `brew-resolve`,
@@ -75,7 +75,7 @@ the chezmoi hooks reach them across the source/root boundary via
 
 | Lib | Provides | Sourced by |
 |---|---|---|
-| `log.sh` | colors, glyphs, rail + flat status helpers | chezup, bootstrap-auth, setup-ollama, wizard, doctor, macos-defaults, clean |
+| `log.sh` | colors, glyphs, rail + flat status helpers | chezup, bootstrap-auth, wizard, doctor, macos-defaults, clean |
 | `chezmoi-data.sh` | `cm_data_json/string/bool`, `cm_has_module` | doctor, wizard, bootstrap-auth |
 | `tty.sh` | `tty_reattach` (stdin → controlling terminal) | `run_before_00`, `run_after_02`, `run_onchange_after_04` |
 | `sudo.sh` | `sudo_keep_warm` (background sudo-timestamp refresh) | `run_before_00`, macos-defaults |
@@ -92,8 +92,8 @@ The everyday scripts share the tiny logging library `log.sh`:
   `fail`/`dim`/`hr` plus `line_prefix`/`node_prefix`); inits colors + glyphs
   first.
 - `ui_init_status` — the flat status helpers (`s_pass`/`s_warn`/`s_note`/
-  `s_fail`/`s_info`/`s_section`) for the report-style scripts (`doctor`,
-  `setup-ollama`); inits colors + glyphs first.
+  `s_fail`/`s_info`/`s_section`) for the report-style scripts (`doctor`);
+  inits colors + glyphs first.
 
 `scripts/ci/check-commit-msg.sh` (the Conventional-Commit subject validator
 run by the commit-msg pre-commit hook) is an executed check, not a sourced
