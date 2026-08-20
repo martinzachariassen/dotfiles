@@ -254,3 +254,51 @@ EOF
     echo "$output" | grep -qE '^ *4\. chezsign'
     echo "$output" | grep -qE '^ *5\. chezxcode'
 }
+
+# The completion step's wording is the only thing that tells you *which* piece is
+# missing, and the three states have three different fixes. A single "run
+# chezxcode" for all of them would be a regression the earlier tests can't see.
+
+# _completion_says MODULES DEVDIR HAS_APP HAS_RUNTIME — render the hook, stub the
+# probes to describe that machine, run it, leave output in $output.
+_completion_says() {
+    _stub_config "$1"
+    _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl" \
+        > "$BATS_TEST_TMPDIR/c.sh"
+    cat > "$BATS_TEST_TMPDIR/fake.sh" <<EOF
+xcode_app_path() { [ "$3" = 1 ] && { echo /Applications/Xcode.app; return 0; }; return 1; }
+xcode_selected_is_full() { case "$2" in */Xcode*.app/Contents/Developer) return 0 ;; esac; return 1; }
+xcode_has_ios_runtime() { [ "$4" = 1 ]; }
+EOF
+    sed -i.bak "s|\. \".*/scripts/lib/xcode.sh\"|. \"$BATS_TEST_TMPDIR/fake.sh\"|" \
+        "$BATS_TEST_TMPDIR/c.sh"
+    run bash "$BATS_TEST_TMPDIR/c.sh"
+    [ "$status" -eq 0 ]
+}
+
+@test "completion step: no Xcode at all says so" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _completion_says '["appleDev"]' /Library/Developer/CommandLineTools 0 0
+    [[ "$output" == *"No Xcode is installed"* ]]
+}
+
+@test "completion step: Xcode present but CLT selected names the toolchain" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _completion_says '["appleDev"]' /Library/Developer/CommandLineTools 1 0
+    [[ "$output" == *"Command Line Tools are still the active toolchain"* ]]
+    [[ "$output" != *"No Xcode is installed"* ]]
+}
+
+@test "completion step: only the runtime missing names the runtime" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _completion_says '["appleDev"]' /Applications/Xcode.app/Contents/Developer 1 0
+    [[ "$output" == *"No iOS simulator runtime is downloaded"* ]]
+    [[ "$output" != *"active toolchain"* ]]
+}
+
+# A ready machine must not be nagged — the step disappears entirely.
+@test "completion step: a ready machine gets no chezxcode step" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    _completion_says '["appleDev"]' /Applications/Xcode.app/Contents/Developer 1 1
+    no_match_in "$output" 'chezxcode'
+}

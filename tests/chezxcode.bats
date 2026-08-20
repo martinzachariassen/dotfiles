@@ -188,3 +188,148 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"only exists on macOS"* ]]
 }
+
+# ─── The real run: a stateful fake of the whole Xcode layer ─────────────────────
+# Everything above proves chezxcode does NOT act. These prove it acts correctly
+# when it should. The stubs below are a small state machine — `xcodes install`
+# creates the app, `-license accept` clears the licence gate, `-downloadPlatform`
+# registers a runtime — so a second run genuinely observes the first run's
+# effects, which is the only honest way to test the "idempotent, safe to re-run"
+# claim. Each stub appends to $CALLS, so order is assertable too.
+
+_stateful_stubs() {
+    STATE="$BATS_TEST_TMPDIR/state"
+    CALLS="$BATS_TEST_TMPDIR/calls"
+    mkdir -p "$STATE"
+    : >"$CALLS"
+    echo "${1:-/Library/Developer/CommandLineTools}" >"$STATE/devdir"
+
+    cat >"$STUBS/xcode-select" <<EOF
+#!/usr/bin/env bash
+case "\$1" in
+    -p) cat "$STATE/devdir" ;;
+    -s) printf 'xcode-select -s %s\n' "\$2" >>"$CALLS"; printf '%s\n' "\$2" >"$STATE/devdir" ;;
+esac
+EOF
+    cat >"$STUBS/xcodebuild" <<EOF
+#!/usr/bin/env bash
+case "\$1" in
+    -version)
+        [ -d "$APPS/Xcode.app" ] || { echo "requires Xcode" >&2; exit 1; }
+        [ -f "$STATE/licensed" ] || {
+            echo "You have not agreed to the Xcode license agreements." >&2; exit 69; }
+        echo "Xcode 26.6" ;;
+    -license)
+        printf 'xcodebuild -license %s\n' "\$2" >>"$CALLS"
+        [ "\$2" = accept ] && touch "$STATE/licensed" ;;
+    # Explicit exit: the trailing `exit 0` below would otherwise swallow the
+    # test's result and report first-launch as always done.
+    -checkFirstLaunchStatus) [ -f "$STATE/firstlaunch" ] || exit 1 ;;
+    -runFirstLaunch)
+        printf 'xcodebuild -runFirstLaunch\n' >>"$CALLS"; touch "$STATE/firstlaunch" ;;
+    -showsdks)
+        case "\$(cat "$STATE/devdir")" in
+            */Xcode*.app/Contents/Developer) echo "  Simulator - iOS 26.5  -sdk iphonesimulator26.5" ;;
+            *) echo "  macOS 26.5  -sdk macosx26.5" ;;
+        esac ;;
+    -downloadPlatform)
+        printf 'xcodebuild -downloadPlatform %s\n' "\$2" >>"$CALLS"; touch "$STATE/runtime" ;;
+esac
+exit 0
+EOF
+    cat >"$STUBS/xcrun" <<EOF
+#!/usr/bin/env bash
+echo "== Runtimes =="
+[ -f "$STATE/runtime" ] &&
+    echo "iOS 26.5 (26.5 - 23F79) - com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+exit 0
+EOF
+    # --select is what makes step 2 a no-op on the common path; honour it.
+    cat >"$STUBS/xcodes" <<EOF
+#!/usr/bin/env bash
+printf 'xcodes %s\n' "\$*" >>"$CALLS"
+mkdir -p "$APPS/Xcode.app"
+case "\$*" in *--select*) printf '%s\n' "$APPS/Xcode.app/Contents/Developer" >"$STATE/devdir" ;; esac
+EOF
+    # sudo runs the real (stubbed) command, so privileged steps mutate state.
+    cat >"$STUBS/sudo" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in -v | -n) exit 0 ;; esac
+exec "$@"
+EOF
+    chmod +x "$STUBS"/*
+    export XCODE_APPS_DIR="$APPS"
+}
+
+@test "a full run drives all five steps in order and ends ready" {
+    _stateful_stubs
+    run env YES=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ready to build and run iOS apps"* ]]
+
+    # Order matters: selecting before installing, or downloading a runtime
+    # before first-launch, both fail on a real machine.
+    run cat "$CALLS"
+    [[ "${lines[0]}" == "xcodes install --latest --select --experimental-unxip" ]]
+    [[ "${lines[1]}" == "xcodebuild -license accept" ]]
+    [[ "${lines[2]}" == "xcodebuild -runFirstLaunch" ]]
+    [[ "${lines[3]}" == "xcodebuild -downloadPlatform iOS" ]]
+    [ "${#lines[@]}" -eq 4 ]
+}
+
+# The claim in the script header is "idempotent; safe to re-run". This is what
+# that has to mean: a second run does no work at all.
+@test "re-running a ready machine invokes nothing" {
+    _stateful_stubs
+    env YES=1 bash "$SCRIPT" </dev/null >/dev/null
+    : >"$CALLS"
+
+    run env YES=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already ready"* ]]
+    [ ! -s "$CALLS" ]
+}
+
+# Xcode installed by some other route (App Store, restored image) leaves the CLT
+# selected — step 1 must no-op while step 2 does the repair.
+@test "Xcode present but CLT selected: step 2 repairs the selection" {
+    _stateful_stubs
+    mkdir -p "$APPS/Xcode.app" # present, but devdir still points at the CLT
+
+    run env YES=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    run cat "$CALLS"
+    [[ "$output" != *"xcodes install"* ]]
+    [[ "${lines[0]}" == "xcode-select -s $APPS/Xcode.app/Contents/Developer" ]]
+}
+
+@test "XCODE_VERSION pins the version instead of --latest" {
+    _stateful_stubs
+    run env YES=1 XCODE_VERSION=26.6 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    grep -qF -- "xcodes install 26.6 --select --experimental-unxip" "$CALLS"
+    ! grep -qF -- "--latest" "$CALLS"
+}
+
+@test "SKIP_RUNTIME=1 does everything except the runtime download" {
+    _stateful_stubs
+    run env YES=1 SKIP_RUNTIME=1 bash "$SCRIPT" </dev/null
+    grep -qF "xcodes install" "$CALLS"
+    grep -qF "xcodebuild -runFirstLaunch" "$CALLS"
+    ! grep -qF "downloadPlatform" "$CALLS"
+    # Still not "ready" — and it must say so rather than claim success.
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not ready yet"* ]]
+}
+
+# The licence step is skipped when xcodebuild already runs clean; accepting it
+# again is harmless but a wasted sudo call, and it would mask a real failure.
+@test "an already-licensed Xcode is not re-licensed" {
+    _stateful_stubs "$BATS_TEST_TMPDIR/Applications/Xcode.app/Contents/Developer"
+    mkdir -p "$APPS/Xcode.app"
+    touch "$STATE/licensed"
+
+    run env YES=1 bash "$SCRIPT" </dev/null
+    [ "$status" -eq 0 ]
+    ! grep -qF -- "-license" "$CALLS"
+}

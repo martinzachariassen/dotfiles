@@ -97,8 +97,10 @@ _render_storecode_body() { # $1 = fake HOME
     local keephome e
     keephome="$(_render_str '{{ range .cleanup.keepHome }}{{ . }}{{ "\n" }}{{ end }}')"
     # .config stays whole here (children reconciled separately vs keepConfig);
-    # .ssh holds keys; .storecode is installed by 05-storecode.
-    for e in .storecode .config .ssh; do
+    # .ssh holds keys; .storecode is installed by 05-storecode; .swiftpm is
+    # SwiftPM state with no `swiftpm` binary for the stem heuristic to match, so
+    # without the pin chezclean offers to delete it on every appleDev machine.
+    for e in .storecode .config .ssh .swiftpm; do
         grep -qxF "$e" <<<"$keephome" || {
             echo "keepHome missing required entry: $e"
             return 1
