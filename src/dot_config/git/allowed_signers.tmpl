@@ -1,4 +1,6 @@
 {{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
-{{- if and (ne $signingMode "off") .email .signingKey -}}
-{{ .email }} {{ .signingKey }}
+{{/* dig: the email key is absent entirely when setup was left blank. */ -}}
+{{- $email := dig "email" "" . -}}
+{{- if and (ne $signingMode "off") $email .signingKey -}}
+{{ $email }} {{ .signingKey }}
 {{- end }}

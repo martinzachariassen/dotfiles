@@ -169,6 +169,23 @@ else
     SIGNING_MODE=""
 fi
 
+# ─── Commit author ───────────────────────────────────────────────────────────
+# Checked before signing, because an unsigned commit is a preference and an
+# unattributed one is a mistake. Setup allows a blank email (the address is
+# usually a GitHub noreply nobody remembers on install day) — this is what makes
+# that state visible rather than silent.
+section "Commit author"
+git_email="$(git config --global user.email 2>/dev/null || true)"
+git_name="$(git config --global user.name 2>/dev/null || true)"
+if [ -n "$git_email" ]; then
+    pass "git author: ${git_name:-?} <$git_email>"
+elif [ "$(git config --global user.useConfigOnly 2>/dev/null || true)" = "true" ]; then
+    fail "no git email set — commits are blocked. Run \`chezsetup\` to add one"
+    note "GitHub noreply address: github.com → Settings → Emails"
+else
+    fail "no git email set, and nothing stops git inventing one — run \`chezsetup\`"
+fi
+
 section "Git signing (${SIGNING_MODE:-1password})"
 SSH_SIGN="${GIT_SIGNING_SSH_SIGN:-}"
 if [ "$SIGNING_MODE" = "off" ]; then

@@ -81,6 +81,15 @@ chezsign                # set only the git signing key; keeps every other answer
 chezxcode               # install Xcode + the iOS simulator runtime (appleDev only)
 ```
 
+**Left the email blank during setup?** `chezsetup` is the fix — it re-asks that
+one question and keeps every other answer. A blank email is not stored as an
+answer, so it stays "unanswered" until you fill it in, and until then
+`~/.config/git/config` carries `user.useConfigOnly = true` so git *refuses* to
+commit rather than authoring one as `Your Name <>` (unattributable on GitHub,
+and undoable only by rewriting history). `chezdoctor` reports it, and the
+apply's closing summary lists it as a numbered next move. Your GitHub noreply
+address is at github.com → Settings → Emails.
+
 The default mode runs plain `chezmoi init`, which — via chezmoi's
 `prompt*Once` functions — keeps every answer you've given and only asks for
 setup keys still blank. So it fills in newly added questions but never lets you

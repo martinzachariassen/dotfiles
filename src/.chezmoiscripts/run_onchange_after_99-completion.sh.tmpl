@@ -7,6 +7,7 @@ set -euo pipefail
 PROFILE="{{ .profile }}"
 SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
+EMAIL="{{ dig "email" "" . }}"
 SIGNKEY="{{ dig "signingKey" "" . }}"
 
 EXTRAS=""
@@ -39,6 +40,18 @@ add_step() {
 ${1}"
     NEXT=$((NEXT + 1))
 }
+
+# Setup allows a blank email — the address is usually a GitHub noreply nobody
+# has memorised on install day. Say so here, because the consequence (git
+# refusing to commit) otherwise turns up much later, in an unrelated repo.
+if [ -z "$EMAIL" ]; then
+    add_step "    ${M}${NEXT}.${R} ${C}chezsetup${R}
+       ${Y}No git email is set${R} — git will refuse to commit until there is one.
+       Better than the alternative: an empty address authors every commit as
+       \"<>\", which GitHub cannot attribute and only a rewrite undoes.
+       chezsetup re-asks just this question. Your noreply address is at
+       github.com → Settings → Emails."
+fi
 
 # Setup can defer the signing key: on a fresh Mac it's still locked in 1Password,
 # which Homebrew only just installed. Surface the one-shot fix rather than
