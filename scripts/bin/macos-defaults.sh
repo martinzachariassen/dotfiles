@@ -30,7 +30,14 @@ explain \
 if ! sudo -n true 2>/dev/null; then
     sleep 0.2
 fi
-sudo -v -p "[macos-defaults] sudo password: "
+# Never fatal: run_before_00-sudo-cache is allowed to give up on caching sudo,
+# so arriving here without a warm timestamp is a supported state. Under `set -e`
+# a bare `sudo -v` would kill the hook, abort the whole apply, and take the
+# completion summary with it.
+if ! sudo -v -p "[macos-defaults] sudo password: "; then
+    s_warn "no sudo — skipping macOS defaults. Re-run later with: macos-defaults"
+    exit 0
+fi
 
 # Keep sudo alive for the rest of this script — unless a chezmoi apply already
 # has run_before_00-sudo-cache's keeper running for the whole apply lifetime

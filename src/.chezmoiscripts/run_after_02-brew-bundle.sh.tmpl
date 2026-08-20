@@ -20,7 +20,15 @@ exit 0
 ui_init_logging
 tty_reattach || warn "no terminal available; casks needing sudo may ask later"
 
-eval "$(/opt/homebrew/bin/brew shellenv)"
+# Guarded like every sibling hook: this file is `set -uo pipefail` (no -e), so a
+# bare eval on a machine without /opt/homebrew would print a raw "No such file"
+# and then march on into brew commands that don't exist.
+if [ -x /opt/homebrew/bin/brew ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif ! command -v brew >/dev/null 2>&1; then
+    warn "brew not found — skipping packages (expected /opt/homebrew on Apple Silicon)"
+    exit 0
+fi
 
 {{ $modules := dig "modules" (list) . -}}
 FILES=(

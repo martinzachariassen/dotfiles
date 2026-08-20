@@ -4,6 +4,13 @@
 # keyed on the hash below re-fires only when the hook set changes.
 #
 # pre-commit config hash: {{ include "../.pre-commit-config.yaml" | sha256sum }}
+#
+# The presence marker below is part of the hash on purpose. This hook exits 0
+# when pre-commit is missing (hook 02 hadn't installed it yet, or its bundle
+# failed), and chezmoi records a clean exit as "done" — so without a marker that
+# flips when the tool appears, a single failed bundle would silently leave the
+# repo with no git hooks forever.
+# pre-commit binary: {{ if lookPath "pre-commit" }}present{{ else }}absent{{ end }}
 
 set -euo pipefail
 
@@ -20,7 +27,8 @@ fi
 echo "▶ pre-commit hooks"
 
 if ! command -v pre-commit >/dev/null 2>&1; then
-    echo "  ! pre-commit not on PATH — skipping (run \`chezup\` after brew bundle installs it)"
+    echo "  ! pre-commit not on PATH — skipping; re-runs automatically on the next"
+    echo "    \`chezup\`/\`chezapply\` once brew bundle has installed it"
     exit 0
 fi
 

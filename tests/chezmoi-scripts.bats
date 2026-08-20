@@ -151,3 +151,53 @@ _render_template() {
         fi
     done
 }
+
+# ─── run_onchange hooks must be able to recover from a partial install ──────
+# chezmoi records a run_onchange script as done on ANY zero exit — including the
+# "tool isn't installed yet, skipping" path. Keyed only on a static manifest
+# hash, such a hook would never re-fire, so one failed brew bundle would leave a
+# machine permanently without git hooks or VS Code extensions. Each hook that
+# skips on a missing tool must fold that tool's presence into its own hash.
+
+@test "hooks that skip on a missing tool key their hash on the tool's presence" {
+    # hook → the command whose absence makes it skip
+    for pair in \
+        "run_onchange_after_02e-pre-commit-install.sh.tmpl:pre-commit" \
+        "run_onchange_after_03-vscode.sh.tmpl:code"; do
+        tmpl="$SCRIPTS_DIR/${pair%%:*}"
+        cmd="${pair##*:}"
+        [ -f "$tmpl" ] || { echo "missing hook: $tmpl"; return 1; }
+        grep -qF "lookPath \"$cmd\"" "$tmpl" || {
+            echo "$(basename "$tmpl") skips when '$cmd' is absent but does not"
+            echo "include {{ lookPath \"$cmd\" }} in its hash — it can never re-fire."
+            return 1
+        }
+    done
+}
+
+@test "the presence marker flips between absent and present" {
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    # A marker that renders the same either way would not change the hash.
+    run chezmoi execute-template '{{ if lookPath "definitely-not-a-real-tool" }}present{{ else }}absent{{ end }}'
+    [ "$status" -eq 0 ]
+    [ "$output" = "absent" ]
+    run chezmoi execute-template '{{ if lookPath "sh" }}present{{ else }}absent{{ end }}'
+    [ "$status" -eq 0 ]
+    [ "$output" = "present" ]
+}
+
+# ─── Nothing may abort the apply before the completion summary ──────────────
+# 99-completion prints the "Next moves" block (chezsign, bootstrap-auth,
+# chezdoctor) that a fresh Mac depends on. A hook that exits non-zero takes
+# chezmoi's whole apply down with it and the user never sees those steps.
+
+@test "the macOS-defaults hook cannot abort the apply" {
+    tmpl="$SCRIPTS_DIR/run_onchange_after_04-macos-defaults.sh.tmpl"
+    # set -e is on, so the invocation must be inside a condition, not bare.
+    grep -qE 'if .*macos-defaults\.sh"?; then' "$tmpl" || {
+        echo "macos-defaults.sh is invoked bare under set -e — a failed defaults"
+        echo "pass would abort the apply and skip 05-storecode and 99-completion."
+        return 1
+    }
+    grep -qF 'did not complete' "$tmpl"
+}

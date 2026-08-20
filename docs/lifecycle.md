@@ -13,13 +13,17 @@ hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level tooling
 ## The stages
 
 `chezmoi apply` renders the managed files into `$HOME`, then runs the scripts in
-[`src/.chezmoiscripts/`](../src/.chezmoiscripts). chezmoi sorts scripts
-alphabetically by full filename, so the `when` bucket (`before`, `after`,
-`once_before`, `onchange_after`) always determines order first — the
-two-digit `NN` only orders scripts *within the same bucket* (e.g. `run_after_02`
-→ `run_after_02b`). A `run_after_*` script always runs before every
-`run_onchange_after_*` script regardless of NN, even though today's numbering
-(`02`/`02b` vs. `02e`/`03`/`04`/`05`/`99`) reads like one continuous sequence.
+[`src/.chezmoiscripts/`](../src/.chezmoiscripts). chezmoi splits them into
+`before` and `after` passes, and **within a pass it sorts by *target* name —
+the filename with its `run_`/`once_`/`onchange_` attributes stripped.** So it is
+the two-digit `NN` alone that orders `02-brew-bundle` → `02b-mise-install` →
+`02e-pre-commit-install` → `03-vscode` → `04-macos-defaults` → `05-storecode`
+→ `99-completion`; `run_after_*` and `run_onchange_after_*` interleave freely.
+Confirm with `chezmoi status`, which prints the stripped target names.
+
+That matters when adding a hook: the "the tool exists by now" assumption in
+`02e`/`03`/`05` holds only because their `NN` is greater than brew-bundle's.
+A new `run_onchange_after_01-*` would land *before* it.
 
 | Prefix | When it runs |
 |---|---|

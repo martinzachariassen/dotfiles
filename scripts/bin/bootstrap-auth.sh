@@ -194,10 +194,20 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
     fi
 fi
 
-if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
+# The smoke test is specific to signingMode = 1password. Under `ssh-key` or
+# `off` the git config it asserts is deliberately absent, so running it there
+# reports a wall of failures for a correctly configured machine.
+signing_mode=""
+if command -v cm_data_json >/dev/null 2>&1; then
+    signing_mode="$(cm_data_string "$(cm_data_json)" "signingMode")"
+fi
+if [ "${SKIP_SIGNTEST:-0}" != "1" ] && [ "$signing_mode" != "off" ] && [ "$signing_mode" != "ssh-key" ]; then
     step "Git signing smoke test" "Verifies op-ssh-sign + 1Password agent + your git config all line up."
-    SSH_SIGN="$GIT_SIGNING_SSH_SIGN"
-    if [ ! -x "$SSH_SIGN" ]; then
+    # git-signing.sh is sourced conditionally above; `set -u` would abort here.
+    SSH_SIGN="${GIT_SIGNING_SSH_SIGN:-}"
+    if [ -z "$SSH_SIGN" ]; then
+        warn "scripts/lib/git-signing.sh not readable - skipping the smoke test"
+    elif [ ! -x "$SSH_SIGN" ]; then
         fail "op-ssh-sign missing - install/launch 1Password and enable the SSH agent"
     elif [ -z "$(git config --global user.signingkey 2>/dev/null)" ]; then
         warn "no signing key in git config - re-run this script and paste the 1Password public key"

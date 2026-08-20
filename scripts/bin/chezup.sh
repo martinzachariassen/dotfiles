@@ -54,20 +54,42 @@ if ! command -v chezmoi >/dev/null 2>&1; then
     fail "chezmoi is not on PATH — run install.sh, or brew install chezmoi"
     exit 1
 fi
+# Two questions, not one: managed files can be perfectly in sync while apply
+# hooks (brew bundle, mise, VS Code, macOS defaults) still have work to do —
+# a partial install leaves no file drift at all. Gating only on file drift is
+# what used to make chezup a no-op exactly when a retry was needed.
 pending="$(chezmoi status --exclude scripts 2>/dev/null || true)"
-if [ -z "$pending" ]; then
-    ok "already in sync — no managed files drifted"
+hooks="$(chezmoi status --include scripts 2>/dev/null || true)"
+count=0
+[ -n "$pending" ] && count="$(printf '%s\n' "$pending" | grep -c .)"
+hook_count=0
+[ -n "$hooks" ] && hook_count="$(printf '%s\n' "$hooks" | grep -c .)"
+
+if [ "$count" -eq 0 ] && [ "$hook_count" -eq 0 ]; then
+    ok "already in sync — no managed files drifted, no hooks pending"
     exit 0
 fi
-count="$(printf '%s\n' "$pending" | grep -c .)"
-info "$count managed file(s) drifted (A add · M modify · D remove):"
-printf '%s\n' "$pending" | while IFS= read -r line; do
-    [ -n "$line" ] && dim "    $line"
-done
+if [ "$count" -gt 0 ]; then
+    info "$count managed file(s) drifted (A add · M modify · D remove):"
+    printf '%s\n' "$pending" | while IFS= read -r line; do
+        [ -n "$line" ] && dim "    $line"
+    done
+else
+    ok "no managed files drifted"
+fi
+if [ "$hook_count" -gt 0 ]; then
+    info "$hook_count apply hook(s) pending (packages, runtimes, extensions, defaults)"
+    explain "Hooks are idempotent — a re-run installs only what is still missing."
+fi
 
 # ─── 3. Apply (single confirm gate) ──────────────────────────────────────────
 if [ "$ASSUME_YES" != "1" ] && [ -r /dev/tty ]; then
-    printf '%s  Apply these %s change(s)? [Y/n] ' "$(line_prefix)" "$count" >/dev/tty
+    if [ "$count" -gt 0 ]; then
+        gate="Apply these $count change(s)? [Y/n] "
+    else
+        gate="Run the $hook_count pending hook(s)? [Y/n] "
+    fi
+    printf '%s  %s' "$(line_prefix)" "$gate" >/dev/tty
     IFS= read -r reply </dev/tty || reply=""
     case "$reply" in
         n | N | no | NO)

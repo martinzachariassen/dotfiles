@@ -207,6 +207,11 @@ step "Dotfiles repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
     step_ok "already cloned — $SOURCE_DIR"
 else
+    # A non-empty, non-git directory here would make `git clone` die with a raw
+    # error under `set -e`. Say what's wrong instead.
+    if [ -d "$SOURCE_DIR" ] && [ -n "$(ls -A "$SOURCE_DIR" 2>/dev/null)" ]; then
+        die "$SOURCE_DIR exists but is not a git checkout — move it aside, or set DOTFILES_DIR."
+    fi
     explain "Your config lives here from now on; edit it, then run \`chezup\`."
     info "cloning into $SOURCE_DIR"
     mkdir -p "$(dirname "$SOURCE_DIR")"

@@ -32,6 +32,11 @@ fi
 
 # run_before_00-sudo-cache already keeps sudo warm for this whole apply; tell
 # macos-defaults.sh so it doesn't spawn a second, redundant keeper.
-DOTFILES_SUDO_KEPT_WARM=1 bash "{{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"
-
-echo "✓ macOS defaults applied"
+# `|| :` on purpose: hooks 05 and 99 run after this one, and 99 prints the
+# "Next moves" block (chezsign, bootstrap-auth, chezdoctor) a fresh Mac depends
+# on. A defaults pass that fails must never cost the user those instructions.
+if DOTFILES_SUDO_KEPT_WARM=1 bash "{{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"; then
+    echo "✓ macOS defaults applied"
+else
+    echo "! macOS defaults did not complete — re-run with: macos-defaults"
+fi

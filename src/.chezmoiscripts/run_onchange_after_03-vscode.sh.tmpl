@@ -3,6 +3,12 @@
 # uninstalls untracked). Re-runs when this script or the manifest changes.
 #
 # Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
+#
+# The presence marker below is part of the hash on purpose — see the same note in
+# run_onchange_after_02e. Skipping on a missing `code` CLI still exits 0, which
+# chezmoi records as done; the marker is what makes the hook re-fire once hook 02
+# has actually installed VS Code.
+# VS Code CLI: {{ if lookPath "code" }}present{{ else }}absent{{ end }}
 
 set -euo pipefail
 
@@ -24,7 +30,8 @@ EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
 . "$ROOT/scripts/lib/vscode.sh"
 
 if ! command -v code >/dev/null 2>&1; then
-    echo "! VS Code CLI not found; extension sync skipped"
+    echo "! VS Code CLI not found; extension sync skipped — re-runs automatically"
+    echo "  on the next \`chezup\`/\`chezapply\` once brew bundle has installed it"
     exit 0
 fi
 
