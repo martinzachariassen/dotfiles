@@ -60,7 +60,10 @@ xcodes_bootstrap() {
         return 1
     }
 
-    tmp="$(mktemp -d -t xcodesdl 2>/dev/null || return 1)"
+    # Bare `mktemp -d`, not `-t <prefix>`: that form is BSD-only. GNU coreutils
+    # treats the argument as a template and rejects it for having no X's, so on
+    # Linux this returned 1 before anything was downloaded.
+    tmp="$(mktemp -d)" || return 1
     zip="$tmp/xcodes.zip"
     # Clean up on every exit path, including the failures below.
     trap 'rm -rf "$tmp" 2>/dev/null || true' RETURN
@@ -72,8 +75,14 @@ xcodes_bootstrap() {
 
     # Verify before unzipping: an unverified archive is never expanded, let
     # alone made executable.
+    # shasum on macOS, sha256sum on most Linux. If neither exists `got` stays
+    # empty and the comparison below fails closed — never silently passes.
     local got
-    got="$(shasum -a 256 "$zip" 2>/dev/null | awk '{print $1}')"
+    if command -v shasum >/dev/null 2>&1; then
+        got="$(shasum -a 256 "$zip" 2>/dev/null | awk '{print $1}')"
+    else
+        got="$(sha256sum "$zip" 2>/dev/null | awk '{print $1}')"
+    fi
     if [ "$got" != "$sha" ]; then
         printf 'xcodes: checksum mismatch for %s\n  expected %s\n  got      %s\n' \
             "$url" "$sha" "${got:-<none>}" >&2
