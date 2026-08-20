@@ -1,0 +1,22 @@
+# xcodes — the CLI that installs Xcode.app, used by `chezxcode` and nothing else.
+#
+# Deliberately NOT a Brewfile entry. The `xcodesorg/made` tap ships a
+# source-build formula whose only bottles are tagged `arm64_mojave`/`mojave`,
+# which are not in any modern Apple Silicon bottle-fallback chain. So Homebrew
+# builds it from source, and that build needs `xcbuild` from a full Xcode.app:
+#
+#   error: xcbuild executable at '/Library/Developer/SharedFrameworks/
+#          XCBuild.framework/Versions/A/Support/xcbuild' does not exist
+#
+# Which is the circle — `xcodes` is the thing that installs Xcode.app. On a
+# fresh Mac with only the Command Line Tools it can never build, so the
+# `appleDev` Brewfile failed on every clean install. Upstream ships a signed,
+# universal prebuilt binary for exactly this case; `chezxcode` fetches that on
+# demand instead. See scripts/lib/xcodes.sh.
+
+[xcodes]
+version = "2.0.3"
+# github.com/XcodesOrg/xcodes/releases/download/<version>/xcodes.zip
+url = "https://github.com/XcodesOrg/xcodes/releases/download/2.0.3/xcodes.zip"
+# shasum -a 256 xcodes.zip — verified before anything is unzipped or run.
+sha256 = "9ccb3398dc72aca17174b705ee1657c69747fec25663fc85d2dffb8702ff37aa"

@@ -62,7 +62,7 @@ gate on membership with sprig `has`, e.g.
 | `theme` | Catppuccin Mocha across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
-| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcodes, xcbeautify, fastlane, SF Symbols). On by default for `personal`. Installs the *tooling* only — Xcode.app, its licence and an iOS simulator runtime come from [`chezxcode`](commands.md#advanced--occasional-helpers), which needs an Apple ID and so can't run during an apply. |
+| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcbeautify, fastlane, SF Symbols). On by default for `personal`. Installs the *tooling* only — Xcode.app, its licence and an iOS simulator runtime come from [`chezxcode`](commands.md#advanced--occasional-helpers), which needs an Apple ID and so can't run during an apply. The `xcodes` CLI is **not** a Brewfile entry: the only tap formula builds from source and that build needs a full Xcode.app, which is the thing it exists to install, so it could never succeed on a fresh Mac. `chezxcode` fetches upstream's signed prebuilt binary into `~/.local/bin` instead, verified against the sha256 pinned in [`src/.chezmoidata/xcodes.toml`](../src/.chezmoidata/xcodes.toml). |
 
 The per-profile defaults the wizard pre-checks live in the `[profileDefaults]`
 table of `modules.toml`. That table **must** mirror the `$defaults` blocks in

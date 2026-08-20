@@ -34,6 +34,8 @@ fi
 . "$_DIR/../lib/sudo.sh"
 # shellcheck source=../lib/xcode.sh
 . "$_DIR/../lib/xcode.sh"
+# shellcheck source=../lib/xcodes.sh
+. "$_DIR/../lib/xcodes.sh"
 
 usage() {
     echo "usage: chezxcode [--check]"
@@ -194,9 +196,6 @@ step_begin "Xcode.app"
 XCODE_APP="$(xcode_app_path || true)"
 if [ -n "$XCODE_APP" ]; then
     step_ok "already installed — $XCODE_APP"
-elif ! command -v xcodes >/dev/null 2>&1; then
-    step_fail "xcodes is not on PATH — the appleDev module installs it; run \`chezup\` first."
-    exit 1
 else
     explain \
         "xcodes downloads Xcode from Apple, so it needs your Apple ID and a 2FA" \
@@ -205,6 +204,22 @@ else
     if ! confirm "Download and install Xcode ${XCODE_VERSION:-(latest)} (~40 GB)?"; then
         info "skipped — re-run chezxcode when you're ready."
         exit 0
+    fi
+    # Only now that the big download is consented to: `xcodes` itself can't come
+    # from Homebrew — its formula builds from source and that build needs a full
+    # Xcode.app, the very thing we're here to install. Fetch the upstream
+    # prebuilt binary instead. See lib/xcodes.sh for the whole story.
+    if ! xcodes_installed; then
+        if [ "$DRY_RUN" = "1" ]; then
+            dim "dry-run \$ install the xcodes CLI into $XCODES_BIN_DIR"
+        else
+            info "installing the xcodes CLI (not available as a working Homebrew bottle)"
+            if ! xcodes_bootstrap; then
+                step_fail "could not install the xcodes CLI — see the error above."
+                exit 1
+            fi
+            ok "xcodes $(xcodes version 2>/dev/null || true) — $XCODES_BIN_DIR/xcodes"
+        fi
     fi
     # --select lets xcodes point xcode-select at what it just installed; step 2
     # still runs, as the safety net for an Xcode that arrived some other way.
