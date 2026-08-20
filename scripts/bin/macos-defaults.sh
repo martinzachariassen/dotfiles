@@ -29,12 +29,17 @@ explain \
 # sleep works around a first-keystroke-eaten TTY race on GPU terminals.
 if ! sudo -n true 2>/dev/null; then
     sleep 0.2
+    # Only when the ticket really has lapsed. The apply promises the password is
+    # needed once, so a second ask needs a reason attached — otherwise it reads
+    # as a bare, unexplained prompt appearing minutes into an install.
+    s_info "the earlier admin session expired — macOS settings need it once more"
+    s_info "nothing appears as you type; Touch ID works here too"
 fi
 # Never fatal: run_before_00-sudo-cache is allowed to give up on caching sudo,
 # so arriving here without a warm timestamp is a supported state. Under `set -e`
 # a bare `sudo -v` would kill the hook, abort the whole apply, and take the
 # completion summary with it.
-if ! sudo -v -p "[macos-defaults] sudo password: "; then
+if ! sudo -v -p "  macOS password for %u: "; then
     s_warn "no sudo — skipping macOS defaults. Re-run later with: macos-defaults"
     exit 0
 fi
