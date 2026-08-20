@@ -20,7 +20,7 @@
   "effortLevel": "high",
   "theme": "dark-ansi",
   "verbose": false,
-  "model": "claude-fable-5",
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "~/.config/claude/statusline.sh",
