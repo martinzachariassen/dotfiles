@@ -1,45 +1,69 @@
 # dotfiles
 
-One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, managed by [chezmoi](https://chezmoi.io).
+One command turns a fresh Apple Silicon Mac into a working backend/iOS workstation — shell, terminal, editors, runtimes, apps and macOS defaults — managed by [chezmoi](https://chezmoi.io).
 
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 ![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Mocha](assets/banner.png)
 
-**Status:** Personal, single-machine setup. Actively maintained, applied to my Mac most weeks.
-
-## Why
-
-- **One command, idempotent.** [`install.sh`](install.sh) takes a fresh or legacy Mac from zero — Xcode CLT → Homebrew → this repo → every package → macOS defaults — and every step is safe to re-run.
-- **Convergent, not scripted.** `chezmoi apply` reconciles *real installed state* against the repo on every run, rather than replaying a one-shot setup script.
-- **Additive by contract.** An apply only ever installs what the Brewfiles declare; it never uninstalls. Removal is a separate, confirm-gated verb (`chezmirror`/`chezclean`) you run by hand — see [docs/lifecycle.md](docs/lifecycle.md).
-- **What this isn't.** A general-purpose dotfiles framework for arbitrary machines and users. It's tuned to one person's single Apple Silicon Mac; profiles and modules exist for my own personal/work split, not for broad customization. Fork it as a starting point, but expect to swap in your own packages, theme, and macOS defaults.
-
-## Quickstart
+## Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-Works on both a fresh and an existing Mac. The installer only ever **adds** — it renders managed files, installs the Brewfiles and runs `mise install`; reconciling what the repo no longer tracks is the separate, confirm-gated [`chezmirror`/`chezclean`](docs/lifecycle.md) step. It does **not** back up pre-existing dotfiles, and the first apply replaces `~/.zshrc`, `~/.gitconfig`, `~/.bash_profile`, `~/.bashrc`, `~/.profile` and `~/.zprofile` — copy anything you want to keep out of the way first. When the plain-text wizard finishes, sign in and reload:
+That's the whole install. It works on a fresh Mac *and* on one you've been using for years, it explains each step as it goes, and it's safe to re-run — every step checks first and skips what's already done.
+
+> [!IMPORTANT]
+> **It does not back up your existing dotfiles.** The first run overwrites `~/.zshrc`, `~/.gitconfig`, `~/.bash_profile`, `~/.bashrc`, `~/.profile` and `~/.zprofile`. Copy anything you want to keep somewhere safe first.
+
+### What it does — about 15–25 minutes
+
+Almost all of it is downloading. You'll be asked for your macOS password (Homebrew first, then again later for app installs and system settings) — each prompt says why before it appears.
+
+| # | Step | |
+| --- | --- | --- |
+| 1 | Xcode Command Line Tools | Apple's compilers. Homebrew needs them. **Not Xcode itself.** |
+| 2 | Homebrew | The package manager everything else uses. |
+| 3 | chezmoi | Renders this repo into your home folder. |
+| 4 | Clone this repo | Into `~/Developer/personal/dotfiles`. |
+| 5 | Setup wizard → apply | Four questions, then it installs everything. |
+
+### The four questions
+
+Plain-text prompts, sensible defaults, and every answer is changeable later with `chezsetup`.
+
+| Question | Options | If unsure |
+| --- | --- | --- |
+| **Name + email** | for git commits | Your GitHub noreply address is fine. Don't leave the email blank — git refuses to commit without one. |
+| **Profile** | `personal` · `work` · `minimal` | `personal`. It picks which package sets you get. |
+| **Optional modules** | apps, macOS defaults, theme, JVM, Swift/iOS… | Keep the defaults for your profile. |
+| **Git commit signing** | `1password` · `ssh-key` · `off` | On a **fresh** Mac, choose to set the key **later** — it's still locked inside 1Password, which hasn't been installed yet. |
+
+### When it finishes
+
+The apply prints these for you, in order:
 
 ```sh
-open -a 1Password                                                  # skip if disabled
-bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh   # finishes git signing
-exec zsh                                                           # reload the managed shell
-chezdoctor                                                         # verify everything is healthy
-sudo shutdown -r now                                               # reboot to finish macOS defaults
+exec zsh                                                          # 1. reload the managed shell
+bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # 2. sign in to gh / cloud CLIs
+chezdoctor                                                        # 3. health-check everything
 ```
 
-From then on, staying current is one verb:
+If you deferred the signing key, open 1Password, enable its SSH agent (**Settings → Developer**), then run `chezsign` — it offers the keys the agent already holds, so there's nothing to paste. Reboot when you're done; some macOS defaults only take effect on login.
 
-```sh
-chezup    # pull latest → preview the drift → apply
-```
+## Day to day
 
-> [!NOTE]
-> The wizard replaces chezmoi's own TUI picker, which is unreliable under `curl | bash`. It asks plain-text prompts, then feeds the answers to `chezmoi init --apply` as flags. Advanced flags (`DOTFILES_REPO`, `DOTFILES_DIR`, `--promptDefaults`) are in [docs/install.md](docs/install.md#advanced-flags).
+Three verbs cover almost everything. `chezhelp` prints the rest.
+
+| Command | What it does |
+| --- | --- |
+| `chezup` | **The one you run.** Pull latest → show what will change → apply. |
+| `chezdoctor` | Read-only health check: repo, brew, auth, signing, mise, shell. Fixes nothing. |
+| `chezstatus` | Explains pending file and package drift in plain words. |
+
+**An apply only ever adds.** It renders files, installs what the Brewfiles declare, and runs `mise install` — it never uninstalls anything. Removing what the repo no longer tracks is a separate, confirm-gated step you run by hand (`chezmirror` for packages, `chezclean` for dotfiles).
 
 ## What you get
 
@@ -50,30 +74,61 @@ chezup    # pull latest → preview the drift → apply
 | Editors | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
 | Runtimes | [mise](https://mise.jdx.dev) for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml` |
-| iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols — [details](docs/packages.md#optional-modules). Xcode itself comes from `chezxcode` (Apple ID, ~40 GB), not from an apply |
+| iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols. Xcode itself comes from `chezxcode` (Apple ID, ~40 GB), not from an apply |
 | AI | Default `macApps` module: the Claude and Claude Code apps |
 | Apps | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md) |
 
-## Commands
+---
 
-Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) that delegates to a script in [`scripts/bin/`](scripts/bin). Two matter day to day; `chezhelp` prints the full list in your terminal.
+<details>
+<summary><b>Forking this for your own Mac</b></summary>
+
+This is tuned to one person's Apple Silicon Mac — the profiles and modules exist for my own personal/work split, not as a general customization framework. It forks cleanly, but expect to swap in your own choices:
+
+| Change | Where |
+| --- | --- |
+| Packages and apps | [`packages/Brewfile*`](packages/) — core, per-profile, per-module |
+| VS Code extensions | [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt) |
+| Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and per-profile defaults |
+| macOS defaults | [`scripts/bin/macos-defaults.sh`](scripts/bin/macos-defaults.sh) ([what it sets](docs/macos.md)) |
+| Repo URL in the installer | `REPO` in [`install.sh`](install.sh), or point at your fork without editing: `DOTFILES_REPO=<url> bash install.sh` |
+
+Install from a fork without touching the installer:
+
+```sh
+DOTFILES_REPO=https://github.com/you/dotfiles.git \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/you/dotfiles/main/install.sh)"
+```
+
+`DOTFILES_DIR=<path>` clones somewhere other than `~/Developer/personal/dotfiles`. Any extra argument to `install.sh` skips the wizard and forwards straight to `chezmoi init --apply` — `… | bash -s -- --promptDefaults` is the non-interactive/CI path. More in [docs/install.md](docs/install.md#advanced-flags).
+
+</details>
+
+<details>
+<summary><b>The full command set</b></summary>
+
+Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) that delegates to a script in [`scripts/bin/`](scripts/bin).
 
 | Command | What it does |
 | --- | --- |
-| `chezup` | **Converge this Mac to the repo.** Pull latest → preview the drift → apply. The one you run most. |
-| `chezdoctor` | Read-only **health check**: repo, chezmoi, brew, auth, signing, mise, shell layout. Fixes nothing. |
-| `chezsetup` | Re-run the setup wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added setup keys (default). |
-| `chezsign` | Set **only** the git signing key, keeping every other answer. For the fresh-Mac case where the key was still locked in 1Password when the wizard asked. |
-| `chezapply` / `chezstatus` | Apply without pulling, or explain pending file + package drift in plain words. Both read the same `chezmoi status`. |
-| `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. An apply never uninstalls — this is the deliberate, manual undo. |
+| `chezup` | Converge this Mac to the repo. Pull latest → preview the drift → apply. |
+| `chezdoctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout. |
+| `chezstatus` / `chezapply` | Explain pending drift, or apply without pulling. Both read the same `chezmoi status`. |
+| `chezsetup` | Re-run the wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added keys. |
+| `chezsign` | Set **only** the git signing key, replaying every other answer untouched. |
+| `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. The deliberate, manual undo an apply never does. |
 | `chezreconcile` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
+| `chezxcode` | Install Xcode.app, select it, accept the licence, fetch a simulator runtime. Needs an Apple ID; ~40 GB. |
 
-Full reference, including `DRY_RUN=1`/`YES=1` flags and what each verb touches: [docs/commands.md](docs/commands.md).
+Full reference including `DRY_RUN=1`/`YES=1` and what each verb touches: [docs/commands.md](docs/commands.md).
 
-## Architecture
+</details>
 
-`install.sh` is a tiny bootstrap fetched via `curl | bash` **before the repo exists on disk** — it installs only the prerequisites, then hands off to the setup wizard, which feeds your answers to `chezmoi init --apply`. `chezup` runs the same `chezmoi apply` on every subsequent run, which is what makes the whole system convergent rather than a one-shot script.
+<details>
+<summary><b>How it works</b></summary>
+
+`install.sh` is a tiny bootstrap fetched via `curl | bash` **before the repo exists on disk** — it installs only the prerequisites, then hands off to the setup wizard, which feeds your answers to `chezmoi init --apply`. `chezup` runs that same `chezmoi apply` every time after, which is what makes this convergent (it reconciles real installed state against the repo) rather than a one-shot script you can only run once.
 
 ```mermaid
 flowchart LR
@@ -85,11 +140,28 @@ flowchart LR
   Hooks --> Defaults[(macOS defaults)]
 ```
 
-The repo root splits into **what chezmoi deploys** (everything under `src/`, its source directory per [`.chezmoiroot`](.chezmoiroot)) and **the tooling that supports it** (everything else — `scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`, never rendered to `$HOME`). Full layout, naming conventions, and the hook stage-by-stage breakdown: [docs/architecture.md](docs/architecture.md) and [docs/lifecycle.md](docs/lifecycle.md).
+The repo root splits into **what chezmoi deploys** (everything under `src/`, its source directory per [`.chezmoiroot`](.chezmoiroot)) and **the tooling that supports it** (everything else — `scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`, never rendered to `$HOME`). The wizard is a plain-text picker because chezmoi's own raw-mode TUI is unreliable under `curl | bash`.
+
+</details>
+
+<details>
+<summary><b>Developing on it</b></summary>
+
+```sh
+shellcheck install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh   # lint shell
+bats tests/                                                               # unit tests
+pre-commit run --all-files                                                # the full local gate set
+```
+
+CI ([`ci.yml`](.github/workflows/ci.yml)) runs the same gates: `shellcheck`, `shfmt`, `typos`, config validation, the full chezmoi render matrix across profiles and modules, the bats suites, Homebrew name resolution, and Conventional Commit titles. Detail: [docs/development.md](docs/development.md).
+
+Edit sources under `src/` — never the rendered copies in `$HOME`, since every apply entry point passes `--force` and overwrites local drift. `CLAUDE.md` has the working conventions.
+
+**Contributing:** this is a personal, single-machine setup, so I'm not chasing external contributions — but issues and small PRs (typo fixes, a broken link, a genuine bug) are welcome. Run `pre-commit run --all-files` and `bats tests/` first.
+
+</details>
 
 ## Documentation
-
-Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
 
 | Doc | Covers |
 | --- | --- |
@@ -101,20 +173,6 @@ Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
 | [macos.md](docs/macos.md) | Every macOS system setting applied |
 | [development.md](docs/development.md) | Quality gates, the CI matrix, and the bats suites |
 | [shell.md](docs/shell.md) · [terminal.md](docs/terminal.md) · [editors.md](docs/editors.md) · [ai.md](docs/ai.md) | The configured environment — zsh/CLI/mise/git, Ghostty/Zellij/Starship, VS Code/Neovim, and AI tooling |
-
-## Development
-
-```sh
-shellcheck install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh   # lint shell
-bats tests/                                                               # unit tests
-pre-commit run --all-files                                                # the full local gate set
-```
-
-CI ([`ci.yml`](.github/workflows/ci.yml)) runs the same gates: `shellcheck`, `shfmt`, `typos`, config validation, the full chezmoi render matrix across profiles and modules, the bats suites, Homebrew name resolution, and Conventional Commit titles. Detail: [docs/development.md](docs/development.md).
-
-## Contributing
-
-This is a personal, single-machine setup, so I'm not chasing external contributions — but issues and small PRs (typo fixes, a broken link, a genuine bug) are welcome. Run `pre-commit run --all-files` and `bats tests/` before opening one.
 
 ## License
 
