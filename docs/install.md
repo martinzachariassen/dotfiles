@@ -58,9 +58,13 @@ else, so you never have to walk the whole wizard again just to supply a key.
 
 ### Existing Mac with an older setup
 
-Use the **same installer**. It snapshots any pre-existing legacy dotfiles into a
-timestamped backup before taking over (skip with `SKIP_BACKUP=1`), converges the
-machine, and runs the [deprecation cleanup](#cleaning-up-drift-on-an-existing-mac):
+Use the **same installer** — but note it takes no backup of what is already
+there. The first apply writes managed files over their live counterparts and
+deletes the legacy ones this repo declares gone (`~/.zshrc`, `~/.gitconfig`,
+`~/.bash_profile`, `~/.bashrc`, `~/.profile`, `~/.zprofile`, `~/.continue`).
+Copy anything you want to keep somewhere safe first. Removing what the repo no
+longer tracks is a separate, confirm-gated step — see
+[cleaning up drift](#cleaning-up-drift-on-an-existing-mac):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
@@ -81,12 +85,11 @@ Just stay current with [`chezup`](commands.md#everyday) — no installer needed.
 
 With no arguments `install.sh` runs the wizard. **Any** extra arguments bypass
 the wizard and forward straight to `chezmoi init --apply` (for scripted/CI use).
-It also reads three environment variables:
+It also reads two environment variables:
 
 ```sh
 DOTFILES_REPO=<repo-url> bash install.sh                  # point at a fork
 DOTFILES_DIR=<path>      bash install.sh                  # clone somewhere else
-SKIP_BACKUP=1            bash install.sh                  # don't snapshot legacy dotfiles
 curl -fsSL …/install.sh | bash -s -- --promptDefaults     # non-interactive (CI): skip wizard, accept defaults
 ```
 

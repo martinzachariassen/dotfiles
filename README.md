@@ -22,7 +22,7 @@ One `curl | bash` turns a fresh Apple Silicon Mac into my backend workstation, m
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
-Works on both a fresh and an existing Mac — the installer snapshots any legacy dotfiles into a timestamped backup before taking over (`SKIP_BACKUP=1` to skip) and runs a [deprecation cleanup](docs/install.md#cleaning-up-drift-on-an-existing-mac). When the plain-text wizard finishes, sign in and reload:
+Works on both a fresh and an existing Mac. The installer only ever **adds** — it renders managed files, installs the Brewfiles and runs `mise install`; reconciling what the repo no longer tracks is the separate, confirm-gated [`chezmirror`/`chezclean`](docs/lifecycle.md) step. It does **not** back up pre-existing dotfiles, and the first apply replaces `~/.zshrc`, `~/.gitconfig`, `~/.bash_profile`, `~/.bashrc`, `~/.profile` and `~/.zprofile` — copy anything you want to keep out of the way first. When the plain-text wizard finishes, sign in and reload:
 
 ```sh
 open -a 1Password                                                  # skip if disabled
@@ -93,7 +93,7 @@ Deeper guides live in [`docs/`](docs/) ([index](docs/README.md)):
 
 | Doc | Covers |
 | --- | --- |
-| [install.md](docs/install.md) | Bootstrap scenarios, `install.sh` flags, deprecation cleanup |
+| [install.md](docs/install.md) | Bootstrap scenarios, `install.sh` flags, cleaning up drift |
 | [commands.md](docs/commands.md) | Every verb — `chezup`, `chezdoctor`, and the occasional helpers |
 | [packages.md](docs/packages.md) | Package tiers, profiles, the module catalog, and the wizard |
 | [architecture.md](docs/architecture.md) | The `src/` split, repo layout, and `scripts/` organization |
