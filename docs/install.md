@@ -16,9 +16,11 @@ line or two on why it matters. `QUIET=1` drops the prose and keeps the results.
 **"Xcode Command Line Tools" is not Xcode.** Step 1 installs Apple's compilers
 because Homebrew needs them, and nothing more: no iOS SDK, no Simulator, no
 SourceKit-LSP. Selecting the `appleDev` module gets you the Swift *tooling*
-(SwiftLint, SwiftFormat, `xcodes`, SweetPad …) but still not Xcode itself —
-`xcodes install` needs an Apple ID with 2FA, so it can't run unattended from an
-apply. Run **`chezxcode`** once afterwards to close that gap; the apply's
+(SwiftLint, SwiftFormat, SweetPad …) but still not Xcode itself — `xcodes
+install` needs an Apple ID with 2FA, so it can't run unattended from an apply.
+The `xcodes` CLI isn't a Brewfile entry either: its formula builds from source
+and that build needs a full Xcode.app, so `chezxcode` fetches the upstream
+prebuilt binary (pinned by sha256 in `src/.chezmoidata/xcodes.toml`) itself. Run **`chezxcode`** once afterwards to close that gap; the apply's
 closing summary prompts you when it's outstanding, and `chezdoctor` stays red
 until it's done. See [commands.md](commands.md#advanced--occasional-helpers).
 

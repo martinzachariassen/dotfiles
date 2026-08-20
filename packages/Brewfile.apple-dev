@@ -1,9 +1,11 @@
 # Swift / iOS development tooling — installed when the `appleDev` module is selected.
-# Xcode itself is managed with `xcodes` (see below), not the App Store.
+# Xcode itself is managed with `xcodes`, not the App Store — but `xcodes` is
+# deliberately NOT in this file. Its only tap formula builds from source, and
+# that build needs `xcbuild` from a full Xcode.app, so it can never succeed on a
+# fresh Command-Line-Tools-only Mac. `chezxcode` fetches the upstream prebuilt
+# binary on demand instead; the pin lives in src/.chezmoidata/xcodes.toml.
 
-tap "xcodesorg/made"
-
-# Core: lint, format, Xcode version management, SF Symbols browser
+# Core: lint, format, SF Symbols browser
 # No maintained VS Code extension surfaces these live in the editor (vknabel's
 # were archived upstream 2025-11-19) — wire swiftlint into an Xcode Run Script
 # build phase (`swiftlint lint --config ~/.config/swiftlint/config.yml`, or let
@@ -12,7 +14,6 @@ tap "xcodesorg/made"
 # formatter instead (see [swift] block in VS Code settings). See docs/editors.md.
 brew "swiftlint"
 brew "swiftformat"
-brew "xcodesorg/made/xcodes"
 brew "aria2"     # for `xcodes install`
 cask "sf-symbols" # SF Symbols browser
 
