@@ -226,15 +226,6 @@ if command -v brew >/dev/null 2>&1; then
 $active_files
 EOF
     fi
-    # Ollama ships in the macApps module, so only check it when that's active.
-    if cm_has_module "$data_json" macApps &&
-        command -v ollama >/dev/null 2>&1; then
-        if brew services list 2>/dev/null | grep -E '^ollama[[:space:]]' | grep -q started; then
-            pass "Ollama service running"
-        else
-            warn "Ollama service not started — run: scripts/bin/setup-ollama.sh"
-        fi
-    fi
     # Opposite-direction drift: ad-hoc installs not in any Brewfile.
     leaves_tmp=$(mktemp)
     brew leaves >"$leaves_tmp" 2>/dev/null || true

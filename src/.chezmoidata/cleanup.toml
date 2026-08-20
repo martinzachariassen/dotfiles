@@ -49,7 +49,7 @@ keepHome = [
 # orphan again.
 #
 # Only needed when the entry's own stem isn't already a command on PATH — e.g.
-# .gradle, .ollama, .minikube, .claude resolve automatically. This map is just the
+# .gradle, .minikube, .claude resolve automatically. This map is just the
 # aliases where dir name and tool diverge.
 [cleanup.owners]
 [cleanup.owners.".azure"]

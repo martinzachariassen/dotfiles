@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Tests for scripts/lib/log.sh — the dependency-free terminal UI helpers shared
-# by doctor.sh, chezup.sh, bootstrap-auth.sh, and setup-ollama.sh.
+# by doctor.sh, chezup.sh, bootstrap-auth.sh, and macos-defaults.sh.
 #
 # log.sh runs on a fresh machine before any package is installed, so two
 # invariants matter: never colorize non-TTY output, and glyphs must degrade to
