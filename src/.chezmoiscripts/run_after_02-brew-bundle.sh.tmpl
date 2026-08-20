@@ -122,14 +122,50 @@ rm -f "$RC_FILE" 2>/dev/null || true
 chmod -R go-w /opt/homebrew/share/zsh* 2>/dev/null || true
 
 if [ "${#failures[@]}" -gt 0 ]; then
+    # Keep the log somewhere that survives a reboot. mktemp lands in
+    # /var/folders, which macOS purges — so the "full log:" path printed below
+    # was routinely dead by the time anyone went looking for it. ~/.local is on
+    # cleanup.keepHome, so chezclean won't offer it either.
+    log_dir="{{ .chezmoi.homeDir }}/.local/state/dotfiles"
+    if mkdir -p "$log_dir" 2>/dev/null && cp "$BREW_LOG" "$log_dir/brew-bundle.log" 2>/dev/null; then
+        BREW_LOG="$log_dir/brew-bundle.log"
+    fi
+
     warn "${#failures[@]} Brewfile(s) had install failures — everything else installed:"
     for f in "${failures[@]}"; do dim "    $FAIL_MARK $f"; done
-    # Output was captured to drive the bar, so surface enough to diagnose.
-    dim "    last lines from Homebrew:"
-    grep -v "$BUNDLE_DONE" "$BREW_LOG" 2>/dev/null | tail -n 15 | sed 's/^/      /'
+
+    # Name the packages, not just the file. This is the same question the user
+    # would ask next, and it reports real current state rather than whatever
+    # happened to scroll past.
+    dim "    still missing:"
+    missing_any=0
+    for f in "${FILES[@]}"; do
+        [ -f "$f" ] || continue
+        case " ${failures[*]} " in
+            *" $(basename "$f") "*) ;;
+            *) continue ;;
+        esac
+        while IFS= read -r entry; do
+            [ -n "$entry" ] || continue
+            missing_any=1
+            dim "      $entry ($(basename "$f"))"
+        done < <(brew_unmet_entries "$f")
+    done
+    [ "$missing_any" -eq 1 ] || dim "      (nothing missing now — the failure looks transient)"
+
+    # Then *why*. A blind tail of a 65-package log showed the last few successes
+    # and none of the error, which is how a hard failure (xcodes needing a full
+    # Xcode.app in order to build) read as a flaky download.
+    dim "    what Homebrew reported:"
+    brew_error_lines "$BREW_LOG" 12 | grep -v "$BUNDLE_DONE" | sed 's/^/      /'
     dim "    full log: $BREW_LOG"
-    explain "Usually a transient download. Re-run \`chezup\` to retry —" \
-        "already-installed packages are skipped, so it picks up where it left off."
+
+    # Deliberately not "usually transient". Sometimes it is a download; sometimes
+    # the package cannot install on this machine at all, and telling someone to
+    # re-run forever is worse than telling them to read the error.
+    explain "Re-run \`chezup\` to retry — already-installed packages are skipped," \
+        "so it picks up where it left off. If the same package fails again, the" \
+        "error above is the real reason and retrying will not change it."
     exit 0
 fi
 rm -f "$BREW_LOG" 2>/dev/null || true

@@ -146,3 +146,36 @@ brew_stall_note() {
         printf 'no output from Homebrew for %ss — it is on a long download, or waiting for a password prompt below.' "$secs"
     fi
 }
+
+# ── Failure reporting ─────────────────────────────────────────────────────────
+# When a Brewfile fails, the output that would explain why has already been
+# consumed to drive the bar. These two turn the captured log and Homebrew's own
+# state back into an answer, instead of a blind `tail` that shows the last few
+# successes and none of the error.
+
+# brew_unmet_entries FILE — the entries FILE still declares but the machine
+# lacks, one "Cask docker-desktop" / "Formula a/b/c" per line.
+#
+# Two macOS traps in one command: `brew bundle check` reports on **stderr**, and
+# `sed -E` is required because BSD sed reads `\|` as a literal pipe rather than
+# alternation, which silently matches nothing.
+brew_unmet_entries() {
+    brew bundle check --verbose --no-upgrade --file="$1" 2>&1 |
+        sed -nE 's/^[^A-Za-z]*((Cask|Formula|Tap|VSCode|App) .*) needs to be installed\.?/\1/p'
+}
+
+# brew_error_lines LOG [MAX] — the lines from LOG that state a failure, newest
+# last. Falls back to the tail only when nothing matches, so there is always
+# something to read.
+brew_error_lines() {
+    local log="$1" max="${2:-12}" hits
+    hits="$(grep -aiE '^[^A-Za-z]*(error|fatal|warning: .*fail)' "$log" 2>/dev/null | tail -n "$max")"
+    if [ -n "$hits" ]; then
+        printf '%s\n' "$hits"
+    else
+        tail -n "$max" "$log" 2>/dev/null || true
+    fi
+    # Reporting helper: an unreadable log is worth saying nothing about, never
+    # worth failing an apply over.
+    return 0
+}
