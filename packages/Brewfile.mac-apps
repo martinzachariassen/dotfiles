@@ -17,7 +17,7 @@ cask "font-ia-writer-quattro"   # Obsidian editor font
 # Brewfile (VS Code's editor font), so it's not repeated here.
 
 # ─── Browser ──────────────────────────────────────────────────────────────────
-cask "google-chrome"            # what web tooling assumes
+cask "google-chrome"
 
 # ─── Media ────────────────────────────────────────────────────────────────────
 cask "spotify"
