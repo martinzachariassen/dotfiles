@@ -117,7 +117,13 @@ from mise, `.sonarlint`→the `sonarsource.sonarlint-vscode` extension).
 Dropped **Homebrew packages** are reconciled the same way, by hand:
 `chezmirror` runs `brew bundle cleanup` to uninstall anything no longer in a
 Brewfile, then `brew autoremove` to prune orphaned dependencies, while
-`chezstatus`/`chezdoctor` report the drift read-only. Nothing about removal is
+`chezstatus`/`chezdoctor` report the drift read-only. "No longer in a Brewfile"
+means no Brewfile **active on this machine** — core, the enabled modules and
+this profile's tier. Both directions resolve that set through
+[`scripts/lib/brewfiles.sh`](../scripts/lib/brewfiles.sh), so install and
+removal can't disagree: moving a package to the other profile's tier makes it
+removable here, exactly as deleting it would. The removal side fails closed —
+an unresolvable tier set offers nothing, never more. Nothing about removal is
 automatic: if a machine drifts, its owner runs `chezmirror` and `chezclean`
 to bring it back in line. To do both package directions in one step —
 install what the Brewfiles declare, then remove what they don't —
@@ -135,6 +141,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezstatus` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
+| Active Brewfile tier set (shared by install check, cleanup, doctor) | `scripts/lib/brewfiles.sh` (`brew_active_files`, reads `packages.toml` via `chezmoi data`) |
 | Untracked dotfile cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
 | chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |

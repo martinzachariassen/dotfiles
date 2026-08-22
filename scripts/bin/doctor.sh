@@ -59,6 +59,11 @@ if [ -r "$_DOCTOR_DIR/../lib/chezmoi-data.sh" ]; then
     . "$_DOCTOR_DIR/../lib/chezmoi-data.sh"
 fi
 
+# shellcheck source=../lib/brewfiles.sh
+if [ -r "$_DOCTOR_DIR/../lib/brewfiles.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/brewfiles.sh"
+fi
+
 # shellcheck source=../lib/vscode.sh
 if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
     . "$_DOCTOR_DIR/../lib/vscode.sh"
@@ -246,20 +251,10 @@ fi
 section "Homebrew packages"
 if command -v brew >/dev/null 2>&1; then
     pass "brew installed"
-    # Resolves the same Brewfile map as the brew hook; --no-upgrade keeps this a
-    # presence check (freshness is chezbump's job).
-    # `.key as $k` first: inside `select`, the input to `index` is $mods (an
-    # array), so a bare `index(.key)` looks up ".key" on the array and errors —
-    # which silently reduced this whole check to the warning below.
-    active_files="$(printf '%s' "$DATA_JSON" | jq -r '
-        (.modules // []) as $mods
-        | (.profile // "") as $prof
-        | ([.brewfiles.core]
-           + (.brewfiles.byModule | to_entries
-              | map(select(.key as $k | $mods | index($k))) | map(.value))
-           + ([.brewfiles.byProfile[$prof]] | map(select(. != null))))
-        | map(select(. != null))
-        | .[]' 2>/dev/null)"
+    # Resolves the same Brewfile map as the brew hook and as chezmirror's
+    # removal set; --no-upgrade keeps this a presence check (freshness is
+    # chezbump's job).
+    active_files="$(brew_active_files "$DATA_JSON" 2>/dev/null)"
     if [ -z "$active_files" ]; then
         warn "could not resolve active Brewfiles from chezmoi data"
     else
@@ -277,18 +272,34 @@ if command -v brew >/dev/null 2>&1; then
 $active_files
 EOF
     fi
-    # Opposite-direction drift: ad-hoc installs not in any Brewfile.
-    leaves_tmp=$(mktemp)
-    brew leaves >"$leaves_tmp" 2>/dev/null || true
-    tracked=$(grep -h '^\(brew\|cask\) ' "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.* 2>/dev/null |
-        sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
-        awk -F/ '{print $NF}' |
-        sort -u)
-    untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked") 2>/dev/null || true)
-    rm -f "$leaves_tmp"
+    # Opposite-direction drift: installs no ACTIVE tier declares. Same tier set
+    # as the check above and as chezmirror, so the two can't disagree about
+    # what "tracked" means on this machine.
+    tracked_files=()
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        [ -f "$SOURCE_DIR/$rel" ] && tracked_files+=("$SOURCE_DIR/$rel")
+    done <<EOF
+$active_files
+EOF
+    # Guard the empty case explicitly: a bare `grep -h PATTERN` with no file
+    # operands reads stdin and would hang this check forever.
+    if [ "${#tracked_files[@]}" -eq 0 ]; then
+        warn "could not resolve the active Brewfiles — skipping the untracked-package check"
+        untracked=""
+    else
+        leaves_tmp=$(mktemp)
+        brew leaves >"$leaves_tmp" 2>/dev/null || true
+        tracked=$(grep -h '^\(brew\|cask\) ' "${tracked_files[@]}" 2>/dev/null |
+            sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
+            awk -F/ '{print $NF}' |
+            sort -u)
+        untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked") 2>/dev/null || true)
+        rm -f "$leaves_tmp"
+    fi
     if [ -n "$untracked" ]; then
         n=$(echo "$untracked" | wc -l | tr -d ' ')
-        warn "$n brew package(s) installed but not in any Brewfile (run \`chezstatus\` for the list)"
+        warn "$n brew package(s) installed but declared by no active Brewfile (run \`chezstatus\` for the list)"
     else
         pass "no untracked brew packages"
     fi
