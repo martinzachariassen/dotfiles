@@ -39,11 +39,19 @@ name, for deterministic colors across Ghostty versions. Applied only when the
 ## Zellij
 
 Config: [`src/dot_config/zellij/config.kdl`](../src/dot_config/zellij/config.kdl).
-A modern tmux alternative: `default_shell zsh`, custom `main` layout with a
-one-line [zjstatus](https://github.com/dj95/zjstatus) bar
-([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl)),
-`copy_on_select` → `pbcopy`, mouse mode on, sessions serialized across
-restarts, rounded pane frames showing pane titles.
+A modern tmux alternative: `default_shell zsh`, custom `main` layout with no
+status or tab bar ([`layouts/main.kdl`](../src/dot_config/zellij/layouts/main.kdl))
+— the rounded pane frame carries the session and pane names on its own —
+`copy_on_select` → `pbcopy`, mouse mode on, a 100k-line scroll buffer, and
+sessions serialized across restarts with their viewports intact.
+`pane_frame_style "full"` is pinned because Zellij 0.45 defaults it to
+`"titles"`, and `web_sharing "disabled"` keeps 0.45's HTTP session sharing
+unreachable — the default `"off"` still lets a session opt in.
+
+Zellij accepts unknown top-level config keys **silently** — a misspelled
+option is dead config, not an error. Check names against `zellij setup
+--dump-config` when editing; values on recognised keys *are* validated, so
+`zellij setup --check` only catches the second kind of mistake.
 
 Interactive Ghostty shells auto-attach to Zellij; each window gets its own
 session — the project (cwd) name for the first, `-2`/`-3`… suffixes for
@@ -87,7 +95,7 @@ editor when the `theme` module is selected — see
 [packages.md](packages.md#optional-modules).
 
 JetBrains Mono is the shared typeface, in two builds (both core Brewfile):
-the Nerd Font patch everywhere glyphs are drawn — Ghostty, Zellij's zjstatus
-bar, the Claude statusline, VS Code's integrated terminal — and the unpatched
+the Nerd Font patch everywhere glyphs are drawn — Ghostty, Zellij, the
+Claude statusline, VS Code's integrated terminal — and the unpatched
 `font-jetbrains-mono` in the VS Code editor, whose stock metrics match
 IntelliJ. See [editors.md](editors.md#vs-code).
