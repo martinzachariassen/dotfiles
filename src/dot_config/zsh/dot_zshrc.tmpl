@@ -423,7 +423,7 @@ chezapply() {
         untracked=$(_chez_brew_removals "$src")
         if [ -n "$untracked" ]; then
             echo
-            echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but in no Brewfile."
+            echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but declared by no active Brewfile."
             echo "    review: chezstatus   ·   reconcile (uninstall): chezmirror"
         fi
     fi
@@ -500,7 +500,7 @@ chezstatus() {
         local removals
         removals=$(_chez_brew_removals "$src")
         if [ -n "$removals" ]; then
-            echo "── Untracked Homebrew packages (in no Brewfile tier) ──────────"
+            echo "── Untracked Homebrew packages (in no active Brewfile tier) ───"
             printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
             echo "  reconcile (uninstall): chezmirror"
             echo
@@ -613,13 +613,37 @@ chezbump() {
     echo "Now: cd $src && git diff   to review, then commit."
 }
 
-# "<kind>\t<name>" (cask | formula | tap) for every Homebrew item in no Brewfile
-# tier — the removal set chezmirror acts on. $1 is the repo root; pure/testable.
-# The tier set comes from the `Brewfile.*` glob, not a hardcoded list, so new
-# tiers are picked up automatically. `brew bundle cleanup` only honours one
-# --file, so tiers are concatenated onto stdin (--file=-).
+# "<kind>\t<name>" (cask | formula | tap) for every Homebrew item no ACTIVE
+# Brewfile tier declares — the removal set chezmirror acts on. $1 is the repo
+# root; pure/testable. The tier set comes from scripts/lib/brewfiles.sh, the
+# same resolver chezdoctor uses and the mirror of what the brew-bundle hook
+# installs from, so "tracked" means the same thing in both directions: a
+# work-profile cask on a personal machine is untracked here, not silently kept.
+# `brew bundle cleanup` only honours one --file, so the active tiers are
+# concatenated onto stdin (--file=-).
 _chez_brew_removals() {
     local src=$1
+
+    if [ ! -r "$src/scripts/lib/brewfiles.sh" ]; then
+        echo "  ! cannot resolve the active Brewfiles: no $src/scripts/lib/brewfiles.sh — nothing offered for removal" >&2
+        return 1
+    fi
+    . "$src/scripts/lib/brewfiles.sh"
+
+    # Fail closed: an unresolvable tier set means an empty removal set, never a
+    # broader one. Comparing against too FEW tiers would offer the whole
+    # toolchain for uninstall.
+    local rel
+    local -a files
+    files=()
+    while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        [ -f "$src/$rel" ] && files+=("$src/$rel")
+    done < <(brew_active_files)
+    if [ "${#files[@]}" -eq 0 ]; then
+        echo "  ! could not resolve the active Brewfiles (is jq installed?) — nothing offered for removal" >&2
+        return 1
+    fi
 
     # Homebrew 6.0 refuses to even load a Brewfile referencing an untrusted
     # non-official tap — `brew bundle cleanup` then errors out with nothing on
@@ -629,7 +653,7 @@ _chez_brew_removals() {
     while IFS= read -r taprepo; do
         [ -n "$taprepo" ] || continue
         brew trust --tap "$taprepo" >/dev/null 2>&1
-    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null)
+    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "${files[@]}" 2>/dev/null)
 
     # brew's stderr routinely carries benign noise (API-cache refresh,
     # deprecation notices) even on success, so only surface lines using
@@ -637,7 +661,7 @@ _chez_brew_removals() {
     # untrusted-tap failure's exact signature, not a generic "any stderr" check.
     local out err
     err=$(mktemp)
-    out=$(cat "$src"/packages/Brewfile "$src"/packages/Brewfile.* 2>/dev/null |
+    out=$(cat "${files[@]}" 2>/dev/null |
         brew bundle cleanup --file=- 2>"$err")
     if grep -q '^Error:' "$err" 2>/dev/null; then
         echo "  ! brew bundle cleanup reported errors — removal set may be incomplete:" >&2
@@ -697,19 +721,28 @@ chezmirror() {
     done
 
     _chez_explain "Untracked packages" \
-        "Finds Homebrew packages installed on this Mac that no Brewfile declares," \
-        "then offers to uninstall them. This is the only verb that removes packages;" \
-        "apply and chezup never do. Each removal is confirmed separately."
+        "Finds Homebrew packages installed on this Mac that no Brewfile active for" \
+        "this profile and module set declares, then offers to uninstall them. This is" \
+        "the only verb that removes packages; apply and chezup never do. Each removal" \
+        "is confirmed separately."
 
-    local parsed
+    # Distinguish "resolved, and nothing is untracked" from "could not resolve"
+    # — both yield an empty set, but only the first is a clean bill of health.
+    local parsed rc
     parsed=$(_chez_brew_removals "$src")
+    rc=$?
 
+    if [ "$rc" -ne 0 ]; then
+        echo "  ! could not determine what this machine tracks — nothing removed"
+        echo "    fix the error above (usually: run \`chezup\`), then re-run chezmirror"
+        return 1
+    fi
     if [ -z "$parsed" ]; then
         echo "  ✓ nothing to remove — every installed package is tracked"
         return 0
     fi
 
-    echo "── Untracked (installed locally, in no Brewfile tier) ────────"
+    echo "── Untracked (installed locally, in no active Brewfile tier) ──"
     printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
     echo
 

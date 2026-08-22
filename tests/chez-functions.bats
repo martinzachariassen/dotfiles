@@ -15,10 +15,13 @@ setup() {
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
 
+    command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
+
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/packages" "$FAKE/scripts/bin"
-    # All four tiers must exist — zsh's NOMATCH would abort _chez_brew_removals's
-    # `Brewfile.*` glob read otherwise.
+    mkdir -p "$FAKE/packages" "$FAKE/scripts/bin" "$FAKE/scripts/lib"
+    # The real resolver, so these zsh-side tests exercise the committed lib —
+    # _chez_brew_removals sources it out of the repo root it's handed.
+    cp "$REPO_ROOT/scripts/lib/brewfiles.sh" "$FAKE/scripts/lib/brewfiles.sh"
     printf 'brew "git"\n' >"$FAKE/packages/Brewfile"
     : >"$FAKE/packages/Brewfile.mac-apps"
     : >"$FAKE/packages/Brewfile.personal"
@@ -27,14 +30,34 @@ setup() {
     STUBS="$(mktemp -d)"
     APPLY_LOG="$STUBS/apply.log"
     DIFF_LOG="$STUBS/diff.log"
+    DATA_JSON_FILE="$STUBS/data.json"
+
+    # A personal machine with macApps on — so mac-apps + personal are active
+    # tiers and Brewfile.work is not.
+    cat >"$DATA_JSON_FILE" <<'EOF'
+{
+  "profile": "personal",
+  "modules": ["macApps"],
+  "brewfiles": {
+    "core": "packages/Brewfile",
+    "byModule": {"macApps": "packages/Brewfile.mac-apps"},
+    "byProfile": {
+      "personal": "packages/Brewfile.personal",
+      "work": "packages/Brewfile.work"
+    }
+  }
+}
+EOF
 
     # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and honours
-    # CHEZMOI_APPLY_RC; diff records args (chezstatus's raw-passthrough path).
+    # CHEZMOI_APPLY_RC; diff records args (chezstatus's raw-passthrough path);
+    # data feeds the Brewfile-tier resolver.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
 if [ "\$1" = status ]; then printf '%s' "\${CHEZMOI_STATUS:-}"; exit 0; fi
 if [ "\$1" = apply ]; then shift; printf 'apply %s\n' "\$*" >>"$APPLY_LOG"; exit "\${CHEZMOI_APPLY_RC:-0}"; fi
 if [ "\$1" = diff ]; then shift; printf 'diff %s\n' "\$*" >>"$DIFF_LOG"; exit 0; fi
+if [ "\$1" = data ]; then exec cat "$DATA_JSON_FILE"; fi
 exit 0
 EOF
     # brew stub: bundle cleanup consumes the piped tier union and echoes
@@ -69,6 +92,7 @@ extract() {
 # Run a zsh snippet with the stub PATH and log paths exported.
 run_zsh() {
     run env PATH="$STUBS:$PATH" APPLY_LOG="$APPLY_LOG" DIFF_LOG="$DIFF_LOG" \
+        DATA_JSON_FILE="$DATA_JSON_FILE" \
         BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
         CHEZMOI_STATUS="${CHEZMOI_STATUS:-}" CHEZMOI_APPLY_RC="${CHEZMOI_APPLY_RC:-0}" \
         zsh -c "$1"
@@ -121,7 +145,7 @@ OUT
     CHEZMOI_STATUS="" BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_zsh "$(extract chezapply _chez_brew_removals); chezapply"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"in no Brewfile"* ]]
+    [[ "$output" == *"no active Brewfile"* ]]
     [[ "$output" == *"chezmirror"* ]]
 }
 

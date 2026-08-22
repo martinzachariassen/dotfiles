@@ -28,6 +28,19 @@ run_doctor() {
     run env HOME="$ISO_HOME" DOTFILES_DIR="$ISO_REPO" PATH="$ISO_PATH" bash "$DOCTOR"
 }
 
+# Negative assertions must go through this. A bare `! grep …` in the middle of
+# a test body is exempt from set -e (POSIX: "the return value is being inverted
+# with !"), so bats never sees it fail — the assertion silently passes no
+# matter what the file contains.
+#
+# no_match <extended-regex> <file…>
+no_match() {
+    if grep -qE "$@"; then
+        echo "unexpected match for: $1"
+        return 1
+    fi
+}
+
 # ─── XDG layout ─────────────────────────────────────────────────────────────
 
 @test "doctor.sh fails when a legacy .zshrc is present" {
@@ -225,49 +238,30 @@ run_doctor_xcode() {
 }
 
 # ─── Brewfile resolution ────────────────────────────────────────────────────
-# doctor.sh picks the active Brewfiles out of chezmoi data with a jq filter.
-# A wrong filter doesn't fail loudly — it errors to /dev/null, yields an empty
-# list, and degrades the whole "are my packages installed?" section to a single
-# "could not resolve active Brewfiles" warning. It sat broken that way, so the
-# filter is extracted from the script and exercised against fixture data here
-# rather than merely grepped for.
+# The resolver itself lives in scripts/lib/brewfiles.sh and is exercised in
+# tests/brewfiles-lib.bats. What matters here is that doctor.sh keeps using it
+# for BOTH directions — "is my active set installed?" and "what's installed
+# that no active tier declares?". They used to disagree: the first was
+# profile/module-gated, the second globbed every `Brewfile.*` that existed, so
+# chezdoctor called a work-only cask tracked on a personal machine.
 
-# doctor_brewfile_filter — the jq program doctor.sh actually runs.
-doctor_brewfile_filter() {
-    sed -n "/active_files=/,/\.\[\]'/p" "$DOCTOR" |
-        sed "1s/.*jq -r '//" |
-        sed "\$s/' 2>\/dev\/null)\"\$//"
+@test "doctor.sh sources the shared Brewfile resolver" {
+    grep -qF 'lib/brewfiles.sh' "$DOCTOR"
 }
 
-@test "doctor.sh resolves core + selected-module + profile Brewfiles" {
-    command -v jq >/dev/null 2>&1 || skip "jq not installed"
-    local filter data
-    filter="$(doctor_brewfile_filter)"
-    [ -n "$filter" ]
-    data='{"profile":"work","modules":["macApps"],"brewfiles":{
-        "core":"packages/Brewfile",
-        "byModule":{"macApps":"packages/Brewfile.mac-apps","appleDev":"packages/Brewfile.apple-dev"},
-        "byProfile":{"personal":"packages/Brewfile.personal","work":"packages/Brewfile.work"}}}'
-    run jq -rn --argjson d "$data" "\$d | $filter"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"packages/Brewfile"* ]]
-    [[ "$output" == *"packages/Brewfile.mac-apps"* ]]
-    [[ "$output" == *"packages/Brewfile.work"* ]]
-    # appleDev wasn't selected; personal isn't the profile.
-    [[ "$output" != *"apple-dev"* ]]
-    [[ "$output" != *"Brewfile.personal"* ]]
+@test "doctor.sh resolves its active Brewfiles via brew_active_files" {
+    grep -qE 'active_files="\$\(brew_active_files "\$DATA_JSON"' "$DOCTOR"
 }
 
-@test "doctor.sh's Brewfile filter survives a profile with no Brewfile of its own" {
-    command -v jq >/dev/null 2>&1 || skip "jq not installed"
-    local filter data
-    filter="$(doctor_brewfile_filter)"
-    # minimal has no byProfile entry — the lookup is null and must be dropped,
-    # not emitted as the string "null" nor blow up the whole filter.
-    data='{"profile":"minimal","modules":[],"brewfiles":{
-        "core":"packages/Brewfile","byModule":{"macApps":"packages/Brewfile.mac-apps"},
-        "byProfile":{"personal":"packages/Brewfile.personal"}}}'
-    run jq -rn --argjson d "$data" "\$d | $filter"
-    [ "$status" -eq 0 ]
-    [ "$output" = "packages/Brewfile" ]
+@test "doctor.sh's untracked check reads only the active tiers (glob regression)" {
+    # The old code grepped "$SOURCE_DIR"/packages/Brewfile.* here, which counts
+    # every tier that exists — including the other profile's.
+    no_match 'packages/Brewfile\.\*' "$DOCTOR"
+    # It must build its file list from active_files instead.
+    grep -qF 'tracked_files+=("$SOURCE_DIR/$rel")' "$DOCTOR"
+}
+
+@test "doctor.sh guards the empty tier set before grepping (no stdin hang)" {
+    # `grep -h PATTERN` with zero file operands reads stdin and hangs the run.
+    grep -qF '[ "${#tracked_files[@]}" -eq 0 ]' "$DOCTOR"
 }

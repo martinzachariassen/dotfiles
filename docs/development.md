@@ -59,6 +59,7 @@ so a rename or drifted default fails fast:
 | `data-model.bats` | `[profileDefaults]` mirrors the `$defaults` blocks in `.chezmoi.toml.tmpl`. |
 | `chezmoi-data.bats` / `chezmoi-scripts.bats` | The data readers and hook conventions. |
 | `brewfile-contents.bats` | Brewfile tiers stay well-formed. |
+| `brewfiles-lib.bats` | `brew_active_files` picks the tiers this profile/module set actually uses. |
 | `mise-config.bats` | The rendered mise config. |
 | `wizard.bats` | The wizard's prompt tiers and flag mapping. |
 | `shell-functions.bats` / `zshrc-wiring.bats` | The zsh verbs and their wiring. |

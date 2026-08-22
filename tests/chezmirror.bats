@@ -10,6 +10,12 @@
 # the REAL functions from the template and run them against a stubbed
 # brew/gum, so a regression in the committed source fails here.
 #
+# The tier set is the ACTIVE one (core + enabled modules + this profile),
+# resolved by the real scripts/lib/brewfiles.sh against a stubbed `chezmoi
+# data` — not every `Brewfile.*` that exists. Too FEW tiers offers the
+# toolchain for uninstall; too MANY (the old glob) silently keeps packages
+# this machine's profile dropped.
+#
 # The interactive per-package loop needs a controlling terminal; the two
 # TTY-dependent tests are inverse-gated (safety runs headless in CI, the
 # confirm-loop test needs a real/pseudo tty). Run it locally with:
@@ -20,10 +26,14 @@ setup() {
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
-    # Fake repo with four Brewfile tiers, each with a distinct marker, so we
-    # can prove the UNION reaches brew's stdin.
+    command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
+
+    # Fake repo with four Brewfile tiers, each with a distinct marker, so we can
+    # prove exactly which ones reach brew's stdin. It carries the REAL resolver
+    # lib, so these tests exercise the committed brewfiles.sh, not a mock of it.
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/packages"
+    mkdir -p "$FAKE/packages" "$FAKE/scripts/lib"
+    cp "$REPO_ROOT/scripts/lib/brewfiles.sh" "$FAKE/scripts/lib/brewfiles.sh"
     printf 'brew "marker-core"\n' >"$FAKE/packages/Brewfile"
     printf 'cask "marker-macapps"\n' >"$FAKE/packages/Brewfile.mac-apps"
     printf 'brew "marker-personal"\n' >"$FAKE/packages/Brewfile.personal"
@@ -35,6 +45,34 @@ setup() {
     ARGS_LOG="$STUBS/brew-args.log" # args passed to `brew bundle cleanup`
     STDIN_LOG="$STUBS/brew-stdin"   # what got piped into `brew bundle cleanup`
     UNINSTALL_LOG="$STUBS/uninstall.log"
+    DATA_JSON_FILE="$STUBS/data.json" # what stub `chezmoi data` prints
+
+    # Default machine: personal profile with macApps on, appleDev off — so the
+    # active set is core + mac-apps + personal, and Brewfile.work is NOT active.
+    # Tests that need another shape rewrite this file.
+    cat >"$DATA_JSON_FILE" <<'EOF'
+{
+  "profile": "personal",
+  "modules": ["macApps"],
+  "brewfiles": {
+    "core": "packages/Brewfile",
+    "byModule": {
+      "macApps": "packages/Brewfile.mac-apps",
+      "appleDev": "packages/Brewfile.apple-dev"
+    },
+    "byProfile": {
+      "personal": "packages/Brewfile.personal",
+      "work": "packages/Brewfile.work"
+    }
+  }
+}
+EOF
+
+    cat >"$STUBS/chezmoi" <<EOF
+#!/usr/bin/env bash
+[ "\$1" = data ] && exec cat "$DATA_JSON_FILE"
+exit 0
+EOF
 
     # One cask + two formulae, then the cache-pruning section newer Homebrew
     # appends. The parser must stop at "Would `brew cleanup`:" — otherwise
@@ -82,7 +120,7 @@ EOF
 IFS= read -r ans || ans=""
 [ "$ans" = yes ]
 EOF
-    chmod +x "$STUBS/brew" "$STUBS/gum"
+    chmod +x "$STUBS/brew" "$STUBS/gum" "$STUBS/chezmoi"
 }
 
 teardown() {
@@ -107,6 +145,7 @@ run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" BREW_CLEANUP_STDERR="${BREW_CLEANUP_STDERR:-}" \
+        DATA_JSON_FILE="$DATA_JSON_FILE" \
         bash -c "$1"
 }
 
@@ -131,7 +170,7 @@ no_match_in() {
     fi
 }
 
-# ─── _chez_brew_removals: the union + parser (the bug lived here) ────────────
+# ─── _chez_brew_removals: the active tier set + parser (bugs lived here) ─────
 
 @test "_chez_brew_removals parses cleanup output into <kind><TAB><name> rows" {
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
@@ -168,11 +207,13 @@ EOF
     no_match_in "$output" 'Would untap' # the header itself must never leak
 }
 
-@test "_chez_brew_removals feeds the UNION of all four tiers to brew (bug regression)" {
+@test "_chez_brew_removals feeds EVERY active tier to brew (multi-tier regression)" {
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
-    # Every tier's marker must reach brew's stdin — not just the last file's.
-    for m in marker-core marker-macapps marker-personal marker-work; do
+    # Each active tier's marker must reach brew's stdin — not just the last
+    # file's. Missing one reports its packages as untracked and queues the
+    # toolchain for uninstall.
+    for m in marker-core marker-macapps marker-personal; do
         grep -qF "$m" "$STDIN_LOG" || {
             echo "missing $m from brew stdin:"
             cat "$STDIN_LOG"
@@ -181,17 +222,63 @@ EOF
     done
 }
 
-@test "_chez_brew_removals sweeps in a newly-added tier (apple-dev glob regression)" {
-    # Original bug: hardcoded tier filenames silently ignored a new tier, so its
-    # packages read as untracked. Tier set must be the `Brewfile.*` glob.
+@test "_chez_brew_removals excludes the other profile's tier (work-on-personal bug)" {
+    # The bug: the tier set was the `Brewfile.*` glob, so Brewfile.work counted
+    # as tracked on a personal machine — a cask moved from mac-apps to the work
+    # profile was never offered for removal on the machine that just dropped it.
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    no_match 'marker-work' "$STDIN_LOG"
+}
+
+@test "_chez_brew_removals excludes a disabled module's tier" {
     printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
+    # appleDev is absent from .modules in the default stub data.
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    no_match 'marker-appledev' "$STDIN_LOG"
+}
+
+@test "_chez_brew_removals includes a module tier once its module is enabled" {
+    # The other half of the same rule, and the apple-dev regression from #72: a
+    # tier the machine DOES have enabled must never read as untracked.
+    printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
+    jq '.modules += ["appleDev"]' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
+    mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
     grep -qF marker-appledev "$STDIN_LOG" || {
-        echo "the apple-dev tier never reached brew stdin (glob regressed):"
+        echo "the enabled apple-dev tier never reached brew stdin:"
         cat "$STDIN_LOG"
         return 1
     }
+}
+
+@test "_chez_brew_removals follows the profile: work data feeds work, not personal" {
+    jq '.profile = "work"' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
+    mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 0 ]
+    grep -qF marker-work "$STDIN_LOG"
+    no_match 'marker-personal' "$STDIN_LOG"
+}
+
+@test "_chez_brew_removals fails closed when the tier set cannot be resolved" {
+    # Fail-closed matters more than fail-loud here: an empty/garbage resolve
+    # must yield NO removal set, never a bigger one. brew must not even run.
+    : >"$DATA_JSON_FILE"
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 1 ]
+    [ ! -s "$ARGS_LOG" ]
+    grep -qF 'could not resolve the active Brewfiles' <<<"$output"
+}
+
+@test "_chez_brew_removals fails closed when the resolver lib is missing" {
+    rm -f "$FAKE/scripts/lib/brewfiles.sh"
+    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    [ "$status" -eq 1 ]
+    [ ! -s "$ARGS_LOG" ]
+    grep -qF 'cannot resolve the active Brewfiles' <<<"$output"
 }
 
 @test "_chez_brew_removals passes a single --file=- (never multiple --file)" {
@@ -248,6 +335,18 @@ EOF
 }
 
 # ─── chezmirror: end-to-end behaviour ───────────────────────────────────────
+
+@test "chezmirror refuses to call the set clean when it could not resolve it" {
+    # An empty removal set has two very different causes. Reporting the
+    # unresolvable one as "✓ every installed package is tracked" would be a
+    # false all-clear on exactly the machine that needs looking at.
+    : >"$DATA_JSON_FILE"
+    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    [ "$status" -eq 1 ]
+    no_match_in "$output" 'nothing to remove'
+    grep -qF 'could not determine what this machine tracks' <<<"$output"
+    [ ! -s "$UNINSTALL_LOG" ]
+}
 
 @test "chezmirror reports nothing to remove when every package is tracked" {
     : >"$CANNED" # nothing untracked
