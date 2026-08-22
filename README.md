@@ -5,6 +5,10 @@ One command turns a fresh Apple Silicon Mac into a working backend/iOS workstati
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
+![install.sh explaining the five steps it is about to run, then reporting Xcode Command Line Tools already installed](assets/banner.png)
+
+<sup>A re-run on a Mac that already has everything — it explains itself before it starts, then skips each step it finds done.</sup>
+
 ## Install
 
 ```sh
@@ -12,10 +16,6 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 ```
 
 That's the whole install. It works on a fresh Mac *and* on one you've been using for years, it explains each step as it goes, and it's safe to re-run — every step checks first and skips what's already done.
-
-![install.sh: an overview box explaining the five steps, then each step reporting done — Xcode Command Line Tools, Homebrew, chezmoi, the repo clone, and the setup wizard](assets/install.png)
-
-<sup>The re-run above is what "skips what's already done" looks like on a Mac that has everything.</sup>
 
 > [!IMPORTANT]
 > **It does not back up your existing dotfiles.** The first run overwrites `~/.zshrc`, `~/.gitconfig`, `~/.bash_profile`, `~/.bashrc`, `~/.profile` and `~/.zprofile`. Copy anything you want to keep somewhere safe first.
@@ -34,7 +34,9 @@ Almost all of it is downloading. You'll be asked for your macOS password (Homebr
 
 ### The four questions
 
-Plain-text prompts, sensible defaults, and every answer is changeable later with `chezsetup`.
+Plain `read` prompts and a pure-bash picker — so it works under `curl | bash` on a Mac with
+nothing installed yet. Sensible defaults throughout, and every answer is changeable later
+with `chezsetup`.
 
 | Question | Options | If unsure |
 | --- | --- | --- |
@@ -42,10 +44,6 @@ Plain-text prompts, sensible defaults, and every answer is changeable later with
 | **Profile** | `personal` · `work` · `minimal` | `personal`. It picks which package sets you get. |
 | **Optional modules** | apps, macOS defaults, theme, JVM, Swift/iOS… | Keep the defaults for your profile. |
 | **Git commit signing** | `1password` · `ssh-key` · `off` | On a **fresh** Mac, choose to set the key **later** — it's still locked inside 1Password, which hasn't been installed yet. |
-
-![The setup wizard asking for name and email, then an arrow-key picker for the profile, then a checkbox list of the optional modules](assets/wizard.png)
-
-<sup>Questions 1–3. Plain `read` and a pure-bash picker, so it works under `curl | bash` on a Mac with nothing installed yet.</sup>
 
 ### When it finishes
 
@@ -69,9 +67,7 @@ Three verbs cover almost everything. `chezhelp` prints the rest.
 | `chezdoctor` | Read-only health check: repo, brew, auth, signing, mise, shell. Fixes nothing. |
 | `chezstatus` | Explains pending file and package drift in plain words. |
 
-![chezup reporting the repo up to date, no file drift, three apply hooks pending, and a confirm gate; then chezstatus reporting in sync with one untracked Homebrew tap](assets/chezup.png)
-
-<sup>`DRY_RUN=1` prints what a verb would do instead of doing it. Without it, `chezup` runs the hooks.</sup>
+Prefix any of them with `DRY_RUN=1` to print what the verb would do instead of doing it.
 
 <details>
 <summary><b>What <code>chezdoctor</code> reports</b></summary>
