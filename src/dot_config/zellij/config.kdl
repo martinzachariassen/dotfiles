@@ -1,21 +1,34 @@
 // Zellij config — managed by chezmoi. https://zellij.dev/documentation/configuration
+// Unknown keys are accepted silently, so verify option names against
+// `zellij setup --dump-config` rather than trusting a rename to fail loudly.
 
 // ─── Theme ────────────────────────────────────────────────────────────────
 theme "catppuccin-mocha"
 
 // ─── Behavior ─────────────────────────────────────────────────────────────
-scrollback_lines     100000             // match Ghostty's buffer
+scroll_buffer_size   100000             // 10x Zellij's default; Ghostty's limit is in bytes, not lines
 default_shell        "zsh"
 default_layout       "main"             // layouts/main.kdl (no status bar)
 mouse_mode           true
 copy_on_select       true
 copy_command         "pbcopy"
 mirror_session       false              // each Ghostty tab = independent session
-session_serialization true
 pane_frames          true
 pane_frame_style     "full"             // 0.45 defaults to "titles" (no full frame)
 simplified_ui        false
 show_startup_tips    false
+show_release_notes   false              // no pane popping open on every version bump
+
+// ─── Session resurrection ─────────────────────────────────────────────────
+session_serialization         true
+serialize_pane_viewport       true      // without this, resurrected panes come back blank
+scrollback_lines_to_serialize 10000     // bound what resurrection writes to disk
+
+// ─── Web server ───────────────────────────────────────────────────────────
+// 0.45 can serve sessions over HTTP. The server is off by default, but the
+// default sharing mode ("off") still lets a session opt in — "disabled"
+// removes that path on a machine that never shares terminals in a browser.
+web_sharing "disabled"
 
 // ─── UI ───────────────────────────────────────────────────────────────────
 ui {
