@@ -13,7 +13,7 @@ is the core file plus whatever your profile and modules add:
 | Tier | File | Installed when |
 |---|---|---|
 | **Core** | [`Brewfile`](../packages/Brewfile) | Always. The smallest set that makes the documented shell experience work. |
-| **Profile** | `Brewfile.personal` / `Brewfile.work` | Your profile matches. `work` adds the cloud/Kubernetes/IaC CLIs (az, gcloud, kubectl, kubectx, kubelogin, terraform, helm, minikube) and work apps (M365, Teams, Slack). |
+| **Profile** | `Brewfile.personal` / `Brewfile.work` | Your profile matches. `work` adds the cloud/Kubernetes/IaC CLIs (az, gcloud, kubectl, kubectx, kubelogin, terraform, helm, minikube) and work apps (IntelliJ IDEA, M365, Teams, Slack). |
 | **Module** | `Brewfile.mac-apps`, `Brewfile.apple-dev` | The matching module is selected (`macApps` → GUI + AI apps; `appleDev` → Swift/iOS toolchain). |
 
 The profile→file and module→file mappings live in
