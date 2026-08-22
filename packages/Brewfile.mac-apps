@@ -26,7 +26,6 @@ cask "vlc"
 # ─── Development ──────────────────────────────────────────────────────────────
 cask "bruno"                    # Postman alternative
 cask "fork"                     # git client
-cask "intellij-idea"
 
 # ─── AI tooling + apps ────────────────────────────────────────────────────────
 cask "claude"

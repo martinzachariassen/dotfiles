@@ -17,6 +17,7 @@ cask "gcloud-cli"               # GCP account/project CLI
 # ─── Work apps ────────────────────────────────────────────────────────────────
 # microsoft-office is the full M365 suite; don't also list the standalone
 # Word/Excel/Outlook/… casks — it `conflicts_with` them and `brew bundle` fails.
+cask "intellij-idea"            # non-trivial Java/Kotlin work
 cask "microsoft-office"
 cask "microsoft-teams"
 cask "slack"
