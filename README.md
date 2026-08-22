@@ -5,7 +5,9 @@ One command turns a fresh Apple Silicon Mac into a working backend/iOS workstati
 [![CI](https://img.shields.io/github/actions/workflow/status/martinzachariassen/dotfiles/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-![martin@dotfiles — chezmoi-managed macOS setup: zsh, Ghostty + Zellij, mise runtimes, Homebrew, Catppuccin Mocha](assets/banner.png)
+![install.sh explaining the five steps it is about to run, then reporting Xcode Command Line Tools already installed](assets/banner.png)
+
+<sup>A re-run on a Mac that already has everything — it explains itself before it starts, then skips each step it finds done.</sup>
 
 ## Install
 
@@ -32,7 +34,9 @@ Almost all of it is downloading. You'll be asked for your macOS password (Homebr
 
 ### The four questions
 
-Plain-text prompts, sensible defaults, and every answer is changeable later with `chezsetup`.
+Plain `read` prompts and a pure-bash picker — so it works under `curl | bash` on a Mac with
+nothing installed yet. Sensible defaults throughout, and every answer is changeable later
+with `chezsetup`.
 
 | Question | Options | If unsure |
 | --- | --- | --- |
@@ -62,6 +66,17 @@ Three verbs cover almost everything. `chezhelp` prints the rest.
 | `chezup` | **The one you run.** Pull latest → show what will change → apply. |
 | `chezdoctor` | Read-only health check: repo, brew, auth, signing, mise, shell. Fixes nothing. |
 | `chezstatus` | Explains pending file and package drift in plain words. |
+
+Prefix any of them with `DRY_RUN=1` to print what the verb would do instead of doing it.
+
+<details>
+<summary><b>What <code>chezdoctor</code> reports</b></summary>
+
+![chezdoctor's report: source repo, chezmoi, XDG layout, Claude config, commit author, git signing, Homebrew packages, VS Code extensions, mise runtimes, Xcode/iOS, cloud auth, fonts, privacy permissions, and a pass/action/fail summary](assets/chezdoctor.png)
+
+Every check names the fix. It changes nothing — the two `!` lines and the one `✗` above are this Mac's real state, not a mock-up.
+
+</details>
 
 **An apply only ever adds.** It renders files, installs what the Brewfiles declare, and runs `mise install` — it never uninstalls anything. Removing what the repo no longer tracks is a separate, confirm-gated step you run by hand (`chezmirror` for packages, `chezclean` for dotfiles).
 
