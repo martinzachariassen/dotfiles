@@ -6,14 +6,14 @@ theme "catppuccin-mocha"
 // ─── Behavior ─────────────────────────────────────────────────────────────
 scrollback_lines     100000             // match Ghostty's buffer
 default_shell        "zsh"
-default_layout       "main"             // layouts/main.kdl (zjstatus bar)
+default_layout       "main"             // layouts/main.kdl (no status bar)
 mouse_mode           true
 copy_on_select       true
 copy_command         "pbcopy"
 mirror_session       false              // each Ghostty tab = independent session
 session_serialization true
 pane_frames          true
-pane_frame_style     "full"              // 0.45 defaults to "titles" (no full frame)
+pane_frame_style     "full"             // 0.45 defaults to "titles" (no full frame)
 simplified_ui        false
 show_startup_tips    false
 
@@ -21,7 +21,7 @@ show_startup_tips    false
 ui {
     pane_frames {
         rounded_corners   true
-        hide_session_name true            // already shown in the zjstatus bar
+        hide_session_name false           // the frame is the only chrome left
     }
 }
 
