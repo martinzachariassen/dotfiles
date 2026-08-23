@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Registers the chezdistill launchd agents when the job, its engine or either
+# plist changes. Re-registering is how an edited plist takes effect at all —
+# launchd caches the loaded copy, so a rewritten file alone changes nothing.
+#
+# scripts/bin/distill.sh  hash: {{ include "../scripts/bin/distill.sh" | sha256sum }}
+# scripts/lib/distill.sh  hash: {{ include "../scripts/lib/distill.sh" | sha256sum }}
+# nightly plist           hash: {{ include "Library/LaunchAgents/no.zachariassen.chezdistill.nightly.plist.tmpl" | sha256sum }}
+# weekly plist            hash: {{ include "Library/LaunchAgents/no.zachariassen.chezdistill.weekly.plist.tmpl" | sha256sum }}
+
+set -euo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ chezdistill: not on macOS, skipping"
+exit 0
+{{ end -}}
+
+{{ if not (has "claudeDistiller" (dig "modules" (list) .)) -}}
+echo "→ chezdistill: 'claudeDistiller' module not selected, skipping"
+exit 0
+{{ end -}}
+
+home="{{ .chezmoi.homeDir }}"
+agents="$home/Library/LaunchAgents"
+
+echo "▶ chezdistill"
+
+# launchd writes stdout/stderr to these paths and will not create the directory.
+mkdir -p "$home/.local/state/chezdistill/logs"
+
+for label in nightly weekly; do
+    plist="$agents/no.zachariassen.chezdistill.$label.plist"
+    if [ ! -f "$plist" ]; then
+        echo "  ! $plist missing — apply did not render it"
+        continue
+    fi
+    launchctl bootout "gui/$(id -u)/no.zachariassen.chezdistill.$label" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+        echo "  ✓ $label agent registered"
+    else
+        echo "  ! could not register the $label agent — check: launchctl print gui/$(id -u)"
+    fi
+done
+
+echo "  Nightly at 01:00, weekly on Sunday at 02:00."
+echo "  The vault must exist first — the job creates nothing. Check: chezdistill --status"

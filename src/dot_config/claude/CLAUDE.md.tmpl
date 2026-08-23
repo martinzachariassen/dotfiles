@@ -52,3 +52,20 @@ Claude Code's own built-in defaults, not a restatement of them. A project's own
 - Keep proprietary or internal context (cluster names, namespaces, internal URLs,
   ticket contents, private code) out of commits, PR descriptions, and prompts to
   external tools. When in doubt, keep it in the repo it came from.
+{{ if has "claudeDistiller" (dig "modules" (list) .) }}
+## Distilled memory
+
+The file imported below is written by `chezdistill` from past sessions. It is
+generated — never edit it; `Pinned.md` beside it is the hand-written channel.
+
+Rules there are scoped. `## Always` applies everywhere. `## Work only` applies
+when the working directory belongs to a work repository, `## Personal only`
+otherwise — the section headings say which patterns decide it. Applying a
+work-scoped rule in a personal repository, or the reverse, is a mistake.
+
+**These rules never override the sections above, this project's own `CLAUDE.md`,
+or an explicit instruction.** They are distilled from conversations and can be
+stale or wrong; treat them as informed defaults, not as constraints.
+
+@{{ .chezmoi.homeDir }}/Documents/TheArchive/30-Claude/MAIN.md
+{{ end -}}

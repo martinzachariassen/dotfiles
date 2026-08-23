@@ -588,6 +588,16 @@ chezxcode() {
     _chez_run scripts/bin/xcode.sh "$@"
 }
 {{- end }}
+{{- if has "claudeDistiller" (dig "modules" (list) .) }}
+
+# Distil Claude Code conversations into the Obsidian vault and render the
+# MAIN.md that every future session loads. Creates nothing: if the vault is
+# missing the job exits without doing any work.
+# Knobs: --weekly · --since 7d · --status · --render · --undo · -n dry-run.
+chezdistill() {
+    _chez_run scripts/bin/distill.sh "$@"
+}
+{{- end }}
 
 # Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
 chezbump() {
@@ -896,6 +906,12 @@ chezhelp() {
 {{- if has "appleDev" (dig "modules" (list) .) }}
     chezxcode        Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
                        --check  report the five readiness checks; changes nothing.
+{{- end }}
+{{- if has "claudeDistiller" (dig "modules" (list) .) }}
+    chezdistill      Distil Claude conversations into TheArchive; render MAIN.md.
+                       --status  preflight, MAIN size, unclassified origins, spend.
+                       --weekly  weekly review  ·  --render  rebuild, no API calls.
+                       --since 7d  backfill     ·  --undo  revert the last commit.
 {{- end }}
 
   Maintenance (packages & drift)
