@@ -10,5 +10,8 @@ AGENTS.md
 # Optional per-module content: when a module isn't selected its files are ignored.
 {{ $modules := dig "modules" (list) . -}}
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
+{{ if not (has "claudeDistiller" $modules) }}.config/claude/skills
+Library/LaunchAgents/no.zachariassen.chezdistill.nightly.plist
+Library/LaunchAgents/no.zachariassen.chezdistill.weekly.plist{{ end }}
 {{ if not (has "appleDev" $modules) }}.swiftformat
 .config/swiftlint{{ end }}

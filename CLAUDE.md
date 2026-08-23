@@ -65,6 +65,16 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   and ~40 GB — don't move it into an apply hook or a Brewfile. Its read-only
   probes live in `scripts/lib/xcode.sh` and are shared with `chezdoctor` so the
   two can't disagree; add checks there, not in either caller.
+- **`chezdistill` writes outside the repo, into the Obsidian vault.** It is the one
+  verb whose output lands in `~/Documents/TheArchive/30-Claude` rather than `$HOME`,
+  and it **creates nothing** — preflight requires the vault, its `.obsidian` dir and
+  `30-Claude/` to already exist, then exits 0. Its guiding rule is *the model
+  extracts and narrates, bash decides and writes*: every judgement that must come
+  out identical on two machines (hit counts, scope, what enters `MAIN.md`, what is
+  demoted) is computed in `scripts/lib/distill.sh`, and every `claude -p` call runs
+  `--tools ""` with no write access. Don't move a decision into a prompt — a second
+  machine would then render a different `MAIN.md` and the two would conflict in git
+  on every run. Full model in [docs/ai.md](docs/ai.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in
   `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and
