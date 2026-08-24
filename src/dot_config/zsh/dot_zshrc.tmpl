@@ -593,7 +593,7 @@ chezxcode() {
 # Distil Claude Code conversations into the Obsidian vault and render the
 # MAIN.md that every future session loads. Creates nothing: if the vault is
 # missing the job exits without doing any work.
-# Knobs: --weekly · --since 7d · --status · --render · --undo · -n dry-run.
+# Knobs: --setup · --weekly · --since 7d · --status · --render · --undo · -n.
 chezdistill() {
     _chez_run scripts/bin/distill.sh "$@"
 }
@@ -909,6 +909,7 @@ chezhelp() {
 {{- end }}
 {{- if has "claudeDistiller" (dig "modules" (list) .) }}
     chezdistill      Distil Claude conversations into TheArchive; render MAIN.md.
+                       --setup   turn it on here: folder, module, apply, timers.
                        --status  preflight, MAIN size, unclassified origins, spend.
                        --weekly  weekly review  ·  --render  rebuild, no API calls.
                        --since 7d  backfill     ·  --undo  revert the last commit.

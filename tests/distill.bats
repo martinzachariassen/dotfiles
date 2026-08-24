@@ -300,3 +300,102 @@ item() {
     [ ! -f "$stub/called" ]
     rm -rf "$stub"
 }
+
+# ─── Setup ────────────────────────────────────────────────────────────────────
+#
+# --setup is the only path allowed to create the 30-Claude folder. The guard it
+# must not weaken is the one above: a vault that is unmounted or was never cloned
+# looks exactly like an empty directory, so setup has to refuse just as hard.
+
+# setup_env — a fake HOME with a chezmoi config, plus chezmoi/launchctl stubs so
+# no test can reach the real config, the real apply, or the real launchd.
+# $1 is the TOML module list literal; CHEZMOI_DATA mirrors it as JSON.
+setup_env() {
+    SETUP_HOME="$BATS_TEST_TMPDIR/home"
+    STUBS="$BATS_TEST_TMPDIR/stubs"
+    mkdir -p "$SETUP_HOME/.config/chezmoi" "$STUBS"
+
+    cat >"$SETUP_HOME/.config/chezmoi/chezmoi.toml" <<EOF
+sourceDir = "/x"
+
+[data]
+    name        = "CI"
+    modules     = $1
+EOF
+    printf '#!/usr/bin/env bash\n[ "$1" = data ] && { printf "%%s" "${CHEZMOI_DATA:-{\\}}"; exit 0; }\necho "STUB chezmoi $*" >>"%s/chezmoi.log"\nexit 0\n' \
+        "$STUBS" >"$STUBS/chezmoi"
+    printf '#!/usr/bin/env bash\necho "STUB launchctl $*" >>"%s/launchctl.log"\nexit 1\n' \
+        "$STUBS" >"$STUBS/launchctl"
+    chmod +x "$STUBS/chezmoi" "$STUBS/launchctl"
+
+    CHEZMOI_DATA="$(printf '%s' "$1" | jq -c '{modules: .}')"
+    export CHEZMOI_DATA
+}
+
+# run_setup FLAGS… — --setup against the fake HOME, stubs first on PATH.
+run_setup() {
+    HOME="$SETUP_HOME" PATH="$STUBS:$PATH" YES=1 run bash "$BIN" --setup "$@"
+}
+
+@test "--setup creates the 30-Claude folder inside a real vault" {
+    rmdir "$VAULT/30-Claude"
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    [ -d "$VAULT/30-Claude" ]
+}
+
+@test "--setup never creates the vault itself" {
+    gone="$VAULT-gone"
+    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$gone" '{vaultPath:$v, folder:"30-Claude"}')"
+    export DISTILL_CONFIG_JSON
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 1 ]
+    [ ! -e "$gone" ]
+}
+
+@test "--setup refuses a directory that is not a vault" {
+    rm -rf "$VAULT/.obsidian" "$VAULT/30-Claude"
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".obsidian"* ]]
+    [ ! -e "$VAULT/30-Claude" ]
+}
+
+@test "--setup -n creates nothing and enables nothing" {
+    rmdir "$VAULT/30-Claude"
+    setup_env '["macApps"]'
+    run_setup -n
+    [ "$status" -eq 0 ]
+    [ ! -e "$VAULT/30-Claude" ]
+    grep -q 'modules     = \["macApps"\]$' "$SETUP_HOME/.config/chezmoi/chezmoi.toml"
+    [ ! -f "$STUBS/chezmoi.log" ]
+}
+
+@test "--setup appends claudeDistiller and keeps the other modules" {
+    setup_env '["macApps", "theme"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    grep -q 'modules     = \["macApps", "theme", "claudeDistiller"\]$' \
+        "$SETUP_HOME/.config/chezmoi/chezmoi.toml"
+    grep -q 'apply --force' "$STUBS/chezmoi.log"
+}
+
+@test "--setup handles an empty module list" {
+    setup_env '[]'
+    run_setup
+    [ "$status" -eq 0 ]
+    grep -q 'modules     = \["claudeDistiller"\]$' \
+        "$SETUP_HOME/.config/chezmoi/chezmoi.toml"
+}
+
+@test "--setup is idempotent: an enabled module triggers no apply" {
+    setup_env '["macApps", "claudeDistiller"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    grep -q 'modules     = \["macApps", "claudeDistiller"\]$' \
+        "$SETUP_HOME/.config/chezmoi/chezmoi.toml"
+    [ ! -f "$STUBS/chezmoi.log" ]
+}

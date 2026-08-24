@@ -68,8 +68,11 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 - **`chezdistill` writes outside the repo, into the Obsidian vault.** It is the one
   verb whose output lands in `~/Documents/TheArchive/30-Claude` rather than `$HOME`,
   and it **creates nothing** — preflight requires the vault, its `.obsidian` dir and
-  `30-Claude/` to already exist, then exits 0. Its guiding rule is *the model
-  extracts and narrates, bash decides and writes*: every judgement that must come
+  `30-Claude/` to already exist, then exits 0. The single exception is
+  `chezdistill --setup`, the confirm-gated on-switch, which may create `30-Claude/`
+  and only that, and only once the vault and its `.obsidian` dir are already there —
+  don't extend it to the vault, and don't move any of it into preflight.
+  Its guiding rule is *the model extracts and narrates, bash decides and writes*: every judgement that must come
   out identical on two machines (hit counts, scope, what enters `MAIN.md`, what is
   demoted) is computed in `scripts/lib/distill.sh`, and every `claude -p` call runs
   `--tools ""` with no write access. Don't move a decision into a prompt — a second
