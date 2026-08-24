@@ -13,23 +13,68 @@ Gated on the `claudeDistiller` module. Verb reference in
 
 ## Turning it on
 
-The job **creates nothing**. Preflight requires all of this to exist already and
-exits 0 (quietly, so launchd isn't spammed) otherwise:
+One command, from a checkout of this repo:
 
-1. **Create the folder in Obsidian**: `30-Claude` at the vault root. That is the
-   deliberate on-switch — a vault that hasn't been cloned on this machine looks
-   exactly like an empty directory, and without the check reports would be
-   written into a dead end.
-2. **Enable the module** if this Mac predates it: `chezsetup`, tick
-   *claudeDistiller*. It's in the base profile, so new machines get it by default.
+```sh
+bash ~/Developer/personal/dotfiles/scripts/bin/distill.sh --setup
+```
+
+It goes through the full path — check the vault, create `30-Claude/`, add
+`claudeDistiller` to the module list, apply, register both launchd agents, then
+print `--status`. Every step is confirmed and every step is idempotent, so
+re-running it on a machine that is already set up just reports green. It makes no
+API calls.
+
+The long form of the script path is not an accident: the `chezdistill` shell verb
+is gated on the module, so until `--setup` has turned the module on, the verb does
+not exist. Afterwards, `chezdistill --setup` works normally.
+
+**What `--setup` will not do is create the vault.** The job creates nothing, and
+`--setup` bends that rule by exactly one directory. The rule exists because a vault
+that was never cloned — or is not mounted right now — looks exactly like an empty
+directory, and reports written into one would vanish. That guard is the
+vault + `.obsidian` check, and `--setup` enforces it just as hard: no vault, or no
+`.obsidian` inside it, and it refuses and exits 1 having changed nothing. Clone or
+mount TheArchive first.
+
+Preflight itself is untouched, so the nightly job still requires the vault, its
+`.obsidian` dir and `30-Claude/` to already exist, and exits 0 quietly (so launchd
+isn't spammed) when any is missing.
+
+**On the work machine only**, confirm `storecode` writes where the harvester looks.
+If `--status` shows an empty harvest, add the real path to `transcriptRoots` in
+[`distill.toml`](../src/.chezmoidata/distill.toml).
+
+### Doing it by hand
+
+`--setup` is a wrapper around four steps you can also do yourself:
+
+1. **Create the folder in Obsidian**: `30-Claude` at the vault root.
+2. **Enable the module**: `chezsetup`, tick *claudeDistiller*. It's in the base
+   profile, so new machines get it by default.
 3. **Apply**: `chezup`. Hook 06 registers both launchd agents.
 4. **Check**: `chezdistill --status`. It should report the vault path, not
    "not available".
-5. **On the work machine only**, confirm `storecode` writes where the harvester
-   looks. If `--status` shows an empty harvest, add the real path to
-   `transcriptRoots` in [`distill.toml`](../src/.chezmoidata/distill.toml).
 
-Then either wait for 01:00, or run `chezdistill --since 7d` once to backfill.
+## Running it now
+
+Nothing has to wait for 01:00 — the flags below are the same code path launchd
+takes, just started by hand:
+
+```sh
+chezdistill              # the nightly job, right now
+chezdistill -n           # preview: what it would read and run, no model calls
+chezdistill --since 7d   # backfill the last week
+chezdistill --weekly     # the weekly review and compaction
+chezdistill --render     # rebuild MAIN/Inbox/Topics from the ledger, no API calls
+chezdistill --status     # preflight, MAIN size, unclassified origins, spend
+chezdistill --undo       # revert the vault's last distiller commit
+```
+
+`-n` first is the cheap habit: it prints the sessions that would be read and the
+calls that would be made without spending anything. A repeat run of a day already
+distilled is a no-op — the `## Sources` fingerprint matches and no model is called
+— so running it by hand does not double-bill you for the night.
 
 ## What happens each night
 
