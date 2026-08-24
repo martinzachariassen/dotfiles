@@ -236,11 +236,21 @@ ui_progress_render() {
     printf '\r\033[K%s' "$line"
 }
 
-# ui_progress_tick ITEM — one item finished; advance and redraw.
-ui_progress_tick() {
+# ui_progress_advance — one item finished; update the counter without drawing.
+#
+# Split out from ui_progress_tick for the one caller that must keep counting
+# while staying off the screen: a bar parked over a password prompt (see
+# ui_progress_pause) still has to know where it got to, so it can resume at the
+# right count once the prompt is answered.
+ui_progress_advance() {
     local n
     n="$(($(ui_progress_count) + 1))"
     printf '%s\n' "$n" >"$UI_PROGRESS_STATE"
+}
+
+# ui_progress_tick ITEM — one item finished; advance and redraw.
+ui_progress_tick() {
+    ui_progress_advance
     ui_progress_render "${1:-}"
 }
 

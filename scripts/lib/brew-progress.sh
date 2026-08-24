@@ -78,6 +78,146 @@ brew_fetch_label() {
     esac
 }
 
+# ── Password prompts during an install ────────────────────────────────────────
+#
+# Casks that ship an Apple installer package run it under `sudo`. Homebrew hands
+# that child a closed pipe for stdin (Library/Homebrew/system_command.rb), so
+# sudo cannot read stdin and falls back to opening /dev/tty itself. Its prompt
+# therefore never enters the pipeline this file reads — it lands straight on the
+# terminal, underneath the progress bar, and the next `\r\033[K` redraw erases
+# it. What the user sees is a bar frozen at the same count with no explanation,
+# while sudo silently counts down `passwd_timeout` and then fails the cask. That
+# is the "sometimes it works" behaviour: it worked whenever someone happened to
+# type blind into an invisible prompt before it expired.
+#
+# The fix is not to guess from silence — a 500 MB download is silent for exactly
+# the same reason, which is why the old 90-second stall heuristic could never be
+# more than a hedge. It is to ask sudo directly. `sudo -n true` succeeds only
+# when a call would NOT prompt, so:
+#
+#   ticket held    → nothing can prompt → keep the bar live, clock and all
+#   ticket missing → a prompt may arrive at any moment → stop drawing entirely,
+#                    say what is about to be asked, and leave the line free
+#
+# Polling also refreshes the timestamp, so in the normal case (pre-authorised by
+# the hook before the bar ever starts) the ticket cannot lapse mid-run and the
+# bar never has to park at all.
+
+# brew_sudo_ready — 0 when Homebrew cannot be blocked on a password prompt.
+#
+# `-n` never prompts, so this is safe to poll from inside the render loop. stdin
+# is /dev/null deliberately: the loop's own stdin is the pipe carrying brew's
+# output, and sudo must not eat a line of it. No sudo on PATH means nothing can
+# prompt. BREW_PROGRESS_SUDO_PROBE=0 disables the probe for non-interactive runs.
+brew_sudo_ready() {
+    [ "${BREW_PROGRESS_SUDO_PROBE:-1}" = "1" ] || return 0
+    command -v sudo >/dev/null 2>&1 || return 0
+    sudo -n true </dev/null >/dev/null 2>&1
+}
+
+# brew_is_sudo_notice CLEAN — 0 when CLEAN is Homebrew announcing that it is
+# about to run something under sudo. Current Homebrew prints
+#   ==> Running installer for docker-desktop with `sudo` (which may request your password)...
+# and older versions ended it "; the password may be necessary." Matching any of
+# the three lets the bar park on the exact line before the prompt, rather than
+# waiting for the poll interval to notice.
+brew_is_sudo_notice() {
+    case "$1" in
+        *'may request your password'* | *'password may be necessary'* | *'with `sudo`'*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# brew_sudo_notice_target LINE [FALLBACK] — the cask an already-matched sudo
+# notice refers to, so the banner can name what is being installed. Falls back
+# to the caller's current entry when the wording changes upstream.
+brew_sudo_notice_target() {
+    local name
+    name="$(printf '%s\n' "$1" | sed -nE 's/.*installer for ([^ ]+).*/\1/p')"
+    if [ -n "$name" ]; then
+        printf '%s' "$name"
+    else
+        printf '%s' "${2:-}"
+    fi
+}
+
+# brew_sudo_park ITEM — clear the bar and explain the prompt that is coming.
+#
+# `dim`, not `explain`: QUIET=1 drops prose, and the one thing that must never
+# arrive unannounced is a password prompt. Several short lines on purpose — this
+# is the single moment in an otherwise unattended install where the machine
+# needs a human, and it has to be readable at a glance.
+brew_sudo_park() {
+    local item="${1:-}"
+    ui_progress_pause ""
+    hr
+    printf '%s  %s%s%s %s%s%s\n' "$(line_prefix)" "$YELLOW" "$NODE" "$RESET" \
+        "$BOLD" "Administrator password needed" "$RESET"
+    # "around" and not "installing": the last entry line we saw is a good hint at
+    # who is asking, but Homebrew can start the installer for one cask while the
+    # counter still reads the previous one. brew_sudo_park_target names it exactly
+    # once Homebrew says so — that correction must not read as a contradiction.
+    if [ -n "$item" ]; then
+        dim "Homebrew is around \"$item\" and has reached a step that installs"
+        dim "with an Apple installer package. macOS will not run it without admin."
+    else
+        dim "Homebrew has reached a step that needs admin access."
+    fi
+    dim "Type your macOS login password at the prompt below, then press Enter."
+    dim "Nothing appears as you type — that is normal, not a frozen terminal."
+    dim "Touch ID works here too, if you have it enabled for sudo."
+    dim "The install is paused until you answer; the progress bar is hidden so"
+    dim "nothing overwrites the prompt."
+    hr
+}
+
+# brew_sudo_park_target ITEM — name the cask once the bar is already parked.
+#
+# Order of events on a machine that never had a ticket: the bar parks before the
+# first line of output, so the banner cannot say what is being installed —
+# Homebrew only names the cask on the line immediately before it calls sudo.
+# This adds that name when it arrives, rather than leaving the user to guess
+# which of sixty-five packages stopped the install.
+brew_sudo_park_target() {
+    printf '%s  %s%s%s It is %s"%s"%s asking — the prompt is below.\n' \
+        "$(line_prefix)" "$YELLOW" "$NODE" "$RESET" "$BOLD" "$1" "$RESET"
+}
+
+# brew_sudo_unpark — confirm what happened, before the bar comes back.
+# The ticket is re-checked rather than assumed: a prompt can also end by timing
+# out or being declined, and reporting that as success is worse than not
+# reporting it at all.
+brew_sudo_unpark() {
+    if brew_sudo_ready; then
+        ok "password accepted — resuming the install"
+    else
+        warn "continuing without admin access — apps that need an installer may fail"
+    fi
+}
+
+# brew_parked_line ITEM — a settled "[12/65] docker-desktop" line, used in place
+# of the bar while parked. Printed only when an entry genuinely finishes, so it
+# can never appear while a prompt is on screen waiting (Homebrew is blocked, and
+# blocked means no output) — but a run that continued past a declined prompt
+# still visibly makes progress instead of looking dead.
+brew_parked_line() {
+    dim "$(printf '[%s/%s] %s' "$(ui_progress_count)" "${UI_PROGRESS_TOTAL:-0}" "${1:-}")"
+}
+
+# brew_quiet_label ITEM SECS — the bar's label once Homebrew has gone quiet.
+# Reached only while the ticket is held, which rules a prompt out — so this can
+# say plainly that it is a download and keep the elapsed clock running, instead
+# of parking and freezing it for the several minutes a big cask takes.
+brew_quiet_label() {
+    local item="${1:-}" secs="${2:-0}" for_
+    for_="$(printf '%dm%02ds' "$((secs / 60))" "$((secs % 60))")"
+    if [ -n "$item" ]; then
+        printf '%s — quiet for %s, still downloading' "$item" "$for_"
+    else
+        printf 'quiet for %s, still downloading' "$for_"
+    fi
+}
+
 # brew_progress_consume SENTINEL — read brew output on stdin, ticking the shared
 # ui_progress counter once per resolved entry. Returns when SENTINEL arrives.
 #
@@ -85,38 +225,58 @@ brew_fetch_label() {
 # BOTH a timeout and real EOF (the >128 convention is bash 4+). Without it the
 # loop cannot tell "still downloading" from "finished", and either exits early or
 # hangs. The 1s timeout is what keeps the clock moving during a long single
-# download, when no new line arrives for minutes.
-#
-# BREW_PROGRESS_STALL is the other half of that timeout. After this many silent
-# seconds the bar is *parked*: cleared once, explained, and then not repainted
-# until Homebrew speaks again. Casks write `sudo` prompts straight to /dev/tty,
-# which a 1Hz `\r\033[K` redraw erases — so a machine waiting for a password
-# looked identical to one downloading, and the install sat there until the
-# prompt timed out. Parking costs a frozen elapsed clock during long downloads;
-# an erased password prompt costs the package.
+# download, when no new line arrives for minutes — and what paces the sudo poll.
 brew_progress_consume() {
-    local sentinel="$1" line clean current="" idle=0 parked=0
+    local sentinel="$1" line clean label current="" named="" ticked
+    local idle=0 parked=0 since_poll=0
     local max_idle="${BREW_PROGRESS_MAX_IDLE:-3600}"
-    local stall="${BREW_PROGRESS_STALL:-90}"
+    local quiet_after="${BREW_PROGRESS_STALL:-90}"
+    local poll="${BREW_SUDO_POLL:-15}"
+
+    # Settle the ticket question before drawing anything at all. A bar that
+    # never appears is better than one that appears and then eats a prompt.
+    if ! brew_sudo_ready; then
+        parked=1
+        brew_sudo_park ""
+    fi
+
     while :; do
+        label=""
+        ticked=0
         if IFS= read -r -t 1 line; then
             idle=0
             [ "$line" = "$sentinel" ] && break
-            # Coming back from a park: the note stays, the bar resumes below it.
-            parked=0
             clean="$(brew_strip_ansi "$line")"
             case "$clean" in
                 "==> Fetching"* | "==> Downloading"*)
                     # Homebrew bulk-fetches before resolving any entry; show that
                     # rather than sitting at 0/N with no explanation.
-                    ui_progress_render "$(brew_fetch_label "$clean")"
+                    label="$(brew_fetch_label "$clean")"
                     ;;
-                "==>"*) ;; # Homebrew's own narration — never a bundle entry.
+                "==>"*)
+                    # Homebrew's own narration — never a bundle entry, but it is
+                    # where sudo gets announced. Force the poll on that line so
+                    # the bar is already out of the way when sudo speaks.
+                    if brew_is_sudo_notice "$clean"; then
+                        current="$(brew_sudo_notice_target "$clean" "$current")"
+                        if [ "$parked" -eq 1 ]; then
+                            if [ -n "$current" ] && [ "$current" != "$named" ]; then
+                                named="$current"
+                                brew_sudo_park_target "$current"
+                            fi
+                        else
+                            since_poll="$poll"
+                        fi
+                    fi
+                    label="$current"
+                    ;;
                 *)
                     if brew_is_entry_line "$clean"; then
                         current="$(brew_entry_name "$clean")"
-                        ui_progress_tick "$current"
+                        ui_progress_advance
+                        ticked=1
                     fi
+                    label="$current"
                     ;;
             esac
         else
@@ -124,27 +284,31 @@ brew_progress_consume() {
             # the loop; this cap only catches a producer killed mid-stream.
             idle=$((idle + 1))
             [ "$idle" -gt "$max_idle" ] && break
-            if [ "$idle" -eq "$stall" ]; then
-                parked=1
-                ui_progress_pause "$(brew_stall_note "$current" "$stall")"
+            label="$current"
+            [ "$idle" -ge "$quiet_after" ] && label="$(brew_quiet_label "$current" "$idle")"
+        fi
+
+        since_poll=$((since_poll + 1))
+        if [ "$since_poll" -ge "$poll" ]; then
+            since_poll=0
+            if brew_sudo_ready; then
+                if [ "$parked" -eq 1 ]; then
+                    parked=0
+                    brew_sudo_unpark
+                fi
             elif [ "$parked" -eq 0 ]; then
-                ui_progress_render "$current"
+                parked=1
+                named="$current"
+                brew_sudo_park "$current"
             fi
         fi
-    done
-}
 
-# brew_stall_note ITEM SECONDS — what to leave on screen when the bar parks.
-# Deliberately does not claim a password is being asked for: a big cask download
-# is silent for the same reason. It names both possibilities and gets out of the
-# way so whichever one it is can show itself.
-brew_stall_note() {
-    local item="${1:-}" secs="${2:-90}"
-    if [ -n "$item" ]; then
-        printf 'no output from Homebrew for %ss on "%s" — it is on a long download, or waiting for a password prompt below.' "$secs" "$item"
-    else
-        printf 'no output from Homebrew for %ss — it is on a long download, or waiting for a password prompt below.' "$secs"
-    fi
+        if [ "$parked" -eq 1 ]; then
+            [ "$ticked" -eq 1 ] && brew_parked_line "$current"
+        else
+            ui_progress_render "$label"
+        fi
+    done
 }
 
 # ── Failure reporting ─────────────────────────────────────────────────────────
@@ -167,9 +331,21 @@ brew_unmet_entries() {
 # brew_error_lines LOG [MAX] — the lines from LOG that state a failure, newest
 # last. Falls back to the tail only when nothing matches, so there is always
 # something to read.
+# brew_sudo_failed LOG — 0 when LOG shows sudo itself giving up: the prompt
+# timed out, was declined, or was never answerable. Worth separating from a
+# failed download, because the advice is the opposite — a retry of the same
+# download may well work, whereas this one only stops happening if the password
+# is given (or pre-authorised) next time.
+brew_sudo_failed() {
+    grep -aqiE 'sudo: (a (terminal|password)|no (tty|password|askpass)|[0-9]+ incorrect|timed out reading password)' \
+        "$1" 2>/dev/null
+}
+
 brew_error_lines() {
     local log="$1" max="${2:-12}" hits
-    hits="$(grep -aiE '^[^A-Za-z]*(error|fatal|warning: .*fail)' "$log" 2>/dev/null | tail -n "$max")"
+    # `^sudo:` too: a prompt that timed out is the failure, but it says neither
+    # "error" nor "fatal", so the old pattern reported a dead download instead.
+    hits="$(grep -aiE '^[^A-Za-z]*(error|fatal|warning: .*fail)|^sudo:' "$log" 2>/dev/null | tail -n "$max")"
     if [ -n "$hits" ]; then
         printf '%s\n' "$hits"
     else

@@ -66,6 +66,43 @@ fi
 explain "Some packages are missing — installing them now. This is the slow step;" \
     "Homebrew prints its own progress below."
 
+# ─── Pre-flight: admin access ─────────────────────────────────────────────────
+# Casks that ship an Apple installer package run it under `sudo`, and Homebrew
+# gives that child a closed stdin — so sudo opens /dev/tty itself and its prompt
+# bypasses the pipeline below, landing *underneath* the progress bar where the
+# next redraw erases it. Asking here, on a clean screen before the bar exists,
+# means that prompt never has to happen at all. (brew-progress.sh handles the
+# case where it does anyway: it stops drawing whenever the ticket is missing.)
+#
+# SUDO_PROMPT is exported for Homebrew's *own* sudo calls, which pass `-E`.
+# Without it a cask asks with a bare "Password:" that names neither who is
+# asking nor why, in the middle of a wall of install output.
+SUDO_PROMPT="  macOS password for %u (Homebrew needs admin access): "
+export SUDO_PROMPT
+
+if ! sudo -n true </dev/null 2>/dev/null; then
+    hr
+    info "some apps install with an Apple installer package and need admin access"
+    # dim, not explain: QUIET=1 drops prose, and a password prompt is the one
+    # thing that must never arrive unannounced.
+    dim "Enter your macOS login password once now, before the install starts."
+    dim "Nothing appears as you type — that is normal. Touch ID works here too."
+    sleep 0.2 # let the lines above drain before sudo flips the line discipline
+    if sudo -v -p "  macOS password for %u: "; then
+        ok "admin access granted — you should not be asked again during this install"
+        # Keep the ticket alive for the whole bundle: a 65-package run is well
+        # past sudo's 5-minute cache, and a cask installing at minute 12 would
+        # otherwise prompt again from behind the progress bar.
+        # shellcheck source=../../scripts/lib/sudo.sh
+        . "{{ .chezmoi.workingTree }}/scripts/lib/sudo.sh"
+        sudo_keep_warm "$$"
+    else
+        warn "no admin access — apps that need an installer package will be skipped"
+        dim "Everything else still installs. Re-run \`chezup\` to finish the rest."
+    fi
+    hr
+fi
+
 # ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
 # Homebrew 6.0 ignores non-official taps until trusted; without this, `brew bundle` silently skips their formulae.
 for f in "${FILES[@]}"; do
@@ -159,6 +196,16 @@ if [ "${#failures[@]}" -gt 0 ]; then
     dim "    what Homebrew reported:"
     brew_error_lines "$BREW_LOG" 12 | grep -v "$BUNDLE_DONE" | sed 's/^/      /'
     dim "    full log: $BREW_LOG"
+
+    # A password prompt that expired is not a flaky download, and the generic
+    # "re-run and it may work" advice below is wrong for it — say so separately.
+    if brew_sudo_failed "$BREW_LOG"; then
+        hr
+        warn "at least one app failed because the admin password was not entered"
+        dim "    macOS stops waiting after about a minute. Re-run \`chezup\` and enter"
+        dim "    your password at the \"macOS password\" prompt before the install starts;"
+        dim "    everything already installed is skipped, so it picks up where it left off."
+    fi
 
     # Deliberately not "usually transient". Sometimes it is a download; sometimes
     # the package cannot install on this machine at all, and telling someone to

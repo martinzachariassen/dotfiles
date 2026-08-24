@@ -23,6 +23,15 @@ applied by the `macosDefaults` module) you can tap instead. Immediately after
 the first one, Homebrew's own installer prints a long wall of `/usr/bin/sudo …`
 lines — that is what it always does, not a failure.
 
+Every ask is deliberately placed on a clean screen *before* a long noisy step,
+never in the middle of one — the package step re-checks the ticket and asks
+before its progress bar starts, and holds it warm for the length of the bundle.
+If the ticket lapses anyway, the bar stops drawing and an **Administrator
+password needed** banner takes its place rather than a prompt being overwritten
+mid-redraw (see [commands.md](commands.md#progress)). You always get an explicit
+`✓ password accepted` when it lands, and a warning naming the password — not the
+download — if a cask failed because the prompt went unanswered.
+
 **"Xcode Command Line Tools" is not Xcode.** Step 1 installs Apple's compilers
 because Homebrew needs them, and nothing more: no iOS SDK, no Simulator, no
 SourceKit-LSP. Selecting the `appleDev` module gets you the Swift *tooling*
