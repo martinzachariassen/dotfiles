@@ -17,6 +17,8 @@ exit 0
 . "{{ .chezmoi.workingTree }}/scripts/lib/log.sh"
 # shellcheck source=../../scripts/lib/brew-progress.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/brew-progress.sh"
+# shellcheck source=../../scripts/lib/homebrew.sh
+. "{{ .chezmoi.workingTree }}/scripts/lib/homebrew.sh"
 ui_init_logging
 tty_reattach || warn "no terminal available; casks needing sudo may ask later"
 
@@ -29,6 +31,12 @@ elif ! command -v brew >/dev/null 2>&1; then
     warn "brew not found — skipping packages (expected /opt/homebrew on Apple Silicon)"
     exit 0
 fi
+
+# Before any `brew trust` call: pin trust.json to the one path the deployed
+# zshenv will also make brew use. Unpinned, a `curl | bash` first install (no
+# XDG_CONFIG_HOME) writes ~/.homebrew/trust.json and every later shell reads
+# ~/.config/homebrew/trust.json instead.
+brew_trust_store >/dev/null
 
 {{ $modules := dig "modules" (list) . -}}
 FILES=(
@@ -104,14 +112,25 @@ if ! sudo -n true </dev/null 2>/dev/null; then
 fi
 
 # ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
-# Homebrew 6.0 ignores non-official taps until trusted; without this, `brew bundle` silently skips their formulae.
-for f in "${FILES[@]}"; do
-    [ -f "$f" ] || continue
+# Homebrew 6.0 ignores non-official taps until trusted, and `brew bundle` skips
+# their entries without saying so — a work-profile install reported success with
+# neither kubelogin nor terraform on the machine. Trust is granted here, then
+# read back, and anything that didn't take is named loudly *before* the progress
+# bar starts, because a warning printed underneath the bar is a warning nobody
+# sees.
+untrusted_taps="$(brew_trust_taps "${FILES[@]}")"
+if [ -n "$untrusted_taps" ]; then
+    hr
+    warn "Homebrew will not load these taps, so their packages get skipped:"
     while IFS= read -r taprepo; do
         [ -n "$taprepo" ] || continue
-        brew trust --tap "$taprepo" >/dev/null 2>&1 || echo "! could not trust tap: $taprepo"
-    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "$f")
-done
+        dim "    $taprepo"
+    done <<EOF
+$untrusted_taps
+EOF
+    dim "    fix: brew trust --tap <name>, then re-run \`chezup\`"
+    hr
+fi
 
 # ─── Pre-flight: clear stale partial downloads ───────────────────────────────
 # A leftover *.incomplete can trigger a race that makes brew bundle wrongly report the file as failed.
@@ -205,6 +224,22 @@ if [ "${#failures[@]}" -gt 0 ]; then
         dim "    macOS stops waiting after about a minute. Re-run \`chezup\` and enter"
         dim "    your password at the \"macOS password\" prompt before the install starts;"
         dim "    everything already installed is skipped, so it picks up where it left off."
+    fi
+
+    # Same reasoning for trust: an untrusted tap is not a flaky download either,
+    # and it is the one failure whose symptom is a package that never appears in
+    # the log at all — so re-read the store rather than grepping the output.
+    still_untrusted="$(brew_trust_taps "${FILES[@]}")"
+    if [ -n "$still_untrusted" ]; then
+        hr
+        warn "at least one tap is still untrusted, so Homebrew skipped its packages"
+        while IFS= read -r taprepo; do
+            [ -n "$taprepo" ] || continue
+            dim "    brew trust --tap $taprepo"
+        done <<EOF
+$still_untrusted
+EOF
+        dim "    run the line(s) above, then re-run \`chezup\`."
     fi
 
     # Deliberately not "usually transient". Sometimes it is a download; sometimes

@@ -136,6 +136,12 @@ not_declares() {
     declares "$WORK" cask gcloud-cli
 }
 
+# Not a casual app addition: a work Mac that isn't enrolled in Intune loses
+# access to the corporate resources the rest of this tier exists to reach.
+@test "work Brewfile declares intune-company-portal" {
+    declares "$WORK" cask intune-company-portal
+}
+
 # Microsoft 365 footgun: the suite cask `conflicts_with` every standalone
 # Office cask. If both are listed `brew bundle` fails outright on a clean
 # install — a real foot-cannon documented inline in the Brewfile.
