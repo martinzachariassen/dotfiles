@@ -61,7 +61,11 @@ apply count, so these re-fire only when their embedded content hash changes.
 Package convergence uses Homebrew's native `brew bundle`: the
 `02-brew-bundle` hook reads the active file set from
 [`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml), then
-runs `brew bundle --no-upgrade` to converge *presence*, not freshness. It
+runs `brew bundle --no-upgrade` to converge *presence*, not freshness. Casks
+that ship an Apple installer package need admin access, so the hook confirms
+the sudo ticket (asking on a clean screen, before the progress bar) and keeps
+it warm for the length of the bundle rather than letting a prompt surface from
+behind the bar. It
 only *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling
 packages the Brewfile no longer lists) is `chezmirror`'s: an apply must never
 silently uninstall, so `chezapply` flags untracked packages and `chezmirror`
@@ -136,7 +140,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 
 | Concern | Source |
 |---|---|
-| Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `scripts/lib/sudo.sh`) |
+| Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `scripts/lib/sudo.sh`); `run_after_02-brew-bundle` re-checks and asks again before its progress bar starts, if the ticket lapsed |
 | Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `scripts/lib/homebrew.sh`) |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |

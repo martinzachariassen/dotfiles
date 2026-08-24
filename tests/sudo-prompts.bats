@@ -14,6 +14,7 @@ setup() {
     SUDO_LIB="$REPO_ROOT/scripts/lib/sudo.sh"
     MACOS="$REPO_ROOT/scripts/bin/macos-defaults.sh"
     HOOK="$REPO_ROOT/src/.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl"
+    BREW="$REPO_ROOT/src/.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl"
 }
 
 # ─── install.sh ───────────────────────────────────────────────────────────────
@@ -73,6 +74,65 @@ setup() {
     # announcing a prompt that never appears.
     run bash -c "grep -A6 'if ! sudo -n true' '$MACOS' | grep -c 'earlier admin session expired'"
     [ "$output" = "1" ]
+}
+
+# ─── the brew-bundle step ─────────────────────────────────────────────────────
+# The worst prompt in the whole install: a cask running an Apple installer under
+# sudo writes to /dev/tty, which the progress bar's 1Hz redraw erased. Ask for
+# the password *before* the bar exists and the prompt never has to happen there.
+
+@test "admin access is obtained before the progress bar starts" {
+    # Order matters more than the call itself: the pre-flight is only a fix if
+    # it runs while the screen is still clean.
+    preflight="$(grep -n 'sudo -v -p' "$BREW" | head -n1 | cut -d: -f1)"
+    bar="$(grep -n 'ui_progress_start' "$BREW" | head -n1 | cut -d: -f1)"
+    [ -n "$preflight" ]
+    [ -n "$bar" ]
+    [ "$preflight" -lt "$bar" ]
+}
+
+@test "the brew step only asks when the ticket has actually lapsed" {
+    # run_before_00 normally has it cached already; an unconditional prompt here
+    # would be a third ask for a password the apply promised to take once.
+    run bash -c "grep -A12 'if ! sudo -n true' '$BREW' | grep -c 'sudo -v -p'"
+    [ "$output" = "1" ]
+}
+
+@test "the brew step's ask explains itself and survives QUIET=1" {
+    grep -q 'need admin access' "$BREW"
+    # dim/info, never explain: QUIET=1 drops prose, and this is a password prompt.
+    grep -q 'dim "Nothing appears as you type' "$BREW"
+    grep -q 'info "some apps install with an Apple installer' "$BREW"
+}
+
+@test "the brew step confirms the password was accepted" {
+    # A prompt that vanishes with no acknowledgement reads as a prompt that was
+    # missed. Say it landed, and say it will not come back.
+    grep -q 'ok "admin access granted' "$BREW"
+    grep -q 'not be asked again' "$BREW"
+}
+
+@test "the ticket is kept warm for the length of the bundle" {
+    # A 65-package run is well past sudo's 5-minute cache, so pre-authorising
+    # without a keeper just moves the prompt to minute 12 — behind the bar.
+    grep -q 'sudo_keep_warm' "$BREW"
+}
+
+@test "Homebrew's own sudo calls get a prompt that names who is asking" {
+    # Homebrew invokes sudo with -E, so it inherits SUDO_PROMPT. Without it a
+    # cask asks with a bare "Password:" in the middle of a wall of output.
+    grep -q 'export SUDO_PROMPT' "$BREW"
+    grep -q 'SUDO_PROMPT="  macOS password for %u' "$BREW"
+}
+
+@test "a declined password does not fail the whole apply" {
+    # Everything that does not need admin access must still install.
+    grep -q 'no admin access — apps that need an installer package will be skipped' "$BREW"
+}
+
+@test "an expired prompt is reported as a password problem, not a bad download" {
+    grep -q 'brew_sudo_failed' "$BREW"
+    grep -q 'admin password was not entered' "$BREW"
 }
 
 # ─── the keeper ───────────────────────────────────────────────────────────────

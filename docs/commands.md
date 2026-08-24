@@ -132,6 +132,19 @@ and is pinned by `tests/progress.bats`.
 The bar redraws on a 1-second timeout as well as on new output, so during a
 single large cask download the clock keeps moving instead of looking frozen.
 
+**The bar gets out of the way of a password prompt.** A cask that ships an Apple
+installer package runs it under `sudo`, and Homebrew hands that child a closed
+stdin — so `sudo` opens `/dev/tty` itself and its prompt lands *outside* the
+pipeline the bar is reading, where the next redraw erased it. The install really
+was halted, waiting on a prompt nobody could see, until `sudo`'s `passwd_timeout`
+gave up and failed that one cask; that is what made it look intermittent. Now
+`brew-progress.sh` polls `sudo -n true` and, the moment the ticket is missing,
+stops drawing entirely and prints an **Administrator password needed** banner
+instead — the counter keeps advancing off-screen, finished packages print as
+plain `[n/total]` lines, and the bar only comes back after an `✓ password
+accepted`. The apply hook also asks up front, before the bar exists, so on a
+normal run the prompt never has to happen here at all.
+
 **Where there is no denominator, there is no bar.** Apple's Command Line Tools
 installer exposes no progress data, so that step gets an elapsed timer only —
 `ui_wait_tick`, not `ui_progress_*`. mise renders its own per-tool progress, so

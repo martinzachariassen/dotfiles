@@ -22,7 +22,7 @@ That's the whole install. It works on a fresh Mac *and* on one you've been using
 
 ### What it does — about 15–25 minutes
 
-Almost all of it is downloading. You'll be asked for your macOS password (Homebrew first, then again later for app installs and system settings) — each prompt says why before it appears.
+Almost all of it is downloading. You'll be asked for your macOS password (Homebrew first, then again later for app installs and system settings) — each prompt says why before it appears, waits on a clean screen rather than behind a progress bar, and tells you when it's been accepted.
 
 | # | Step | |
 | --- | --- | --- |

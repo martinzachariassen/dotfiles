@@ -11,6 +11,11 @@ setup() {
     LOG="$REPO_ROOT/scripts/lib/log.sh"
     BP="$REPO_ROOT/scripts/lib/brew-progress.sh"
     FIX="$(mktemp -d)"
+    # The consumer asks `sudo -n true` whether a password prompt is possible.
+    # Left alone, the answer depends on whether the developer running the suite
+    # happened to use sudo in the last five minutes — so it is off by default
+    # here, and the tests that care pin it with sudo_stub.
+    export BREW_PROGRESS_SUDO_PROBE=0
 }
 teardown() { rm -rf "$FIX"; }
 
@@ -18,6 +23,55 @@ teardown() { rm -rf "$FIX"; }
 # Without this these tests assert Unicode while ui_init_glyphs may correctly pick
 # the ASCII fallback, and they pass or fail on the runner's environment.
 lib() { printf 'export LC_ALL=en_US.UTF-8; . "%s"; . "%s"; ui_init_logging;' "$LOG" "$BP"; }
+
+# sudo_stub EXIT — put a `sudo` on PATH that always exits EXIT, and re-enable
+# the probe. 0 = ticket held (nothing can prompt), 1 = ticket missing.
+sudo_stub() {
+    mkdir -p "$FIX/bin"
+    printf '#!/usr/bin/env bash\nexit %s\n' "$1" >"$FIX/bin/sudo"
+    chmod +x "$FIX/bin/sudo"
+    printf 'export PATH="%s:$PATH" BREW_PROGRESS_SUDO_PROBE=1;' "$FIX/bin"
+}
+
+# has / lacks NEEDLE HAYSTACK — substring assertions that actually fail the test.
+#
+# bats' errexit does not fire on a bare `[[ … ]]`, so an inline pattern check
+# that is not the last line of a test is silently ignored — every assertion
+# above the final one passes for free. A function returning non-zero does abort,
+# so these give the assertion back its teeth.
+has() {
+    case "$2" in
+        *"$1"*) ;;
+        *)
+            printf 'expected to find: %s\n---\n%s\n---\n' "$1" "$2" >&2
+            return 1
+            ;;
+    esac
+}
+lacks() {
+    case "$2" in
+        *"$1"*)
+            printf 'expected NOT to find: %s\n---\n%s\n---\n' "$1" "$2" >&2
+            return 1
+            ;;
+        *) ;;
+    esac
+}
+
+# sudo_stub_after N — a `sudo` that fails its first N-1 calls then succeeds,
+# standing in for a password being typed partway through the run.
+sudo_stub_after() {
+    mkdir -p "$FIX/bin"
+    cat >"$FIX/bin/sudo" <<EOF
+#!/usr/bin/env bash
+n=\$(cat "$FIX/calls" 2>/dev/null || echo 0)
+n=\$((n + 1))
+printf '%s' "\$n" >"$FIX/calls"
+[ "\$n" -ge $1 ]
+EOF
+    chmod +x "$FIX/bin/sudo"
+    printf 'export PATH="%s:$PATH" BREW_PROGRESS_SUDO_PROBE=1;' "$FIX/bin"
+}
 
 # ─── the bar itself ───────────────────────────────────────────────────────────
 
@@ -170,33 +224,162 @@ lib() { printf 'export LC_ALL=en_US.UTF-8; . "%s"; . "%s"; ui_init_logging;' "$L
     [ "$output" = "3" ]
 }
 
-@test "the bar parks when Homebrew goes silent, so a password prompt survives" {
-    # A cask writes its sudo prompt straight to /dev/tty; the 1Hz redraw used to
-    # erase it. After BREW_PROGRESS_STALL silent seconds the bar must clear
-    # itself, say why, and stop repainting.
-    run bash -c "$(lib) export BREW_PROGRESS_STALL=2; ui_progress_start 2 p >/dev/null
-        { printf 'Installing docker-desktop\n'; sleep 4; printf 'SENT\n'; } |
+# ─── password prompts ─────────────────────────────────────────────────────────
+# A cask's `sudo` prompt goes straight to /dev/tty — Homebrew hands the child a
+# closed stdin, so sudo opens the terminal itself and the prompt never enters
+# the pipe this consumer reads. The 1Hz `\r\033[K` redraw then erased it, which
+# is what made a real install look frozen and "work sometimes". The consumer
+# must therefore never draw while a prompt is possible, and it decides that by
+# asking sudo rather than by guessing from silence.
+
+@test "the bar never draws while the admin ticket is missing" {
+    run bash -c "$(sudo_stub 1) $(lib) ui_progress_start 2 p >/dev/null
+        { printf 'Installing docker-desktop\n'; sleep 3; printf 'SENT\n'; } |
             brew_progress_consume SENT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no output from Homebrew"* ]]
-    [[ "$output" == *"docker-desktop"* ]]
-    [[ "$output" == *"waiting for a password prompt"* ]]
+    has "Administrator password needed" "$output"
+    # Nothing that would overwrite the prompt: no bar, no per-item repaint.
+    lacks "░" "$output"
+    lacks "█" "$output"
 }
 
-@test "the stall note never claims a password is being asked for" {
-    # It cannot know: a large download is silent for the same reason. Naming
-    # both possibilities is the honest form.
-    run bash -c "$(lib) brew_stall_note 'docker-desktop' 90"
-    [[ "$output" == *"long download"* ]]
-    [[ "$output" == *"or waiting for a password"* ]]
+@test "the banner says plainly that a password is being asked for" {
+    # The old note could not know — a large download is silent for the same
+    # reason — so it hedged. Asking sudo removes the ambiguity, and the wording
+    # has to be unambiguous too: this is the one moment a human is needed.
+    run bash -c "$(lib) brew_sudo_park 'docker-desktop'"
+    has "Administrator password needed" "$output"
+    has "docker-desktop" "$output"
+    has "Nothing appears as you type" "$output"
+    has "Touch ID" "$output"
+    has "paused" "$output"
 }
 
-@test "parking happens once, not on every idle second" {
-    run bash -c "$(lib) export BREW_PROGRESS_STALL=2; ui_progress_start 1 p >/dev/null
-        { printf 'Installing x\n'; sleep 5; printf 'SENT\n'; } |
+@test "the banner survives QUIET=1" {
+    # explain() drops prose under QUIET; a password prompt must never be dropped.
+    run bash -c "$(lib) QUIET=1 brew_sudo_park 'docker-desktop'"
+    has "Administrator password needed" "$output"
+    has "Nothing appears as you type" "$output"
+}
+
+@test "parking happens once, not on every poll" {
+    run bash -c "$(sudo_stub 1) $(lib) export BREW_SUDO_POLL=1
+        ui_progress_start 1 p >/dev/null
+        { printf 'Installing x\n'; sleep 4; printf 'SENT\n'; } |
             brew_progress_consume SENT"
-    count="$(printf '%s' "$output" | grep -c 'no output from Homebrew' || true)"
+    count="$(printf '%s' "$output" | grep -c 'Administrator password needed' || true)"
     [ "$count" = "1" ]
+}
+
+@test "the bar keeps its clock running while the ticket is held" {
+    # The old behaviour parked on silence alone, which froze the elapsed clock
+    # for the several minutes a big cask download takes. A held ticket rules a
+    # prompt out, so silence can be reported as what it is.
+    run bash -c "$(sudo_stub 0) $(lib) export BREW_PROGRESS_STALL=2
+        ui_progress_start 2 p >/dev/null
+        { printf 'Installing docker-desktop\n'; sleep 4; printf 'SENT\n'; } |
+            brew_progress_consume SENT"
+    has "still downloading" "$output"
+    lacks "Administrator password needed" "$output"
+}
+
+@test "the quiet label never claims a password is being asked for" {
+    # It is only ever reached with the ticket held, where a prompt is impossible.
+    run bash -c "$(lib) brew_quiet_label 'docker-desktop' 125"
+    has "docker-desktop" "$output"
+    has "2m05s" "$output"
+    lacks "password" "$output"
+    lacks "Password" "$output"
+}
+
+@test "Homebrew's own sudo announcement parks the bar on the spot" {
+    # Homebrew prints exactly one line before it calls sudo. Waiting for the
+    # poll interval instead would leave the bar repainting over the prompt for
+    # up to BREW_SUDO_POLL seconds, which is how the prompt got erased.
+    run bash -c "$(sudo_stub 1) $(lib) export BREW_SUDO_POLL=999
+        ui_progress_start 2 p >/dev/null
+        { printf 'Using jq\n'
+          printf '==> Running installer for docker-desktop with \`sudo\` (which may request your password)...\n'
+          sleep 2
+          printf 'SENT\n'; } | brew_progress_consume SENT"
+    has "Administrator password needed" "$output"
+    has "docker-desktop" "$output"
+}
+
+@test "the announcement is recognised in every wording Homebrew has shipped" {
+    run bash -c "$(lib)
+        brew_is_sudo_notice '==> Running installer for x with \`sudo\` (which may request your password)...' && echo A
+        brew_is_sudo_notice '==> Running installer for x; the password may be necessary.' && echo B
+        brew_is_sudo_notice '==> Installing Cask docker-desktop' || echo C"
+    has "A" "$output"
+    has "B" "$output"
+    has "C" "$output"
+}
+
+@test "the announcement names the cask, and falls back when the wording changes" {
+    run bash -c "$(lib) brew_sudo_notice_target '==> Running installer for docker-desktop with \`sudo\`' ''"
+    [ "$output" = "docker-desktop" ]
+    run bash -c "$(lib) brew_sudo_notice_target '==> something new with \`sudo\`' 'obsidian'"
+    [ "$output" = "obsidian" ]
+}
+
+@test "the bar comes back with a confirmation once the password is accepted" {
+    # Silence after a prompt is answered is indistinguishable from silence
+    # before it, so the run has to say which one happened.
+    run bash -c "$(sudo_stub_after 3) $(lib) export BREW_SUDO_POLL=1
+        ui_progress_start 2 p >/dev/null
+        { printf 'Installing docker-desktop\n'; sleep 5; printf 'SENT\n'; } |
+            brew_progress_consume SENT"
+    has "Administrator password needed" "$output"
+    has "password accepted" "$output"
+}
+
+@test "a prompt that was declined is not reported as accepted" {
+    run bash -c "$(lib) $(sudo_stub 1) brew_sudo_unpark"
+    has "without admin access" "$output"
+    lacks "accepted" "$output"
+}
+
+@test "entries still count while the bar is parked" {
+    # The counter has to survive the park, or the bar resumes at the wrong place
+    # and the run reports fewer packages than it installed.
+    run bash -c "$(sudo_stub 1) $(lib) ui_progress_start 3 p >/dev/null
+        { printf 'Using jq\n'; printf 'Using fd\n'; printf 'Using bat\n'
+          printf 'SENT\n'; } | brew_progress_consume SENT >/dev/null
+        printf '%s' \"\$(ui_progress_count)\""
+    [ "$output" = "3" ]
+}
+
+@test "a parked run still shows the packages it finishes" {
+    # Past a declined prompt Homebrew keeps going. Nothing may repaint, but a
+    # settled line per completed entry keeps the run from looking dead.
+    run bash -c "$(sudo_stub 1) $(lib) ui_progress_start 2 p >/dev/null
+        { printf 'Using jq\n'; printf 'Using fd\n'; printf 'SENT\n'; } |
+            brew_progress_consume SENT"
+    has "[1/2] jq" "$output"
+    has "[2/2] fd" "$output"
+}
+
+@test "the probe never reads from the pipe it is polling beside" {
+    # `sudo -n true` inheriting the consumer's stdin would swallow a line of
+    # Homebrew's output, silently losing a tick.
+    grep -q 'sudo -n true </dev/null' "$BP"
+}
+
+@test "a sudo timeout is reported as a password problem, not a bad download" {
+    printf 'sudo: timed out reading password\nError: Failure while executing\n' >"$FIX/log"
+    run bash -c "$(lib) brew_sudo_failed '$FIX/log' && echo YES"
+    [ "$output" = "YES" ]
+    # ...and the line itself survives into the error extract, which used to grep
+    # only for error/fatal and so showed a dead download instead.
+    run bash -c "$(lib) brew_error_lines '$FIX/log' 12"
+    has "timed out reading password" "$output"
+}
+
+@test "an ordinary download failure is not blamed on the password" {
+    printf 'Error: Download failed on Cask docker-desktop\n' >"$FIX/log"
+    run bash -c "$(lib) brew_sudo_failed '$FIX/log' || echo NO"
+    [ "$output" = "NO" ]
 }
 
 @test "the consumer stops at the sentinel instead of hanging" {

@@ -10,7 +10,7 @@ exit 0
 {{ end -}}
 
 if sudo -n true 2>/dev/null; then
-    echo "✓ sudo already cached"
+    echo "✓ admin access already granted — you will not be asked during this apply"
 else
     # chezmoi closes stdin; no TTY means nobody to ask — warn and skip.
     # shellcheck source=../../scripts/lib/tty.sh
@@ -22,10 +22,13 @@ else
 
     cat <<'EOF'
 
-▶ sudo access
+▶ Administrator password needed
 
-  Some later steps need admin access for Homebrew casks and macOS
-  defaults. Enter the password once here, before the noisy install output.
+  Some apps install with an Apple installer package, and the macOS
+  settings step changes system preferences. Both need admin access.
+
+  Enter the password once here, before the noisy install output — that
+  way nothing has to stop and ask you halfway through a long download.
 
   Nothing appears as you type — that is sudo, not a frozen terminal.
   If Touch ID for sudo is already enabled, just tap your finger.
@@ -38,7 +41,7 @@ EOF
         echo "! sudo was not cached; steps that need admin access may skip or ask again"
         exit 0
     fi
-    echo "✓ sudo cached for this apply"
+    echo "✓ password accepted — you should not be asked again during this apply"
 fi
 
 # Background keeper: refreshes the sudo timestamp until chezmoi exits, so later
