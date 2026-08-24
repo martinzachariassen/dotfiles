@@ -289,6 +289,86 @@ item() {
     [ "$status" -eq 0 ]
 }
 
+# ─── Run log ──────────────────────────────────────────────────────────────────
+#
+# The run log exists for the runs nobody watches: a nightly job on the other Mac
+# leaves no trace anywhere the user looks, so a failure has to reach the vault.
+
+@test "a run is recorded and rendered into Runs.md" {
+    load_lib
+    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    DISTILL_RUN_SEEN=4
+    DISTILL_RUN_KEPT=2
+    DISTILL_RUN_ITEMS=7
+    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
+    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+
+    [ -f "$VAULT/30-Claude/.state/runs/hostA.jsonl" ]
+    grep -q '| hostA | daily | 2/4 | 7 |' "$VAULT/30-Claude/Runs.md"
+}
+
+@test "a failed run reaches the vault, with the reason" {
+    load_lib
+    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    distill_fail "claude invocation failed for model sonnet" >/dev/null
+    DISTILL_HOST_OVERRIDE=hostA distill_run_record failed
+    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+
+    grep -q '\*\*failed\*\*' "$VAULT/30-Claude/Runs.md"
+    grep -q 'claude invocation failed for model sonnet' "$VAULT/30-Claude/Runs.md"
+}
+
+@test "a skipped session records why it was skipped" {
+    load_lib
+    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    distill_run_session sess-1 personal 2 "too short, no model call" 0
+    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
+    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+
+    grep -q 'too short, no model call' "$VAULT/30-Claude/Runs.md"
+}
+
+@test "both machines' runs appear in one table" {
+    load_lib
+    mkdir -p "$VAULT/30-Claude/.state/runs"
+    for host in hostA hostB; do
+        DISTILL_HOST_OVERRIDE="$host" distill_run_begin daily
+        DISTILL_HOST_OVERRIDE="$host" distill_run_record ok
+    done
+    distill_render_runs
+    grep -q '| hostA |' "$VAULT/30-Claude/Runs.md"
+    grep -q '| hostB |' "$VAULT/30-Claude/Runs.md"
+}
+
+@test "records older than the retention window are pruned" {
+    load_lib
+    mkdir -p "$VAULT/30-Claude/.state/runs"
+    jq -nc --arg t "$(distill_iso_ago 200)" '{t:$t, end:$t, host:"hostA"}' \
+        >"$VAULT/30-Claude/.state/runs/hostA.jsonl"
+    jq -nc --arg t "$(distill_iso_now)" '{t:$t, end:$t, host:"hostA"}' \
+        >>"$VAULT/30-Claude/.state/runs/hostA.jsonl"
+    DISTILL_HOST_OVERRIDE=hostA distill_run_prune
+    [ "$(wc -l <"$VAULT/30-Claude/.state/runs/hostA.jsonl" | tr -d ' ')" -eq 1 ]
+}
+
+@test "rendering the run log twice is byte-identical" {
+    load_lib
+    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
+    distill_render_runs "$VAULT/one.md"
+    distill_render_runs "$VAULT/two.md"
+    diff "$VAULT/one.md" "$VAULT/two.md"
+}
+
+@test "the run log is written before the vault is committed" {
+    load_lib
+    # Both must happen inside distill_run_end, and the record must come first:
+    # a record that lands after the push is only ever committed a day late.
+    awk '/^distill_run_end\(\) \{/,/^\}/' "$LIB" >"$VAULT/end.sh"
+    [ "$(grep -n distill_run_record "$VAULT/end.sh" | cut -d: -f1)" \
+        -lt "$(grep -n distill_git_push "$VAULT/end.sh" | cut -d: -f1)" ]
+}
+
 # ─── Dry run ──────────────────────────────────────────────────────────────────
 
 @test "DRY_RUN makes no model call" {

@@ -46,6 +46,12 @@ minHits = 2
 # demoted from MAIN.md to Topics/. Demotion never deletes.
 demoteAfterDays = 21
 
+# Run log. Every run appends one record to .state/runs/<host>.jsonl and Runs.md
+# is re-rendered from all of them, so the Mac you are not using is visible too.
+# runsShown bounds the table; runRetentionDays bounds the records behind it.
+runsShown = 30
+runRetentionDays = 90
+
 # Extracts hold near-verbatim conversation text and must be committed so the two
 # machines can merge. This bounds how long that text is kept.
 extractRetentionDays = 90
