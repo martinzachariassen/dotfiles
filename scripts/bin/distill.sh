@@ -31,16 +31,18 @@ usage: chezdistill [--setup] [--weekly] [--since SPEC] [--status] [--render]
                    [--undo] [-n]
 
 Distil recent Claude Code conversations into ~/Documents/TheArchive/30-Claude:
-a daily report, a weekly review, and a size-capped MAIN.md that is loaded into
-every future session.
+a daily report, a weekly review, a Runs.md log of every run from every machine,
+and a size-capped MAIN.md that is loaded into every future session.
 
   (no flags)        run the nightly job now — the same code path launchd uses
   --setup           turn it on for this Mac: create the vault folder, enable the
                     module, apply, register the timers. Idempotent, no API calls
   --weekly          run the weekly review and compaction now
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
-  --status          preflight, MAIN size vs cap, unclassified origins, spend
-  --render          rebuild MAIN.md, Inbox and Topics from the ledger; no API calls
+  --status          preflight, MAIN size vs cap, unclassified origins, spend,
+                    last run
+  --render          rebuild MAIN.md, Inbox, Topics and Runs from the ledger; no
+                    API calls
   --undo            revert the vault's most recent chezdistill commit
   -n, --dry-run     show what would be read and run, without calling the model
   -h, --help        this text
@@ -410,7 +412,8 @@ _distill_main() {
             distill_render_main
             distill_render_inbox
             distill_render_topics
-            ok "rendered MAIN.md, Inbox and Topics from the ledger"
+            distill_render_runs
+            ok "rendered MAIN.md, Inbox, Topics and Runs from the ledger"
             ;;
         weekly)
             distill_run_weekly || return 1

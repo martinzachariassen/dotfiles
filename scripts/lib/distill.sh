@@ -298,12 +298,12 @@ distill_claude() {
         --max-budget-usd "$budget" \
         --output-format json \
         "$prompt" 2>&1)" || {
-        fail "claude invocation failed for model $model"
+        distill_fail "claude invocation failed for model $model"
         return 1
     }
 
     if ! printf '%s' "$envelope" | jq -e . >/dev/null 2>&1; then
-        fail "claude returned non-JSON output"
+        distill_fail "claude returned non-JSON output"
         printf '%s\n' "$envelope" | head -3 >&2
         return 1
     fi
@@ -312,12 +312,12 @@ distill_claude() {
 
     if [ "$(printf '%s' "$envelope" | jq -r '.is_error // false')" = "true" ]; then
         err="$(printf '%s' "$envelope" | jq -r '.result // .subtype // "unknown"')"
-        fail "claude reported an error: $err"
+        distill_fail "claude reported an error: $err"
         return 1
     fi
 
     printf '%s' "$envelope" | jq -e '.structured_output' 2>/dev/null || {
-        fail "claude returned no structured output"
+        distill_fail "claude returned no structured output"
         return 1
     }
 }
@@ -364,10 +364,248 @@ distill_spend_ok() {
     spent="$(distill_spend_7d)"
     ceiling="$(distill_cfg maxSpendUsd7d 15.0)"
     if jq -n --argjson s "$spent" --argjson c "$ceiling" -e '$s >= $c' >/dev/null 2>&1; then
-        fail "7-day spend \$$spent has reached the \$$ceiling ceiling — refusing to start"
+        distill_fail "7-day spend \$$spent has reached the \$$ceiling ceiling — refusing to start"
         return 1
     fi
     return 0
+}
+
+# ─── Run log ──────────────────────────────────────────────────────────────────
+#
+# One record per run, appended to .state/runs/<host>.jsonl — one file per machine
+# so two laptops never conflict — and rendered into Runs.md by bash, like every
+# other note here. The point is the runs you are NOT sitting in front of: a
+# nightly job that skipped every session, or failed on the other Mac, otherwise
+# leaves its only trace in a launchd log on a machine you are not using.
+#
+# The record is written even when the run failed. The commit may not happen (a
+# gitleaks hit blocks it), but the file is append-only, so the next run that does
+# commit carries the failed run's record with it.
+
+distill_runs_dir() {
+    printf '%s/runs\n' "$(distill_state_dir)"
+}
+
+distill_run_file() {
+    printf '%s/%s.jsonl\n' "$(distill_runs_dir)" "$(distill_host)"
+}
+
+# distill_run_all — every machine's records, oldest first within each file.
+distill_run_all() {
+    cat "$(distill_runs_dir)"/*.jsonl 2>/dev/null
+}
+
+# distill_run_begin MODE — open the record for this run.
+distill_run_begin() {
+    _DISTILL_RUN_MODE="$1"
+    _DISTILL_RUN_START="$(distill_iso_now)"
+    _DISTILL_RUN_EPOCH="$(date -u +%s)"
+    _DISTILL_RUN_SINCE=""
+    _DISTILL_EVENTS="$(mktemp)"
+    _DISTILL_SESSIONS="$(mktemp)"
+    DISTILL_RUN_SEEN=0
+    DISTILL_RUN_KEPT=0
+    DISTILL_RUN_ITEMS=0
+    DISTILL_RUN_DATES=""
+    DISTILL_RUN_WEEK=""
+}
+
+# distill_event LEVEL TEXT — remember a line for the record. A no-op outside a
+# run, so --status and --render can call the same helpers.
+distill_event() {
+    [ -f "${_DISTILL_EVENTS:-}" ] || return 0
+    printf '%s\t%s\n' "$1" "$2" >>"$_DISTILL_EVENTS"
+}
+
+# distill_warn / distill_fail — say it on the console AND keep it for Runs.md.
+# Nobody reads the launchd log of the Mac that was asleep.
+distill_warn() {
+    distill_event warn "$1"
+    warn "$1"
+}
+
+distill_fail() {
+    distill_event fail "$1"
+    fail "$1"
+}
+
+# distill_run_session NAME ORIGIN TURNS VERDICT ITEMS — why one session was kept
+# or skipped. This is what makes a quiet run legible: "7 seen, 0 kept" is
+# alarming until you can see that six were under minTurns and cost nothing.
+distill_run_session() {
+    [ -f "${_DISTILL_SESSIONS:-}" ] || return 0
+    jq -nc --arg s "$1" --arg o "$2" --argjson t "${3:-0}" \
+        --arg v "$4" --argjson n "${5:-0}" \
+        '{session:$s, origin:$o, turns:$t, verdict:$v, items:$n}' \
+        >>"$_DISTILL_SESSIONS"
+}
+
+# distill_run_cost — what this run spent, read back from the same per-machine
+# ledger the rolling ceiling uses rather than counted separately.
+distill_run_cost() {
+    local f
+    f="$(distill_spend_file)"
+    [ -f "$f" ] || {
+        echo 0
+        return 0
+    }
+    jq -s --arg since "${_DISTILL_RUN_START:-}" \
+        '[.[] | select(.t >= $since) | .usd] | add // 0' "$f" 2>/dev/null || echo 0
+}
+
+# distill_run_record STATUS — append this run to this machine's log.
+distill_run_record() {
+    local status="$1" f notes sessions cost main
+    f="$(distill_run_file)"
+    mkdir -p "$(dirname "$f")"
+
+    notes="$(jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t")
+                          | {level: .[0], text: (.[1] // "")})' \
+        <"${_DISTILL_EVENTS:-/dev/null}" 2>/dev/null)"
+    sessions="$(jq -s -c '.' <"${_DISTILL_SESSIONS:-/dev/null}" 2>/dev/null)"
+    cost="$(distill_run_cost)"
+    main=0
+    [ -f "$DISTILL_ROOT/MAIN.md" ] && main="$(wc -c <"$DISTILL_ROOT/MAIN.md" | tr -d ' ')"
+
+    jq -nc \
+        --arg t "${_DISTILL_RUN_START:-$(distill_iso_now)}" \
+        --arg end "$(distill_iso_now)" \
+        --argjson dur "$(($(date -u +%s) - ${_DISTILL_RUN_EPOCH:-0}))" \
+        --arg host "$(distill_host)" \
+        --arg mode "${_DISTILL_RUN_MODE:-daily}" \
+        --arg trigger "${DISTILL_TRIGGER:-manual}" \
+        --arg since "${_DISTILL_RUN_SINCE:-}" \
+        --arg dates "${DISTILL_RUN_DATES:-}" \
+        --argjson seen "${DISTILL_RUN_SEEN:-0}" \
+        --argjson kept "${DISTILL_RUN_KEPT:-0}" \
+        --argjson items "${DISTILL_RUN_ITEMS:-0}" \
+        --argjson cost "${cost:-0}" \
+        --argjson main "${main:-0}" \
+        --arg status "$status" \
+        --argjson notes "${notes:-[]}" \
+        --argjson sessions "${sessions:-[]}" \
+        '{t:$t, end:$end, dur:$dur, host:$host, mode:$mode, trigger:$trigger,
+          since:$since, status:$status, items:$items, cost:$cost,
+          main_bytes:$main,
+          dates:($dates | split(" ") | map(select(length > 0))),
+          sessions:{seen:$seen, kept:$kept, detail:$sessions},
+          notes:$notes}' >>"$f"
+}
+
+# distill_run_prune — the log is a running record, not an archive.
+distill_run_prune() {
+    local f cutoff
+    f="$(distill_run_file)"
+    [ -f "$f" ] || return 0
+    cutoff="$(distill_iso_ago "$(distill_cfg runRetentionDays 90)")"
+    jq -c --arg c "$cutoff" 'select(.t >= $c)' "$f" >"$f.tmp" 2>/dev/null &&
+        mv "$f.tmp" "$f" || rm -f "$f.tmp"
+}
+
+# distill_last_run — the newest record across every machine, one JSON line.
+distill_last_run() {
+    distill_run_all | jq -s -c 'sort_by(.t, .host) | last // empty' 2>/dev/null
+}
+
+# distill_render_runs — the operator's view: what ran, when, on which machine,
+# what it cost and what went wrong. Rendered from every machine's log, so the Mac
+# that was asleep at 01:00 still shows up here. Deterministic like every other
+# render: same records in, byte-identical file out.
+distill_render_runs() {
+    local out="${1:-$DISTILL_ROOT/Runs.md}" shown week
+    shown="$(distill_cfg runsShown 30)"
+    week="$(distill_iso_ago 7)"
+    mkdir -p "$(dirname "$out")"
+
+    {
+        printf '<!-- Generated by chezdistill. Times are UTC. -->\n\n'
+        printf '# Runs\n\n'
+        printf 'Every nightly and weekly run, from both machines.\n\n'
+
+        printf '## Last 7 days\n\n'
+        distill_run_all | jq -s -r --arg since "$week" '
+            [.[] | select(.t >= $since)] as $r
+            | if ($r | length) == 0 then "No runs in the last 7 days."
+              else
+                "- \($r | length) run(s): \([$r[] | select(.status == "ok")] | length) ok, \([$r[] | select(.status != "ok")] | length) failed",
+                "- \([$r[].sessions.kept] | add // 0) of \([$r[].sessions.seen] | add // 0) session(s) distilled, \([$r[].items] | add // 0) item(s)",
+                "- $\(([$r[].cost] | add // 0) * 100 | round / 100) spent"
+              end'
+
+        printf '\n## Recent runs\n\n'
+        printf '| Ended | Host | Mode | Sessions | Items | Cost | MAIN | Result |\n'
+        printf '|---|---|---|---|---|---|---|---|\n'
+        distill_run_all | jq -s -r --argjson n "$shown" '
+            sort_by(.t, .host) | reverse | .[0:$n][]
+            | ([(.notes // [])[] | select(.level == "fail")] | length) as $f
+            | ([(.notes // [])[] | select(.level == "warn")] | length) as $w
+            | "| \(.end[0:16] | sub("T"; " ")) | \(.host) | \(.mode) | \(.sessions.kept)/\(.sessions.seen) | \(.items) | $\(.cost * 100 | round / 100) | \((.main_bytes / 1024 * 10 | round / 10))K | "
+              + (if .status != "ok" then "**failed**"
+                 elif $f > 0 then "ok, \($f) error(s)"
+                 elif $w > 0 then "ok, \($w) warning(s)"
+                 else "ok" end)
+              + " |"'
+
+        printf '\n## Problems\n\n'
+        distill_run_all | jq -s -r --arg since "$week" '
+            [.[] | select(.t >= $since) | . as $r | (.notes // [])[]
+             | "- \($r.end[0:16] | sub("T"; " ")) · \($r.host) · \($r.mode) · **\(.level)** — \(.text)"]
+            | if length == 0 then "Nothing reported in the last 7 days."
+              else (sort | reverse | .[]) end'
+
+        printf '\n## Last run in detail\n\n'
+        distill_run_all | jq -s -r '
+            (sort_by(.t, .host) | last) as $r
+            | if $r == null then "No runs recorded yet."
+              else
+                "*\($r.end[0:16] | sub("T"; " ")) · \($r.host) · \($r.mode) · \($r.trigger) · \($r.dur)s · read since \(if $r.since == "" then "?" else $r.since end)*",
+                "",
+                (if ($r.sessions.detail | length) == 0
+                 then "No sessions were in the window."
+                 else ($r.sessions.detail[]
+                       | "- `\(.session[0:8])` · \(.origin) · \(.turns) turn(s) · \(.verdict)"
+                         + (if .items > 0 then " · \(.items) item(s)" else "" end))
+                 end)
+              end'
+        printf '\n'
+    } >"$out"
+}
+
+# distill_run_message STATUS — the vault commit subject for this run.
+distill_run_message() {
+    local dates="${DISTILL_RUN_DATES:-}"
+    if [ "$1" != "ok" ]; then
+        printf 'chore(distill): failed %s run on %s\n' \
+            "${_DISTILL_RUN_MODE:-daily}" "$(distill_host)"
+    elif [ "${_DISTILL_RUN_MODE:-daily}" = "weekly" ]; then
+        printf 'chore(distill): weekly review %s\n' "${DISTILL_RUN_WEEK:-}"
+    elif [ -n "${dates// /}" ]; then
+        printf 'chore(distill): report for%s\n' "$dates"
+    else
+        printf 'chore(distill): run log for %s\n' "$(distill_host)"
+    fi
+}
+
+# distill_run_end RC — close the record and publish. This is the ONLY place the
+# vault is committed: a run that failed half way still has to leave its record
+# behind, and putting the record in the same commit as the report is what keeps
+# the two from disagreeing about what happened.
+distill_run_end() {
+    local rc="$1" status="ok"
+    [ "$rc" -eq 0 ] || status="failed"
+
+    if [ "${DRY_RUN:-0}" != "1" ] && [ -n "${DISTILL_ROOT:-}" ]; then
+        distill_run_record "$status"
+        distill_run_prune
+        distill_render_runs
+    fi
+    rm -f "${_DISTILL_EVENTS:-}" "${_DISTILL_SESSIONS:-}"
+    _DISTILL_EVENTS=""
+    _DISTILL_SESSIONS=""
+
+    distill_guard_secrets || return 1
+    distill_sync_skills
+    distill_git_push "$(distill_run_message "$status")"
 }
 
 # ─── Ledger ───────────────────────────────────────────────────────────────────
@@ -530,7 +768,7 @@ distill_render_main() {
 
     base="$(wc -c <"$tmp" | tr -d ' ')"
     if [ "$base" -gt "$cap" ]; then
-        warn "Pinned.md alone exceeds the ${cap}B cap — nothing else will fit"
+        distill_warn "Pinned.md alone exceeds the ${cap}B cap — nothing else will fit"
     fi
 
     # Reserve every section header up front, even for sections that may end up
@@ -572,7 +810,7 @@ distill_render_main() {
     rm -f "$chosen"
 
     used="$(wc -c <"$out" | tr -d ' ')"
-    [ "$used" -le "$cap" ] || warn "MAIN.md is ${used}B, over the ${cap}B cap"
+    [ "$used" -le "$cap" ] || distill_warn "MAIN.md is ${used}B, over the ${cap}B cap"
 }
 
 # distill_render_inbox — everything that did not earn a place in MAIN and why.
@@ -774,7 +1012,7 @@ distill_git_pull() {
     [ "${DRY_RUN:-0}" = "1" ] && return 0
     distill_git_env
     git -C "$DISTILL_VAULT" pull --rebase --autostash >/dev/null 2>&1 ||
-        warn "could not pull the vault (offline?) — continuing locally"
+        distill_warn "could not pull the vault (offline?) — continuing locally"
 }
 
 # distill_git_push MESSAGE — commit and push, rebasing once on rejection.
@@ -837,7 +1075,7 @@ distill_sync_skills() {
 # ─── Status ───────────────────────────────────────────────────────────────────
 
 distill_status() {
-    local main cap spent ceiling n
+    local main cap spent ceiling n last line
     s_section "chezdistill"
 
     if distill_preflight; then
@@ -877,6 +1115,19 @@ distill_status() {
     spent="$(distill_spend_7d)"
     ceiling="$(distill_cfg maxSpendUsd7d 15.0)"
     s_note "spend    \$$spent of \$$ceiling over 7 days"
+
+    last="$(distill_last_run)"
+    if [ -z "$last" ]; then
+        s_note "last run no run recorded yet — see Runs.md once one has"
+    else
+        line="$(printf '%s' "$last" | jq -r \
+            '"\(.end[0:16] | sub("T"; " ")) UTC · \(.host) · \(.mode) · \(.status)"
+             + " · \(.sessions.kept)/\(.sessions.seen) session(s) · $\(.cost * 100 | round / 100)"')"
+        case "$(printf '%s' "$last" | jq -r '.status')" in
+            ok) s_pass "last run $line" ;;
+            *) s_fail "last run $line" ;;
+        esac
+    fi
 
     for f in "$(distill_state_dir)"/cursor-*.json; do
         [ -f "$f" ] || continue
@@ -954,14 +1205,27 @@ distill_cursor_write() {
 
 # ─── Nightly ──────────────────────────────────────────────────────────────────
 
+# distill_run_daily — the nightly job, wrapped in a run record. The wrapper is
+# what makes a failure visible: whatever the body does, distill_run_end still
+# writes the record and is the one place that commits.
 distill_run_daily() {
+    local rc
+    distill_run_begin daily
+    _distill_daily_body
+    rc=$?
+    distill_run_end "$rc" || rc=1
+    return "$rc"
+}
+
+_distill_daily_body() {
     local since now host tmp sysfile schema filtered turns origin cwd
-    local sess title mapped date dates n_seen n_kept
+    local sess name title mapped date n_items
 
     distill_spend_ok || return 1
     distill_git_pull
 
     since="$(distill_cursor_read)"
+    _DISTILL_RUN_SINCE="$since"
     now="$(distill_iso_now)"
     host="$(distill_host)"
     tmp="$(mktemp -d)"
@@ -974,62 +1238,73 @@ distill_run_daily() {
     distill_schema_map >"$schema"
 
     info "reading transcripts since $since"
-    n_seen=0
-    n_kept=0
 
     while IFS= read -r sess; do
         [ -n "$sess" ] || continue
-        n_seen=$((n_seen + 1))
-        filtered="$tmp/$(basename "$sess" .jsonl).ndjson"
+        name="$(basename "$sess" .jsonl)"
+        DISTILL_RUN_SEEN=$((DISTILL_RUN_SEEN + 1))
+        filtered="$tmp/$name.ndjson"
         distill_filter "$sess" "$since" | distill_dedupe >"$filtered"
-        [ -s "$filtered" ] || continue
-
-        turns="$(distill_turns <"$filtered")"
-        if [ "${turns:-0}" -lt "$(distill_cfg minTurns 3)" ]; then
-            dim "skip $(basename "$sess" .jsonl) — only ${turns} typed turn(s)"
+        if [ ! -s "$filtered" ]; then
+            distill_run_session "$name" "-" 0 "nothing new since the cursor" 0
             continue
         fi
 
+        turns="$(distill_turns <"$filtered")"
         cwd="$(jq -r 'select(.c != null) | .c' <"$filtered" | head -1)"
         origin="$(distill_classify_origin "$cwd")"
         title="$(distill_session_title "$sess")"
         date="$(jq -r '.t[0:10]' <"$filtered" | head -1)"
 
+        if [ "${turns:-0}" -lt "$(distill_cfg minTurns 3)" ]; then
+            dim "skip $name — only ${turns} typed turn(s)"
+            distill_run_session "$name" "$origin" "${turns:-0}" "too short, no model call" 0
+            continue
+        fi
+
         mapped="$(distill_claude "$(distill_cfg mapModel sonnet)" "$sysfile" "$schema" \
             "Session title: ${title:-untitled}. Extract durable items, or none." \
-            <"$filtered")" || continue
+            <"$filtered")" || {
+            distill_run_session "$name" "$origin" "$turns" "model call failed" 0
+            continue
+        }
 
-        if [ "$(printf '%s' "$mapped" | jq -r '.items | length')" = "0" ]; then
-            dim "skip $(basename "$sess" .jsonl) — nothing durable in it"
+        n_items="$(printf '%s' "$mapped" | jq -r '.items | length')"
+        if [ "${n_items:-0}" = "0" ]; then
+            dim "skip $name — nothing durable in it"
+            distill_run_session "$name" "$origin" "$turns" "nothing durable in it" 0
             continue
         fi
 
         printf '%s\n' "$mapped" |
-            jq -c --arg o "$origin" --arg h "$host" --arg s "$(basename "$sess" .jsonl)" \
+            jq -c --arg o "$origin" --arg h "$host" --arg s "$name" \
                 --arg c "$cwd" --arg tool "${DISTILL_TOOL:-claude-code}" \
                 '.items[] | . + {origin:$o, host:$h, session:$s, cwd:$c, tool:$tool}' \
                 >>"$tmp/items-$date.ndjson"
-        n_kept=$((n_kept + 1))
+        DISTILL_RUN_KEPT=$((DISTILL_RUN_KEPT + 1))
+        DISTILL_RUN_ITEMS=$((DISTILL_RUN_ITEMS + n_items))
+        distill_run_session "$name" "$origin" "$turns" "kept" "$n_items"
     done < <(distill_session_files "$since")
 
-    ok "$n_kept of $n_seen session(s) yielded items"
+    ok "$DISTILL_RUN_KEPT of $DISTILL_RUN_SEEN session(s) yielded items"
 
-    dates=""
     for f in "$tmp"/items-*.ndjson; do
         [ -f "$f" ] || continue
         date="$(basename "$f" .ndjson)"
         date="${date#items-}"
         mkdir -p "$(distill_extracts_dir)/$date"
         jq -s '{items: .}' "$f" >"$(distill_extracts_dir)/$date/$host.json"
-        dates="$dates $date"
+        DISTILL_RUN_DATES="$DISTILL_RUN_DATES $date"
     done
 
-    distill_finish_dates "$dates" "$tmp"
+    distill_finish_dates "$DISTILL_RUN_DATES" "$tmp"
     distill_cursor_write "$now"
     rm -rf "$tmp"
 }
 
-# distill_finish_dates DATES TMPDIR — narrate, render and publish.
+# distill_finish_dates DATES TMPDIR — narrate and render. Publishing (gitleaks,
+# skills, commit) belongs to distill_run_end, so a run that never gets this far
+# still leaves its record in the vault.
 distill_finish_dates() {
     local dates="$1" tmp="$2" date before
     local main="$DISTILL_ROOT/MAIN.md"
@@ -1056,10 +1331,6 @@ distill_finish_dates() {
         distill_sources_fingerprint "$date" \
             >"$(distill_state_dir)/narratives/$date.sources"
     done
-
-    distill_guard_secrets || return 1
-    distill_sync_skills
-    distill_git_push "chore(distill): report for${dates}"
 }
 
 # distill_narrate DATE TMPDIR — the one model call that writes prose.
@@ -1091,12 +1362,24 @@ distill_guard_secrets() {
 
 # ─── Weekly ───────────────────────────────────────────────────────────────────
 
+# distill_run_weekly — same shape as the nightly job: the body does the work,
+# the wrapper records the run and is the only thing that commits.
 distill_run_weekly() {
+    local rc
+    distill_run_begin weekly
+    _distill_weekly_body
+    rc=$?
+    distill_run_end "$rc" || rc=1
+    return "$rc"
+}
+
+_distill_weekly_body() {
     local week out tmp
     distill_spend_ok || return 1
     distill_git_pull
 
     week="$(date -u +%G-W%V)"
+    DISTILL_RUN_WEEK="$week"
     out="$DISTILL_ROOT/Weekly/$week.md"
     tmp="$(mktemp -d)"
     distill_rubric >"$tmp/rubric.md"
@@ -1123,12 +1406,6 @@ distill_run_weekly() {
             sort
     } >"$out"
 
-    distill_guard_secrets || {
-        rm -rf "$tmp"
-        return 1
-    }
-    distill_sync_skills
-    distill_git_push "chore(distill): weekly review $week"
     rm -rf "$tmp"
 }
 

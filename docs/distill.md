@@ -96,9 +96,17 @@ distilled is a no-op — the `## Sources` fingerprint matches and no model is ca
   ├─ SOURCES     already reflected in the report? → done, no further calls
   ├─ NARRATE     one model call per date → the ## Summary prose
   ├─ RENDER      bash builds MAIN.md, Topics/, Inbox/, the daily report
+  ├─ RECORD      append the run to .state/runs/<hostname>.jsonl, render Runs.md
   ├─ GITLEAKS    over the whole folder, extracts included → abort on any hit
   └─ COMMIT      and push; deferred to the next run if offline
 ```
+
+Every step from RECORD down runs whether the run succeeded or failed — a failure
+that leaves no trace in the vault is a failure you find out about weeks later, on
+the machine you weren't using. A run that harvested nothing still commits, so
+"nothing ran last night" and "nothing was worth keeping last night" stay
+distinguishable.
+
 
 The weekly job (Sunday 02:00) is the same shape, writing `Weekly/YYYY-Www.md`.
 
@@ -116,7 +124,7 @@ story, because the second Mac would then render a different `MAIN.md`.
 |---|---|---|
 | `MAIN.md` | 6 KB cap, `@`-imported by the persona | paid for in **every** session, forever |
 | `Topics/*.md` | unbounded | free — read only when Claude follows a wikilink |
-| `Daily/`, `Weekly/` | append-only | for you; Claude never reads them back |
+| `Daily/`, `Weekly/`, `Runs.md` | append-only | for you; Claude never reads them back |
 
 Each extracted item is split along that seam: a rule of **at most 200 characters**
 goes into MAIN, the full explanation goes into the topic note. The limit is in the
@@ -173,6 +181,46 @@ narrative, then the items split by origin and kind, then `## Sources`.
 
 Everything that hasn't earned a place in MAIN: seen only once, or from a project
 whose origin couldn't be determined. Entries here affect nothing.
+
+### `Runs.md` — did it run, and did it work?
+
+Every nightly and weekly run from **both** machines, newest first:
+
+```markdown
+## Last 7 days
+
+- 9 run(s): 8 ok, 1 failed
+- 11 of 34 session(s) distilled, 41 item(s)
+- $1.87 spent
+
+## Recent runs
+
+| Ended | Host | Mode | Sessions | Items | Cost | MAIN | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-08-24 01:03 | air | daily | 3/7 | 12 | $0.42 | 5.1K | ok |
+| 2026-08-23 01:02 | studio | daily | 0/4 | 0 | $0 | 5.0K | **failed** |
+
+## Problems
+
+- 2026-08-23 01:02 · studio · daily · **fail** — claude invocation failed for model sonnet
+
+## Last run in detail
+
+*2026-08-24 01:03 · air · daily · launchd · 214s · read since 2026-08-23T01:00:11Z*
+
+- `a41f0c9e` · personal · 14 turn(s) · kept · 5 item(s)
+- `7b2d1180` · personal · 2 turn(s) · too short, no model call
+- `c93ae004` · work · 9 turn(s) · nothing durable in it
+```
+
+**`0/7` is the number to read.** Seven sessions seen and none distilled looks
+like a broken job; the per-session detail is what tells you it was six sessions
+under `minTurns` and one with nothing durable in it — free, and working as
+designed. Times are UTC, because the two machines have to agree on the order.
+
+The records behind it are `.state/runs/<hostname>.jsonl`, one file per machine so
+they can never conflict, kept for `runRetentionDays`. `chezdistill --status`
+prints the newest one; `--render` rebuilds the note from the records for free.
 
 ## The promotion gate
 
@@ -292,7 +340,7 @@ hang until the machine was rebooted.
 ## Troubleshooting
 
 ```sh
-chezdistill --status                       # preflight, MAIN vs cap, unclassified, spend
+chezdistill --status                       # preflight, MAIN vs cap, unclassified, spend, last run
 chezdistill -n --since 7d                  # what would be read, no API calls
 tail -50 ~/.local/state/chezdistill/logs/nightly.log
 launchctl print gui/$(id -u)/no.mlz.chezdistill.nightly
@@ -309,6 +357,9 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | Ran at 09:00, not 01:00 | The Mac was asleep. launchd fired on wake; the cursor means nothing was lost. |
 | "7-day spend has reached the ceiling" | Raise `maxSpendUsd7d`, or find out what got expensive in `.state/spend/`. |
 | Agent not in `launchctl list` | Hook 06 didn't run. `chezapply`, then check its output. |
+| Did it run at all last night? | `Runs.md` in the vault — both machines, newest first. |
+| It ran but distilled nothing | `## Last run in detail` in `Runs.md` gives the per-session reason. |
+| A failed run left nothing in the vault | Only a `gitleaks` hit or a failed commit can do that — the record is written before the commit, so it is carried by the next run that succeeds. Meanwhile: the launchd log. |
 
 ## Configuration
 
@@ -326,6 +377,8 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 | `mapModel`, `narrateModel` | `sonnet`, `opus` | Extraction and prose. |
 | `maxBudgetUsd`, `maxSpendUsd7d` | `2.0`, `25.0` | Per call, and rolling across both machines. |
 | `extractRetentionDays` | `90` | How long near-verbatim conversation text is kept. |
+| `runsShown` | `30` | Rows in the `Runs.md` table. |
+| `runRetentionDays` | `90` | How long the run records behind it are kept. |
 
 Change a value, then `chezup` and `chezdistill --render` to see the effect without
 spending anything.
