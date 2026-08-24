@@ -295,8 +295,8 @@ hang until the machine was rebooted.
 chezdistill --status                       # preflight, MAIN vs cap, unclassified, spend
 chezdistill -n --since 7d                  # what would be read, no API calls
 tail -50 ~/.local/state/chezdistill/logs/nightly.log
-launchctl print gui/$(id -u)/no.zachariassen.chezdistill.nightly
-launchctl kickstart -k gui/$(id -u)/no.zachariassen.chezdistill.nightly
+launchctl print gui/$(id -u)/no.mlz.chezdistill.nightly
+launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 ```
 
 | Symptom | Cause |
@@ -344,8 +344,8 @@ the window. TheArchive is a private repo — keep it that way.
 deploying the agents, but launchd keeps what it already loaded — unload it by hand:
 
 ```sh
-launchctl bootout gui/$(id -u)/no.zachariassen.chezdistill.nightly
-launchctl bootout gui/$(id -u)/no.zachariassen.chezdistill.weekly
+launchctl bootout gui/$(id -u)/no.mlz.chezdistill.nightly
+launchctl bootout gui/$(id -u)/no.mlz.chezdistill.weekly
 ```
 
 The vault folder is yours; nothing removes it. Drop the `@`-import by removing the

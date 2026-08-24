@@ -243,13 +243,13 @@ _distill_setup_agents() {
     }
     uid="$(id -u)"
     for label in nightly weekly; do
-        plist="$HOME/Library/LaunchAgents/no.zachariassen.chezdistill.$label.plist"
+        plist="$HOME/Library/LaunchAgents/no.mlz.chezdistill.$label.plist"
         if [ ! -f "$plist" ]; then
             s_warn "agents   $label plist not rendered yet"
             [ "$rc" -eq 1 ] || rc=3
             continue
         fi
-        if launchctl print "gui/$uid/no.zachariassen.chezdistill.$label" >/dev/null 2>&1; then
+        if launchctl print "gui/$uid/no.mlz.chezdistill.$label" >/dev/null 2>&1; then
             s_pass "agents   $label registered"
             continue
         fi
