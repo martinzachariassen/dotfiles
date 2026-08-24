@@ -472,6 +472,7 @@ window_setup() {
 }
 
 @test "--setup offers the apply when the plists were never rendered" {
+    [ "$(uname -s)" = "Darwin" ] || skip "launchd agents are macOS-only"
     setup_env '["macApps", "claudeDistiller"]'
     rm -f "$SETUP_HOME/Library/LaunchAgents/"*.plist
     run_setup
