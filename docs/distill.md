@@ -20,8 +20,9 @@ bash ~/Developer/personal/dotfiles/scripts/bin/distill.sh --setup
 ```
 
 It goes through the full path — check the vault, create `30-Claude/`, add
-`claudeDistiller` to the module list, apply, register both launchd agents, then
-print `--status`. Every step is confirmed and every step is idempotent, so
+`claudeDistiller` to the module list, apply, register both launchd agents, seed an
+empty `MAIN.md` so the persona's `@`-import resolves from the first session rather
+than after the first successful night, then print `--status`. Every step is confirmed and every step is idempotent, so
 re-running it on a machine that is already set up just reports green. It makes no
 API calls.
 
@@ -228,6 +229,14 @@ That's why the job tracks a cursor (`.state/cursor-<hostname>.json`) rather than
 asking "what happened yesterday?". A job built on "yesterday" loses everything
 the machine slept through; "what has happened since I last read?" cannot. A run
 spanning several days writes one `Daily/` note per calendar day.
+
+The file scan is widened from the same cursor, and that is load-bearing: the
+harvester only opens transcripts whose **mtime** is newer than the cursor (minus a
+day of slack), because a transcript's mtime moves whenever a turn is appended, so
+an older one really can hold nothing new. Pin that window to a constant instead
+and the cursor is quietly defeated — the sessions from the nights the machine
+slept are exactly the ones whose files stopped being written, and `--since 7d`
+would read only the last two days of them while reporting success.
 
 `pmset repeat wake` would force an exact 01:00, but it also wakes the laptop in
 your bag. Not used here.

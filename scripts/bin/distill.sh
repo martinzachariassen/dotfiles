@@ -228,10 +228,11 @@ _distill_setup_module() {
     return 3
 }
 
-# _distill_setup_agents — the launchd half. The plists are rendered by an apply;
-# hook 06 registers them, so an apply is what this asks for when they are absent.
+# _distill_setup_agents — the launchd half. The plists are rendered by an apply,
+# and hook 06 registers them; 3 means "they are not on disk yet, apply first".
+# 0 = both registered · 3 = a plist is missing · 1 = a registration failed.
 _distill_setup_agents() {
-    local uid missing=0 label plist
+    local uid rc=0 label plist
     [ "$(uname -s)" = "Darwin" ] || {
         s_note "agents   not macOS — no launchd agents to register"
         return 0
@@ -245,25 +246,25 @@ _distill_setup_agents() {
         plist="$HOME/Library/LaunchAgents/no.zachariassen.chezdistill.$label.plist"
         if [ ! -f "$plist" ]; then
             s_warn "agents   $label plist not rendered yet"
-            missing=1
+            [ "$rc" -eq 1 ] || rc=3
             continue
         fi
         if launchctl print "gui/$uid/no.zachariassen.chezdistill.$label" >/dev/null 2>&1; then
             s_pass "agents   $label registered"
             continue
         fi
-        run launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null &&
-            s_pass "agents   $label registered" ||
-            {
-                s_warn "agents   could not register $label"
-                missing=1
-            }
+        if run launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+            s_pass "agents   $label registered"
+        else
+            s_warn "agents   could not register $label"
+            rc=1
+        fi
     done
-    return "$missing"
+    return "$rc"
 }
 
 _distill_setup() {
-    local folder_rc module_rc needs_apply=0
+    local folder_rc module_rc agents_rc needs_apply=0
 
     echo
     printf '%s%s%s  %sSetting up chezdistill on this Mac%s\n' \
@@ -281,16 +282,21 @@ _distill_setup() {
     module_rc=$?
     [ "$module_rc" -eq 3 ] && needs_apply=1
 
+    # An apply is also what puts the plists on disk, so a machine whose module
+    # was already on but never applied gets offered the same fix.
+    _distill_setup_agents
+    agents_rc=$?
+    [ "$agents_rc" -eq 3 ] && needs_apply=1
+
     if [ "$needs_apply" -eq 1 ]; then
         s_note "apply    needed — the plists and the MAIN.md import render there"
         if _distill_confirm "Run chezmoi apply now?"; then
             run chezmoi apply --force || s_warn "apply    chezmoi apply reported an error"
+            _distill_setup_agents || true
         else
             s_warn "apply    skipped — run chezup before the timers can fire"
         fi
     fi
-
-    _distill_setup_agents || true
 
     if [ "$folder_rc" -ne 0 ]; then
         echo
@@ -298,8 +304,28 @@ _distill_setup() {
         return 1
     fi
 
-    # Under a dry run nothing was created, so a status pass would report the
-    # folder missing and read as a failure. Say so instead.
+    # DISTILL_ROOT is exported by preflight, and only by preflight — everything
+    # below reads it, and it now has a folder to find.
+    if ! distill_preflight >/dev/null 2>&1 && [ "$DRY_RUN" != "1" ]; then
+        echo
+        fail "setup incomplete — preflight still refuses this vault"
+        distill_status
+        return 1
+    fi
+
+    # Seed MAIN.md from the (usually empty) ledger. The apply above rewrote the
+    # global persona to @-import it, and an import that resolves to nothing is a
+    # rough edge in every session until the first nightly run. Costs no API call.
+    if [ "$DRY_RUN" = "1" ]; then
+        s_note "render   skipped — a dry run has nothing to render from"
+    elif [ -f "$DISTILL_ROOT/MAIN.md" ]; then
+        s_pass "render   MAIN.md is present"
+    else
+        distill_render_main
+        distill_render_inbox
+        s_pass "render   seeded an empty MAIN.md for the persona to import"
+    fi
+
     if [ "$DRY_RUN" = "1" ]; then
         s_note "status   skipped — a dry run changed nothing to report on"
     else
