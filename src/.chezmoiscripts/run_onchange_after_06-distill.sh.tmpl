@@ -5,8 +5,8 @@
 #
 # scripts/bin/distill.sh  hash: {{ include "../scripts/bin/distill.sh" | sha256sum }}
 # scripts/lib/distill.sh  hash: {{ include "../scripts/lib/distill.sh" | sha256sum }}
-# nightly plist           hash: {{ include "Library/LaunchAgents/no.zachariassen.chezdistill.nightly.plist.tmpl" | sha256sum }}
-# weekly plist            hash: {{ include "Library/LaunchAgents/no.zachariassen.chezdistill.weekly.plist.tmpl" | sha256sum }}
+# nightly plist           hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.nightly.plist.tmpl" | sha256sum }}
+# weekly plist            hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.weekly.plist.tmpl" | sha256sum }}
 
 set -euo pipefail
 
@@ -29,12 +29,12 @@ echo "▶ chezdistill"
 mkdir -p "$home/.local/state/chezdistill/logs"
 
 for label in nightly weekly; do
-    plist="$agents/no.zachariassen.chezdistill.$label.plist"
+    plist="$agents/no.mlz.chezdistill.$label.plist"
     if [ ! -f "$plist" ]; then
         echo "  ! $plist missing — apply did not render it"
         continue
     fi
-    launchctl bootout "gui/$(id -u)/no.zachariassen.chezdistill.$label" 2>/dev/null || true
+    launchctl bootout "gui/$(id -u)/no.mlz.chezdistill.$label" 2>/dev/null || true
     if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
         echo "  ✓ $label agent registered"
     else

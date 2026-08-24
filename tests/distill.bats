@@ -331,8 +331,8 @@ EOF
     # Both plists present by default: a missing one is itself a reason to apply,
     # which would mask what most of these tests are actually asserting.
     mkdir -p "$SETUP_HOME/Library/LaunchAgents"
-    : >"$SETUP_HOME/Library/LaunchAgents/no.zachariassen.chezdistill.nightly.plist"
-    : >"$SETUP_HOME/Library/LaunchAgents/no.zachariassen.chezdistill.weekly.plist"
+    : >"$SETUP_HOME/Library/LaunchAgents/no.mlz.chezdistill.nightly.plist"
+    : >"$SETUP_HOME/Library/LaunchAgents/no.mlz.chezdistill.weekly.plist"
 
     CHEZMOI_DATA="$(printf '%s' "$1" | jq -c '{modules: .}')"
     export CHEZMOI_DATA
