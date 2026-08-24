@@ -139,16 +139,36 @@ distill_host() {
 
 # ─── Harvest ──────────────────────────────────────────────────────────────────
 
-# distill_session_files — transcripts touched recently, subagents excluded.
+# distill_session_files SINCE_ISO — transcripts that can still hold anything
+# newer than SINCE, subagents excluded.
+#
+# The window is derived from the cursor rather than fixed, because a fixed one
+# silently defeats the cursor. A Mac that slept for five days wakes with a
+# five-day-old cursor, and `--since 7d` asks for a week outright; either way a
+# transcript last written six days ago is exactly the file that must be read,
+# and a two-day window drops it without a word. A file's mtime moves whenever a
+# turn is appended, so mtime older than the cursor really does mean "nothing new
+# in here" — the one day of slack absorbs clock skew and timezone edges.
+#
 # `find` is shadowed by bfs in this user's interactive shell, hence the full path.
 distill_session_files() {
-    local root expanded
+    local root expanded days since="${1:-}"
+    days=2
+    if [ -n "$since" ]; then
+        days="$(distill_days_since "$since")"
+        # 9999 is distill_days_since's answer for a timestamp it cannot parse;
+        # never let that turn into a scan of every transcript ever written.
+        if ! [ "$days" -ge 1 ] 2>/dev/null || [ "$days" -ge 9999 ]; then
+            days=1
+        fi
+        days=$((days + 1))
+    fi
     while IFS= read -r root; do
         [ -n "$root" ] || continue
         expanded="$(distill_expand "$root")"
         [ -d "$expanded" ] || continue
         /usr/bin/find "$expanded" -type f -name '*.jsonl' \
-            -not -path '*/subagents/*' -mtime -"${DISTILL_MTIME_DAYS:-2}" 2>/dev/null
+            -not -path '*/subagents/*' -mtime -"${DISTILL_MTIME_DAYS:-$days}" 2>/dev/null
     done < <(distill_cfg_list transcriptRoots)
 }
 
@@ -990,7 +1010,7 @@ distill_run_daily() {
                 '.items[] | . + {origin:$o, host:$h, session:$s, cwd:$c, tool:$tool}' \
                 >>"$tmp/items-$date.ndjson"
         n_kept=$((n_kept + 1))
-    done < <(distill_session_files)
+    done < <(distill_session_files "$since")
 
     ok "$n_kept of $n_seen session(s) yielded items"
 
