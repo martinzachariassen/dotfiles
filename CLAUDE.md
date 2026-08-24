@@ -74,7 +74,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   demoted) is computed in `scripts/lib/distill.sh`, and every `claude -p` call runs
   `--tools ""` with no write access. Don't move a decision into a prompt — a second
   machine would then render a different `MAIN.md` and the two would conflict in git
-  on every run. Full model in [docs/ai.md](docs/ai.md).
+  on every run. Full guide in [docs/distill.md](docs/distill.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in
   `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and
