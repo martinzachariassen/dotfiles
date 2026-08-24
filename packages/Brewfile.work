@@ -18,6 +18,7 @@ cask "gcloud-cli"               # GCP account/project CLI
 # microsoft-office is the full M365 suite; don't also list the standalone
 # Word/Excel/Outlook/… casks — it `conflicts_with` them and `brew bundle` fails.
 cask "intellij-idea"            # non-trivial Java/Kotlin work
+cask "intune-company-portal"    # MDM enrolment; ships a .pkg, so it needs admin
 cask "microsoft-office"
 cask "microsoft-teams"
 cask "slack"
