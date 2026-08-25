@@ -19,7 +19,7 @@ The three things this job produces have nothing in common, so they live apart.
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` | none — rendered from state |
 | `~/.local/state/chezdistill/` | the extract corpus, `Pinned.md`, cursor, spend, run log, logs | a local repo, remote optional |
-| `~/Documents/TheArchive/30-Claude/` | `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
+| `~/Documents/TheArchive/30-Claude/` | `README.md`, `Decisions.md`, `Open threads.md`, `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
 
 Three consequences worth knowing before changing anything:
 
@@ -100,7 +100,7 @@ chezdistill              # the nightly job, right now
 chezdistill -n           # preview: what it would read and run, no model calls
 chezdistill --since 7d   # backfill the last week
 chezdistill --weekly     # the weekly review and compaction
-chezdistill --render     # rebuild MAIN/Topics/Candidates from the corpus, free
+chezdistill --render     # rebuild every generated note from the corpus, free
 chezdistill --status     # where things live, MAIN size vs cap, spend, last run
 chezdistill --undo       # revert the last state commit and re-render
 ```
@@ -148,6 +148,27 @@ hit counts, what enters MAIN, what gets demoted — is computed in
 access: each runs `--tools ""`, takes its payload on stdin, returns
 schema-validated JSON. Keeping the decisions in bash is what makes a re-run of an
 already-distilled day produce a byte-identical file and therefore no commit.
+
+## Two audiences
+
+`MAIN.md` answers *what should Claude know*. `Decisions.md` and `Open threads.md`
+answer *what did I settle, and what do I still owe*. They are built from the same
+corpus and they behave differently on purpose.
+
+**The promotion gate does not apply to the second pair.** The gate exists because
+`MAIN.md` is loaded into every session unattended, so one misreading becoming a
+global rule is a real cost. Neither half of that holds for a note you open
+yourself: a decision made once is still a decision, an open thread mentioned once
+is still open, and you have the judgement to discard a bad entry. Gating them
+would have meant 37 of 39 items reaching nothing a person ever reads.
+
+`Open threads.md` is **rebuilt** every run rather than accumulated. An entry drops
+off when it stops being extracted — from here, that is what closing it looks like.
+
+The extraction rubric carves both out of the "still true in a month" test it
+applies to everything else. An open thread is worth knowing *tomorrow*, which is
+exactly the horizon that test rejects — before the carve-out, the corpus held
+nineteen gotchas and zero open threads.
 
 ## Three tiers, priced differently
 
@@ -213,6 +234,19 @@ run, truncated to one line each. **That block is the point:** ten seconds a day 
 that changed in the instructions every session now loads. Then a `## Summary`
 narrative, then the items by kind, then the source fingerprint.
 
+### `README.md` — the folder explaining itself
+
+Generated. What each note is, how an entry gets here, and how to overrule one,
+with wikilinks to the rest. Everything else about this system is documented in
+the dotfiles repo, which is not where you are when you are reading your notes.
+
+### `Decisions.md` and `Open threads.md`
+
+What was settled and what is still owed, both ungated, both linked to their topic.
+`Topics/` is symlinked into the vault so those links resolve in Obsidian without
+a second copy on disk; the symlink is gitignored, because a committed one is an
+absolute path that is wrong on every other machine.
+
 ### `Candidates.md`
 
 Everything that hasn't earned a place in MAIN: seen only once, or past the gate
@@ -269,7 +303,7 @@ from the corpus. Use these instead:
 |---|---|
 | A rule is wrong or badly worded | Write the correct one in `~/.config/claude/memory/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
 | Last night's run made a mess | `chezdistill --undo` reverts the state repo's last commit and re-renders the memory from it. |
-| You edited the corpus or `Pinned.md` | `chezdistill --render` rebuilds MAIN, Topics and Candidates. No API calls. |
+| You edited the corpus or `Pinned.md` | `chezdistill --render` rebuilds every generated note, daily reports included. No API calls — the narratives are cached beside the extracts. |
 | An entry should be gone entirely | Delete its sightings from `extracts/<date>.json`. Everything about an entry is derived from the corpus, so that is the only place it exists. |
 
 `--undo` reverts the corpus rather than the rendered files, because

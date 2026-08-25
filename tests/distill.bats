@@ -250,6 +250,76 @@ item() {
     grep -q 'detail' "$MEM/Topics/T.md"
 }
 
+# ─── The notes you read ───────────────────────────────────────────────────────
+#
+# These are for the human, not for MAIN.md, and are deliberately not behind the
+# promotion gate: a decision made once is still a decision. Gating them would mean
+# almost nothing ever reaches anything a person opens.
+
+@test "a decision reaches the register from its first sighting" {
+    load_lib
+    extract 2026-08-22 "[$(jq -nc '{text:"use X over Y", detail:"because Z",
+        kind:"decisions", topic:"T", session:"s1"}')]"
+    distill_render_decisions
+    grep -q 'use X over Y' "$VAULT/30-Claude/Decisions.md"
+    grep -q 'because Z' "$VAULT/30-Claude/Decisions.md"
+}
+
+@test "an open thread reaches its note from its first sighting" {
+    load_lib
+    extract 2026-08-22 "[$(jq -nc '{text:"finish the migration", detail:"half done",
+        kind:"open_threads", topic:"T", session:"s1"}')]"
+    distill_render_threads
+    grep -q 'finish the migration' "$VAULT/30-Claude/Open threads.md"
+}
+
+# Rebuilt, not accumulated: an entry that stops being extracted has to disappear,
+# because that is what closing it looks like from here.
+@test "an open thread that stops being extracted disappears" {
+    load_lib
+    extract 2026-08-22 "[$(jq -nc '{text:"was open", detail:"d",
+        kind:"open_threads", topic:"T", session:"s1"}')]"
+    distill_render_threads
+    grep -q 'was open' "$VAULT/30-Claude/Open threads.md"
+
+    extract 2026-08-22 "[$(item 'unrelated' s1)]"
+    distill_render_threads
+    refute_file_contains "$VAULT/30-Claude/Open threads.md" 'was open'
+    grep -q 'Nothing outstanding' "$VAULT/30-Claude/Open threads.md"
+}
+
+# The model names topics freely and has produced "Git/GitHub". The file it is
+# written to and the wikilink that finds it must agree, or both fail silently in
+# opposite directions.
+@test "a wikilink uses the same slug as the topic note it points at" {
+    load_lib
+    extract 2026-08-22 "[$(jq -nc '{text:"a decision", detail:"d",
+        kind:"decisions", topic:"Git/GitHub", session:"s1"}')]"
+    distill_render_topics
+    distill_render_decisions
+    [ -f "$MEM/Topics/Git-GitHub.md" ]
+    grep -q '\[\[Git-GitHub\]\]' "$VAULT/30-Claude/Decisions.md"
+}
+
+@test "the index names the notes it links to" {
+    load_lib
+    distill_render_index
+    grep -q '\[\[Decisions\]\]' "$VAULT/30-Claude/README.md"
+    grep -q '\[\[Open threads\]\]' "$VAULT/30-Claude/README.md"
+    grep -q 'two separate sessions' "$VAULT/30-Claude/README.md"
+}
+
+# A real directory here is the pre-split layout. Replacing it would delete notes.
+@test "linking Topics never replaces a real directory" {
+    load_lib
+    mkdir -p "$VAULT/30-Claude/Topics"
+    printf 'mine\n' >"$VAULT/30-Claude/Topics/keep.md"
+    mkdir -p "$MEM/Topics"
+    distill_link_topics
+    [ -f "$VAULT/30-Claude/Topics/keep.md" ]
+    [ ! -L "$VAULT/30-Claude/Topics" ]
+}
+
 # ─── Determinism and the cap ──────────────────────────────────────────────────
 
 @test "rendering MAIN twice is byte-identical" {

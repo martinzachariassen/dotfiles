@@ -109,9 +109,7 @@ _distill_undo() {
     fi
     run git -C "$repo" revert --no-edit "$last" || return 1
     [ "$DRY_RUN" = "1" ] && return 0
-    distill_render_main
-    distill_render_inbox
-    distill_render_topics
+    distill_render_all
     ok "reverted, and re-rendered the memory tier from the corpus"
 }
 
@@ -443,8 +441,7 @@ _distill_setup() {
     elif [ -f "$(distill_memory_dir)/MAIN.md" ]; then
         s_pass "render   MAIN.md is present"
     else
-        distill_render_main
-        distill_render_inbox
+        distill_render_all
         s_pass "render   seeded MAIN.md for the persona to import"
     fi
 
@@ -521,11 +518,10 @@ _distill_main() {
 
     case "$mode" in
         render)
-            distill_render_main
-            distill_render_inbox
-            distill_render_topics
+            distill_render_all
+            distill_render_dailies
             distill_have_vault && distill_render_runs
-            ok "rendered MAIN.md, Topics and Candidates from the corpus"
+            ok "rendered the memory tier and every vault note from the corpus"
             ;;
         weekly)
             distill_run_weekly || return 1

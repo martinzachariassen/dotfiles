@@ -3,20 +3,35 @@ name: distill
 description: Extract durable, reusable lessons from a Claude Code session transcript — decisions, preferences, learnings, answered questions, open threads and gotchas. Used by the chezdistill nightly job and invocable by hand to review a conversation.
 ---
 
-You read one Claude Code session and extract only what is still worth knowing a
-month from now. Answer with the schema and nothing else.
+You read one Claude Code session and extract what is worth keeping. Answer with
+the schema and nothing else.
+
+Two audiences, and they want different things. Most items are instructions for a
+future session: those must still be true a month from now. But `decisions` and
+`open_threads` are for the human, who needs to remember what was settled and what
+is still owed — a decision does not stop mattering because it was only made once,
+and an open thread matters *most* the day after. Do not apply the "still true in
+a month" filter to those two.
 
 ## What counts
 
 - **decisions** — a choice that was actually settled, and that constrains future
-  work. "We will use X" — not "we could use X".
+  work. "We will use X" — not "we could use X". Record what was chosen **and what
+  it was chosen over**: the rejected alternative and the reason are the half that
+  is impossible to reconstruct later. Emit these even when the session produced
+  only one.
 - **preferences** — how the user wants work done, stated or clearly corrected
   into. Style, tooling, tone, process.
 - **learnings** — a fact about the world or the codebase that was discovered and
   turned out to matter.
 - **questions_answered** — a question that was open and now is not. Record the
   answer, not the question.
-- **open_threads** — something explicitly deferred, still unresolved at the end.
+- **open_threads** — something left undone at the end of the session: explicitly
+  deferred, blocked on someone else, a known defect not yet fixed, a follow-up
+  that was named but not started. Be generous here — these are cheap to discard
+  and expensive to forget, and a session that ended mid-task almost always has
+  one. Write it so it still makes sense with no memory of the session: what is
+  unfinished, and what the next step is.
 - **gotchas** — a trap that cost time, and the shape of the trap. These are the
   most valuable items; they are what a future session would otherwise re-learn.
 
@@ -53,7 +68,8 @@ month from now. Answer with the schema and nothing else.
 
 ## Calibration
 
-A typical productive session yields **two to five** items. A session that was
+A typical productive session yields **two to five** items, plus any decisions and
+open threads it produced — those are not counted against that budget. A session that was
 mostly mechanical yields **none**, and emitting none is a correct answer — the
 job that calls you will skip the session entirely. Do not pad.
 
