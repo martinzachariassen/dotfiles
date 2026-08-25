@@ -1251,7 +1251,9 @@ distill_status() {
         s_note "backup   no state repo yet — the first run creates it"
     fi
 
-    spent="$(distill_spend_7d)"
+    # Rounded for display the same way Runs.md rounds it. The raw sum is a float
+    # accumulated from per-call costs, so it reads as $2.7951789000000002.
+    spent="$(distill_spend_7d | jq -r '. * 100 | round / 100')"
     ceiling="$(distill_cfg maxSpendUsd7d 15.0)"
     s_note "spend    \$$spent of \$$ceiling over 7 days"
 
