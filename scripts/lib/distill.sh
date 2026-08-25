@@ -218,6 +218,22 @@ distill_pinned_file() {
     printf '%s/Pinned.md\n' "$(distill_state_dir)"
 }
 
+# distill_seed_pinned — create it empty, once, and never touch it again.
+#
+# Every generated note tells you to fix a wrong rule by editing this file. Until
+# something creates it, that instruction points at nothing, and the format it
+# wants — plain bullets, copied verbatim — is not guessable from an absent file.
+# The seed is one comment line because the whole file is pasted into MAIN.md and
+# competes with the distilled rules for the same 6 KB.
+distill_seed_pinned() {
+    local f
+    f="$(distill_pinned_file)"
+    [ -e "$f" ] && return 0
+    mkdir -p "$(dirname "$f")" || return 0
+    printf '<!-- Hand-written. Copied into MAIN.md verbatim, never demoted. One `- ` rule per line. -->\n' \
+        >"$f"
+}
+
 # distill_have_vault — 0 when the reports have somewhere to go.
 distill_have_vault() {
     [ "${DISTILL_VAULT_OK:-0}" = "1" ] && [ -n "${DISTILL_ROOT:-}" ]
@@ -559,6 +575,8 @@ distill_render_runs() {
                 "- \($r | length) run(s): \([$r[] | select(.status == "ok")] | length) ok, \([$r[] | select(.status != "ok")] | length) failed",
                 "- \([$r[].sessions.kept] | add // 0) of \([$r[].sessions.seen] | add // 0) session(s) distilled, \([$r[].items] | add // 0) item(s)",
                 "- $\(([$r[].cost] | add // 0) * 100 | round / 100) spent",
+                (([$r[] | .dur // 0] | sort) as $d
+                 | "- typical run \($d[($d | length) / 2 | floor])s, longest \($d[-1])s"),
                 (([$r[] | select(.vault == "skipped")] | length) as $skipped
                  | if $skipped > 0
                    then "- ⚠ \($skipped) run(s) could not write to the vault — reports skipped that night"
@@ -566,13 +584,15 @@ distill_render_runs() {
               end'
 
         printf '\n## Recent runs\n\n'
-        printf '| Ended | Mode | Sessions | Items | Cost | MAIN | Result |\n'
-        printf '|---|---|---|---|---|---|---|\n'
+        printf '| Ended | Mode | Took | Sessions | Items | Cost | MAIN | Result |\n'
+        printf '|---|---|---|---|---|---|---|---|\n'
         distill_run_all | jq -s -r --argjson n "$shown" '
             sort_by(.t) | reverse | .[0:$n][]
             | ([(.notes // [])[] | select(.level == "fail")] | length) as $f
             | ([(.notes // [])[] | select(.level == "warn")] | length) as $w
-            | "| \(.end[0:16] | sub("T"; " ")) | \(.mode) | \(.sessions.kept)/\(.sessions.seen) | \(.items) | $\(.cost * 100 | round / 100) | \((.main_bytes / 1024 * 10 | round / 10))K | "
+            | ((.dur // 0) as $d
+               | if $d >= 60 then "\($d / 60 | floor)m \($d % 60)s" else "\($d)s" end) as $took
+            | "| \(.end[0:16] | sub("T"; " ")) | \(.mode) | \($took) | \(.sessions.kept)/\(.sessions.seen) | \(.items) | $\(.cost * 100 | round / 100) | \((.main_bytes / 1024 * 10 | round / 10))K | "
               + (if .status != "ok" then "**failed**"
                  elif $f > 0 then "ok, \($f) error(s)"
                  elif $w > 0 then "ok, \($w) warning(s)"
@@ -1392,6 +1412,65 @@ distill_commit_local() {
     return 0
 }
 
+# distill_render_state_readme — the repo explaining itself, on GitHub.
+#
+# This one is not for you and not for Claude: it is for whoever opens the remote
+# on a machine that has none of this set up, which in practice is you on a
+# replacement Mac. A backup you cannot interpret is not a backup, and the restore
+# procedure is two commands that are impossible to guess from the file names.
+#
+# Deterministic like every other render, so a run that changed nothing produces
+# no commit.
+distill_render_state_readme() {
+    local out="${1:-$(distill_state_dir)/README.md}" remote
+    # Read back from git rather than a config key, so the clone line in the
+    # README can never name a remote this repo does not actually push to.
+    remote="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+    mkdir -p "$(dirname "$out")"
+    {
+        printf '# claude-memory\n\n'
+        printf 'The corpus behind my Claude Code memory. Written by `chezdistill`, a\n'
+        printf 'nightly job in [dotfiles](https://github.com/martinzachariassen/dotfiles);\n'
+        printf 'nothing here is edited by hand.\n\n'
+
+        printf 'Each night the job reads the Claude Code sessions written since it last\n'
+        printf 'looked, asks a model what is worth keeping, and stores the answer. The\n'
+        printf 'rules Claude actually loads (`MAIN.md`, `Topics/`) are **not** in this\n'
+        printf 'repo — they are regenerated from what is, so keeping both would be two\n'
+        printf 'copies of one decision, free to disagree.\n\n'
+
+        printf '## What is in here\n\n'
+        printf -- '| Path | What it is |\n|---|---|\n'
+        printf -- '| `extracts/<date>.json` | One file per day: every item the model kept, with a short quote as evidence. **The source of truth** — everything else is derived from this. |\n'
+        printf -- '| `narratives/<date>.md` | The written summary for that day, cached so a re-render costs nothing. |\n'
+        printf -- '| `narratives/<date>.sources` | A fingerprint of the extract the summary was written from, so a stale one is detected rather than trusted. |\n'
+        printf -- '| `runs.jsonl` | One record per run: when, how long, what it cost, what broke. |\n'
+        printf -- '| `spend.jsonl` | Per-call cost, which the rolling 7-day ceiling reads back. |\n'
+        printf -- '| `Pinned.md` | The hand-written rules. Copied here because they are the one thing that cannot be regenerated. |\n\n'
+
+        printf 'Deliberately absent: `cursor.json` (how far *this* Mac has read — meaningless\n'
+        printf 'on another) and `logs/` (launchd noise, and the only thing here that grows\n'
+        printf 'without bound).\n\n'
+
+        printf '## Restoring onto a new Mac\n\n'
+        printf 'Set the dotfiles up first, then:\n\n'
+        printf '```sh\n'
+        printf 'git clone %s \\\n' "${remote:-<this repo>}"
+        printf '    ~/.local/state/chezdistill\n'
+        printf 'chezdistill --render\n'
+        printf '```\n\n'
+        printf '`--render` makes no model calls and costs nothing. It rebuilds `MAIN.md`,\n'
+        printf '`Topics/` and the reports from the extracts, so the new machine starts with\n'
+        printf 'the memory the old one had rather than an empty one.\n\n'
+
+        printf '## Why it is private\n\n'
+        printf 'Each item carries a short quote from the conversation it came from, as\n'
+        printf 'evidence for why it was kept. That is transcript text. Quotes are stripped\n'
+        printf 'from items older than the retention window, but the recent ones are real,\n'
+        printf 'so this repo stays private and every push is scanned by `gitleaks` first.\n'
+    } >"$out"
+}
+
 # distill_state_repo_init — created on first use. A remote is optional: add one
 # by hand (`git -C <state> remote add origin …`) and every run pushes to it, so a
 # replacement Mac clones the corpus instead of starting from an empty memory.
@@ -1419,6 +1498,8 @@ distill_state_repo_init() {
     git -C "$repo" config user.name chezdistill >/dev/null 2>&1 || true
     git -C "$repo" config user.email chezdistill@localhost >/dev/null 2>&1 || true
     distill_state_repo_pushurl
+    distill_render_state_readme
+    distill_seed_pinned
     # Ensure each rule, rather than only writing the file when absent: a repo
     # initialised by an older version keeps its old .gitignore forever, and a
     # rule added later would never reach it. Untrack too — .gitignore has no
@@ -1556,7 +1637,7 @@ distill_status() {
     else
         line="$(printf '%s' "$last" | jq -r \
             '"\(.end[0:16] | sub("T"; " ")) UTC · \(.mode) · \(.status)"
-             + " · \(.sessions.kept)/\(.sessions.seen) session(s) · $\(.cost * 100 | round / 100)"')"
+             + " · \(.sessions.kept)/\(.sessions.seen) session(s) · \(.dur // 0)s · $\(.cost * 100 | round / 100)"')"
         case "$(printf '%s' "$last" | jq -r '.status')" in
             ok) s_pass "last run $line" ;;
             *) s_fail "last run $line" ;;

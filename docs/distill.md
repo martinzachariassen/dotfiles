@@ -322,19 +322,24 @@ Every nightly and weekly run, newest first:
 - 9 run(s): 8 ok, 1 failed
 - 11 of 34 session(s) distilled, 41 item(s)
 - $1.87 spent
+- typical run 148s, longest 210s
 
 ## Recent runs
 
-| Ended | Mode | Sessions | Items | Cost | MAIN | Result |
-|---|---|---|---|---|---|---|
-| 2026-08-24 01:03 | daily | 3/7 | 12 | $0.42 | 5.1K | ok |
-| 2026-08-23 01:02 | daily | 0/4 | 0 | $0 | 5.0K | **failed** |
+| Ended | Mode | Took | Sessions | Items | Cost | MAIN | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-08-24 01:03 | daily | 2m 50s | 3/7 | 12 | $0.42 | 5.1K | ok |
+| 2026-08-23 01:02 | daily | 4s | 0/4 | 0 | $0 | 5.0K | **failed** |
 ```
 
 **`0/7` is the number to read.** Seven sessions seen and none distilled looks
 like a broken job; the `## Last run in detail` block is what tells you it was six
 sessions under `minTurns` and one with nothing durable in it — free, and working
-as designed. Times are UTC.
+as designed.
+
+`Took` is the second one. A run that ends in seconds did no work — either nothing
+was in the window, or it failed early. A run drifting from two minutes towards
+ten is reading more sessions than it used to. Times are UTC.
 
 The records behind it are `runs.jsonl`, kept for `runRetentionDays`.
 `chezdistill --status` prints the newest one; `--render` rebuilds the note from
@@ -455,7 +460,9 @@ Three repos between them hold everything a replacement Mac needs:
 | a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
 
 The third is optional and has no remote by default, which means the corpus lives
-on exactly one Mac. To back it up, create a private repo and point the state dir
+on exactly one Mac. On this machine it is
+[`martinzachariassen/claude-memory`](https://github.com/martinzachariassen/claude-memory),
+private. To set one up elsewhere, create a private repo and point the state dir
 at it:
 
 ```sh
@@ -466,6 +473,19 @@ git -C ~/.local/state/chezdistill push -u origin main
 
 Every run pushes it from then on, and `chezdistill --status` says so — it warns
 `no remote — this Mac is the only copy` until you do.
+
+**Nothing pushes outside a run.** The push is the last step of `distill_run_end`,
+after the secret sweep, and it is the same commit that carries the run record —
+so a night that failed still lands on the remote with its reason attached. If the
+machine is offline the commit is made locally anyway and the next run carries it;
+"deferred" in the output is not an error.
+
+The repo writes its own `README.md` on every run — what each path is, why
+`cursor.json` and `logs/` are deliberately absent, and the two-command restore.
+It is generated, so don't edit it on GitHub; change
+`distill_render_state_readme` instead. `Pinned.md` is seeded empty the first time
+the repo is created, so the "edit `Pinned.md`" instruction in every generated note
+points at a file that exists.
 
 `logs/`, `cursor.json`, `main-diff-*.txt` and `*.tmp` are gitignored: the cursor
 answers "how far has *this* machine read", which is meaningless anywhere else.

@@ -417,7 +417,20 @@ item() {
     distill_render_runs
 
     [ -f "$STATE/runs.jsonl" ]
-    grep -q '| daily | 2/4 | 7 |' "$VAULT/30-Claude/Runs.md"
+    grep -q '| daily | 0s | 2/4 | 7 |' "$VAULT/30-Claude/Runs.md"
+}
+
+# "Did it work?" and "is it getting slower?" are the two questions a nightly job
+# has to answer without being watched, and the second one needs the number on
+# every row, not only on the last run.
+@test "every run row carries how long it took" {
+    load_lib
+    jq -nc --arg t "$(distill_iso_now)" '{t:$t, end:$t, dur:95, mode:"daily",
+        status:"ok", items:3, cost:0, main_bytes:0,
+        sessions:{seen:2, kept:1, detail:[]}, notes:[]}' >"$STATE/runs.jsonl"
+    distill_render_runs
+    grep -q '| daily | 1m 35s | 1/2 | 3 |' "$VAULT/30-Claude/Runs.md"
+    grep -q 'typical run 95s, longest 95s' "$VAULT/30-Claude/Runs.md"
 }
 
 @test "a failed run reaches the vault, with the reason" {
@@ -728,6 +741,46 @@ item() {
     distill_commit_local "chore(distill): test"
     run git -C "$STATE" ls-files
     [[ "$output" != *"logs/nightly.log"* ]]
+}
+
+# The generated notes all say "fix a wrong rule by editing Pinned.md". Until
+# something creates it that instruction points at nothing.
+@test "Pinned.md is seeded once and never overwritten" {
+    load_lib
+    distill_seed_pinned
+    [ -f "$STATE/Pinned.md" ]
+    printf -- '- mine\n' >"$STATE/Pinned.md"
+    distill_seed_pinned
+    grep -qx -- '- mine' "$STATE/Pinned.md"
+}
+
+# The remote is opened on a machine that has none of this set up — which is the
+# whole point of a backup — so the repo has to carry its own restore procedure.
+@test "the state repo carries a README with the restore procedure" {
+    load_lib
+    extract 2026-08-22 "[$(item 'committed' s1)]"
+    distill_commit_local "chore(distill): test"
+
+    grep -q 'chezdistill --render' "$STATE/README.md"
+    grep -q '~/.local/state/chezdistill' "$STATE/README.md"
+    git -C "$STATE" ls-files | grep -qx 'README.md'
+}
+
+# A clone line naming a remote the repo does not push to is worse than no clone
+# line, so it is read back from git rather than written from config.
+@test "the README names the remote git actually has" {
+    load_lib
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin https://example.invalid/claude-memory.git
+    distill_render_state_readme
+    grep -q 'https://example.invalid/claude-memory.git' "$STATE/README.md"
+}
+
+@test "rendering the state README twice is byte-identical" {
+    load_lib
+    distill_render_state_readme "$STATE/one.md"
+    distill_render_state_readme "$STATE/two.md"
+    cmp "$STATE/one.md" "$STATE/two.md"
 }
 
 @test "reverting the state repo takes the rule back out of MAIN" {
