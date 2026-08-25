@@ -9,8 +9,8 @@
 # Three destinations, because the three have nothing in common. See docs/ai.md.
 #
 # memoryPath is what Claude loads: the persona @-imports MAIN.md from here, so it
-# has to resolve whether or not the vault is mounted. statePath is the ledger,
-# extracts, cursor, spend and run log. The extracts ARE the memory — every rule and
+# has to resolve whether or not the vault is mounted. statePath is the extract
+# corpus, the hand-written Pinned.md, the cursor, spend and run log. The extracts ARE the memory — every rule and
 # hit count is derived from them — so this is the directory worth backing up. Both
 # are ordinary local directories and are created on demand.
 memoryPath = "~/.config/claude/memory"

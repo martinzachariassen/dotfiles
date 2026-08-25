@@ -6,7 +6,7 @@
 #   DISTILL_MEMORY  ~/.config/claude/memory — MAIN.md, Pinned.md, Topics/,
 #                   Candidates.md. Read by Claude, so it must resolve whether or
 #                   not the vault happens to be mounted.
-#   DISTILL_STATE   ~/.local/state/chezdistill — ledger, extracts, cursor, spend,
+#   DISTILL_STATE   ~/.local/state/chezdistill — the extract corpus, cursor, spend,
 #                   run log. The extracts ARE the memory: every rule, hit count
 #                   and date is derived from them on each render.
 #   DISTILL_ROOT    the vault's 30-Claude — Daily/, Weekly/, Runs.md. Reports for
@@ -165,7 +165,7 @@ distill_preflight() {
             "The POSIX bits allow it, so this is macOS privacy protection:" \
             "a launchd agent has no access to ~/Documents unless it is granted." \
             "System Settings → Privacy & Security → Full Disk Access → add /bin/bash." \
-            "Until then the nightly run still writes MAIN.md and the ledger."
+            "Until then the nightly run still writes MAIN.md and the corpus."
         return 0
     fi
     if ! git -C "$vault" rev-parse --git-dir >/dev/null 2>&1; then
@@ -295,11 +295,6 @@ distill_dedupe() {
 # distill_turns — typed human turns in a filtered stream.
 distill_turns() {
     jq -s '[.[] | select(.r == "user")] | length'
-}
-
-# distill_dates — the calendar days a filtered stream spans.
-distill_dates() {
-    jq -r '.t[0:10]' | sort -u
 }
 
 # ─── Model invocation ─────────────────────────────────────────────────────────
@@ -473,7 +468,7 @@ distill_run_session() {
         >>"$_DISTILL_SESSIONS"
 }
 
-# distill_run_cost — what this run spent, read back from the same ledger the
+# distill_run_cost — what this run spent, read back from the same spend log the
 # rolling ceiling uses rather than counted separately.
 distill_run_cost() {
     local f
@@ -658,14 +653,15 @@ distill_run_end() {
 
 # ─── Ledger ───────────────────────────────────────────────────────────────────
 #
-# One file per entry, keyed by a hash of the normalised text, so the same fact
-# extracted twice lands on the same path with the same content.
+# There is one source of truth and it is the extract corpus: `extracts/<date>.json`,
+# one file per day. Everything the renderer needs — the rule, its detail, hit
+# counts, first and last seen — is DERIVED from it on every run rather than stored
+# alongside it. Deriving is what makes `--since 7d`, `--render` and a repeated
+# nightly run all safe to fire at will; a stored count would double on the second
+# read of a day.
 #
-# The files hold only what cannot be recomputed: text, kind, topic, first_seen and
-# any supersession. Everything the renderer needs to make a decision — hit counts,
-# recency — is DERIVED from the extract corpus on every run rather than
-# incremented. Incrementing would double-count the moment a day is re-run;
-# deriving is what makes `--since 7d` and `--render` safe to run at will.
+# An entry's identity is a hash of its normalised text, so the same fact extracted
+# from two conversations collapses to one entry with two sightings.
 
 distill_sha() {
     if command -v shasum >/dev/null 2>&1; then
@@ -684,25 +680,8 @@ distill_entry_id() {
         distill_sha
 }
 
-distill_ledger_dir() {
-    printf '%s/ledger\n' "$(distill_state_dir)"
-}
-
 distill_extracts_dir() {
     printf '%s/extracts\n' "$(distill_state_dir)"
-}
-
-# distill_ledger_upsert ID TEXT KIND TOPIC — never overwrites first_seen.
-distill_ledger_upsert() {
-    local id="$1" text="$2" kind="$3" topic="$4" dir f
-    dir="$(distill_ledger_dir)"
-    mkdir -p "$dir"
-    f="$dir/$id.json"
-    [ -f "$f" ] && return 0
-    jq -n --arg id "$id" --arg text "$text" --arg kind "$kind" \
-        --arg topic "$topic" --arg first "$(date -u +%Y-%m-%d)" \
-        '{id:$id, text:$text, kind:$kind, topic:$topic,
-          first_seen:$first, superseded_by:null}' >"$f"
 }
 
 # distill_derive — the single source of truth for every rendering decision.
@@ -712,9 +691,8 @@ distill_ledger_upsert() {
 # `hits` counts DISTINCT sessions, which is what the promotion gate is really
 # asking: has this come up more than once, or is it one conversation's reading?
 distill_derive() {
-    local ex led
+    local ex
     ex="$(distill_extracts_dir)"
-    led="$(distill_ledger_dir)"
     [ -d "$ex" ] || return 0
 
     /usr/bin/find "$ex" -type f -name '*.json' 2>/dev/null |
@@ -729,7 +707,7 @@ distill_derive() {
                 jq -c --arg id "$(distill_entry_id \
                     "$(printf '%s' "$item" | jq -r '.text')")" '. + {id:$id}'
         done |
-        jq -s -c --arg leddir "$led" '
+        jq -s -c '
             group_by(.id)[]
             | { id: .[0].id,
                 text: .[0].text,
@@ -773,14 +751,6 @@ distill_prune_extracts() {
     done
 }
 
-# distill_superseded ID — the id that replaced this one, empty when current.
-distill_superseded() {
-    local f
-    f="$(distill_ledger_dir)/$1.json"
-    [ -f "$f" ] || return 0
-    jq -r '.superseded_by // empty' "$f" 2>/dev/null
-}
-
 # ─── Rendering ────────────────────────────────────────────────────────────────
 #
 # One section, because one machine distilling one person's work has no second
@@ -792,7 +762,6 @@ distill_superseded() {
 #
 # Eligibility for MAIN, all derived:
 #   hits >= minHits          the promotion gate — one misreading can't become a rule
-#   not superseded           a newer decision has replaced it
 #   last_seen >= cutoff      still current; stale entries fall back to Topics
 #
 # Note this differs from the original plan, which demoted on
@@ -1097,7 +1066,7 @@ distill_git_pull() {
 # pull, and no way for this to fail on a network.
 #
 # Only state is tracked, not memory. MAIN.md, Topics/ and Candidates.md are a
-# pure function of the ledger and the extracts, so reverting the inputs and
+# pure function of the extract corpus, so reverting the inputs and
 # re-rendering puts the memory tier back exactly — which is what `--undo` does.
 # Versioning derived output alongside its input would just be two copies of the
 # same decision, free to disagree.
@@ -1260,8 +1229,11 @@ distill_status() {
         s_note "MAIN.md  not rendered yet"
     fi
 
-    n="$(/usr/bin/find "$(distill_ledger_dir)" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
-    s_note "ledger   ${n} entries"
+    n="$(distill_derive | jq -s 'length' 2>/dev/null || echo 0)"
+    line="$(distill_derive | jq -s -r 'if length == 0 then "" else
+        "\([.[].hits] | add) sighting(s) of \(length) entr\(if length == 1 then "y" else "ies" end), oldest \([.[].first_seen] | min)"
+        end' 2>/dev/null || true)"
+    s_note "corpus   ${line:-nothing extracted yet}"
 
     n="$(distill_eligible | jq -s '[.[] | select(.eligible | not)] | length' 2>/dev/null || echo 0)"
     if [ "${n:-0}" -gt 0 ]; then
@@ -1302,14 +1274,6 @@ distill_status() {
 }
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
-
-distill_schema_triage() {
-    cat <<'JSON'
-{"type":"object","additionalProperties":false,
- "required":["worth","reason"],
- "properties":{"worth":{"type":"boolean"},"reason":{"type":"string"}}}
-JSON
-}
 
 # One call per session, not two. Measured on real transcripts, a separate Haiku
 # triage pass cost $0.05/session while the map cost $0.23 — but each call also
@@ -1384,7 +1348,7 @@ distill_run_daily() {
 
 _distill_daily_body() {
     local since now tmp sysfile schema filtered turns cwd out
-    local sess name title mapped date n_items
+    local sess name title mapped date n_items persisted=1
 
     distill_spend_ok || return 1
     distill_git_pull
@@ -1449,28 +1413,57 @@ _distill_daily_body() {
 
     ok "$DISTILL_RUN_KEPT of $DISTILL_RUN_SEEN session(s) yielded items"
 
-    # One file per date, merged with what that date already holds: a backfill and
-    # a nightly run can both land on the same day, and `unique` keeps a re-read
-    # session from counting twice.
+    distill_persist_extracts "$tmp" || persisted=0
+
+    distill_finish_dates "$DISTILL_RUN_DATES" "$tmp"
+    distill_prune_extracts
+    if [ "$persisted" -eq 1 ]; then
+        distill_cursor_write "$now"
+    else
+        distill_warn "cursor held at $since — the next run re-reads this window"
+    fi
+    rm -rf "$tmp"
+    [ "$persisted" -eq 1 ]
+}
+
+# distill_persist_extracts TMPDIR — write this run's items into the corpus, one
+# file per date, merged with whatever that date already holds. A backfill and a
+# nightly run can both land on the same day, and `unique` keeps a session that was
+# read twice from counting twice.
+#
+# Appends each date it wrote to DISTILL_RUN_DATES. Returns non-zero if any write
+# failed, which is the one failure in this job that loses money: the model calls
+# are already billed by the time this runs, and no re-run recovers them. The
+# caller holds the cursor back on non-zero so the next run reads the window again.
+distill_persist_extracts() {
+    local tmp="$1" f date out rc=0
     for f in "$tmp"/items-*.ndjson; do
         [ -f "$f" ] || continue
         date="$(basename "$f" .ndjson)"
         date="${date#items-}"
         out="$(distill_extract_file "$date")"
-        mkdir -p "$(dirname "$out")"
+        mkdir -p "$(dirname "$out")" 2>/dev/null
+
         if [ -f "$out" ]; then
-            jq -s '{items: (.[0].items + .[1] | unique)}' \
-                "$out" <(jq -s '.' "$f") >"$out.tmp" && mv "$out.tmp" "$out"
+            if jq -s '{items: (.[0].items + .[1] | unique)}' \
+                "$out" <(jq -s '.' "$f") >"$out.tmp" 2>/dev/null &&
+                mv "$out.tmp" "$out" 2>/dev/null; then
+                :
+            else
+                rm -f "$out.tmp"
+                rc=1
+            fi
         else
-            jq -s '{items: .}' "$f" >"$out"
+            jq -s '{items: .}' "$f" >"$out" 2>/dev/null || rc=1
+        fi
+
+        if [ "$rc" -ne 0 ]; then
+            distill_fail "could not write $out — extracted items not saved"
+            return 1
         fi
         DISTILL_RUN_DATES="$DISTILL_RUN_DATES $date"
     done
-
-    distill_finish_dates "$DISTILL_RUN_DATES" "$tmp"
-    distill_prune_extracts
-    distill_cursor_write "$now"
-    rm -rf "$tmp"
+    return 0
 }
 
 # distill_finish_dates DATES TMPDIR — narrate and render. Publishing (gitleaks,
@@ -1580,7 +1573,7 @@ _distill_weekly_body() {
             jq -s -r 'map("- [\(.kind)] \(.text)") | join("\n")' |
             distill_claude "$(distill_cfg narrateModel opus)" "$tmp/rubric.md" \
                 <(distill_schema_narrative) \
-                "Write the weekly review for $week from these ledger entries." |
+                "Write the weekly review for $week from these entries." |
             jq -r '.summary // empty'
         printf '\n## Not in MAIN.md\n\n'
         printf 'Below the promotion gate or gone stale. The full list is in\n'

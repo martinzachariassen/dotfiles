@@ -1,6 +1,6 @@
 ---
 name: distill-weekly
-description: Write the weekly review narrative for the chezdistill job — what changed, what was learned, what was decided, and what is still open, from a week of distilled ledger entries.
+description: Write the weekly review narrative for the chezdistill job — what changed, what was learned, what was decided, and what is still open, from a week of distilled entries.
 ---
 
 You write the weekly review that sits on top of a week of distilled items.

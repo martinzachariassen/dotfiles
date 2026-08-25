@@ -67,8 +67,8 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   two can't disagree; add checks there, not in either caller.
 - **`chezdistill` writes to three places, none of them this repo.** The memory tier
   (`MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md`) goes to
-  `~/.config/claude/memory`, beside the persona that `@`-imports it; the ledger,
-  extracts, cursor, spend and run log to `~/.local/state/chezdistill`, in a git repo
+  `~/.config/claude/memory`, beside the persona that `@`-imports it; the extract
+  corpus, `Pinned.md`, cursor, spend and run log to `~/.local/state/chezdistill`, in a git repo
   whose remote is optional (add one and every run pushes, so a replacement Mac
   clones the corpus instead of starting empty); and
   only the reports you read (`Daily/`, `Weekly/`, `Runs.md`) to
@@ -87,7 +87,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   write access. `hits` is **derived** from the extract corpus, never incremented —
   that is what makes `--render`, `--since 7d` and a repeated nightly run idempotent.
   Don't move a decision into a prompt, and don't make `--undo` revert the rendered
-  files: `MAIN.md` is derived, so undo reverts the ledger and re-renders. Full guide
+  files: `MAIN.md` is derived, so undo reverts the corpus and re-renders. Full guide
   in [docs/distill.md](docs/distill.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in

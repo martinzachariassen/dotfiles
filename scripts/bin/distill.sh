@@ -33,7 +33,7 @@ usage: chezdistill [--setup] [--weekly] [--since SPEC] [--status] [--render]
 Distil recent Claude Code conversations into three places:
 
   ~/.config/claude/memory     MAIN.md, Topics/, Candidates.md — read by Claude
-  ~/.local/state/chezdistill  ledger, extracts, cursor, spend, run log
+  ~/.local/state/chezdistill  the extract corpus, Pinned.md, cursor, spend, runs
   the vault's 30-Claude       Daily/, Weekly/, Runs.md — read by you
 
   (no flags)        run the nightly job now — the same code path launchd uses
@@ -44,7 +44,7 @@ Distil recent Claude Code conversations into three places:
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
   --status          where everything lives, MAIN size vs cap, spend, last run
   --render          rebuild MAIN.md, Topics, Candidates and Runs from the
-                    ledger; no API calls
+                    corpus; no API calls
   --undo            revert the state repo's last chezdistill commit and
                     re-render the memory tier from it
   -n, --dry-run     show what would be read and run, without calling the model
@@ -76,10 +76,9 @@ _distill_since() {
     esac
 }
 
-# _distill_undo — revert the ledger and extracts, then rebuild the memory tier
-# from them. MAIN.md, Topics/ and Candidates.md are derived, so undoing the
+# _distill_undo — revert the extract corpus, then rebuild the memory tier from it. MAIN.md, Topics/ and Candidates.md are derived, so undoing the
 # inputs and re-rendering is what actually puts them back; reverting the rendered
-# files would leave them free to disagree with the ledger that produced them.
+# files would leave them free to disagree with the corpus that produced them.
 _distill_undo() {
     local last repo
     distill_preflight || return $?
@@ -96,7 +95,7 @@ _distill_undo() {
         return 0
     fi
     say "would revert $(git -C "$repo" log -1 --format='%h %s' "$last")"
-    explain "Then re-render MAIN.md, Topics and Candidates from the reverted ledger."
+    explain "Then re-render MAIN.md, Topics and Candidates from the reverted corpus."
     if [ "$ASSUME_YES" != "1" ] && [ "$DRY_RUN" != "1" ] && { : </dev/tty; } 2>/dev/null; then
         printf '%s  %s' "$(line_prefix)" "Revert it? [y/N] " >/dev/tty
         IFS= read -r reply </dev/tty || reply=""
@@ -113,7 +112,7 @@ _distill_undo() {
     distill_render_main
     distill_render_inbox
     distill_render_topics
-    ok "reverted, and re-rendered the memory tier from the ledger"
+    ok "reverted, and re-rendered the memory tier from the corpus"
 }
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
@@ -210,7 +209,7 @@ _distill_setup_migrate() {
     dim "           .state/  →  $state"
     dim "           MAIN.md, Pinned.md, Topics/, Inbox/  →  $mem"
     if ! _distill_confirm "Move them?"; then
-        s_warn "layout   left in place — the job would start from an empty ledger"
+        s_warn "layout   left in place — the job would start from an empty corpus"
         return 1
     fi
     if [ "$DRY_RUN" = "1" ]; then
@@ -436,7 +435,7 @@ _distill_setup() {
         return 1
     fi
 
-    # Seed MAIN.md from the (usually empty) ledger. The apply above rewrote the
+    # Seed MAIN.md from the (usually empty) corpus. The apply above rewrote the
     # global persona to @-import it, and an import that resolves to nothing is a
     # rough edge in every session until the first nightly run. Costs no API call.
     if [ "$DRY_RUN" = "1" ]; then
@@ -526,7 +525,7 @@ _distill_main() {
             distill_render_inbox
             distill_render_topics
             distill_have_vault && distill_render_runs
-            ok "rendered MAIN.md, Topics and Candidates from the ledger"
+            ok "rendered MAIN.md, Topics and Candidates from the corpus"
             ;;
         weekly)
             distill_run_weekly || return 1

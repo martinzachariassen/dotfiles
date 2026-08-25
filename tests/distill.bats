@@ -14,7 +14,7 @@
 #   cap          MAIN is loaded into every session forever; the limit is a
 #                guarantee, not an estimate
 #   spend        an unattended nightly job must not be able to bill for a week
-#   undo         MAIN.md is derived, so undo reverts the ledger and re-renders
+#   undo         MAIN.md is derived, so undo reverts the corpus and re-renders
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -471,6 +471,43 @@ item() {
     grep -q 'could not write' "$_DISTILL_EVENTS"
 }
 
+# ─── Losing paid work ─────────────────────────────────────────────────────────
+#
+# Writing the extract is the only step in the job that can lose money: the model
+# calls are already billed by the time it runs, and no re-run recovers them. So a
+# failure there has to hold the cursor back, or the next run skips the same window
+# and the spend is gone for good.
+
+@test "extracts are merged into the day they belong to, without double-counting" {
+    load_lib
+    extract 2026-08-22 "[$(item 'already here' s1)]"
+    tmp="$BATS_TEST_TMPDIR/items"
+    mkdir -p "$tmp"
+    # s1 again (a re-read session) plus a genuinely new one.
+    printf '%s\n%s\n' "$(item 'already here' s1)" "$(item 'brand new' s2)" \
+        >"$tmp/items-2026-08-22.ndjson"
+
+    distill_run_begin daily
+    run distill_persist_extracts "$tmp"
+    [ "$status" -eq 0 ]
+    [ "$(jq '.items | length' "$STATE/extracts/2026-08-22.json")" -eq 2 ]
+}
+
+@test "a failed extract write is fatal, so the caller can hold the cursor" {
+    load_lib
+    mkdir -p "$STATE/extracts"
+    chmod a-w "$STATE/extracts"
+    tmp="$BATS_TEST_TMPDIR/items"
+    mkdir -p "$tmp"
+    printf '%s\n' "$(item 'would be lost' s1)" >"$tmp/items-2026-08-22.ndjson"
+
+    distill_run_begin daily
+    run distill_persist_extracts "$tmp"
+    chmod u+w "$STATE/extracts"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not saved"* ]]
+}
+
 # ─── Retention ────────────────────────────────────────────────────────────────
 #
 # The obvious reading of extractRetentionDays — delete old extracts — would erase
@@ -564,9 +601,9 @@ item() {
 
 # ─── Undo ─────────────────────────────────────────────────────────────────────
 #
-# MAIN.md is derived, so undo reverts the ledger and extracts that produced it
+# MAIN.md is derived, so undo reverts the extract corpus that produced it
 # and renders again. Reverting the rendered file instead would leave it free to
-# disagree with the ledger on the next run.
+# disagree with the corpus on the next run.
 
 # Signing is pinned off in the repo itself, not inherited: a global
 # commit.gpgsign backed by 1Password raises a GUI prompt, and the 01:00 launchd
@@ -709,7 +746,7 @@ run_setup() {
 # half-migrated vault the user cannot inspect is worse than a duplicated one.
 @test "--setup migrates an old single-folder layout without deleting it" {
     old="$VAULT/30-Claude"
-    mkdir -p "$old/.state/extracts/2026-08-22" "$old/.state/ledger" "$old/Topics"
+    mkdir -p "$old/.state/extracts/2026-08-22" "$old/Topics"
     jq -n --argjson items "[$(item 'migrated rule' s1)]" '{items:$items}' \
         >"$old/.state/extracts/2026-08-22/$(hostname -s).json"
     printf '# Pinned\n\n- pinned survives\n' >"$old/Pinned.md"

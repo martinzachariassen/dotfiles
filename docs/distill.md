@@ -18,7 +18,7 @@ The three things this job produces have nothing in common, so they live apart.
 | Where | What | Git |
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` | none — rendered from state |
-| `~/.local/state/chezdistill/` | ledger, extracts, cursor, spend, run log, logs | a local repo with **no remote** |
+| `~/.local/state/chezdistill/` | the extract corpus, `Pinned.md`, cursor, spend, run log, logs | a local repo, remote optional |
 | `~/Documents/TheArchive/30-Claude/` | `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
 
 Three consequences worth knowing before changing anything:
@@ -100,7 +100,7 @@ chezdistill              # the nightly job, right now
 chezdistill -n           # preview: what it would read and run, no model calls
 chezdistill --since 7d   # backfill the last week
 chezdistill --weekly     # the weekly review and compaction
-chezdistill --render     # rebuild MAIN/Topics/Candidates from the ledger, free
+chezdistill --render     # rebuild MAIN/Topics/Candidates from the corpus, free
 chezdistill --status     # where things live, MAIN size vs cap, spend, last run
 chezdistill --undo       # revert the last state commit and re-render
 ```
@@ -125,7 +125,8 @@ running it by hand does not double-bill you for the night.
   │                thinking, sidechains, harness noise        ~16x smaller
   ├─ GATE        fewer than minTurns typed turns → skipped, free, no API call
   ├─ MAP         one model call per surviving session → items as JSON
-  │                → state/extracts/<date>.json
+  │                → state/extracts/<date>.json — a failed write here holds the
+  │                  cursor back: the calls are billed, no re-run recovers them
   ├─ SOURCE      already reflected in the report? → done, no further calls
   ├─ NARRATE     one model call per date → the ## Summary prose
   ├─ RENDER      bash builds MAIN.md, Topics/, Candidates.md, the daily report
@@ -207,8 +208,8 @@ classpath; older Spring Boot versions still use com.fasterxml.
 
 ### `Daily/2026-08-22.md` — in the vault
 
-Opens with `## MAIN.md changes` — added, demoted, superseded, truncated to one
-line each. **That block is the point:** ten seconds a day tells you everything
+Opens with `## MAIN.md changes` — every rule added or demoted since the last
+run, truncated to one line each. **That block is the point:** ten seconds a day tells you everything
 that changed in the instructions every session now loads. Then a `## Summary`
 narrative, then the items by kind, then the source fingerprint.
 
@@ -262,18 +263,18 @@ safe to fire at will.
 ## Correcting it
 
 The generated files are not the place to push back — the next run overwrites them
-from the ledger. Use these instead:
+from the corpus. Use these instead:
 
 | Situation | What to do |
 |---|---|
 | A rule is wrong or badly worded | Write the correct one in `~/.config/claude/memory/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
 | Last night's run made a mess | `chezdistill --undo` reverts the state repo's last commit and re-renders the memory from it. |
-| You edited the ledger or `Pinned.md` | `chezdistill --render` rebuilds MAIN, Topics and Candidates. No API calls. |
-| An entry should be gone entirely | Delete its `ledger/<id>.json` **and** its sightings in `extracts/`; `hits` is derived from the extracts, so the ledger file alone isn't enough. |
+| You edited the corpus or `Pinned.md` | `chezdistill --render` rebuilds MAIN, Topics and Candidates. No API calls. |
+| An entry should be gone entirely | Delete its sightings from `extracts/<date>.json`. Everything about an entry is derived from the corpus, so that is the only place it exists. |
 
-`--undo` reverts the ledger and extracts rather than the rendered files, because
+`--undo` reverts the corpus rather than the rendered files, because
 `MAIN.md`, `Topics/` and `Candidates.md` are a pure function of them. Reverting
-the output instead would leave it free to disagree with the ledger on the next
+the output instead would leave it free to disagree with the corpus on the next
 run.
 
 ## Sleep, wake, and the cursor
@@ -336,6 +337,7 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 
 | Symptom | Cause |
 |---|---|
+| "cursor held at …" | An extract could not be written. The window is deliberately re-read next run, because the model calls behind it were already paid for. |
 | "cannot write to …/30-Claude" at 01:00 but not by hand | macOS privacy protection. See below — the POSIX bits are fine, the syscall is refused. |
 | "vault not found" / "has no .obsidian" | The vault isn't cloned or mounted here. The reports are skipped; `MAIN.md` still rendered. |
 | "30-Claude does not exist" | Create it in Obsidian. The job will not. |
@@ -408,7 +410,7 @@ script on the machine gets the same reach — which is the trade for having the
 reports written unattended.
 
 Without it, nothing is lost that matters to Claude: `MAIN.md`, `Topics/` and the
-ledger live outside `~/Documents` and are written normally. Only `Daily/`,
+corpus live outside `~/Documents` and are written normally. Only `Daily/`,
 `Weekly/` and `Runs.md` wait for a run you start yourself. Each such night is
 recorded, and `Runs.md` names them the next time it can be written:
 

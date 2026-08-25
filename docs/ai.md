@@ -38,7 +38,7 @@ weekly review on Sunday at 02:00.
 It writes to three places, because the three have nothing in common. The memory
 tier — `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` — goes to
 `~/.config/claude/memory`, beside the persona that imports it, so it resolves
-whether or not the vault happens to be mounted. The ledger, extracts, cursor,
+whether or not the vault happens to be mounted. The extract corpus, cursor,
 spend and run log go to `~/.local/state/chezdistill`, in a git repo with no
 remote unless you add one — see the guide for backing the corpus up to a private
 repo. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
