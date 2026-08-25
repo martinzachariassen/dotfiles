@@ -93,6 +93,22 @@ distill_days_since() {
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
+# distill_can_write DIR — create a file and remove it again.
+#
+# `[ -w ]` is not enough on macOS. Under TCC the POSIX bits on
+# ~/Documents/TheArchive say "writable" and the write syscall is still refused
+# with EPERM, because a launchd agent has no Documents access unless it has been
+# granted explicitly. That gap is how the 01:00 run spent weeks reporting success
+# while every single write failed. Only an actual write tells the truth.
+distill_can_write() {
+    local dir="$1" probe
+    [ -d "$dir" ] || return 1
+    probe="$dir/.chezdistill-write-probe.$$"
+    : >"$probe" 2>/dev/null || return 1
+    rm -f "$probe" 2>/dev/null
+    return 0
+}
+
 # distill_preflight — every precondition, checked before any processing.
 # Always exports DISTILL_MEMORY and DISTILL_STATE; exports DISTILL_VAULT,
 # DISTILL_ROOT and DISTILL_VAULT_OK=1 only when the vault is genuinely here.
@@ -103,7 +119,7 @@ distill_days_since() {
 # memory tier lives on local disk and Claude needs it either way.
 # 0 = go · 1 = broken/unwritable (a real failure)
 distill_preflight() {
-    local vault folder
+    local vault folder d
 
     if ! command -v jq >/dev/null 2>&1; then
         fail "jq is required but not on PATH"
@@ -118,6 +134,15 @@ distill_preflight() {
     DISTILL_ROOT=""
     DISTILL_VAULT_OK=0
     export DISTILL_MEMORY DISTILL_STATE DISTILL_VAULT DISTILL_ROOT DISTILL_VAULT_OK
+
+    # Memory and state are the job's own directories. If they cannot be written
+    # there is nothing worth continuing for, so this one IS fatal.
+    mkdir -p "$DISTILL_MEMORY" "$DISTILL_STATE" 2>/dev/null || true
+    for d in "$DISTILL_MEMORY" "$DISTILL_STATE"; do
+        distill_can_write "$d" && continue
+        fail "cannot write to $d"
+        return 1
+    done
 
     vault="$(distill_expand "$(distill_cfg vaultPath)")"
     folder="$(distill_cfg folder 30-Claude)"
@@ -134,9 +159,14 @@ distill_preflight() {
         info "$vault/$folder does not exist — create it in Obsidian first"
         return 0
     fi
-    if [ ! -w "$vault/$folder" ]; then
-        fail "$vault/$folder is not writable"
-        return 1
+    if ! distill_can_write "$vault/$folder"; then
+        distill_warn "cannot write to $vault/$folder — skipping the reports"
+        explain \
+            "The POSIX bits allow it, so this is macOS privacy protection:" \
+            "a launchd agent has no access to ~/Documents unless it is granted." \
+            "System Settings → Privacy & Security → Full Disk Access → add /bin/bash." \
+            "Until then the nightly run still writes MAIN.md and the ledger."
+        return 0
     fi
     if ! git -C "$vault" rev-parse --git-dir >/dev/null 2>&1; then
         fail "$vault is not a git repo"
@@ -462,6 +492,7 @@ distill_run_record() {
         --argjson dur "$(($(date -u +%s) - ${_DISTILL_RUN_EPOCH:-0}))" \
         --arg mode "${_DISTILL_RUN_MODE:-daily}" \
         --arg trigger "${DISTILL_TRIGGER:-manual}" \
+        --arg vault "$(distill_have_vault && printf ok || printf skipped)" \
         --arg since "${_DISTILL_RUN_SINCE:-}" \
         --arg dates "${DISTILL_RUN_DATES:-}" \
         --argjson seen "${DISTILL_RUN_SEEN:-0}" \
@@ -472,7 +503,7 @@ distill_run_record() {
         --arg status "$status" \
         --argjson notes "${notes:-[]}" \
         --argjson sessions "${sessions:-[]}" \
-        '{t:$t, end:$end, dur:$dur, mode:$mode, trigger:$trigger,
+        '{t:$t, end:$end, dur:$dur, mode:$mode, trigger:$trigger, vault:$vault,
           since:$since, status:$status, items:$items, cost:$cost,
           main_bytes:$main,
           dates:($dates | split(" ") | map(select(length > 0))),
@@ -517,7 +548,11 @@ distill_render_runs() {
               else
                 "- \($r | length) run(s): \([$r[] | select(.status == "ok")] | length) ok, \([$r[] | select(.status != "ok")] | length) failed",
                 "- \([$r[].sessions.kept] | add // 0) of \([$r[].sessions.seen] | add // 0) session(s) distilled, \([$r[].items] | add // 0) item(s)",
-                "- $\(([$r[].cost] | add // 0) * 100 | round / 100) spent"
+                "- $\(([$r[].cost] | add // 0) * 100 | round / 100) spent",
+                (([$r[] | select(.vault == "skipped")] | length) as $skipped
+                 | if $skipped > 0
+                   then "- ⚠ \($skipped) run(s) could not write to the vault — reports skipped that night"
+                   else empty end)
               end'
 
         printf '\n## Recent runs\n\n'
@@ -546,7 +581,7 @@ distill_render_runs() {
             (sort_by(.t) | last) as $r
             | if $r == null then "No runs recorded yet."
               else
-                "*\($r.end[0:16] | sub("T"; " ")) · \($r.mode) · \($r.trigger) · \($r.dur)s · read since \(if $r.since == "" then "?" else $r.since end)*",
+                "*\($r.end[0:16] | sub("T"; " ")) · \($r.mode) · \($r.trigger) · \($r.dur)s · reports \($r.vault // "?") · read since \(if $r.since == "" then "?" else $r.since end)*",
                 "",
                 (if ($r.sessions.detail | length) == 0
                  then "No sessions were in the window."
@@ -581,6 +616,13 @@ distill_run_end() {
     local rc="$1" status="ok" msg
 
     [ "$rc" -eq 0 ] || status="failed"
+    # A body can return 0 while individual writes failed underneath it — which is
+    # exactly how a run where nothing reached disk was recorded as "ok". Any
+    # fail-level event this run recorded overrides the body's own verdict.
+    if [ -f "${_DISTILL_EVENTS:-}" ] &&
+        grep -q '^fail	' "${_DISTILL_EVENTS}" 2>/dev/null; then
+        status="failed"
+    fi
     msg="$(distill_run_message "$status")"
 
     if [ "${DRY_RUN:-0}" != "1" ]; then
@@ -786,10 +828,17 @@ distill_render_main() {
             done
     fi
 
-    mv "$tmp" "$out"
     rm -f "$chosen"
+    if ! mv "$tmp" "$out" 2>/dev/null; then
+        rm -f "$tmp"
+        distill_fail "could not write $out"
+        return 1
+    fi
 
-    used="$(wc -c <"$out" | tr -d ' ')"
+    used="$(wc -c <"$out" 2>/dev/null | tr -d ' ')"
+    # Guard the comparison: a failed write leaves this empty, and `[ -le ]` on an
+    # empty string is a shell error that reads as "MAIN.md is B, over the cap".
+    [ -n "$used" ] || return 1
     [ "$used" -le "$cap" ] || distill_warn "MAIN.md is ${used}B, over the ${cap}B cap"
 }
 

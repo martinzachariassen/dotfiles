@@ -362,6 +362,19 @@ item() {
     grep -q 'too short, no model call' "$VAULT/30-Claude/Runs.md"
 }
 
+# A night that could not write the vault could not write Runs.md either, so the
+# only place the fact survives is the run record in state. Runs.md is re-rendered
+# from every record, so the next run that CAN write surfaces the nights that could not.
+@test "a night that skipped the vault shows up in Runs.md afterwards" {
+    load_lib
+    DISTILL_VAULT_OK=0
+    distill_run_begin daily
+    distill_run_record ok
+    DISTILL_VAULT_OK=1
+    distill_render_runs
+    grep -q 'could not write to the vault' "$VAULT/30-Claude/Runs.md"
+}
+
 @test "records older than the retention window are pruned" {
     load_lib
     jq -nc --arg t "$(distill_iso_ago 200)" '{t:$t, end:$t}' >"$STATE/runs.jsonl"
@@ -400,6 +413,53 @@ item() {
     awk '/^distill_guard_secrets\(\) \{/,/^\}/' "$LIB" >"$VAULT/guard.sh"
     grep -q 'distill_state_dir' "$VAULT/guard.sh"
     grep -q 'distill_memory_dir' "$VAULT/guard.sh"
+}
+
+# ─── Failed writes must be loud ───────────────────────────────────────────────
+#
+# The 01:00 launchd run spent weeks reporting "ok, 1 warning(s)" while macOS
+# refused every write into ~/Documents. Two things allowed that: `[ -w ]` passes
+# under TCC because the POSIX bits are fine, and a body that returns 0 outvoted
+# the failures recorded underneath it.
+
+@test "a writable-looking but unwritable dir is caught by an actual write" {
+    load_lib
+    ro="$BATS_TEST_TMPDIR/ro"
+    mkdir -p "$ro"
+    chmod a-w "$ro"
+    run distill_can_write "$ro"
+    chmod u+w "$ro"
+    [ "$status" -ne 0 ]
+}
+
+@test "an unwritable vault is skipped, not treated as a successful report" {
+    load_lib
+    chmod a-w "$VAULT/30-Claude"
+    run distill_preflight
+    chmod u+w "$VAULT/30-Claude"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"cannot write"* ]]
+}
+
+@test "a run with any recorded failure is never reported ok" {
+    load_lib
+    distill_run_begin daily
+    distill_fail "could not write MAIN.md" >/dev/null
+    distill_run_end 0 >/dev/null 2>&1 || true
+    run distill_last_run
+    [[ "$output" == *'"status":"failed"'* ]]
+}
+
+@test "a failed MAIN.md write is recorded, not swallowed" {
+    load_lib
+    ro="$BATS_TEST_TMPDIR/ro-main"
+    mkdir -p "$ro"
+    chmod a-w "$ro"
+    distill_run_begin daily
+    run distill_render_main "$ro/MAIN.md"
+    chmod u+w "$ro"
+    [ "$status" -ne 0 ]
+    grep -q 'could not write' "$_DISTILL_EVENTS"
 }
 
 # ─── Undo ─────────────────────────────────────────────────────────────────────

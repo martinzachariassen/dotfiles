@@ -336,6 +336,7 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 
 | Symptom | Cause |
 |---|---|
+| "cannot write to …/30-Claude" at 01:00 but not by hand | macOS privacy protection. See below — the POSIX bits are fine, the syscall is refused. |
 | "vault not found" / "has no .obsidian" | The vault isn't cloned or mounted here. The reports are skipped; `MAIN.md` still rendered. |
 | "30-Claude does not exist" | Create it in Obsidian. The job will not. |
 | Claude isn't loading any rules | Check `~/.config/claude/memory/MAIN.md` exists and that the persona imports it — `grep memory/MAIN.md ~/.config/claude/CLAUDE.md`. |
@@ -346,6 +347,33 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | Did it run at all last night? | `Runs.md` in the vault. |
 | It ran but distilled nothing | `## Last run in detail` in `Runs.md` gives the per-session reason. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
+
+## macOS and `~/Documents`
+
+A launchd agent has **no access to `~/Documents`** unless it has been granted it,
+and the failure does not look like a permission problem: `[ -w ]` returns true
+because the POSIX bits are fine, and only the write syscall is refused with
+`Operation not permitted`. Run `chezdistill` by hand from a terminal and it works,
+because the terminal has been granted access; the same code at 01:00 writes
+nothing.
+
+That is why the job probes with a real write rather than trusting `[ -w ]`, and
+why a run that could not write is recorded as **failed** rather than `ok`. Before
+that, a nightly job whose every write was refused reported `ok, 1 warning(s)`.
+
+To grant it: **System Settings → Privacy & Security → Full Disk Access**, add
+`/bin/bash` (the plist's `ProgramArguments[0]`). It is a broad grant — every bash
+script on the machine gets the same reach — which is the trade for having the
+reports written unattended.
+
+Without it, nothing is lost that matters to Claude: `MAIN.md`, `Topics/` and the
+ledger live outside `~/Documents` and are written normally. Only `Daily/`,
+`Weekly/` and `Runs.md` wait for a run you start yourself. Each such night is
+recorded, and `Runs.md` names them the next time it can be written:
+
+```markdown
+- ⚠ 3 run(s) could not write to the vault — reports skipped that night
+```
 
 ## Configuration
 
