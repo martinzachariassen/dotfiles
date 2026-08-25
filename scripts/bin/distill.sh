@@ -251,6 +251,14 @@ _distill_setup_migrate() {
         done
         f="$old/.state/cursor-$host.json"
         [ -f "$f" ] && cp -f "$f" "$state/cursor.json"
+        # The fingerprint that makes an already-distilled day free used to be
+        # "<host>  <hash>", one line per contributing machine. Left in the old
+        # format nothing ever matches, and the next run silently re-narrates
+        # every migrated day — one paid model call each.
+        for f in "$state"/narratives/*.sources; do
+            [ -f "$f" ] || continue
+            awk '{print $NF}' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
+        done
         moved=1
     fi
 

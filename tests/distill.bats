@@ -579,6 +579,22 @@ run_setup() {
     [ ! -e "$VAULT/30-Claude/MAIN.md" ]
 }
 
+# The fingerprint is what keeps an already-distilled day free. Migrated in the old
+# "<host>  <hash>" form it never matches, and the next run pays to re-narrate
+# every day it just migrated.
+@test "--setup rewrites the sources fingerprints to the new format" {
+    old="$VAULT/30-Claude"
+    mkdir -p "$old/.state/narratives" "$old/.state/extracts/2026-08-22"
+    jq -n --argjson items "[$(item 'x' s1)]" '{items:$items}' \
+        >"$old/.state/extracts/2026-08-22/$(hostname -s).json"
+    printf 'some-host  abc123def456\n' >"$old/.state/narratives/2026-08-22.sources"
+
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    [ "$(cat "$STATE/narratives/2026-08-22.sources")" = "abc123def456" ]
+}
+
 # The migration runs once and copies; nothing in the vault is deleted, because a
 # half-migrated vault the user cannot inspect is worse than a duplicated one.
 @test "--setup migrates an old single-folder layout without deleting it" {
