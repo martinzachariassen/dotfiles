@@ -234,6 +234,23 @@ run, truncated to one line each. **That block is the point:** ten seconds a day 
 that changed in the instructions every session now loads. Then a `## Summary`
 narrative, then the items by kind, then the source fingerprint.
 
+### Written for Obsidian
+
+The vault notes are the only window onto this, so they are written for it rather
+than for a terminal: YAML properties the `base` tables sort on, callouts for the
+parts that matter, real checkboxes for open threads, wikilinks to the topic behind
+every item, and prev/next navigation between days. `Topics/`, `MAIN.md` and
+`Candidates.md` are symlinked in from the memory dir — one copy on disk, visible
+from both sides. The symlinks are gitignored; a committed one is an absolute path
+that is wrong on every other machine.
+
+Three rubrics, not one. Extraction, the daily summary and the weekly review are
+different jobs, and running the two narrative calls under the *extraction* rubric
+— which is what happened until now — is why summaries came out as one dense
+paragraph. The narrative schema now asks for a lede plus two to four sections, and
+the length limit is in the schema rather than the prompt, for the same reason the
+200-character rule limit is.
+
 ### `README.md` — the folder explaining itself
 
 Generated. What each note is, how an entry gets here, and how to overrule one,

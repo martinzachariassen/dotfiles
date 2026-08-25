@@ -816,12 +816,27 @@ run_setup() {
     [ -d "$VAULT/30-Claude" ]
 }
 
-@test "--setup seeds MAIN.md where the persona imports it, not in the vault" {
+# MAIN.md is written to the memory dir — that is the copy the persona imports and
+# the only one on disk. The vault gets a symlink so Obsidian can show it, because
+# Obsidian is the only window onto this and a rule governing every session should
+# not be the one thing invisible from there.
+@test "--setup writes MAIN.md to the memory dir and links it into the vault" {
     setup_env '["macApps"]'
     run_setup
     [ "$status" -eq 0 ]
     [ -f "$MEM/MAIN.md" ]
-    [ ! -e "$VAULT/30-Claude/MAIN.md" ]
+    [ ! -f "$VAULT/30-Claude/MAIN.md" ] || [ -L "$VAULT/30-Claude/MAIN.md" ]
+}
+
+@test "the vault links to the memory tier rather than copying it" {
+    load_lib
+    extract 2026-08-22 "[$(item 'linked' s1)]"
+    distill_render_all
+    for n in Topics MAIN.md Candidates.md; do
+        [ -L "$VAULT/30-Claude/$n" ]
+    done
+    # Never committed: a symlink in git is an absolute path, wrong everywhere else.
+    grep -q '30-Claude/MAIN.md' "$VAULT/.gitignore"
 }
 
 # The fingerprint is what keeps an already-distilled day free. Migrated in the old
