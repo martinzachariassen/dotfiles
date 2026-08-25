@@ -521,6 +521,16 @@ item() {
     rm -rf "$stub"
 }
 
+# The caller parses this function's stdout as the model's answer. A progress line
+# printed there is parsed as JSON, and a dry run then reports "nothing durable in
+# it" for every session regardless of what is in them.
+@test "DRY_RUN keeps its notice off the captured stdout" {
+    load_lib
+    out="$(DRY_RUN=1 distill_claude sonnet /dev/null /dev/null prompt </dev/null 2>/dev/null)"
+    run jq -e '.' <<<"$out"
+    [ "$status" -eq 0 ]
+}
+
 # ─── Setup ────────────────────────────────────────────────────────────────────
 #
 # --setup is the only path allowed to create the 30-Claude folder. The guard it

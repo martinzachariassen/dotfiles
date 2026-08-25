@@ -308,7 +308,11 @@ distill_claude() {
     budget="$(distill_cfg maxBudgetUsd 2.0)"
 
     if [ "${DRY_RUN:-0}" = "1" ]; then
-        dim "dry-run \$ claude -p --model $model --tools \"\" (payload on stdin)"
+        # To stderr, not stdout: the caller captures this function's stdout as the
+        # model's answer, so the notice would be parsed as part of the JSON. It
+        # was — `jq: parse error at line 1, column 10` is the width of "dry-run $ "
+        # — and every session in a dry run therefore reported "nothing durable".
+        dim "dry-run \$ claude -p --model $model --tools \"\" (payload on stdin)" >&2
         echo '{}'
         return 0
     fi
