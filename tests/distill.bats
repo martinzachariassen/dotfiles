@@ -263,7 +263,7 @@ item() {
 
 @test "the cap is a guarantee and Pinned.md survives it" {
     load_lib
-    printf '# Pinned\n\n- keep me forever\n' >"$MEM/Pinned.md"
+    printf '# Pinned\n\n- keep me forever\n' >"$(distill_pinned_file)"
     items="["
     for i in 1 2 3 4 5 6 7 8 9; do
         items="$items$(item "a fairly long rule number $i that eats into the byte budget" s1),"
@@ -272,12 +272,21 @@ item() {
     items="${items%,}]"
     extract 2026-08-22 "$items"
 
-    DISTILL_CONFIG_JSON="$(cfg '{"mainCapBytes":500}')"
+    # Above the fixed preamble (header + Topics pointer, both of which name a
+    # path) but well under the ~550 bytes the nine rules need, so the cap has to
+    # actually truncate rather than happening to fit.
+    DISTILL_CONFIG_JSON="$(cfg '{"mainCapBytes":700}')"
     _DISTILL_CFG=""
     distill_render_main
     size="$(wc -c <"$MEM/MAIN.md" | tr -d ' ')"
-    [ "$size" -le 500 ]
+    [ "$size" -le 700 ]
+    # Pinned is never what gets sacrificed to the cap...
     grep -q 'keep me forever' "$MEM/MAIN.md"
+    # ...and the rules are: not all nine fit. grep -c is exempt from set -e when
+    # it matches nothing, so count the lines rather than trusting its exit code.
+    n="$(grep 'eats into the byte budget' "$MEM/MAIN.md" | wc -l | tr -d ' ')"
+    [ "$n" -ge 1 ]
+    [ "$n" -lt 9 ]
 }
 
 # ─── A day already distilled costs nothing to re-run ──────────────────────────
@@ -462,6 +471,79 @@ item() {
     grep -q 'could not write' "$_DISTILL_EVENTS"
 }
 
+# ─── Retention ────────────────────────────────────────────────────────────────
+#
+# The obvious reading of extractRetentionDays — delete old extracts — would erase
+# the memory, because hits and first_seen are derived from them on every render.
+# An established rule would drop back under the promotion gate and be evicted
+# from MAIN.md, so the corpus would forget exactly what has been true longest.
+
+@test "retention drops the quote and the path, never the rule" {
+    load_lib
+    old_date="$(distill_iso_ago 200 | cut -c1-10)"
+    mkdir -p "$STATE/extracts"
+    jq -n '{items:[{text:"a rule", detail:"why", kind:"learnings", topic:"T",
+                    session:"s1", evidence:"a quoted line", cwd:"/Users/x/secret",
+                    origin:"personal", host:"oldmac"}]}' \
+        >"$STATE/extracts/$old_date.json"
+    distill_prune_extracts
+
+    run jq -r '.items[0] | has("evidence"), has("cwd"), has("origin"), has("host")' \
+        "$STATE/extracts/$old_date.json"
+    [[ "$output" != *"true"* ]]
+    run jq -r '.items[0].text' "$STATE/extracts/$old_date.json"
+    [ "$output" = "a rule" ]
+}
+
+@test "retention leaves a rule promoted after the quote is aged out" {
+    load_lib
+    old_date="$(distill_iso_ago 200 | cut -c1-10)"
+    mkdir -p "$STATE/extracts"
+    for sess in s1 s2; do
+        jq -n --arg s "$sess" '{items:[{text:"survives retention", detail:"why",
+            kind:"learnings", topic:"T", session:$s, evidence:"quote", cwd:"/x"}]}' \
+            >"$STATE/extracts/$old_date-$sess.json"
+    done
+    # demoteAfterDays would evict it for age; this is about hits surviving.
+    DISTILL_CONFIG_JSON="$(cfg '{"demoteAfterDays":99999}')"
+    _DISTILL_CFG=""
+    distill_prune_extracts
+    run distill_derive
+    [[ "$output" == *'"hits":2'* ]]
+}
+
+@test "recent extracts keep their evidence" {
+    load_lib
+    extract 2026-08-22 "[$(item 'recent' s1)]"
+    jq '.items[0] += {evidence:"keep me", cwd:"/x"}' "$STATE/extracts/2026-08-22.json" \
+        >"$STATE/e.tmp" && mv "$STATE/e.tmp" "$STATE/extracts/2026-08-22.json"
+    distill_prune_extracts
+    run jq -r '.items[0].evidence' "$STATE/extracts/2026-08-22.json"
+    [ "$output" = "keep me" ]
+}
+
+# ─── Pinned.md ────────────────────────────────────────────────────────────────
+
+@test "Pinned.md lives with the inputs and is committed with them" {
+    load_lib
+    printf '# Pinned\n\n- keep me forever\n' >"$(distill_pinned_file)"
+    distill_render_main
+    grep -q 'keep me forever' "$MEM/MAIN.md"
+
+    distill_commit_local "chore(distill): test"
+    run git -C "$STATE" ls-files
+    [[ "$output" == *"Pinned.md"* ]]
+}
+
+@test "the cursor is never committed — it is meaningless on another machine" {
+    load_lib
+    distill_cursor_write "2026-08-22T00:00:00Z"
+    printf 'x\n' >"$STATE/extracts-marker"
+    distill_commit_local "chore(distill): test"
+    run git -C "$STATE" ls-files
+    [[ "$output" != *"cursor.json"* ]]
+}
+
 # ─── Undo ─────────────────────────────────────────────────────────────────────
 #
 # MAIN.md is derived, so undo reverts the ledger and extracts that produced it
@@ -618,7 +700,7 @@ run_setup() {
     run_setup
     [ "$status" -eq 0 ]
     [ -f "$STATE/extracts/2026-08-22.json" ]
-    [ -f "$MEM/Pinned.md" ]
+    [ -f "$STATE/Pinned.md" ]
     grep -q 'migrated rule' "$STATE/extracts/2026-08-22.json"
     # Still there: the user removes the old copies by hand once a run looks right.
     [ -f "$old/Pinned.md" ]

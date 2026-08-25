@@ -69,7 +69,8 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   (`MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md`) goes to
   `~/.config/claude/memory`, beside the persona that `@`-imports it; the ledger,
   extracts, cursor, spend and run log to `~/.local/state/chezdistill`, in a git repo
-  with **no remote** because the extracts hold near-verbatim conversation text; and
+  whose remote is optional (add one and every run pushes, so a replacement Mac
+  clones the corpus instead of starting empty); and
   only the reports you read (`Daily/`, `Weekly/`, `Runs.md`) to
   `~/Documents/TheArchive/30-Claude`. Keep that split — putting `Topics/` in the
   vault makes it unreadable to Claude, and putting extracts back in the vault puts

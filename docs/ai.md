@@ -40,8 +40,8 @@ tier — `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` — goes to
 `~/.config/claude/memory`, beside the persona that imports it, so it resolves
 whether or not the vault happens to be mounted. The ledger, extracts, cursor,
 spend and run log go to `~/.local/state/chezdistill`, in a git repo with no
-remote: the extracts hold near-verbatim conversation text and have nowhere to be
-pushed to. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
+remote unless you add one — see the guide for backing the corpus up to a private
+repo. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
 [TheArchive](https://github.com/martinzachariassen/TheArchive)'s `30-Claude/`.
 
 Its guiding rule is that **the model extracts and narrates while bash decides and

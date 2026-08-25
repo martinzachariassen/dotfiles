@@ -28,8 +28,8 @@ Three consequences worth knowing before changing anything:
 a missing vault costs you that day's report and nothing else — the job says so,
 renders the memory, and exits 0.
 
-**The extracts never reach a remote.** They hold near-verbatim conversation text,
-kept for `extractRetentionDays`. They are in a local repo so `--undo` works, and
+**The extracts are the memory.** Every rule, hit count and date is derived from
+them, so they are what a replacement Mac actually needs. They are in a local repo so `--undo` works, and
 that repo has no remote so there is nothing to leak into.
 
 **`Topics/` sits next to `MAIN.md`, not in the vault.** It is the other half of
@@ -348,6 +348,42 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | It ran but distilled nothing | `## Last run in detail` in `Runs.md` gives the per-session reason. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 
+## Backing it up, and moving to a new Mac
+
+Three repos between them hold everything a replacement Mac needs:
+
+| Repo | Gives you |
+|---|---|
+| this dotfiles repo | the persona, `settings.json`, the skills, the distiller itself, the plists |
+| TheArchive | the `Daily/`, `Weekly/` and `Runs.md` reports |
+| a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
+
+The third is optional and has no remote by default, which means the corpus lives
+on exactly one Mac. To back it up, create a private repo and point the state dir
+at it:
+
+```sh
+gh repo create claude-memory --private
+git -C ~/.local/state/chezdistill remote add origin git@github.com:<you>/claude-memory.git
+git -C ~/.local/state/chezdistill push -u origin main
+```
+
+Every run pushes it from then on, and `chezdistill --status` says so. `logs/`,
+`cursor.json` and `*.tmp` are gitignored — the cursor answers "how far has *this*
+machine read", which is meaningless anywhere else.
+
+On the new Mac: run `install.sh` for the dotfiles, clone TheArchive, clone this
+repo into `~/.local/state/chezdistill`, then `chezdistill --render`. That rebuilds
+`MAIN.md`, `Topics/` and `Candidates.md` from the corpus for free — they are pure
+output and are deliberately not tracked. The cursor starts fresh, so the first
+run reads the last 24 hours rather than re-reading everything.
+
+**This assumes one machine at a time.** Two Macs distilling into the same repo
+would collide: they would write the same `extracts/<date>.json` from different
+transcripts. The machinery that made that safe — per-host extracts, per-host
+fingerprints — was removed on purpose. Restoring or replacing is fine; running
+both is not.
+
 ## macOS and `~/Documents`
 
 A launchd agent has **no access to `~/Documents`** unless it has been granted it,
@@ -391,21 +427,30 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 | `minTurns` | `3` | Free pre-filter: shorter sessions never reach the model. |
 | `mapModel`, `narrateModel` | `sonnet`, `opus` | Extraction and prose. |
 | `maxBudgetUsd`, `maxSpendUsd7d` | `2.0`, `25.0` | Per call, and rolling over 7 days. |
-| `extractRetentionDays` | `90` | How long near-verbatim conversation text is kept. |
+| `extractRetentionDays` | `90` | After this, an extract's `evidence` quote and `cwd` are stripped. The rule itself is kept. |
 | `runsShown` | `30` | Rows in the `Runs.md` table. |
 | `runRetentionDays` | `90` | How long the run records behind it are kept. |
 
 Change a value, then `chezup` and `chezdistill --render` to see the effect without
 spending anything.
 
-## Secrets
+## Secrets and retention
 
-`~/.local/state/chezdistill/extracts/` holds near-verbatim conversation text. It
-is in a git repo with no remote, so it stays on this Mac; `extractRetentionDays`
-bounds the window. `gitleaks` sweeps the state dir, the memory dir **and** the
-vault folder before any commit, and any hit aborts every commit that run would
-have made. The extraction rubric forbids reproducing tokens, keys and `.env`
-values. TheArchive is a private repo — keep it that way.
+An extract item is the **distilled** result, not a transcript: a model-written
+rule (≤200 chars) and explanation, plus one short `evidence` quote and the `cwd`
+it came from. The quote and the path are the only parts worth an expiry, and
+`extractRetentionDays` strips exactly those after 90 days.
+
+It does **not** delete old extracts, and that is deliberate. `hits` and
+`first_seen` are derived from the corpus on every render, so deleting a 90-day-old
+sighting would drop a long-established rule back under the promotion gate and
+evict it from `MAIN.md` — the memory would forget precisely what has been true
+longest. Redaction ages out the sensitive half and leaves the rendered memory
+byte-identical.
+
+`gitleaks` sweeps the state dir, the memory dir **and** the vault folder before
+any commit, and any hit aborts every commit that run would have made. The
+extraction rubric forbids reproducing tokens, keys and `.env` values.
 
 ## Turning it off
 

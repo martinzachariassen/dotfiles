@@ -10,9 +10,9 @@
 #
 # memoryPath is what Claude loads: the persona @-imports MAIN.md from here, so it
 # has to resolve whether or not the vault is mounted. statePath is the ledger,
-# extracts, cursor, spend and run log — read by nobody, and holding near-verbatim
-# conversation text, which is why it lives outside every git remote. Both are
-# ordinary local directories and are created on demand.
+# extracts, cursor, spend and run log. The extracts ARE the memory — every rule and
+# hit count is derived from them — so this is the directory worth backing up. Both
+# are ordinary local directories and are created on demand.
 memoryPath = "~/.config/claude/memory"
 statePath = "~/.local/state/chezdistill"
 
@@ -62,6 +62,9 @@ demoteAfterDays = 21
 runsShown = 30
 runRetentionDays = 90
 
-# Extracts hold near-verbatim conversation text. They never leave this Mac, and
-# this bounds how long they are kept even here.
+# Extracts hold the DISTILLED item — a model-written rule and explanation — plus
+# one short `evidence` quote and the `cwd` it came from. After this many days the
+# quote and the path are stripped; the rule itself is kept forever, because `hits`
+# and `first_seen` are derived from the corpus and deleting an old sighting would
+# evict an established rule from MAIN.md.
 extractRetentionDays = 90

@@ -233,7 +233,7 @@ _distill_setup_migrate() {
         done
         # extracts/<date>/<host>.json → extracts/<date>.json. With more than one
         # host the local one wins: the others' transcripts are gone anyway, and
-        # merging two days of near-verbatim text is not worth a conflict.
+        # merging two machines' extracts is not worth a conflict here.
         host="$(hostname -s)"
         for date in "$old"/.state/extracts/*/; do
             [ -d "$date" ] || continue
@@ -262,8 +262,12 @@ _distill_setup_migrate() {
         moved=1
     fi
 
-    for f in MAIN.md Pinned.md; do
-        [ -f "$old/$f" ] && cp -f "$old/$f" "$mem/$f" && moved=1
+    [ -f "$old/MAIN.md" ] && cp -f "$old/MAIN.md" "$mem/MAIN.md" && moved=1
+    # Pinned.md follows the inputs, not the output — see distill_pinned_file.
+    for f in "$old/Pinned.md" "$mem/Pinned.md"; do
+        [ -f "$f" ] || continue
+        [ -f "$(distill_pinned_file)" ] || cp -f "$f" "$(distill_pinned_file)"
+        moved=1
     done
     [ -d "$old/Topics" ] && cp -R "$old/Topics" "$mem/" && moved=1
     [ -f "$old/Inbox/Candidates.md" ] &&
