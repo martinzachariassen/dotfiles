@@ -23,8 +23,27 @@ setup() {
     # `chezmoi data` stub — serves the pin the library reads.
     make_pin "$GOOD_SHA"
 
-    PATH="$STUBS:$PATH"
+    # Every test below one describes what happens when xcodes is NOT installed,
+    # and xcodes_bootstrap opens with `xcodes_installed && return 0`. Prepending
+    # to PATH does not achieve that on a machine where the appleDev module has
+    # actually installed xcodes: the real binary is still visible, every bootstrap
+    # short-circuits, and four tests fail for a reason that has nothing to do with
+    # what they assert. CI has no xcodes, so it never noticed.
+    #
+    # The one test that wants xcodes present plants its own stub in $STUBS.
+    PATH="$STUBS:$(_path_without xcodes)"
     export PATH XCODES_BIN_DIR="$BIN_DIR"
+}
+
+# _path_without CMD — $PATH with every directory holding an executable CMD removed.
+_path_without() {
+    local out="" d
+    while IFS= read -r d; do
+        [ -n "$d" ] || continue
+        [ -x "$d/$1" ] && continue
+        out="${out:+$out:}$d"
+    done < <(printf '%s\n' "$PATH" | tr ':' '\n')
+    printf '%s\n' "$out"
 }
 
 # make_pin SHA — rewrite the `chezmoi` stub so it reports SHA as the pinned sum.
