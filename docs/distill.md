@@ -368,9 +368,14 @@ git -C ~/.local/state/chezdistill remote add origin git@github.com:<you>/claude-
 git -C ~/.local/state/chezdistill push -u origin main
 ```
 
-Every run pushes it from then on, and `chezdistill --status` says so. `logs/`,
-`cursor.json` and `*.tmp` are gitignored — the cursor answers "how far has *this*
-machine read", which is meaningless anywhere else.
+Every run pushes it from then on, and `chezdistill --status` says so — it warns
+`no remote — this Mac is the only copy` until you do.
+
+`logs/`, `cursor.json`, `main-diff-*.txt` and `*.tmp` are gitignored: the cursor
+answers "how far has *this* machine read", which is meaningless anywhere else.
+The ignore list is re-applied on every run rather than written once, and anything
+it newly covers is untracked — a rule added after the repo exists otherwise never
+reaches it, and the file stays published.
 
 On the new Mac: run `install.sh` for the dotfiles, clone TheArchive, clone this
 repo into `~/.local/state/chezdistill`, then `chezdistill --render`. That rebuilds

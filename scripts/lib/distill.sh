@@ -1145,7 +1145,7 @@ distill_commit_local() {
 # hang or fail every night. Nothing here is published or attributed to anyone, so
 # there is nothing for a signature to attest to.
 distill_state_repo_init() {
-    local repo
+    local repo pat
     repo="$(distill_state_dir)"
     mkdir -p "$repo" || return 1
     if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
@@ -1157,7 +1157,16 @@ distill_state_repo_init() {
     git -C "$repo" config commit.gpgsign false >/dev/null 2>&1 || true
     git -C "$repo" config user.name chezdistill >/dev/null 2>&1 || true
     git -C "$repo" config user.email chezdistill@localhost >/dev/null 2>&1 || true
-    [ -f "$repo/.gitignore" ] || printf 'logs/\ncursor.json\n*.tmp\n' >"$repo/.gitignore"
+    # Ensure each rule, rather than only writing the file when absent: a repo
+    # initialised by an older version keeps its old .gitignore forever, and a
+    # rule added later would never reach it. Untrack too — .gitignore has no
+    # effect on a path that is already in the index.
+    for pat in 'logs/' 'cursor.json' '*.tmp' 'main-diff-*.txt'; do
+        grep -qxF "$pat" "$repo/.gitignore" 2>/dev/null && continue
+        printf '%s\n' "$pat" >>"$repo/.gitignore"
+    done
+    git -C "$repo" ls-files -z --cached -i --exclude-standard 2>/dev/null |
+        xargs -0 -r git -C "$repo" rm -q --cached -- 2>/dev/null || true
     return 0
 }
 

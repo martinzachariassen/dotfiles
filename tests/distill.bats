@@ -535,6 +535,24 @@ item() {
     [[ "$output" == *"Pinned.md"* ]]
 }
 
+# A rule added to .gitignore after a repo already exists must both reach that
+# repo and untrack what it now covers. Neither is automatic, and the failure is
+# invisible until the file has already been pushed somewhere.
+@test "an ignore rule added later untracks what it now covers" {
+    load_lib
+    distill_state_repo_init
+    printf 'logs/\n' >"$STATE/.gitignore"
+    distill_cursor_write "2026-08-22T00:00:00Z"
+    git -C "$STATE" add -f cursor.json >/dev/null 2>&1
+    git -C "$STATE" -c commit.gpgsign=false -c user.name=t -c user.email=t@t \
+        commit -q -m "before" >/dev/null 2>&1
+
+    distill_state_repo_init
+    grep -qxF 'cursor.json' "$STATE/.gitignore"
+    run git -C "$STATE" ls-files
+    [[ "$output" != *"cursor.json"* ]]
+}
+
 @test "the cursor is never committed — it is meaningless on another machine" {
     load_lib
     distill_cursor_write "2026-08-22T00:00:00Z"
