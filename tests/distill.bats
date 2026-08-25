@@ -2,17 +2,19 @@
 # chezdistill: the behaviour that bash -n and shellcheck cannot see.
 #
 # The cases that carry the design, and why each exists:
-#   preflight    the job must NEVER create the vault — an unmounted or unclonned
+#   preflight    the job must NEVER create the vault — an unmounted or uncloned
 #                vault would otherwise get reports written into a dead end
-#   determinism  two machines render MAIN.md independently; if the render is not
-#                byte-stable they conflict in git on every single run
+#   split        memory renders whether or not the vault is here, because Claude
+#                @-imports MAIN.md and cannot wait for a mount
+#   secrets      extracts left the vault's remote but still hold near-verbatim
+#                conversation text, so the gitleaks sweep has to follow them
+#   determinism  a re-render must be byte-identical, or every run makes a commit
 #   promotion    hits >= minHits is what stops one misreading in one conversation
 #                becoming a rule applied to every future session
-#   unknown      unclassified origin must never reach MAIN, so a missing pattern
-#                surfaces as a visible pile instead of as silently misfiled work
 #   cap          MAIN is loaded into every session forever; the limit is a
 #                guarantee, not an estimate
 #   spend        an unattended nightly job must not be able to bill for a week
+#   undo         MAIN.md is derived, so undo reverts the ledger and re-renders
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -26,17 +28,33 @@ setup() {
     git -C "$VAULT" init -q
     git -C "$VAULT" remote add origin https://example.invalid/x.git
 
+    # Memory and state are real local directories in production, so they get real
+    # temp directories here — and never $HOME, which holds the live ones.
+    MEM="$(mktemp -d)"
+    STATE="$(mktemp -d)"
+
     export DISTILL_CONFIG_JSON
-    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$VAULT" '{
-        vaultPath:$v, folder:"30-Claude", transcriptRoots:[],
+    DISTILL_CONFIG_JSON="$(cfg)"
+}
+
+# cfg [EXTRA-JSON] — the config every test starts from, optionally overridden.
+# Going through one helper is what keeps a test from silently falling back to the
+# real ~/.config/claude/memory by omitting a path.
+cfg() {
+    local extra='{}'
+    [ $# -gt 0 ] && extra="$1"
+    jq -nc --arg v "$VAULT" --arg m "$MEM" --arg s "$STATE" \
+        --argjson extra "$extra" '{
+        vaultPath:$v, folder:"30-Claude", memoryPath:$m, statePath:$s,
+        transcriptRoots:[],
         mainCapBytes:6144, minHits:2, demoteAfterDays:9999,
-        maxSpendUsd7d:25.0, maxBudgetUsd:1.0, minTurns:3,
-        workRemotes:["work.example.com"], workPaths:[],
-        personalPaths:["/tmp/personal-root"]}')"
+        maxSpendUsd7d:25.0, maxBudgetUsd:1.0, minTurns:3} * $extra'
 }
 
 teardown() {
     [ -n "${VAULT:-}" ] && rm -rf "$VAULT"
+    [ -n "${MEM:-}" ] && rm -rf "$MEM"
+    [ -n "${STATE:-}" ] && rm -rf "$STATE"
     return 0
 }
 
@@ -50,6 +68,9 @@ load_lib() {
     . "$LIB"
     DISTILL_VAULT="$VAULT"
     DISTILL_ROOT="$VAULT/30-Claude"
+    DISTILL_VAULT_OK=1
+    DISTILL_MEMORY="$MEM"
+    DISTILL_STATE="$STATE"
 }
 
 # A bare `! grep …` in a test body is exempt from set -e (POSIX: the return
@@ -63,17 +84,17 @@ refute_file_contains() {
     fi
 }
 
-# extract DATE HOST JSON-ARRAY — write one machine's extract for a day.
+# extract DATE JSON-ARRAY — the day's extract, one file per date.
 extract() {
-    mkdir -p "$VAULT/30-Claude/.state/extracts/$1"
-    jq -n --argjson items "$3" '{items:$items}' \
-        >"$VAULT/30-Claude/.state/extracts/$1/$2.json"
+    mkdir -p "$STATE/extracts"
+    jq -n --argjson items "$2" '{items:$items}' >"$STATE/extracts/$1.json"
 }
 
+# item TEXT SESSION [TOPIC] — hits count distinct sessions, so SESSION is what
+# decides whether a rule is promoted.
 item() {
-    jq -nc --arg t "$1" --arg o "$2" --arg s "$3" \
-        '{text:$t, detail:"detail", kind:"learnings", topic:"T",
-          origin:$o, session:$s}'
+    jq -nc --arg t "$1" --arg s "$2" --arg p "${3:-T}" \
+        '{text:$t, detail:"detail", kind:"learnings", topic:$p, session:$s}'
 }
 
 # ─── Script guards ────────────────────────────────────────────────────────────
@@ -105,11 +126,11 @@ item() {
     [ "$status" -eq 2 ]
 }
 
-# ─── Preflight: never create anything ─────────────────────────────────────────
+# ─── Preflight: never create the vault, always render the memory ──────────────
 
-@test "a missing vault exits 0 and creates nothing" {
+@test "a missing vault exits 0 and creates nothing in its place" {
     gone="$VAULT-gone"
-    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$gone" '{vaultPath:$v, folder:"30-Claude"}')"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg g "$gone" '{vaultPath:$g}')")"
     export DISTILL_CONFIG_JSON
     run bash "$BIN"
     [ "$status" -eq 0 ]
@@ -121,7 +142,7 @@ item() {
     run bash "$BIN"
     [ "$status" -eq 0 ]
     [[ "$output" == *".obsidian"* ]]
-    [ ! -e "$VAULT/30-Claude/MAIN.md" ]
+    [ ! -e "$VAULT/30-Claude/Daily" ]
 }
 
 @test "a missing 30-Claude folder is never created" {
@@ -138,29 +159,40 @@ item() {
     [[ "$output" == *"not available"* ]]
 }
 
-# ─── Origin classification ────────────────────────────────────────────────────
-
-@test "a work git remote wins over the path fallback" {
+# The reason the vault stopped being fatal: the persona @-imports MAIN.md, so a
+# laptop with the vault unmounted must still get its memory rendered, or every
+# session that day silently loses it.
+@test "MAIN.md renders with no vault at all" {
     load_lib
-    repo="$(mktemp -d)"
-    git -C "$repo" init -q
-    git -C "$repo" remote add origin "https://work.example.com/team/svc.git"
-    run distill_classify_origin "$repo"
-    rm -rf "$repo"
-    [ "$output" = "work" ]
+    extract 2026-08-22 "[$(item 'survives a missing vault' s1)]"
+    extract 2026-08-23 "[$(item 'survives a missing vault' s2)]"
+    DISTILL_VAULT_OK=0
+    DISTILL_ROOT=""
+    distill_render_main
+    grep -q 'survives a missing vault' "$MEM/MAIN.md"
 }
 
-@test "a personal path classifies as personal" {
+@test "the memory tier is written outside the vault" {
     load_lib
-    mkdir -p /tmp/personal-root/proj
-    run distill_classify_origin /tmp/personal-root/proj
-    [ "$output" = "personal" ]
+    extract 2026-08-22 "[$(item 'lives in memory' s1)]"
+    extract 2026-08-23 "[$(item 'lives in memory' s2)]"
+    distill_render_main
+    distill_render_topics
+    distill_render_inbox
+    [ -f "$MEM/MAIN.md" ]
+    [ -f "$MEM/Topics/T.md" ]
+    [ -f "$MEM/Candidates.md" ]
+    [ ! -e "$VAULT/30-Claude/MAIN.md" ]
+    [ ! -e "$VAULT/30-Claude/Topics" ]
+    [ ! -e "$VAULT/30-Claude/.state" ]
 }
 
-@test "an unmatched path falls through to unknown" {
+# MAIN carries the rule; Topics carries the reasoning. The pointer is the only
+# thing connecting them, so its absence would make the whole second tier dead.
+@test "MAIN.md points at the Topics beside it" {
     load_lib
-    run distill_classify_origin /tmp/nowhere-in-particular
-    [ "$output" = "unknown" ]
+    distill_render_main
+    grep -q 'Topics/<Topic>.md' "$MEM/MAIN.md"
 }
 
 @test "entry ids ignore case, spacing and trailing punctuation" {
@@ -173,47 +205,57 @@ item() {
 
 # ─── Derivation and the promotion gate ────────────────────────────────────────
 
-@test "an entry seen in both contexts becomes always" {
+@test "hits count distinct sessions, not sightings" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'shared rule' personal s1)]"
-    extract 2026-08-23 hostB "[$(item 'shared rule' work s2)]"
+    extract 2026-08-22 "[$(item 'same rule' s1),$(item 'same rule' s1)]"
     run distill_derive
-    [[ "$output" == *'"scope":"always"'* ]]
+    [[ "$output" == *'"hits":1'* ]]
 }
 
-@test "a single sighting stays out of MAIN and lands in the inbox" {
+@test "a single sighting stays out of MAIN and lands in Candidates" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'seen once' personal s1)]"
+    extract 2026-08-22 "[$(item 'seen once' s1)]"
     distill_render_main
     distill_render_inbox
-    refute_file_contains "$VAULT/30-Claude/MAIN.md" 'seen once'
-    grep -q 'seen once' "$VAULT/30-Claude/Inbox/Candidates.md"
+    refute_file_contains "$MEM/MAIN.md" 'seen once'
+    grep -q 'seen once' "$MEM/Candidates.md"
 }
 
 @test "a second sighting promotes the entry into MAIN" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'promote me' personal s1)]"
-    extract 2026-08-23 hostA "[$(item 'promote me' personal s2)]"
+    extract 2026-08-22 "[$(item 'promote me' s1)]"
+    extract 2026-08-23 "[$(item 'promote me' s2)]"
     distill_render_main
-    grep -q 'promote me' "$VAULT/30-Claude/MAIN.md"
+    grep -q 'promote me' "$MEM/MAIN.md"
 }
 
-@test "an unknown origin never reaches MAIN however often it is seen" {
+# Topics is the free tier and deliberately wider than MAIN: a rule still waiting
+# for its second sighting is worth reading once you have gone looking for it.
+# The model names topics freely and has produced "Git/GitHub". Left alone the
+# slash redirects the write into a directory that does not exist, and the topic
+# is lost with no error anyone sees.
+@test "a topic with a slash in its name still gets a file" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'unclassified' unknown s1)]"
-    extract 2026-08-23 hostA "[$(item 'unclassified' unknown s2)]"
-    distill_render_main
-    distill_render_inbox
-    refute_file_contains "$VAULT/30-Claude/MAIN.md" 'unclassified'
-    grep -q 'unclassified' "$VAULT/30-Claude/Inbox/Candidates.md"
+    extract 2026-08-22 "[$(item 'slashed topic' s1 'Git/GitHub')]"
+    distill_render_topics
+    [ -f "$MEM/Topics/Git-GitHub.md" ]
+    grep -q 'slashed topic' "$MEM/Topics/Git-GitHub.md"
+}
+
+@test "Topics carries the detail for entries MAIN has not promoted" {
+    load_lib
+    extract 2026-08-22 "[$(item 'not promoted yet' s1)]"
+    distill_render_topics
+    grep -q 'not promoted yet' "$MEM/Topics/T.md"
+    grep -q 'detail' "$MEM/Topics/T.md"
 }
 
 # ─── Determinism and the cap ──────────────────────────────────────────────────
 
 @test "rendering MAIN twice is byte-identical" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'rule one' personal s1),$(item 'rule two' work s1)]"
-    extract 2026-08-23 hostB "[$(item 'rule one' personal s2),$(item 'rule two' work s2)]"
+    extract 2026-08-22 "[$(item 'rule one' s1),$(item 'rule two' s1 U)]"
+    extract 2026-08-23 "[$(item 'rule one' s2),$(item 'rule two' s2 U)]"
     distill_render_main "$VAULT/first.md"
     distill_render_main "$VAULT/second.md"
     cmp "$VAULT/first.md" "$VAULT/second.md"
@@ -221,40 +263,37 @@ item() {
 
 @test "the cap is a guarantee and Pinned.md survives it" {
     load_lib
-    printf '# Pinned\n\n- keep me forever\n' >"$VAULT/30-Claude/Pinned.md"
+    printf '# Pinned\n\n- keep me forever\n' >"$MEM/Pinned.md"
     items="["
     for i in 1 2 3 4 5 6 7 8 9; do
-        items="$items$(item "a fairly long rule number $i that eats into the byte budget" personal s1),"
-        items="$items$(item "a fairly long rule number $i that eats into the byte budget" personal s2),"
+        items="$items$(item "a fairly long rule number $i that eats into the byte budget" s1),"
+        items="$items$(item "a fairly long rule number $i that eats into the byte budget" s2),"
     done
     items="${items%,}]"
-    extract 2026-08-22 hostA "$items"
+    extract 2026-08-22 "$items"
 
-    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$VAULT" '{
-        vaultPath:$v, folder:"30-Claude", mainCapBytes:400,
-        minHits:2, demoteAfterDays:9999}')"
+    DISTILL_CONFIG_JSON="$(cfg '{"mainCapBytes":500}')"
     _DISTILL_CFG=""
     distill_render_main
-    size="$(wc -c <"$VAULT/30-Claude/MAIN.md" | tr -d ' ')"
-    [ "$size" -le 400 ]
-    grep -q 'keep me forever' "$VAULT/30-Claude/MAIN.md"
+    size="$(wc -c <"$MEM/MAIN.md" | tr -d ' ')"
+    [ "$size" -le 500 ]
+    grep -q 'keep me forever' "$MEM/MAIN.md"
 }
 
-# ─── The second machine must be a no-op ───────────────────────────────────────
+# ─── A day already distilled costs nothing to re-run ──────────────────────────
 
-@test "sources match only once the report reflects every extract" {
+@test "sources match only once the report reflects the extract" {
     load_lib
-    extract 2026-08-22 hostA "[$(item 'x' personal s1)]"
-    mkdir -p "$VAULT/30-Claude/.state/narratives"
+    extract 2026-08-22 "[$(item 'x' s1)]"
+    mkdir -p "$STATE/narratives"
     run distill_sources_match 2026-08-22
     [ "$status" -ne 0 ]
 
-    distill_sources_fingerprint 2026-08-22 \
-        >"$VAULT/30-Claude/.state/narratives/2026-08-22.sources"
+    distill_sources_fingerprint 2026-08-22 >"$STATE/narratives/2026-08-22.sources"
     run distill_sources_match 2026-08-22
     [ "$status" -eq 0 ]
 
-    extract 2026-08-22 hostB "[$(item 'y' work s2)]"
+    extract 2026-08-22 "[$(item 'x' s1),$(item 'y' s2)]"
     run distill_sources_match 2026-08-22
     [ "$status" -ne 0 ]
 }
@@ -263,9 +302,7 @@ item() {
 
 @test "the rolling spend ceiling refuses to start a run" {
     load_lib
-    mkdir -p "$VAULT/30-Claude/.state/spend"
-    printf '{"t":"%s","usd":99}\n' "$(distill_iso_now)" \
-        >"$VAULT/30-Claude/.state/spend/hostA.jsonl"
+    printf '{"t":"%s","usd":99}\n' "$(distill_iso_now)" >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -ne 0 ]
     [[ "$output" == *"ceiling"* ]]
@@ -273,46 +310,43 @@ item() {
 
 @test "spend under the ceiling allows a run" {
     load_lib
-    mkdir -p "$VAULT/30-Claude/.state/spend"
-    printf '{"t":"%s","usd":0.5}\n' "$(distill_iso_now)" \
-        >"$VAULT/30-Claude/.state/spend/hostA.jsonl"
+    printf '{"t":"%s","usd":0.5}\n' "$(distill_iso_now)" >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -eq 0 ]
 }
 
 @test "spend older than seven days no longer counts" {
     load_lib
-    mkdir -p "$VAULT/30-Claude/.state/spend"
-    printf '{"t":"%s","usd":99}\n' "$(distill_iso_ago 30)" \
-        >"$VAULT/30-Claude/.state/spend/hostA.jsonl"
+    printf '{"t":"%s","usd":99}\n' "$(distill_iso_ago 30)" >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -eq 0 ]
 }
 
 # ─── Run log ──────────────────────────────────────────────────────────────────
 #
-# The run log exists for the runs nobody watches: a nightly job on the other Mac
-# leaves no trace anywhere the user looks, so a failure has to reach the vault.
+# The run log exists for the runs nobody watches: a nightly job that fires at
+# 01:00 and skips everything leaves no trace anywhere the user looks, so the
+# reason has to reach the vault.
 
 @test "a run is recorded and rendered into Runs.md" {
     load_lib
-    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    distill_run_begin daily
     DISTILL_RUN_SEEN=4
     DISTILL_RUN_KEPT=2
     DISTILL_RUN_ITEMS=7
-    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
-    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+    distill_run_record ok
+    distill_render_runs
 
-    [ -f "$VAULT/30-Claude/.state/runs/hostA.jsonl" ]
-    grep -q '| hostA | daily | 2/4 | 7 |' "$VAULT/30-Claude/Runs.md"
+    [ -f "$STATE/runs.jsonl" ]
+    grep -q '| daily | 2/4 | 7 |' "$VAULT/30-Claude/Runs.md"
 }
 
 @test "a failed run reaches the vault, with the reason" {
     load_lib
-    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
+    distill_run_begin daily
     distill_fail "claude invocation failed for model sonnet" >/dev/null
-    DISTILL_HOST_OVERRIDE=hostA distill_run_record failed
-    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+    distill_run_record failed
+    distill_render_runs
 
     grep -q '\*\*failed\*\*' "$VAULT/30-Claude/Runs.md"
     grep -q 'claude invocation failed for model sonnet' "$VAULT/30-Claude/Runs.md"
@@ -320,53 +354,99 @@ item() {
 
 @test "a skipped session records why it was skipped" {
     load_lib
-    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
-    distill_run_session sess-1 personal 2 "too short, no model call" 0
-    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
-    DISTILL_HOST_OVERRIDE=hostA distill_render_runs
+    distill_run_begin daily
+    distill_run_session sess-1 2 "too short, no model call" 0
+    distill_run_record ok
+    distill_render_runs
 
     grep -q 'too short, no model call' "$VAULT/30-Claude/Runs.md"
 }
 
-@test "both machines' runs appear in one table" {
-    load_lib
-    mkdir -p "$VAULT/30-Claude/.state/runs"
-    for host in hostA hostB; do
-        DISTILL_HOST_OVERRIDE="$host" distill_run_begin daily
-        DISTILL_HOST_OVERRIDE="$host" distill_run_record ok
-    done
-    distill_render_runs
-    grep -q '| hostA |' "$VAULT/30-Claude/Runs.md"
-    grep -q '| hostB |' "$VAULT/30-Claude/Runs.md"
-}
-
 @test "records older than the retention window are pruned" {
     load_lib
-    mkdir -p "$VAULT/30-Claude/.state/runs"
-    jq -nc --arg t "$(distill_iso_ago 200)" '{t:$t, end:$t, host:"hostA"}' \
-        >"$VAULT/30-Claude/.state/runs/hostA.jsonl"
-    jq -nc --arg t "$(distill_iso_now)" '{t:$t, end:$t, host:"hostA"}' \
-        >>"$VAULT/30-Claude/.state/runs/hostA.jsonl"
-    DISTILL_HOST_OVERRIDE=hostA distill_run_prune
-    [ "$(wc -l <"$VAULT/30-Claude/.state/runs/hostA.jsonl" | tr -d ' ')" -eq 1 ]
+    jq -nc --arg t "$(distill_iso_ago 200)" '{t:$t, end:$t}' >"$STATE/runs.jsonl"
+    jq -nc --arg t "$(distill_iso_now)" '{t:$t, end:$t}' >>"$STATE/runs.jsonl"
+    distill_run_prune
+    [ "$(wc -l <"$STATE/runs.jsonl" | tr -d ' ')" -eq 1 ]
 }
 
 @test "rendering the run log twice is byte-identical" {
     load_lib
-    DISTILL_HOST_OVERRIDE=hostA distill_run_begin daily
-    DISTILL_HOST_OVERRIDE=hostA distill_run_record ok
+    distill_run_begin daily
+    distill_run_record ok
     distill_render_runs "$VAULT/one.md"
     distill_render_runs "$VAULT/two.md"
     diff "$VAULT/one.md" "$VAULT/two.md"
 }
 
-@test "the run log is written before the vault is committed" {
+@test "the run log is written before anything is committed" {
     load_lib
     # Both must happen inside distill_run_end, and the record must come first:
-    # a record that lands after the push is only ever committed a day late.
+    # a record that lands after the commit is only ever committed a day late.
     awk '/^distill_run_end\(\) \{/,/^\}/' "$LIB" >"$VAULT/end.sh"
     [ "$(grep -n distill_run_record "$VAULT/end.sh" | cut -d: -f1)" \
-        -lt "$(grep -n distill_git_push "$VAULT/end.sh" | cut -d: -f1)" ]
+        -lt "$(grep -n distill_commit_local "$VAULT/end.sh" | cut -d: -f1)" ]
+}
+
+# ─── Secrets ──────────────────────────────────────────────────────────────────
+#
+# The extracts left the vault's remote when state moved out, but they still hold
+# near-verbatim conversation text — and MAIN.md is loaded into every session. A
+# sweep that only looked at the vault would now be looking at the one directory
+# with nothing sensitive in it.
+
+@test "the secret sweep covers state and memory, not just the vault" {
+    load_lib
+    awk '/^distill_guard_secrets\(\) \{/,/^\}/' "$LIB" >"$VAULT/guard.sh"
+    grep -q 'distill_state_dir' "$VAULT/guard.sh"
+    grep -q 'distill_memory_dir' "$VAULT/guard.sh"
+}
+
+# ─── Undo ─────────────────────────────────────────────────────────────────────
+#
+# MAIN.md is derived, so undo reverts the ledger and extracts that produced it
+# and renders again. Reverting the rendered file instead would leave it free to
+# disagree with the ledger on the next run.
+
+# Signing is pinned off in the repo itself, not inherited: a global
+# commit.gpgsign backed by 1Password raises a GUI prompt, and the 01:00 launchd
+# run has nobody to approve it. GIT_CONFIG_GLOBAL forces the case the machine
+# this runs on would otherwise only hit at night.
+@test "the state repo commits without a signing agent, and has no remote" {
+    load_lib
+    printf '[commit]\n\tgpgsign = true\n[gpg]\n\tformat = ssh\n' \
+        >"$BATS_TEST_TMPDIR/gitconfig"
+    printf '[user]\n\tsigningkey = /nonexistent\n' >>"$BATS_TEST_TMPDIR/gitconfig"
+    export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gitconfig"
+
+    extract 2026-08-22 "[$(item 'committed' s1)]"
+    distill_commit_local "chore(distill): test"
+    [ "$(git -C "$STATE" rev-list --count HEAD)" -eq 1 ]
+    [ -z "$(git -C "$STATE" remote)" ]
+}
+
+@test "logs are kept out of the state repo" {
+    load_lib
+    mkdir -p "$STATE/logs"
+    printf 'noise\n' >"$STATE/logs/nightly.log"
+    extract 2026-08-22 "[$(item 'committed' s1)]"
+    distill_commit_local "chore(distill): test"
+    run git -C "$STATE" ls-files
+    [[ "$output" != *"logs/nightly.log"* ]]
+}
+
+@test "reverting the state repo takes the rule back out of MAIN" {
+    load_lib
+    extract 2026-08-22 "[$(item 'first' s1)]"
+    distill_commit_local "chore(distill): one"
+    extract 2026-08-23 "[$(item 'first' s2)]"
+    distill_render_main
+    grep -q 'first' "$MEM/MAIN.md"
+
+    distill_commit_local "chore(distill): two"
+    git -C "$STATE" revert --no-edit HEAD >/dev/null 2>&1
+    distill_render_main
+    refute_file_contains "$MEM/MAIN.md" '^- first'
 }
 
 # ─── Dry run ──────────────────────────────────────────────────────────────────
@@ -431,9 +511,36 @@ run_setup() {
     [ -d "$VAULT/30-Claude" ]
 }
 
+@test "--setup seeds MAIN.md where the persona imports it, not in the vault" {
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    [ -f "$MEM/MAIN.md" ]
+    [ ! -e "$VAULT/30-Claude/MAIN.md" ]
+}
+
+# The migration runs once and copies; nothing in the vault is deleted, because a
+# half-migrated vault the user cannot inspect is worse than a duplicated one.
+@test "--setup migrates an old single-folder layout without deleting it" {
+    old="$VAULT/30-Claude"
+    mkdir -p "$old/.state/extracts/2026-08-22" "$old/.state/ledger" "$old/Topics"
+    jq -n --argjson items "[$(item 'migrated rule' s1)]" '{items:$items}' \
+        >"$old/.state/extracts/2026-08-22/$(hostname -s).json"
+    printf '# Pinned\n\n- pinned survives\n' >"$old/Pinned.md"
+
+    setup_env '["macApps"]'
+    run_setup
+    [ "$status" -eq 0 ]
+    [ -f "$STATE/extracts/2026-08-22.json" ]
+    [ -f "$MEM/Pinned.md" ]
+    grep -q 'migrated rule' "$STATE/extracts/2026-08-22.json"
+    # Still there: the user removes the old copies by hand once a run looks right.
+    [ -f "$old/Pinned.md" ]
+}
+
 @test "--setup never creates the vault itself" {
     gone="$VAULT-gone"
-    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$gone" '{vaultPath:$v, folder:"30-Claude"}')"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg g "$gone" '{vaultPath:$g}')")"
     export DISTILL_CONFIG_JSON
     setup_env '["macApps"]'
     run_setup
@@ -506,8 +613,7 @@ a_transcript() {
 window_setup() {
     ROOTS="$BATS_TEST_TMPDIR/transcripts"
     mkdir -p "$ROOTS"
-    DISTILL_CONFIG_JSON="$(jq -nc --arg v "$VAULT" --arg r "$ROOTS" \
-        '{vaultPath:$v, folder:"30-Claude", transcriptRoots:[$r]}')"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg r "$ROOTS" '{transcriptRoots:[$r]}')")"
     export DISTILL_CONFIG_JSON
     load_lib
 }
@@ -560,11 +666,11 @@ window_setup() {
     grep -q 'apply --force' "$STUBS/chezmoi.log"
 }
 
-@test "--setup seeds a MAIN.md for the persona to import" {
+@test "--setup seeds a MAIN.md even when it had to create the folder" {
     rmdir "$VAULT/30-Claude"
     setup_env '["macApps"]'
     run_setup
     [ "$status" -eq 0 ]
-    [ -f "$VAULT/30-Claude/MAIN.md" ]
-    grep -q 'Generated by chezdistill' "$VAULT/30-Claude/MAIN.md"
+    [ -f "$MEM/MAIN.md" ]
+    grep -q 'Generated by chezdistill' "$MEM/MAIN.md"
 }

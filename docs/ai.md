@@ -30,21 +30,31 @@ status/diff/log/show, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
 ## The nightly distiller (claudeDistiller module)
 
-`chezdistill` reads the Claude Code transcripts this Mac wrote, distils them into
-[TheArchive](https://github.com/martinzachariassen/TheArchive)'s `30-Claude/`
-folder, and renders a size-capped `MAIN.md` that the persona above `@`-imports —
-so what you and Claude worked out yesterday is in context tomorrow. launchd runs
-it at 01:00, and the weekly review on Sunday at 02:00.
+`chezdistill` reads the Claude Code transcripts this Mac wrote and renders a
+size-capped `MAIN.md` that the persona above `@`-imports — so what you and Claude
+worked out yesterday is in context tomorrow. launchd runs it at 01:00, and the
+weekly review on Sunday at 02:00.
+
+It writes to three places, because the three have nothing in common. The memory
+tier — `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` — goes to
+`~/.config/claude/memory`, beside the persona that imports it, so it resolves
+whether or not the vault happens to be mounted. The ledger, extracts, cursor,
+spend and run log go to `~/.local/state/chezdistill`, in a git repo with no
+remote: the extracts hold near-verbatim conversation text and have nowhere to be
+pushed to. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
+[TheArchive](https://github.com/martinzachariassen/TheArchive)'s `30-Claude/`.
 
 Its guiding rule is that **the model extracts and narrates while bash decides and
-writes**: every judgement that must come out identical on two machines is computed
-in [`scripts/lib/distill.sh`](../scripts/lib/distill.sh), and no model call has
+writes**: every judgement is computed in
+[`scripts/lib/distill.sh`](../scripts/lib/distill.sh), and no model call has
 write access. Nothing reaches `MAIN.md` until it has been seen in two distinct
 sessions, so a single misreading can't become a rule applied to every session.
-The job creates nothing — the vault must already be there.
+The job never creates the vault; when it is missing, the reports are skipped and
+the memory tier still renders.
 
-**Full guide: [distill.md](distill.md)** — turning it on, what happens each night,
-how to correct a wrong rule, the two-machine model, cost, and troubleshooting.
+**Full guide: [distill.md](distill.md)** — turning it on, migrating an older
+layout, what happens each night, how to correct a wrong rule, cost, and
+troubleshooting.
 
 ## The status line
 

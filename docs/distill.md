@@ -1,15 +1,40 @@
 # The nightly distiller
 
-`chezdistill` reads the Claude Code transcripts this Mac wrote, distils them into
-the Obsidian vault, and renders a size-capped `MAIN.md` that every future Claude
-session loads. What you and Claude worked out yesterday is in context tomorrow.
+`chezdistill` reads the Claude Code transcripts this Mac wrote, renders a
+size-capped `MAIN.md` that every future Claude session loads, and writes the
+reports you read into the Obsidian vault. What you and Claude worked out
+yesterday is in context tomorrow.
 
-It is the one verb whose output lands outside `$HOME` — in
-`~/Documents/TheArchive/30-Claude` — and the one that talks to a paid API on a
-timer. Both facts shape the rules below.
+It is the one verb that talks to a paid API on a timer, and the one that writes
+outside `$HOME`. Both facts shape the rules below.
 
 Gated on the `claudeDistiller` module. Verb reference in
 [commands.md](commands.md); the persona it feeds is in [ai.md](ai.md).
+
+## Three destinations
+
+The three things this job produces have nothing in common, so they live apart.
+
+| Where | What | Git |
+|---|---|---|
+| `~/.config/claude/memory/` | `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` | none — rendered from state |
+| `~/.local/state/chezdistill/` | ledger, extracts, cursor, spend, run log, logs | a local repo with **no remote** |
+| `~/Documents/TheArchive/30-Claude/` | `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
+
+Three consequences worth knowing before changing anything:
+
+**The memory tier does not depend on the vault.** The persona `@`-imports
+`MAIN.md`, and a laptop with TheArchive unmounted still has to get its rules. So
+a missing vault costs you that day's report and nothing else — the job says so,
+renders the memory, and exits 0.
+
+**The extracts never reach a remote.** They hold near-verbatim conversation text,
+kept for `extractRetentionDays`. They are in a local repo so `--undo` works, and
+that repo has no remote so there is nothing to leak into.
+
+**`Topics/` sits next to `MAIN.md`, not in the vault.** It is the other half of
+each rule, and MAIN carries one line pointing at it. Put it in the vault and
+Claude cannot read it.
 
 ## Turning it on
 
@@ -19,43 +44,51 @@ One command, from a checkout of this repo:
 bash ~/Developer/personal/dotfiles/scripts/bin/distill.sh --setup
 ```
 
-It goes through the full path — check the vault, create `30-Claude/`, add
-`claudeDistiller` to the module list, apply, register both launchd agents, seed an
-empty `MAIN.md` so the persona's `@`-import resolves from the first session rather
-than after the first successful night, then print `--status`. Every step is confirmed and every step is idempotent, so
-re-running it on a machine that is already set up just reports green. It makes no
-API calls.
+It goes through the full path — check the vault, create `30-Claude/`, migrate an
+older single-folder layout if it finds one, add `claudeDistiller` to the module
+list, apply, register both launchd agents, seed a `MAIN.md` so the persona's
+`@`-import resolves from the first session rather than after the first successful
+night, then print `--status`. Every step is confirmed and every step is
+idempotent, so re-running it on a machine that is already set up just reports
+green. It makes no API calls.
 
 The long form of the script path is not an accident: the `chezdistill` shell verb
 is gated on the module, so until `--setup` has turned the module on, the verb does
 not exist. Afterwards, `chezdistill --setup` works normally.
 
-**What `--setup` will not do is create the vault.** The job creates nothing, and
-`--setup` bends that rule by exactly one directory. The rule exists because a vault
-that was never cloned — or is not mounted right now — looks exactly like an empty
-directory, and reports written into one would vanish. That guard is the
-vault + `.obsidian` check, and `--setup` enforces it just as hard: no vault, or no
-`.obsidian` inside it, and it refuses and exits 1 having changed nothing. Clone or
-mount TheArchive first.
+**What `--setup` will not do is create the vault.** The rule exists because a
+vault that was never cloned — or is not mounted right now — looks exactly like an
+empty directory, and reports written into one would vanish. That guard is the
+vault + `.obsidian` check: no vault, or no `.obsidian` inside it, and setup
+refuses and exits 1 having changed nothing. Clone or mount TheArchive first.
 
-Preflight itself is untouched, so the nightly job still requires the vault, its
-`.obsidian` dir and `30-Claude/` to already exist, and exits 0 quietly (so launchd
-isn't spammed) when any is missing.
+The memory dir and the state dir are a different matter. They are ordinary local
+directories with no mount to be wrong about, so they are simply created.
 
-**On the work machine only**, confirm `storecode` writes where the harvester looks.
-If `--status` shows an empty harvest, add the real path to `transcriptRoots` in
-[`distill.toml`](../src/.chezmoidata/distill.toml).
+### Migrating from the single-folder layout
+
+If `30-Claude/` still holds `.state/`, `MAIN.md`, `Topics/` and `Inbox/`, that is
+the pre-split layout, from when two machines merged through the vault's git repo.
+`--setup` offers to move it:
+
+- `.state/` → `~/.local/state/chezdistill/`, with `extracts/<date>/<host>.json`
+  flattened to `extracts/<date>.json` and the per-host `spend/` and `runs/` files
+  concatenated into `spend.jsonl` and `runs.jsonl`
+- `MAIN.md`, `Pinned.md`, `Topics/`, `Inbox/Candidates.md` →
+  `~/.config/claude/memory/`
+- `Daily/`, `Weekly/` and `Runs.md` stay where they are
+
+It **copies**; nothing in the vault is deleted. Once a run looks right, delete the
+old copies by hand — a half-migrated vault you cannot inspect is worse than a
+duplicated one.
 
 ### Doing it by hand
-
-`--setup` is a wrapper around four steps you can also do yourself:
 
 1. **Create the folder in Obsidian**: `30-Claude` at the vault root.
 2. **Enable the module**: `chezsetup`, tick *claudeDistiller*. It's in the base
    profile, so new machines get it by default.
 3. **Apply**: `chezup`. Hook 06 registers both launchd agents.
-4. **Check**: `chezdistill --status`. It should report the vault path, not
-   "not available".
+4. **Check**: `chezdistill --status`.
 
 ## Running it now
 
@@ -67,93 +100,95 @@ chezdistill              # the nightly job, right now
 chezdistill -n           # preview: what it would read and run, no model calls
 chezdistill --since 7d   # backfill the last week
 chezdistill --weekly     # the weekly review and compaction
-chezdistill --render     # rebuild MAIN/Inbox/Topics from the ledger, no API calls
-chezdistill --status     # preflight, MAIN size, unclassified origins, spend
-chezdistill --undo       # revert the vault's last distiller commit
+chezdistill --render     # rebuild MAIN/Topics/Candidates from the ledger, free
+chezdistill --status     # where things live, MAIN size vs cap, spend, last run
+chezdistill --undo       # revert the last state commit and re-render
 ```
 
 `-n` first is the cheap habit: it prints the sessions that would be read and the
 calls that would be made without spending anything. A repeat run of a day already
-distilled is a no-op — the `## Sources` fingerprint matches and no model is called
-— so running it by hand does not double-bill you for the night.
+distilled is a no-op — the source fingerprint matches and no model is called — so
+running it by hand does not double-bill you for the night.
 
 ## What happens each night
 
 ```
 01:00  launchd fires
   │
-  ├─ PREFLIGHT   vault? .obsidian? 30-Claude? writable? under the spend ceiling?
-  │                any no → log, exit 0, zero API calls
-  ├─ PULL        git pull --rebase   (failing here is fine — see "Offline")
-  ├─ CURSOR      read .state/cursor-<hostname>.json, else 24h ago
+  ├─ PREFLIGHT   memory + state paths; vault? .obsidian? 30-Claude? writable?
+  │                under the spend ceiling?
+  │                no vault → say so, skip the reports, keep going
+  ├─ PULL        git pull --rebase in the vault  (failing here is fine)
+  ├─ CURSOR      read cursor.json, else 24h ago
   ├─ HARVEST     transcripts touched since, subagent files excluded
   ├─ FILTER      keep typed human turns + assistant prose; drop tool traffic,
   │                thinking, sidechains, harness noise        ~16x smaller
-  ├─ CLASSIFY    origin per session, from the git remote
   ├─ GATE        fewer than minTurns typed turns → skipped, free, no API call
   ├─ MAP         one model call per surviving session → items as JSON
-  │                → .state/extracts/<date>/<hostname>.json
-  ├─ SOURCES     already reflected in the report? → done, no further calls
+  │                → state/extracts/<date>.json
+  ├─ SOURCE      already reflected in the report? → done, no further calls
   ├─ NARRATE     one model call per date → the ## Summary prose
-  ├─ RENDER      bash builds MAIN.md, Topics/, Inbox/, the daily report
-  ├─ RECORD      append the run to .state/runs/<hostname>.jsonl, render Runs.md
-  ├─ GITLEAKS    over the whole folder, extracts included → abort on any hit
-  └─ COMMIT      and push; deferred to the next run if offline
+  ├─ RENDER      bash builds MAIN.md, Topics/, Candidates.md, the daily report
+  ├─ RECORD      append the run to state/runs.jsonl, render Runs.md
+  ├─ GITLEAKS    over state, memory AND the vault folder → abort on any hit
+  └─ COMMIT      state locally; the vault committed and pushed
 ```
 
 Every step from RECORD down runs whether the run succeeded or failed — a failure
-that leaves no trace in the vault is a failure you find out about weeks later, on
-the machine you weren't using. A run that harvested nothing still commits, so
-"nothing ran last night" and "nothing was worth keeping last night" stay
-distinguishable.
-
+that leaves no trace is a failure you find out about weeks later. A run that
+harvested nothing still commits, so "nothing ran last night" and "nothing was
+worth keeping last night" stay distinguishable.
 
 The weekly job (Sunday 02:00) is the same shape, writing `Weekly/YYYY-Www.md`.
 
-**The model extracts and narrates; bash decides and writes.** Every judgement
-that must come out identical on two machines — hit counts, scope, what enters
-MAIN, what gets demoted — is computed in
+**The model extracts and narrates; bash decides and writes.** Every judgement —
+hit counts, what enters MAIN, what gets demoted — is computed in
 [`scripts/lib/distill.sh`](../scripts/lib/distill.sh). No model call has write
 access: each runs `--tools ""`, takes its payload on stdin, returns
-schema-validated JSON. Moving a decision into a prompt would break the two-machine
-story, because the second Mac would then render a different `MAIN.md`.
+schema-validated JSON. Keeping the decisions in bash is what makes a re-run of an
+already-distilled day produce a byte-identical file and therefore no commit.
 
 ## Three tiers, priced differently
 
 | Tier | Where | What it costs |
 |---|---|---|
 | `MAIN.md` | 6 KB cap, `@`-imported by the persona | paid for in **every** session, forever |
-| `Topics/*.md` | unbounded | free — read only when Claude follows a wikilink |
-| `Daily/`, `Weekly/`, `Runs.md` | append-only | for you; Claude never reads them back |
+| `Topics/*.md` | unbounded, beside MAIN | free — read only when Claude looks a rule up |
+| `Daily/`, `Weekly/`, `Runs.md` | the vault, append-only | for you; Claude never reads them back |
 
 Each extracted item is split along that seam: a rule of **at most 200 characters**
 goes into MAIN, the full explanation goes into the topic note. The limit is in the
 JSON schema, not in the prompt — asking the model to be brief doesn't work, and
 before the cap the median rule was 300 characters and MAIN held 13 of them.
 
+`MAIN.md` carries exactly one line connecting the two tiers, naming the directory
+and the `Topics/<Topic>.md` scheme. One pointer rather than a path per rule:
+per-rule links measured at roughly a sixth of the whole byte budget, to say the
+same thing 30 times.
+
+`Topics/` is deliberately wider than MAIN — it holds every derived entry, including
+ones still waiting for a second sighting. Once you have gone looking for a topic,
+the rule that hasn't been promoted yet is still worth reading.
+
 Eviction moves entries from tier 1 to tier 2. It never deletes.
 
 ## What you'll actually read
 
-### `MAIN.md` — generated, do not edit
+### `~/.config/claude/memory/MAIN.md` — generated, do not edit
 
 ```markdown
 <!-- Generated by chezdistill. Do not edit: edit Pinned.md instead. -->
+
+Fuller explanations for the rules below live beside this file, in
+`~/.config/claude/memory/Topics/<Topic>.md`.
 
 # Pinned
 
 - Never force-push to main.
 
-## Always
+## Learned from past sessions
 
 - Use `rg`, never `grep`.
-
-## Work only — applies when the git remote or path matches a work pattern
-
-- Prefer feature flags over long-lived branches.
-
-## Personal only — applies otherwise
-
 - Bean validation annotations never fire on non-nullable Kotlin constructor properties.
 ```
 
@@ -167,24 +202,24 @@ InvalidFormatException) to build detailed 400 error bodies, import from
 tools.jackson.databind.exc. Relevant when Boot 4 + Jackson 3 is on the
 classpath; older Spring Boot versions still use com.fasterxml.
 
-*personal · 2 hit(s) · last seen 2026-08-22*
+*2 hit(s) · last seen 2026-08-22*
 ```
 
-### `Daily/2026-08-22.md`
+### `Daily/2026-08-22.md` — in the vault
 
 Opens with `## MAIN.md changes` — added, demoted, superseded, truncated to one
 line each. **That block is the point:** ten seconds a day tells you everything
 that changed in the instructions every session now loads. Then a `## Summary`
-narrative, then the items split by origin and kind, then `## Sources`.
+narrative, then the items by kind, then the source fingerprint.
 
-### `Inbox/Candidates.md`
+### `Candidates.md`
 
-Everything that hasn't earned a place in MAIN: seen only once, or from a project
-whose origin couldn't be determined. Entries here affect nothing.
+Everything that hasn't earned a place in MAIN: seen only once, or past the gate
+but gone stale. Entries here affect nothing.
 
 ### `Runs.md` — did it run, and did it work?
 
-Every nightly and weekly run from **both** machines, newest first:
+Every nightly and weekly run, newest first:
 
 ```markdown
 ## Last 7 days
@@ -195,41 +230,34 @@ Every nightly and weekly run from **both** machines, newest first:
 
 ## Recent runs
 
-| Ended | Host | Mode | Sessions | Items | Cost | MAIN | Result |
-|---|---|---|---|---|---|---|---|
-| 2026-08-24 01:03 | air | daily | 3/7 | 12 | $0.42 | 5.1K | ok |
-| 2026-08-23 01:02 | studio | daily | 0/4 | 0 | $0 | 5.0K | **failed** |
-
-## Problems
-
-- 2026-08-23 01:02 · studio · daily · **fail** — claude invocation failed for model sonnet
-
-## Last run in detail
-
-*2026-08-24 01:03 · air · daily · launchd · 214s · read since 2026-08-23T01:00:11Z*
-
-- `a41f0c9e` · personal · 14 turn(s) · kept · 5 item(s)
-- `7b2d1180` · personal · 2 turn(s) · too short, no model call
-- `c93ae004` · work · 9 turn(s) · nothing durable in it
+| Ended | Mode | Sessions | Items | Cost | MAIN | Result |
+|---|---|---|---|---|---|---|
+| 2026-08-24 01:03 | daily | 3/7 | 12 | $0.42 | 5.1K | ok |
+| 2026-08-23 01:02 | daily | 0/4 | 0 | $0 | 5.0K | **failed** |
 ```
 
 **`0/7` is the number to read.** Seven sessions seen and none distilled looks
-like a broken job; the per-session detail is what tells you it was six sessions
-under `minTurns` and one with nothing durable in it — free, and working as
-designed. Times are UTC, because the two machines have to agree on the order.
+like a broken job; the `## Last run in detail` block is what tells you it was six
+sessions under `minTurns` and one with nothing durable in it — free, and working
+as designed. Times are UTC.
 
-The records behind it are `.state/runs/<hostname>.jsonl`, one file per machine so
-they can never conflict, kept for `runRetentionDays`. `chezdistill --status`
-prints the newest one; `--render` rebuilds the note from the records for free.
+The records behind it are `runs.jsonl`, kept for `runRetentionDays`.
+`chezdistill --status` prints the newest one; `--render` rebuilds the note from
+the records for free.
 
 ## The promotion gate
 
 **Nothing reaches `MAIN.md` until it has been seen in two distinct sessions.**
 
 This costs a genuine insight a day. In exchange, one misreading in one
-conversation cannot become a rule applied to every future session on both
-machines — which matters because `MAIN.md` is `@`-imported everywhere and the job
-runs unattended. `minHits` in `distill.toml` if you want it looser.
+conversation cannot become a rule applied to every future session — which matters
+because `MAIN.md` is `@`-imported everywhere and the job runs unattended.
+`minHits` in `distill.toml` if you want it looser.
+
+`hits` counts distinct sessions and is **derived from the extract corpus, never
+incremented.** Incrementing would double-count the moment a day is re-run;
+deriving is what makes `--since 7d`, `--render` and a repeated nightly run all
+safe to fire at will.
 
 ## Correcting it
 
@@ -238,34 +266,15 @@ from the ledger. Use these instead:
 
 | Situation | What to do |
 |---|---|
-| A rule is wrong or badly worded | Write the correct one in `30-Claude/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
-| Last night's run made a mess | `chezdistill --undo` reverts the vault's most recent distiller commit. |
-| You edited the ledger or `Pinned.md` | `chezdistill --render` rebuilds MAIN, Topics and Inbox. No API calls. |
-| Work material is filed as personal | Add a pattern to `workRemotes`, then `chezdistill --render`. |
-| An entry should be gone entirely | Delete its `.state/ledger/<id>.json` **and** its sightings in `.state/extracts/`; `hits` is derived from the extracts, so the ledger file alone isn't enough. |
+| A rule is wrong or badly worded | Write the correct one in `~/.config/claude/memory/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
+| Last night's run made a mess | `chezdistill --undo` reverts the state repo's last commit and re-renders the memory from it. |
+| You edited the ledger or `Pinned.md` | `chezdistill --render` rebuilds MAIN, Topics and Candidates. No API calls. |
+| An entry should be gone entirely | Delete its `ledger/<id>.json` **and** its sightings in `extracts/`; `hits` is derived from the extracts, so the ledger file alone isn't enough. |
 
-## Two machines
-
-Transcripts don't sync, so both Macs have to contribute. There is no lock and no
-primary machine.
-
-Each writes only `.state/extracts/<date>/<hostname>.json` — separate paths, so
-contributions can never conflict in git. Whichever runs later re-renders the day
-from *everyone's* extracts. A `## Sources` fingerprint in each report records
-which machine contributed what, so a machine that has already contributed skips
-the day entirely without calling the model.
-
-Two choices make that converge:
-
-- **The ledger is one file per entry** (`.state/ledger/<id>.json`, id = hash of
-  the normalised text). A single `ledger.json` would conflict on every run.
-- **`hits` is counted out of the corpus, never incremented.** Incrementing would
-  double-count the moment a day is re-run; deriving makes the whole pipeline
-  idempotent, which is what makes a late-waking second machine harmless.
-
-So if machine A summarises Monday alone and machine B wakes on Wednesday,
-Monday's report is simply re-rendered complete. Nothing is lost and nothing is
-double-counted.
+`--undo` reverts the ledger and extracts rather than the rendered files, because
+`MAIN.md`, `Topics/` and `Candidates.md` are a pure function of them. Reverting
+the output instead would leave it free to disagree with the ledger on the next
+run.
 
 ## Sleep, wake, and the cursor
 
@@ -273,10 +282,10 @@ launchd fires a missed `StartCalendarInterval` **on wake**, and **coalesces**
 several missed firings into one run — not three runs after three sleeping nights.
 Powered off, it fires after the next login.
 
-That's why the job tracks a cursor (`.state/cursor-<hostname>.json`) rather than
-asking "what happened yesterday?". A job built on "yesterday" loses everything
-the machine slept through; "what has happened since I last read?" cannot. A run
-spanning several days writes one `Daily/` note per calendar day.
+That's why the job tracks a cursor (`cursor.json`) rather than asking "what
+happened yesterday?". A job built on "yesterday" loses everything the machine
+slept through; "what has happened since I last read?" cannot. A run spanning
+several days writes one `Daily/` note per calendar day.
 
 The file scan is widened from the same cursor, and that is load-bearing: the
 harvester only opens transcripts whose **mtime** is newer than the cursor (minus a
@@ -289,36 +298,13 @@ would read only the last two days of them while reporting success.
 `pmset repeat wake` would force an exact 01:00, but it also wakes the laptop in
 your bag. Not used here.
 
-## Origin and scope
-
-Resolved once, at harvest, on the machine that still has the repo on disk:
-
-```
-1. git remote get-url origin matches workRemotes  → work
-2. path prefix matches workPaths                  → work
-3. path prefix matches personalPaths              → personal
-4. otherwise                                      → unknown
-```
-
-Git remotes are authoritative and self-maintaining; the path lists are a fallback
-for directories that aren't repos. Scope is then **derived**: seen only under work
-→ `work`, only under personal → `personal`, under both → `always`. A rule earns
-`always` by actually recurring in both contexts, rather than by anyone guessing.
-
-`unknown` is deliberately loud. Those entries go to `Inbox/Candidates.md`, are
-blocked from `MAIN.md` by two independent guards, and are listed by
-`chezdistill --status`. A missing pattern therefore shows up as a visible pile
-rather than as Storebrand material quietly filed as personal.
-
 ## Cost
 
 Measured on real transcripts, not estimated: **$0.16–0.23 per session that yields
 items**, roughly $1–2 a night.
 
 - `maxBudgetUsd` caps a single `claude -p`.
-- `maxSpendUsd7d` is a rolling ceiling, summed across **both** machines'
-  `.state/spend/<host>.jsonl` and checked in preflight — the quota being protected
-  belongs to the account, not the laptop.
+- `maxSpendUsd7d` is a rolling ceiling over `spend.jsonl`, checked in preflight.
 - `minTurns` drops short sessions in bash, before any call.
 
 A separate cheap triage model was tried and removed: it cost ~$0.05/session while
@@ -335,12 +321,13 @@ Not an error. If the vault is present but the network is down, the work is done
 and committed locally, and the next run pushes it. `git pull --rebase` handles the
 backlog. Git runs with prompts disabled and a 10-second SSH connect timeout — a
 headless job has no terminal to answer a credential prompt, and would otherwise
-hang until the machine was rebooted.
+hang until the machine was rebooted. The state repo has no remote and so is never
+affected.
 
 ## Troubleshooting
 
 ```sh
-chezdistill --status                       # preflight, MAIN vs cap, unclassified, spend, last run
+chezdistill --status                       # paths, MAIN vs cap, spend, last run
 chezdistill -n --since 7d                  # what would be read, no API calls
 tail -50 ~/.local/state/chezdistill/logs/nightly.log
 launchctl print gui/$(id -u)/no.mlz.chezdistill.nightly
@@ -349,17 +336,16 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 
 | Symptom | Cause |
 |---|---|
-| "vault not found" / "has no .obsidian" | The vault isn't cloned or mounted here. Working as designed — nothing was created. |
+| "vault not found" / "has no .obsidian" | The vault isn't cloned or mounted here. The reports are skipped; `MAIN.md` still rendered. |
 | "30-Claude does not exist" | Create it in Obsidian. The job will not. |
-| Nothing harvested on the work machine | `storecode` writes elsewhere; add its path to `transcriptRoots`. |
-| Many unclassified entries | `workRemotes`/`personalPaths` don't cover a repo you use. |
-| Runs but never reaches MAIN | The promotion gate: entries need a second sighting. Check `Inbox/Candidates.md`. |
+| Claude isn't loading any rules | Check `~/.config/claude/memory/MAIN.md` exists and that the persona imports it — `grep memory/MAIN.md ~/.config/claude/CLAUDE.md`. |
+| Runs but never reaches MAIN | The promotion gate: entries need a second sighting. Check `Candidates.md`. |
 | Ran at 09:00, not 01:00 | The Mac was asleep. launchd fired on wake; the cursor means nothing was lost. |
-| "7-day spend has reached the ceiling" | Raise `maxSpendUsd7d`, or find out what got expensive in `.state/spend/`. |
+| "7-day spend has reached the ceiling" | Raise `maxSpendUsd7d`, or find out what got expensive in `spend.jsonl`. |
 | Agent not in `launchctl list` | Hook 06 didn't run. `chezapply`, then check its output. |
-| Did it run at all last night? | `Runs.md` in the vault — both machines, newest first. |
+| Did it run at all last night? | `Runs.md` in the vault. |
 | It ran but distilled nothing | `## Last run in detail` in `Runs.md` gives the per-session reason. |
-| A failed run left nothing in the vault | Only a `gitleaks` hit or a failed commit can do that — the record is written before the commit, so it is carried by the next run that succeeds. Meanwhile: the launchd log. |
+| `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 
 ## Configuration
 
@@ -367,15 +353,16 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 
 | Key | Default | Effect |
 |---|---|---|
+| `memoryPath` | `~/.config/claude/memory` | MAIN, Pinned, Topics, Candidates. Created on demand. |
+| `statePath` | `~/.local/state/chezdistill` | Ledger, extracts, cursor, spend, runs, logs. |
 | `vaultPath`, `folder` | `~/Documents/TheArchive`, `30-Claude` | Where reports go. Never created. |
-| `transcriptRoots` | `~/.config/claude/projects` | A list — add storecode's path if it differs. |
-| `workRemotes`, `workPaths`, `personalPaths` | `[]`, `[]`, `~/Developer/personal` | Origin classification. Unmatched → `unknown` → Inbox. |
+| `transcriptRoots` | `~/.config/claude/projects` | A list, so a second install can be added. |
 | `mainCapBytes` | `6144` | Hard limit on MAIN, enforced before writing. |
 | `minHits` | `2` | The promotion gate. |
 | `demoteAfterDays` | `21` | Not reinforced this long → demoted to `Topics/`. |
 | `minTurns` | `3` | Free pre-filter: shorter sessions never reach the model. |
 | `mapModel`, `narrateModel` | `sonnet`, `opus` | Extraction and prose. |
-| `maxBudgetUsd`, `maxSpendUsd7d` | `2.0`, `25.0` | Per call, and rolling across both machines. |
+| `maxBudgetUsd`, `maxSpendUsd7d` | `2.0`, `25.0` | Per call, and rolling over 7 days. |
 | `extractRetentionDays` | `90` | How long near-verbatim conversation text is kept. |
 | `runsShown` | `30` | Rows in the `Runs.md` table. |
 | `runRetentionDays` | `90` | How long the run records behind it are kept. |
@@ -385,11 +372,12 @@ spending anything.
 
 ## Secrets
 
-`30-Claude/.state/extracts/` holds near-verbatim conversation text and **must** be
-committed for the two machines to merge. `gitleaks` sweeps the whole folder,
-extracts included, and aborts before the commit on any hit. The extraction rubric
-forbids reproducing tokens, keys and `.env` values. `extractRetentionDays` bounds
-the window. TheArchive is a private repo — keep it that way.
+`~/.local/state/chezdistill/extracts/` holds near-verbatim conversation text. It
+is in a git repo with no remote, so it stays on this Mac; `extractRetentionDays`
+bounds the window. `gitleaks` sweeps the state dir, the memory dir **and** the
+vault folder before any commit, and any hit aborts every commit that run would
+have made. The extraction rubric forbids reproducing tokens, keys and `.env`
+values. TheArchive is a private repo — keep it that way.
 
 ## Turning it off
 
@@ -401,5 +389,6 @@ launchctl bootout gui/$(id -u)/no.mlz.chezdistill.nightly
 launchctl bootout gui/$(id -u)/no.mlz.chezdistill.weekly
 ```
 
-The vault folder is yours; nothing removes it. Drop the `@`-import by removing the
-module, and the persona stops loading `MAIN.md`.
+The vault folder, the memory dir and the state dir are yours; nothing removes
+them. Drop the `@`-import by removing the module, and the persona stops loading
+`MAIN.md`.

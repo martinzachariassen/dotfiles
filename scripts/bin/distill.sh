@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# distill.sh — chezdistill: distil Claude Code conversations into the Obsidian
-# vault, and render the MAIN.md that every future session loads.
+# distill.sh — chezdistill: distil Claude Code conversations into the memory tier
+# every future session loads, and the reports you read in the vault.
 # Env: DRY_RUN=1 print instead of run; YES=1 skip confirm gates; DOTFILES_DIR;
 #      DISTILL_SINCE=ISO override the cursor.
 
@@ -30,25 +30,29 @@ _distill_help() {
 usage: chezdistill [--setup] [--weekly] [--since SPEC] [--status] [--render]
                    [--undo] [-n]
 
-Distil recent Claude Code conversations into ~/Documents/TheArchive/30-Claude:
-a daily report, a weekly review, a Runs.md log of every run from every machine,
-and a size-capped MAIN.md that is loaded into every future session.
+Distil recent Claude Code conversations into three places:
+
+  ~/.config/claude/memory     MAIN.md, Topics/, Candidates.md — read by Claude
+  ~/.local/state/chezdistill  ledger, extracts, cursor, spend, run log
+  the vault's 30-Claude       Daily/, Weekly/, Runs.md — read by you
 
   (no flags)        run the nightly job now — the same code path launchd uses
-  --setup           turn it on for this Mac: create the vault folder, enable the
-                    module, apply, register the timers. Idempotent, no API calls
+  --setup           turn it on for this Mac: migrate an older layout, create the
+                    vault folder, enable the module, apply, register the timers.
+                    Idempotent, no API calls
   --weekly          run the weekly review and compaction now
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
-  --status          preflight, MAIN size vs cap, unclassified origins, spend,
-                    last run
-  --render          rebuild MAIN.md, Inbox, Topics and Runs from the ledger; no
-                    API calls
-  --undo            revert the vault's most recent chezdistill commit
+  --status          where everything lives, MAIN size vs cap, spend, last run
+  --render          rebuild MAIN.md, Topics, Candidates and Runs from the
+                    ledger; no API calls
+  --undo            revert the state repo's last chezdistill commit and
+                    re-render the memory tier from it
   -n, --dry-run     show what would be read and run, without calling the model
   -h, --help        this text
 
 The vault is never created by this command — not even by --setup. If it is
-missing, the job exits without doing anything; clone or mount it first.
+missing, the reports are skipped and the memory tier still renders, so Claude
+keeps its MAIN.md either way.
 
 Before the module is enabled the `chezdistill` shell verb does not exist yet, so
 the very first run goes through the script:
@@ -72,16 +76,27 @@ _distill_since() {
     esac
 }
 
+# _distill_undo — revert the ledger and extracts, then rebuild the memory tier
+# from them. MAIN.md, Topics/ and Candidates.md are derived, so undoing the
+# inputs and re-rendering is what actually puts them back; reverting the rendered
+# files would leave them free to disagree with the ledger that produced them.
 _distill_undo() {
-    local last
+    local last repo
     distill_preflight || return $?
-    last="$(git -C "$DISTILL_VAULT" log --format='%H %s' -20 |
-        grep -m1 'chore(distill)' | cut -d' ' -f1)"
-    if [ -z "$last" ]; then
-        info "no chezdistill commit found in the vault's last 20 commits"
+    repo="$(distill_state_dir)"
+
+    if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+        info "no state repo at $repo yet — nothing to undo"
         return 0
     fi
-    say "would revert $(git -C "$DISTILL_VAULT" log -1 --format='%h %s' "$last")"
+    last="$(git -C "$repo" log --format='%H %s' -20 |
+        grep -m1 'chore(distill)' | cut -d' ' -f1)"
+    if [ -z "$last" ]; then
+        info "no chezdistill commit in the state repo's last 20 commits"
+        return 0
+    fi
+    say "would revert $(git -C "$repo" log -1 --format='%h %s' "$last")"
+    explain "Then re-render MAIN.md, Topics and Candidates from the reverted ledger."
     if [ "$ASSUME_YES" != "1" ] && [ "$DRY_RUN" != "1" ] && { : </dev/tty; } 2>/dev/null; then
         printf '%s  %s' "$(line_prefix)" "Revert it? [y/N] " >/dev/tty
         IFS= read -r reply </dev/tty || reply=""
@@ -93,17 +108,24 @@ _distill_undo() {
                 ;;
         esac
     fi
-    run git -C "$DISTILL_VAULT" revert --no-edit "$last"
+    run git -C "$repo" revert --no-edit "$last" || return 1
+    [ "$DRY_RUN" = "1" ] && return 0
+    distill_render_main
+    distill_render_inbox
+    distill_render_topics
+    ok "reverted, and re-rendered the memory tier from the ledger"
 }
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
 #
 # `--setup` is the one code path allowed to create the `30-Claude` folder. The
-# "creates nothing" rule exists so a report is never written into a vault that is
-# unmounted or was never cloned — a state that looks exactly like an empty
-# directory. That guard is the vault + `.obsidian` check, and it stays: setup
-# refuses just as hard when either is missing. Preflight itself is unchanged, so
-# the nightly job still creates nothing.
+# "creates nothing in the vault" rule exists so a report is never written into a
+# vault that is unmounted or was never cloned — a state that looks exactly like an
+# empty directory. That guard is the vault + `.obsidian` check, and it stays:
+# setup refuses just as hard when either is missing.
+#
+# The memory dir and the state dir are a different matter: they are ordinary local
+# directories with no mount to be wrong about, so they are simply created.
 
 # _distill_confirm PROMPT — 0 to proceed. Nothing here is destructive, so a
 # missing terminal declines rather than aborting the whole run.
@@ -153,14 +175,99 @@ _distill_setup_folder() {
     fi
 
     if ! git -C "$vault" rev-parse --git-dir >/dev/null 2>&1; then
-        s_fail "git      $vault is not a git repo — the two machines merge through it"
+        s_fail "git      $vault is not a git repo — the reports would never be backed up"
         return 1
     fi
     if [ -z "$(git -C "$vault" remote 2>/dev/null)" ]; then
-        s_fail "git      $vault has no remote — nothing would ever reach the other Mac"
+        s_fail "git      $vault has no remote — the reports would never leave this Mac"
         return 1
     fi
     s_pass "git      vault is a repo with a remote"
+    return 0
+}
+
+# _distill_setup_migrate — move a pre-split installation into place, once.
+#
+# The old layout kept everything under the vault's 30-Claude, including the
+# extracts, because two machines merged through git. One machine needs no merge,
+# so the state comes out of the vault entirely and the memory tier moves next to
+# the persona that imports it. Idempotent: with nothing old to find, it is silent.
+_distill_setup_migrate() {
+    local vault folder old mem state date host f moved=0
+    vault="$(distill_expand "$(distill_cfg vaultPath)")"
+    folder="$(distill_cfg folder 30-Claude)"
+    old="$vault/$folder"
+    mem="$(distill_memory_dir)"
+    state="$(distill_state_dir)"
+
+    [ -d "$old" ] || return 0
+    if [ ! -d "$old/.state" ] && [ ! -f "$old/MAIN.md" ]; then
+        s_pass "layout   nothing to migrate"
+        return 0
+    fi
+
+    s_note "layout   found the old single-folder layout in $old"
+    dim "           .state/  →  $state"
+    dim "           MAIN.md, Pinned.md, Topics/, Inbox/  →  $mem"
+    if ! _distill_confirm "Move them?"; then
+        s_warn "layout   left in place — the job would start from an empty ledger"
+        return 1
+    fi
+    if [ "$DRY_RUN" = "1" ]; then
+        dim "dry-run \$ migrate $old"
+        return 0
+    fi
+
+    mkdir -p "$mem" "$state" || {
+        s_fail "layout   could not create $mem or $state"
+        return 1
+    }
+
+    if [ -d "$old/.state" ]; then
+        for f in "$old"/.state/*; do
+            [ -e "$f" ] || continue
+            case "$(basename "$f")" in
+                extracts | spend | runs | cursor-*.json) continue ;;
+            esac
+            cp -R "$f" "$state/" 2>/dev/null || true
+        done
+        # extracts/<date>/<host>.json → extracts/<date>.json. With more than one
+        # host the local one wins: the others' transcripts are gone anyway, and
+        # merging two days of near-verbatim text is not worth a conflict.
+        host="$(hostname -s)"
+        for date in "$old"/.state/extracts/*/; do
+            [ -d "$date" ] || continue
+            f="$date/$host.json"
+            [ -f "$f" ] || f="$(/usr/bin/find "$date" -name '*.json' | sort | head -1)"
+            [ -n "$f" ] && [ -f "$f" ] || continue
+            mkdir -p "$state/extracts"
+            cp -f "$f" "$state/extracts/$(basename "${date%/}").json"
+        done
+        # One file per machine collapses into one file, oldest first.
+        for f in spend runs; do
+            [ -d "$old/.state/$f" ] || continue
+            cat "$old"/.state/"$f"/*.jsonl 2>/dev/null |
+                jq -s -c 'sort_by(.t)[]' >"$state/$f.jsonl" 2>/dev/null || true
+        done
+        f="$old/.state/cursor-$host.json"
+        [ -f "$f" ] && cp -f "$f" "$state/cursor.json"
+        moved=1
+    fi
+
+    for f in MAIN.md Pinned.md; do
+        [ -f "$old/$f" ] && cp -f "$old/$f" "$mem/$f" && moved=1
+    done
+    [ -d "$old/Topics" ] && cp -R "$old/Topics" "$mem/" && moved=1
+    [ -f "$old/Inbox/Candidates.md" ] &&
+        cp -f "$old/Inbox/Candidates.md" "$mem/Candidates.md" && moved=1
+
+    distill_state_repo_init && distill_commit_local "chore(distill): migrate to the split layout"
+
+    if [ "$moved" -eq 1 ]; then
+        s_pass "layout   migrated — the old copies are still in $old"
+        explain "Nothing was deleted. Once a run looks right, remove the old" \
+            "MAIN.md, Pinned.md, Topics/, Inbox/ and .state/ from the vault by hand."
+    fi
     return 0
 }
 
@@ -280,6 +387,8 @@ _distill_setup() {
     _distill_setup_folder
     folder_rc=$?
 
+    [ "$folder_rc" -eq 0 ] && _distill_setup_migrate
+
     _distill_setup_module
     module_rc=$?
     [ "$module_rc" -eq 3 ] && needs_apply=1
@@ -306,11 +415,11 @@ _distill_setup() {
         return 1
     fi
 
-    # DISTILL_ROOT is exported by preflight, and only by preflight — everything
-    # below reads it, and it now has a folder to find.
+    # DISTILL_MEMORY and DISTILL_STATE are exported by preflight, and only by
+    # preflight — everything below reads them.
     if ! distill_preflight >/dev/null 2>&1 && [ "$DRY_RUN" != "1" ]; then
         echo
-        fail "setup incomplete — preflight still refuses this vault"
+        fail "setup incomplete — preflight refuses these paths"
         distill_status
         return 1
     fi
@@ -320,12 +429,12 @@ _distill_setup() {
     # rough edge in every session until the first nightly run. Costs no API call.
     if [ "$DRY_RUN" = "1" ]; then
         s_note "render   skipped — a dry run has nothing to render from"
-    elif [ -f "$DISTILL_ROOT/MAIN.md" ]; then
+    elif [ -f "$(distill_memory_dir)/MAIN.md" ]; then
         s_pass "render   MAIN.md is present"
     else
         distill_render_main
         distill_render_inbox
-        s_pass "render   seeded an empty MAIN.md for the persona to import"
+        s_pass "render   seeded MAIN.md for the persona to import"
     fi
 
     if [ "$DRY_RUN" = "1" ]; then
@@ -397,23 +506,15 @@ _distill_main() {
         "Read what you and Claude worked out since the last run, and write it up." \
         "Only entries seen in two separate sessions reach MAIN.md."
 
-    distill_preflight
-    case "$?" in
-        0) ;;
-        2)
-            info "nothing to do"
-            return 0
-            ;;
-        *) return 1 ;;
-    esac
+    distill_preflight || return 1
 
     case "$mode" in
         render)
             distill_render_main
             distill_render_inbox
             distill_render_topics
-            distill_render_runs
-            ok "rendered MAIN.md, Inbox, Topics and Runs from the ledger"
+            distill_have_vault && distill_render_runs
+            ok "rendered MAIN.md, Topics and Candidates from the ledger"
             ;;
         weekly)
             distill_run_weekly || return 1

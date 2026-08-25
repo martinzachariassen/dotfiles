@@ -6,14 +6,24 @@
 # answers (packages.toml/modules.toml) so merges don't collide.
 
 [distill]
-# The vault is NOT chezmoi-managed and is never created by the job — preflight
-# refuses to run when any of these is missing. See docs/ai.md.
+# Three destinations, because the three have nothing in common. See docs/ai.md.
+#
+# memoryPath is what Claude loads: the persona @-imports MAIN.md from here, so it
+# has to resolve whether or not the vault is mounted. statePath is the ledger,
+# extracts, cursor, spend and run log — read by nobody, and holding near-verbatim
+# conversation text, which is why it lives outside every git remote. Both are
+# ordinary local directories and are created on demand.
+memoryPath = "~/.config/claude/memory"
+statePath = "~/.local/state/chezdistill"
+
+# The vault is NOT chezmoi-managed and is never created by the job. It holds only
+# the reports you read; when it is missing they are skipped and the memory tier
+# still renders.
 vaultPath = "~/Documents/TheArchive"
 folder = "30-Claude"
 
-# Where transcripts live. A list because storecode (work profile) has Claude Code
-# underneath and may write elsewhere; verify with `chezdistill --status` on that
-# machine before trusting its reports. Tildes are expanded by the reader.
+# Where transcripts live. A list so a second Claude Code install can be added
+# without touching the code. Tildes are expanded by the reader.
 transcriptRoots = ["~/.config/claude/projects"]
 
 # Model tiers. One call per session — `items: []` is itself the "nothing durable
@@ -24,8 +34,8 @@ mapModel = "sonnet"
 narrateModel = "opus"
 
 # Cost brakes. maxBudgetUsd caps a single `claude -p`; maxSpendUsd7d is a rolling
-# ceiling summed across every machine's .state/spend/<host>.jsonl and checked in
-# preflight, so a runaway can't quietly bill for a week.
+# ceiling read from spend.jsonl and checked in preflight, so a runaway can't
+# quietly bill for a week before anyone notices.
 maxBudgetUsd = 2.0
 maxSpendUsd7d = 25.0
 
@@ -33,12 +43,12 @@ maxSpendUsd7d = 25.0
 # before any model call.
 minTurns = 3
 
-# MAIN.md budget. Every byte here is paid for in EVERY session on both machines,
-# forever — that's why the cap is enforced in bash and not left to the model.
+# MAIN.md budget. Every byte here is paid for in EVERY session, forever — that's
+# why the cap is enforced in bash and not left to the model.
 mainCapBytes = 6144
 
 # Promotion gate: an entry must be seen in this many distinct sessions before it
-# is rendered into MAIN.md. Below the bar it sits in Inbox/Candidates.md, where
+# is rendered into MAIN.md. Below the bar it sits in Candidates.md, where
 # it affects nothing. This is what stops one misreading becoming a global rule.
 minHits = 2
 
@@ -46,30 +56,12 @@ minHits = 2
 # demoted from MAIN.md to Topics/. Demotion never deletes.
 demoteAfterDays = 21
 
-# Run log. Every run appends one record to .state/runs/<host>.jsonl and Runs.md
-# is re-rendered from all of them, so the Mac you are not using is visible too.
+# Run log. Every run appends one record to runs.jsonl and Runs.md is re-rendered
+# from it, so a night the job skipped everything is still visible.
 # runsShown bounds the table; runRetentionDays bounds the records behind it.
 runsShown = 30
 runRetentionDays = 90
 
-# Extracts hold near-verbatim conversation text and must be committed so the two
-# machines can merge. This bounds how long that text is kept.
+# Extracts hold near-verbatim conversation text. They never leave this Mac, and
+# this bounds how long they are kept even here.
 extractRetentionDays = 90
-
-# ─── Origin classification ────────────────────────────────────────────────────
-# Resolved once, at harvest, on the machine that still has the repo on disk:
-#   1. git remote matches workRemotes  → work
-#   2. path prefix matches workPaths   → work
-#   3. path prefix matches personalPaths → personal
-#   4. otherwise                       → unknown
-#
-# `unknown` is deliberately loud: those entries go to Inbox/Candidates.md and are
-# NEVER rendered into MAIN.md or a scoped section, so a missing pattern shows up
-# as a visible pile rather than as Storebrand material quietly filed as personal.
-# `chezdistill --status` lists every remote and path that matched nothing.
-#
-# Substring match against `git remote get-url origin`. Fill this in on the work
-# machine — until then its repos classify as unknown, which is the safe direction.
-workRemotes = []
-workPaths = []
-personalPaths = ["~/Developer/personal"]

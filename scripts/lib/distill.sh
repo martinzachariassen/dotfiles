@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
-# distill.sh — the chezdistill engine: harvest Claude Code transcripts, distil
-# them into the Obsidian vault, and render MAIN.md from a derived ledger.
+# distill.sh — the chezdistill engine: harvest Claude Code transcripts, render
+# the memory tier Claude loads, and write the reports you read.
+#
+# Three destinations, because the three have nothing in common:
+#   DISTILL_MEMORY  ~/.config/claude/memory — MAIN.md, Pinned.md, Topics/,
+#                   Candidates.md. Read by Claude, so it must resolve whether or
+#                   not the vault happens to be mounted.
+#   DISTILL_STATE   ~/.local/state/chezdistill — ledger, extracts, cursor, spend,
+#                   run log. Read by nobody; extracts hold near-verbatim
+#                   conversation text, which is why they stay off any remote.
+#   DISTILL_ROOT    the vault's 30-Claude — Daily/, Weekly/, Runs.md. Reports for
+#                   a human, in the app built to read them.
 #
 # Design principle: the model extracts and narrates, bash decides and writes.
-# Every judgement that must be reproducible on two machines — scope, hit counts,
-# what earns a place in MAIN, what gets demoted — is computed here from the
-# extract corpus. No model invocation in this file has write access.
+# Every judgement — hit counts, what earns a place in MAIN, what gets demoted —
+# is computed here from the extract corpus, so a re-run of a day already
+# distilled is a no-op. No model invocation in this file has write access.
 # shellcheck disable=SC2034,SC2329
 
 [ -n "${__DOTFILES_DISTILL_SH:-}" ] && return 0
@@ -84,8 +94,14 @@ distill_days_since() {
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 # distill_preflight — every precondition, checked before any processing.
-# Exports DISTILL_VAULT and DISTILL_ROOT on success.
-# 0 = go · 1 = broken/unwritable (real failure) · 2 = absent (expected, not an error)
+# Always exports DISTILL_MEMORY and DISTILL_STATE; exports DISTILL_VAULT,
+# DISTILL_ROOT and DISTILL_VAULT_OK=1 only when the vault is genuinely here.
+#
+# The vault is required for the reports and for nothing else. An unmounted or
+# never-cloned vault looks exactly like an empty directory, so it is still never
+# written into and never created — but it no longer stops the run, because the
+# memory tier lives on local disk and Claude needs it either way.
+# 0 = go · 1 = broken/unwritable (a real failure)
 distill_preflight() {
     local vault folder
 
@@ -94,20 +110,29 @@ distill_preflight() {
         return 1
     fi
 
+    DISTILL_MEMORY="$(distill_expand \
+        "$(distill_cfg memoryPath "$HOME/.config/claude/memory")")"
+    DISTILL_STATE="$(distill_expand \
+        "$(distill_cfg statePath "$HOME/.local/state/chezdistill")")"
+    DISTILL_VAULT=""
+    DISTILL_ROOT=""
+    DISTILL_VAULT_OK=0
+    export DISTILL_MEMORY DISTILL_STATE DISTILL_VAULT DISTILL_ROOT DISTILL_VAULT_OK
+
     vault="$(distill_expand "$(distill_cfg vaultPath)")"
     folder="$(distill_cfg folder 30-Claude)"
 
     if [ -z "$vault" ] || [ ! -d "$vault" ]; then
-        info "vault not found at ${vault:-<unset>} — nothing to do"
-        return 2
+        info "vault not found at ${vault:-<unset>} — skipping the reports"
+        return 0
     fi
     if [ ! -d "$vault/.obsidian" ]; then
         info "$vault has no .obsidian — not a vault (unmounted or not cloned yet)"
-        return 2
+        return 0
     fi
     if [ ! -d "$vault/$folder" ]; then
         info "$vault/$folder does not exist — create it in Obsidian first"
-        return 2
+        return 0
     fi
     if [ ! -w "$vault/$folder" ]; then
         fail "$vault/$folder is not writable"
@@ -124,17 +149,37 @@ distill_preflight() {
 
     DISTILL_VAULT="$vault"
     DISTILL_ROOT="$vault/$folder"
-    export DISTILL_VAULT DISTILL_ROOT
+    DISTILL_VAULT_OK=1
     return 0
 }
 
-# distill_state_dir — .state, created on demand inside an already-present root.
+# distill_state_dir — every file no human reads, outside both git remotes.
+# distill_memory_dir — what Claude loads. Created on demand: unlike the vault,
+# there is nothing here that could be a stale mount point.
+#
+# Both read the exported value when preflight has run and fall back to the
+# configured path when it has not, so a caller that runs before preflight — the
+# one-time migration in --setup does — still lands where the config says rather
+# than on the built-in default.
 distill_state_dir() {
-    printf '%s\n' "$DISTILL_ROOT/.state"
+    [ -n "${DISTILL_STATE:-}" ] && {
+        printf '%s\n' "$DISTILL_STATE"
+        return 0
+    }
+    distill_expand "$(distill_cfg statePath "$HOME/.local/state/chezdistill")"
 }
 
-distill_host() {
-    printf '%s\n' "${DISTILL_HOST_OVERRIDE:-$(hostname -s)}"
+distill_memory_dir() {
+    [ -n "${DISTILL_MEMORY:-}" ] && {
+        printf '%s\n' "$DISTILL_MEMORY"
+        return 0
+    }
+    distill_expand "$(distill_cfg memoryPath "$HOME/.config/claude/memory")"
+}
+
+# distill_have_vault — 0 when the reports have somewhere to go.
+distill_have_vault() {
+    [ "${DISTILL_VAULT_OK:-0}" = "1" ] && [ -n "${DISTILL_ROOT:-}" ]
 }
 
 # ─── Harvest ──────────────────────────────────────────────────────────────────
@@ -170,57 +215,6 @@ distill_session_files() {
         /usr/bin/find "$expanded" -type f -name '*.jsonl' \
             -not -path '*/subagents/*' -mtime -"${DISTILL_MTIME_DAYS:-$days}" 2>/dev/null
     done < <(distill_cfg_list transcriptRoots)
-}
-
-# distill_classify_origin CWD — work | personal | unknown.
-# Resolved here, at harvest, on the machine that still has the repo on disk.
-# Git remotes are authoritative and self-maintaining; paths are the fallback for
-# directories that aren't repos. Anything else is `unknown` on purpose: it lands
-# in Inbox and never in MAIN, so a missing pattern is visible rather than silent.
-distill_classify_origin() {
-    local cwd="$1" remote pat expanded
-    [ -n "$cwd" ] || {
-        echo unknown
-        return 0
-    }
-
-    remote="$(git -C "$cwd" remote get-url origin 2>/dev/null || true)"
-    if [ -n "$remote" ]; then
-        while IFS= read -r pat; do
-            [ -n "$pat" ] || continue
-            case "$remote" in
-                *"$pat"*)
-                    echo work
-                    return 0
-                    ;;
-            esac
-        done < <(distill_cfg_list workRemotes)
-    fi
-
-    while IFS= read -r pat; do
-        [ -n "$pat" ] || continue
-        expanded="$(distill_expand "$pat")"
-        case "$cwd" in
-            "$expanded"*)
-                echo work
-                return 0
-                ;;
-        esac
-    done < <(distill_cfg_list workPaths)
-
-    while IFS= read -r pat; do
-        [ -n "$pat" ] || continue
-        expanded="$(distill_expand "$pat")"
-        case "$cwd" in
-            "$expanded"*)
-                echo personal
-                return 0
-                ;;
-        esac
-    done < <(distill_cfg_list personalPaths)
-
-    printf '%s\t%s\n' "$cwd" "${remote:--}" >>"${DISTILL_UNMATCHED:-/dev/null}"
-    echo unknown
 }
 
 # distill_filter FILE SINCE_ISO — the 16x reduction.
@@ -324,12 +318,11 @@ distill_claude() {
 
 # ─── Spend ────────────────────────────────────────────────────────────────────
 #
-# Append-only, one file per machine so the two never conflict in git, but summed
-# across all of them: the quota being protected belongs to the account, not the
-# laptop.
+# Append-only. The ceiling protects an account quota that `claude -p` shares with
+# interactive work, so it is checked in preflight rather than after the fact.
 
 distill_spend_file() {
-    printf '%s/spend/%s.jsonl\n' "$(distill_state_dir)" "$(distill_host)"
+    printf '%s/spend.jsonl\n' "$(distill_state_dir)"
 }
 
 distill_spend_record() {
@@ -343,18 +336,17 @@ distill_spend_record() {
     printf '{"t":"%s","usd":%s}\n' "$(distill_iso_now)" "$usd" >>"$f"
 }
 
-# distill_spend_7d — total spend across every machine over the last 7 days.
+# distill_spend_7d — total spend over the last 7 days.
 distill_spend_7d() {
-    local since dir
+    local since f
     since="$(distill_iso_ago 7)"
-    dir="$(distill_state_dir)/spend"
-    [ -d "$dir" ] || {
+    f="$(distill_spend_file)"
+    [ -f "$f" ] || {
         echo 0
         return 0
     }
-    cat "$dir"/*.jsonl 2>/dev/null |
-        jq -s --arg since "$since" \
-            '[.[] | select(.t > $since) | .usd] | add // 0' 2>/dev/null || echo 0
+    jq -s --arg since "$since" \
+        '[.[] | select(.t > $since) | .usd] | add // 0' "$f" 2>/dev/null || echo 0
 }
 
 # distill_spend_ok — the rolling ceiling, checked in preflight so a runaway
@@ -372,27 +364,23 @@ distill_spend_ok() {
 
 # ─── Run log ──────────────────────────────────────────────────────────────────
 #
-# One record per run, appended to .state/runs/<host>.jsonl — one file per machine
-# so two laptops never conflict — and rendered into Runs.md by bash, like every
-# other note here. The point is the runs you are NOT sitting in front of: a
-# nightly job that skipped every session, or failed on the other Mac, otherwise
-# leaves its only trace in a launchd log on a machine you are not using.
+# One record per run, appended to runs.jsonl and rendered into Runs.md by bash,
+# like every other note here. The point is the runs nobody watches: a nightly job
+# that skipped every session at 01:00 otherwise leaves its only trace in a launchd
+# log, and "nothing ran" and "nothing was worth keeping" have to stay
+# distinguishable.
 #
 # The record is written even when the run failed. The commit may not happen (a
 # gitleaks hit blocks it), but the file is append-only, so the next run that does
 # commit carries the failed run's record with it.
 
-distill_runs_dir() {
-    printf '%s/runs\n' "$(distill_state_dir)"
-}
-
 distill_run_file() {
-    printf '%s/%s.jsonl\n' "$(distill_runs_dir)" "$(distill_host)"
+    printf '%s/runs.jsonl\n' "$(distill_state_dir)"
 }
 
-# distill_run_all — every machine's records, oldest first within each file.
+# distill_run_all — every record, oldest first.
 distill_run_all() {
-    cat "$(distill_runs_dir)"/*.jsonl 2>/dev/null
+    cat "$(distill_run_file)" 2>/dev/null
 }
 
 # distill_run_begin MODE — open the record for this run.
@@ -429,19 +417,19 @@ distill_fail() {
     fail "$1"
 }
 
-# distill_run_session NAME ORIGIN TURNS VERDICT ITEMS — why one session was kept
-# or skipped. This is what makes a quiet run legible: "7 seen, 0 kept" is
-# alarming until you can see that six were under minTurns and cost nothing.
+# distill_run_session NAME TURNS VERDICT ITEMS — why one session was kept or
+# skipped. This is what makes a quiet run legible: "7 seen, 0 kept" is alarming
+# until you can see that six were under minTurns and cost nothing.
 distill_run_session() {
     [ -f "${_DISTILL_SESSIONS:-}" ] || return 0
-    jq -nc --arg s "$1" --arg o "$2" --argjson t "${3:-0}" \
-        --arg v "$4" --argjson n "${5:-0}" \
-        '{session:$s, origin:$o, turns:$t, verdict:$v, items:$n}' \
+    jq -nc --arg s "$1" --argjson t "${2:-0}" \
+        --arg v "$3" --argjson n "${4:-0}" \
+        '{session:$s, turns:$t, verdict:$v, items:$n}' \
         >>"$_DISTILL_SESSIONS"
 }
 
-# distill_run_cost — what this run spent, read back from the same per-machine
-# ledger the rolling ceiling uses rather than counted separately.
+# distill_run_cost — what this run spent, read back from the same ledger the
+# rolling ceiling uses rather than counted separately.
 distill_run_cost() {
     local f
     f="$(distill_spend_file)"
@@ -465,13 +453,13 @@ distill_run_record() {
     sessions="$(jq -s -c '.' <"${_DISTILL_SESSIONS:-/dev/null}" 2>/dev/null)"
     cost="$(distill_run_cost)"
     main=0
-    [ -f "$DISTILL_ROOT/MAIN.md" ] && main="$(wc -c <"$DISTILL_ROOT/MAIN.md" | tr -d ' ')"
+    [ -f "$(distill_memory_dir)/MAIN.md" ] &&
+        main="$(wc -c <"$(distill_memory_dir)/MAIN.md" | tr -d ' ')"
 
     jq -nc \
         --arg t "${_DISTILL_RUN_START:-$(distill_iso_now)}" \
         --arg end "$(distill_iso_now)" \
         --argjson dur "$(($(date -u +%s) - ${_DISTILL_RUN_EPOCH:-0}))" \
-        --arg host "$(distill_host)" \
         --arg mode "${_DISTILL_RUN_MODE:-daily}" \
         --arg trigger "${DISTILL_TRIGGER:-manual}" \
         --arg since "${_DISTILL_RUN_SINCE:-}" \
@@ -484,7 +472,7 @@ distill_run_record() {
         --arg status "$status" \
         --argjson notes "${notes:-[]}" \
         --argjson sessions "${sessions:-[]}" \
-        '{t:$t, end:$end, dur:$dur, host:$host, mode:$mode, trigger:$trigger,
+        '{t:$t, end:$end, dur:$dur, mode:$mode, trigger:$trigger,
           since:$since, status:$status, items:$items, cost:$cost,
           main_bytes:$main,
           dates:($dates | split(" ") | map(select(length > 0))),
@@ -502,17 +490,17 @@ distill_run_prune() {
         mv "$f.tmp" "$f" || rm -f "$f.tmp"
 }
 
-# distill_last_run — the newest record across every machine, one JSON line.
+# distill_last_run — the newest record, one JSON line.
 distill_last_run() {
-    distill_run_all | jq -s -c 'sort_by(.t, .host) | last // empty' 2>/dev/null
+    distill_run_all | jq -s -c 'sort_by(.t) | last // empty' 2>/dev/null
 }
 
-# distill_render_runs — the operator's view: what ran, when, on which machine,
-# what it cost and what went wrong. Rendered from every machine's log, so the Mac
-# that was asleep at 01:00 still shows up here. Deterministic like every other
-# render: same records in, byte-identical file out.
+# distill_render_runs — the operator's view: what ran, when, what it cost and
+# what went wrong. Deterministic like every other render: same records in,
+# byte-identical file out.
 distill_render_runs() {
     local out="${1:-$DISTILL_ROOT/Runs.md}" shown week
+    distill_have_vault || [ -n "${1:-}" ] || return 0
     shown="$(distill_cfg runsShown 30)"
     week="$(distill_iso_ago 7)"
     mkdir -p "$(dirname "$out")"
@@ -520,7 +508,7 @@ distill_render_runs() {
     {
         printf '<!-- Generated by chezdistill. Times are UTC. -->\n\n'
         printf '# Runs\n\n'
-        printf 'Every nightly and weekly run, from both machines.\n\n'
+        printf 'Every nightly and weekly run on this Mac.\n\n'
 
         printf '## Last 7 days\n\n'
         distill_run_all | jq -s -r --arg since "$week" '
@@ -533,13 +521,13 @@ distill_render_runs() {
               end'
 
         printf '\n## Recent runs\n\n'
-        printf '| Ended | Host | Mode | Sessions | Items | Cost | MAIN | Result |\n'
-        printf '|---|---|---|---|---|---|---|---|\n'
+        printf '| Ended | Mode | Sessions | Items | Cost | MAIN | Result |\n'
+        printf '|---|---|---|---|---|---|---|\n'
         distill_run_all | jq -s -r --argjson n "$shown" '
-            sort_by(.t, .host) | reverse | .[0:$n][]
+            sort_by(.t) | reverse | .[0:$n][]
             | ([(.notes // [])[] | select(.level == "fail")] | length) as $f
             | ([(.notes // [])[] | select(.level == "warn")] | length) as $w
-            | "| \(.end[0:16] | sub("T"; " ")) | \(.host) | \(.mode) | \(.sessions.kept)/\(.sessions.seen) | \(.items) | $\(.cost * 100 | round / 100) | \((.main_bytes / 1024 * 10 | round / 10))K | "
+            | "| \(.end[0:16] | sub("T"; " ")) | \(.mode) | \(.sessions.kept)/\(.sessions.seen) | \(.items) | $\(.cost * 100 | round / 100) | \((.main_bytes / 1024 * 10 | round / 10))K | "
               + (if .status != "ok" then "**failed**"
                  elif $f > 0 then "ok, \($f) error(s)"
                  elif $w > 0 then "ok, \($w) warning(s)"
@@ -549,21 +537,21 @@ distill_render_runs() {
         printf '\n## Problems\n\n'
         distill_run_all | jq -s -r --arg since "$week" '
             [.[] | select(.t >= $since) | . as $r | (.notes // [])[]
-             | "- \($r.end[0:16] | sub("T"; " ")) · \($r.host) · \($r.mode) · **\(.level)** — \(.text)"]
+             | "- \($r.end[0:16] | sub("T"; " ")) · \($r.mode) · **\(.level)** — \(.text)"]
             | if length == 0 then "Nothing reported in the last 7 days."
               else (sort | reverse | .[]) end'
 
         printf '\n## Last run in detail\n\n'
         distill_run_all | jq -s -r '
-            (sort_by(.t, .host) | last) as $r
+            (sort_by(.t) | last) as $r
             | if $r == null then "No runs recorded yet."
               else
-                "*\($r.end[0:16] | sub("T"; " ")) · \($r.host) · \($r.mode) · \($r.trigger) · \($r.dur)s · read since \(if $r.since == "" then "?" else $r.since end)*",
+                "*\($r.end[0:16] | sub("T"; " ")) · \($r.mode) · \($r.trigger) · \($r.dur)s · read since \(if $r.since == "" then "?" else $r.since end)*",
                 "",
                 (if ($r.sessions.detail | length) == 0
                  then "No sessions were in the window."
                  else ($r.sessions.detail[]
-                       | "- `\(.session[0:8])` · \(.origin) · \(.turns) turn(s) · \(.verdict)"
+                       | "- `\(.session[0:8])` · \(.turns) turn(s) · \(.verdict)"
                          + (if .items > 0 then " · \(.items) item(s)" else "" end))
                  end)
               end'
@@ -571,33 +559,34 @@ distill_render_runs() {
     } >"$out"
 }
 
-# distill_run_message STATUS — the vault commit subject for this run.
+# distill_run_message STATUS — the commit subject for this run.
 distill_run_message() {
     local dates="${DISTILL_RUN_DATES:-}"
     if [ "$1" != "ok" ]; then
-        printf 'chore(distill): failed %s run on %s\n' \
-            "${_DISTILL_RUN_MODE:-daily}" "$(distill_host)"
+        printf 'chore(distill): failed %s run\n' "${_DISTILL_RUN_MODE:-daily}"
     elif [ "${_DISTILL_RUN_MODE:-daily}" = "weekly" ]; then
         printf 'chore(distill): weekly review %s\n' "${DISTILL_RUN_WEEK:-}"
     elif [ -n "${dates// /}" ]; then
         printf 'chore(distill): report for%s\n' "$dates"
     else
-        printf 'chore(distill): run log for %s\n' "$(distill_host)"
+        printf 'chore(distill): run log\n'
     fi
 }
 
-# distill_run_end RC — close the record and publish. This is the ONLY place the
-# vault is committed: a run that failed half way still has to leave its record
+# distill_run_end RC — close the record and publish. This is the ONLY place
+# anything is committed: a run that failed half way still has to leave its record
 # behind, and putting the record in the same commit as the report is what keeps
 # the two from disagreeing about what happened.
 distill_run_end() {
-    local rc="$1" status="ok"
-    [ "$rc" -eq 0 ] || status="failed"
+    local rc="$1" status="ok" msg
 
-    if [ "${DRY_RUN:-0}" != "1" ] && [ -n "${DISTILL_ROOT:-}" ]; then
+    [ "$rc" -eq 0 ] || status="failed"
+    msg="$(distill_run_message "$status")"
+
+    if [ "${DRY_RUN:-0}" != "1" ]; then
         distill_run_record "$status"
         distill_run_prune
-        distill_render_runs
+        distill_have_vault && distill_render_runs
     fi
     rm -f "${_DISTILL_EVENTS:-}" "${_DISTILL_SESSIONS:-}"
     _DISTILL_EVENTS=""
@@ -605,20 +594,21 @@ distill_run_end() {
 
     distill_guard_secrets || return 1
     distill_sync_skills
-    distill_git_push "$(distill_run_message "$status")"
+    distill_commit_local "$msg"
+    distill_have_vault && distill_git_push "$msg"
+    return 0
 }
 
 # ─── Ledger ───────────────────────────────────────────────────────────────────
 #
-# One file per entry, because a single ledger.json would conflict in git on every
-# run with two machines writing. The id is a hash of the normalised text, so the
-# same fact found on both machines lands on the same path with the same content.
+# One file per entry, keyed by a hash of the normalised text, so the same fact
+# extracted twice lands on the same path with the same content.
 #
 # The files hold only what cannot be recomputed: text, kind, topic, first_seen and
 # any supersession. Everything the renderer needs to make a decision — hit counts,
-# scope, recency — is DERIVED from the extract corpus on every run. That is what
-# makes rendering idempotent, and idempotence is what makes it safe for the second
-# machine to re-run a day the first machine already summarised.
+# recency — is DERIVED from the extract corpus on every run rather than
+# incremented. Incrementing would double-count the moment a day is re-run;
+# deriving is what makes `--since 7d` and `--render` safe to run at will.
 
 distill_sha() {
     if command -v shasum >/dev/null 2>&1; then
@@ -628,7 +618,7 @@ distill_sha() {
     fi
 }
 
-# distill_entry_id TEXT — stable across machines and across re-runs.
+# distill_entry_id TEXT — stable across re-runs.
 distill_entry_id() {
     printf '%s' "$1" |
         tr '[:upper:]' '[:lower:]' |
@@ -659,13 +649,11 @@ distill_ledger_upsert() {
 }
 
 # distill_derive — the single source of truth for every rendering decision.
-# Aggregates every machine's extracts into one NDJSON stream:
-#   {id, text, kind, topic, hits, origins[], scope, last_seen, superseded_by}
+# Aggregates the extract corpus into one NDJSON stream:
+#   {id, text, kind, topic, hits, first_seen, last_seen}
 #
-# scope: any `unknown` sighting keeps the entry out of MAIN entirely; seen under
-# both work and personal earns `always`; otherwise the single origin it was seen
-# under. Derived, never asserted — a rule earns `always` by actually recurring in
-# both contexts.
+# `hits` counts DISTINCT sessions, which is what the promotion gate is really
+# asking: has this come up more than once, or is it one conversation's reading?
 distill_derive() {
     local ex led
     ex="$(distill_extracts_dir)"
@@ -674,8 +662,8 @@ distill_derive() {
 
     /usr/bin/find "$ex" -type f -name '*.json' 2>/dev/null |
         while IFS= read -r f; do
-            jq -c --arg date "$(basename "$(dirname "$f")")" \
-                '.items[]? | {text, detail, kind, topic, origin, session, date:$date}' \
+            jq -c --arg date "$(basename "$f" .json)" \
+                '.items[]? | {text, detail, kind, topic, session, date:$date}' \
                 "$f" 2>/dev/null
         done |
         while IFS= read -r item; do
@@ -692,15 +680,8 @@ distill_derive() {
                 kind: .[0].kind,
                 topic: (.[0].topic // "General"),
                 hits: ([.[].session] | unique | length),
-                origins: ([.[].origin] | unique),
                 last_seen: ([.[].date] | max),
-                first_seen: ([.[].date] | min) }
-            | . + { scope: (
-                if (.origins | index("unknown")) then "unknown"
-                elif ((.origins | index("work")) and (.origins | index("personal")))
-                    then "always"
-                elif (.origins | index("work")) then "work"
-                else "personal" end) }'
+                first_seen: ([.[].date] | min) }'
 }
 
 # distill_superseded ID — the id that replaced this one, empty when current.
@@ -713,13 +694,15 @@ distill_superseded() {
 
 # ─── Rendering ────────────────────────────────────────────────────────────────
 #
-# MAIN.md is rendered, never written by the model. Identical input therefore
-# yields byte-identical output on both machines, which is the whole reason two
-# machines can write to the same vault without a lock.
+# One section, because one machine distilling one person's work has no second
+# context to scope against. Rules that only apply somewhere say so in their own
+# text, the way a hand-written rule in Pinned.md would.
+#
+# MAIN.md is rendered, never written by the model. Identical input yields a
+# byte-identical file, so a re-render produces no diff and no commit.
 #
 # Eligibility for MAIN, all derived:
 #   hits >= minHits          the promotion gate — one misreading can't become a rule
-#   scope != unknown         unclassified material never reaches a scoped section
 #   not superseded           a newer decision has replaced it
 #   last_seen >= cutoff      still current; stale entries fall back to Topics
 #
@@ -729,6 +712,8 @@ distill_superseded() {
 # rule would have been dead code and MAIN would only ever have grown. Age alone
 # demotes here; `Pinned.md` is the channel for things that must never age out.
 
+_DISTILL_MAIN_HEADING="Learned from past sessions"
+
 distill_eligible() {
     local cutoff minhits
     minhits="$(distill_cfg minHits 2)"
@@ -736,33 +721,40 @@ distill_eligible() {
         date -u -d "$(distill_cfg demoteAfterDays 21) days ago" +%Y-%m-%d)"
     distill_derive | jq -c --argjson minhits "$minhits" --arg cutoff "$cutoff" '
         . + { eligible: (.hits >= $minhits
-                         and .scope != "unknown"
                          and .last_seen >= $cutoff),
               score: (.hits * 100000 + (.last_seen | gsub("-";"") | tonumber % 100000)) }'
 }
 
-_distill_section_title() {
-    case "$1" in
-        always) printf 'Always' ;;
-        work) printf 'Work only — applies when the git remote or path matches a work pattern' ;;
-        personal) printf 'Personal only — applies otherwise' ;;
-    esac
+# The one line in MAIN that points at the tier below it. Every byte here is
+# re-read in every session forever, so this is a single pointer at a guessable
+# naming scheme rather than a link per rule — per-rule paths measured at roughly
+# a sixth of the whole budget.
+_distill_topics_pointer() {
+    local dir
+    dir="$(distill_memory_dir)"
+    # `~` rather than the absolute path: it costs 15 fewer bytes of a 6 KB budget
+    # that is re-read in every session, and reads the same to a person and a model.
+    case "$dir" in "$HOME"/*) dir="~${dir#"$HOME"}" ;; esac
+    printf 'Fuller explanations for the rules below live beside this file, in `%s/Topics/<Topic>.md`.\n' \
+        "$dir"
 }
 
 # distill_render_main [OUTFILE] — deterministic; running it twice is a no-op.
 distill_render_main() {
-    local out="${1:-$DISTILL_ROOT/MAIN.md}"
-    local pinned="$DISTILL_ROOT/Pinned.md"
-    local cap base tmp chosen scope line used
+    local out="${1:-$(distill_memory_dir)/MAIN.md}"
+    local pinned="$(distill_memory_dir)/Pinned.md"
+    local cap base tmp chosen line used
     cap="$(distill_cfg mainCapBytes 6144)"
     tmp="$(mktemp)"
     chosen="$(mktemp)"
+    mkdir -p "$(dirname "$out")"
 
     {
         printf '<!-- Generated by chezdistill. Do not edit: edit Pinned.md instead. -->\n\n'
+        _distill_topics_pointer
         if [ -f "$pinned" ]; then
-            cat "$pinned"
             printf '\n'
+            cat "$pinned"
         fi
     } >"$tmp"
 
@@ -771,40 +763,28 @@ distill_render_main() {
         distill_warn "Pinned.md alone exceeds the ${cap}B cap — nothing else will fit"
     fi
 
-    # Reserve every section header up front, even for sections that may end up
-    # empty. Whether a section is used depends on what gets selected, and what
-    # gets selected depends on the remaining budget — so the reservation is made
-    # unconditionally to keep the cap a guarantee rather than an estimate.
-    used="$base"
-    for scope in always work personal; do
-        line="## $(_distill_section_title "$scope")"
-        used=$((used + ${#line} + 3))
-    done
-    # Highest score first, ties broken by id so the order is machine-independent.
+    # Reserve the section header up front, even though the section may end up
+    # empty: what gets selected depends on the remaining budget, so reserving
+    # unconditionally keeps the cap a guarantee rather than an estimate.
+    used=$((base + ${#_DISTILL_MAIN_HEADING} + 3))
+    # Highest score first, ties broken by id so the order is stable.
     distill_eligible |
-        jq -r 'select(.eligible) | [(.score|tostring), .scope, .topic, .id, .text] | @tsv' |
-        sort -t"$(printf '\t')" -k1,1nr -k4,4 |
-        while IFS=$'\t' read -r _ scope topic id text; do
+        jq -r 'select(.eligible) | [(.score|tostring), .topic, .id, .text] | @tsv' |
+        sort -t"$(printf '\t')" -k1,1nr -k3,3 |
+        while IFS=$'\t' read -r _ topic id text; do
             line="- $text"
             [ $((used + ${#line} + 1)) -le "$cap" ] || break
             used=$((used + ${#line} + 1))
-            printf '%s\t%s\t%s\t%s\n' "$scope" "$topic" "$id" "$text"
+            printf '%s\t%s\t%s\n' "$topic" "$id" "$text"
         done >"$chosen"
 
-    # Only these three scopes are ever emitted, which is a second, independent
-    # guard on `unknown`: even if the eligibility filter above were broken, an
-    # unclassified entry still has no section to land in. Verified by mutation —
-    # both guards must be disabled before tests/distill.bats goes red.
-    for scope in always work personal; do
-        if grep -q "^$scope$(printf '\t')" "$chosen" 2>/dev/null; then
-            printf '\n## %s\n\n' "$(_distill_section_title "$scope")" >>"$tmp"
-            grep "^$scope$(printf '\t')" "$chosen" |
-                sort -t"$(printf '\t')" -k2,2 -k3,3 |
-                while IFS=$'\t' read -r _ _ _ text; do
-                    printf -- '- %s\n' "$text" >>"$tmp"
-                done
-        fi
-    done
+    if [ -s "$chosen" ]; then
+        printf '\n## %s\n\n' "$_DISTILL_MAIN_HEADING" >>"$tmp"
+        sort -t"$(printf '\t')" -k1,1 -k2,2 "$chosen" |
+            while IFS=$'\t' read -r _ _ text; do
+                printf -- '- %s\n' "$text" >>"$tmp"
+            done
+    fi
 
     mv "$tmp" "$out"
     rm -f "$chosen"
@@ -814,55 +794,63 @@ distill_render_main() {
 }
 
 # distill_render_inbox — everything that did not earn a place in MAIN and why.
+# Nothing here affects a session; it is the waiting room for the promotion gate.
 distill_render_inbox() {
-    local out="${1:-$DISTILL_ROOT/Inbox/Candidates.md}"
+    local out="${1:-$(distill_memory_dir)/Candidates.md}"
     local minhits
     minhits="$(distill_cfg minHits 2)"
     mkdir -p "$(dirname "$out")"
     {
         printf '<!-- Generated by chezdistill. Entries here affect nothing. -->\n\n'
         printf '# Candidates\n\n'
-        printf 'Seen once, or from a project that matched no origin pattern.\n'
-        printf 'They reach MAIN.md once seen in at least %s distinct session(s)\n' "$minhits"
-        printf 'with a known origin.\n'
+        printf 'Seen in only one session so far. They reach MAIN.md once seen in\n'
+        printf 'at least %s distinct session(s).\n' "$minhits"
         printf '\n## Awaiting a second sighting\n\n'
         distill_eligible |
             jq -r --argjson m "$minhits" \
-                'select(.scope != "unknown" and .hits < $m)
-                 | "- \(.text)  ·  \(.scope), \(.hits) hit(s), last seen \(.last_seen)"' |
+                'select(.hits < $m)
+                 | "- \(.text)  ·  \(.hits) hit(s), last seen \(.last_seen)"' |
             sort
-        printf '\n## Unclassified origin\n\n'
-        printf 'Add a pattern to `workRemotes`/`workPaths`/`personalPaths` in `distill.toml`.\n\n'
+        printf '\n## Demoted for age\n\n'
+        printf 'Past the promotion gate but not reinforced lately, so they sit in `Topics/` instead.\n\n'
         distill_eligible |
-            jq -r 'select(.scope == "unknown")
-                   | "- \(.text)  ·  \(.hits) hit(s), last seen \(.last_seen)"' |
+            jq -r --argjson m "$minhits" \
+                'select(.hits >= $m and (.eligible | not))
+                 | "- \(.text)  ·  \(.hits) hit(s), last seen \(.last_seen)"' |
             sort
     } >"$out"
 }
 
-# distill_render_topics — the free tier. MAIN carries the terse rule (capped at
-# 200 chars by the schema, because every byte is re-read in every session); the
-# full `detail` lands here, where it is read only when Claude follows a wikilink
-# and length therefore costs nothing.
+# distill_render_topics — the free tier, and the reason MAIN can afford to be
+# terse. MAIN carries the rule (capped at 200 chars by the schema, because every
+# byte is re-read in every session); the full `detail` lands here, next to MAIN,
+# where it is read only when Claude looks a rule up and length costs nothing.
+#
+# Everything derived is written, not only what passed the promotion gate: a rule
+# waiting for its second sighting is still worth reading once you have gone
+# looking for the topic.
 distill_render_topics() {
-    local dir="${1:-$DISTILL_ROOT/Topics}"
-    local topic
+    local dir="${1:-$(distill_memory_dir)/Topics}"
+    local topic slug
     mkdir -p "$dir"
 
-    distill_eligible |
-        jq -r 'select(.scope != "unknown") | .topic' | sort -u |
+    distill_eligible | jq -r '.topic' | sort -u |
         while IFS= read -r topic; do
             [ -n "$topic" ] || continue
+            # The model picks the topic freely, and it has picked names with a
+            # slash in them ("Git/GitHub"). Left alone that redirects the write
+            # into a directory that does not exist and the topic is silently lost.
+            slug="${topic//\//-}"
             {
                 printf '<!-- Generated by chezdistill. -->\n\n# %s\n\n' "$topic"
                 # Sorted inside jq: these records are multi-line, and piping
                 # them through sort(1) would interleave lines across entries.
                 distill_eligible |
                     jq -s -r --arg t "$topic" \
-                        '[.[] | select(.topic == $t and .scope != "unknown")]
+                        '[.[] | select(.topic == $t)]
                          | sort_by(.text)[]
-                         | "## \(.text)\n\n\(.detail)\n\n*\(.scope) · \(.hits) hit(s) · last seen \(.last_seen)*\n"'
-            } >"$dir/$topic.md"
+                         | "## \(.text)\n\n\(.detail)\n\n*\(.hits) hit(s) · last seen \(.last_seen)*\n"'
+            } >"$dir/$slug.md"
         done
 }
 
@@ -878,35 +866,30 @@ distill_main_diff() {
 # ─── Daily and weekly reports ─────────────────────────────────────────────────
 #
 # The item sections are RENDERED from the extract corpus, not spliced into an
-# existing file. That is a deliberate simplification of the original plan: since
-# the items are a pure function of every machine's extracts, recomputing them is
-# both idempotent and machine-independent, and "keep the existing lines verbatim"
-# stops being an instruction the model could disobey. Only the narrative is
-# model-written, and it is stored beside the extracts so a re-render preserves it.
+# existing file. Since the items are a pure function of the extracts, recomputing
+# them is idempotent, and "keep the existing lines verbatim" stops being an
+# instruction the model could disobey. Only the narrative is model-written, and it
+# is stored beside the extracts so a re-render preserves it.
 
 distill_narrative_file() {
     printf '%s/narratives/%s.md\n' "$(distill_state_dir)" "$1"
 }
 
-distill_extract_files() {
-    local d
-    d="$(distill_extracts_dir)/$1"
-    [ -d "$d" ] || return 0
-    /usr/bin/find "$d" -type f -name '*.json' 2>/dev/null | sort
+distill_extract_file() {
+    printf '%s/%s.json\n' "$(distill_extracts_dir)" "$1"
 }
 
-# distill_sources_fingerprint DATE — hostname + content hash per contributing
-# machine. This is the cheap check that makes the second machine a no-op.
+# distill_sources_fingerprint DATE — a content hash of the day's extract. This is
+# the cheap check that keeps a re-run of an already-distilled day free: `--since
+# 7d` over a week that has already been read makes no model call at all.
 distill_sources_fingerprint() {
-    local f host
-    while IFS= read -r f; do
-        [ -n "$f" ] || continue
-        host="$(basename "$f" .json)"
-        printf '%s  %s\n' "$host" "$(distill_sha <"$f")"
-    done < <(distill_extract_files "$1")
+    local f
+    f="$(distill_extract_file "$1")"
+    [ -f "$f" ] || return 0
+    printf '%s\n' "$(distill_sha <"$f")"
 }
 
-# distill_sources_match DATE — 0 when the report already reflects every extract.
+# distill_sources_match DATE — 0 when the report already reflects the extract.
 distill_sources_match() {
     local date="$1" recorded current
     recorded="$(distill_narrative_file "$date")"
@@ -918,24 +901,20 @@ distill_sources_match() {
 
 # distill_render_daily DATE — deterministic given the extracts and the narrative.
 distill_render_daily() {
-    local date="$1" out narrative origins sources scope kind items
+    local date="$1" out narrative kind items diff
+    distill_have_vault || return 0
     out="$DISTILL_ROOT/Daily/$date.md"
     narrative="$(distill_narrative_file "$date")"
+    diff="$(distill_state_dir)/main-diff-$date.txt"
     items="$(mktemp)"
     mkdir -p "$(dirname "$out")"
 
-    origins="$(distill_date_items "$date" | jq -r '.origin' | sort -u |
-        paste -sd, - | sed 's/,/, /g')"
-    sources="$(distill_sources_fingerprint "$date" | awk '{print $1}' |
-        paste -sd, - | sed 's/,/, /g')"
-
     {
-        printf -- '---\norigins: [%s]\nsources: [%s]\n---\n\n' \
-            "${origins:-}" "${sources:-}"
+        printf -- '---\ndate: %s\n---\n\n' "$date"
 
-        if [ -s "$DISTILL_ROOT/.state/main-diff-$date.txt" ]; then
+        if [ -s "$diff" ]; then
             printf '## MAIN.md changes\n\n'
-            cat "$DISTILL_ROOT/.state/main-diff-$date.txt"
+            cat "$diff"
             printf '\n'
         fi
 
@@ -945,30 +924,20 @@ distill_render_daily() {
             printf '\n'
         fi
 
-        for scope in personal work unknown; do
+        for kind in decisions preferences learnings questions_answered \
+            open_threads gotchas; do
             distill_date_items "$date" |
-                jq -e --arg s "$scope" 'select(.origin == $s)' >/dev/null 2>&1 || continue
-            case "$scope" in
-                personal) printf '## Personal\n' ;;
-                work) printf '## Work\n' ;;
-                unknown) printf '## Unclassified\n' ;;
-            esac
-            for kind in decisions preferences learnings questions_answered \
-                open_threads gotchas; do
-                distill_date_items "$date" |
-                    jq -r --arg s "$scope" --arg k "$kind" \
-                        'select(.origin == $s and .kind == $k)
-                         | "- \(.text)  ·  \(.tool // "claude-code")"' |
-                    sort -u >"$items"
-                [ -s "$items" ] || continue
-                printf '\n### %s\n\n' "$(distill_kind_title "$kind")"
-                cat "$items"
-            done
-            printf '\n'
+                jq -r --arg k "$kind" \
+                    'select(.kind == $k)
+                     | "- \(.text)  ·  \(.tool // "claude-code")"' |
+                sort -u >"$items"
+            [ -s "$items" ] || continue
+            printf '\n## %s\n\n' "$(distill_kind_title "$kind")"
+            cat "$items"
         done
 
-        printf '## Sources\n\n'
-        distill_sources_fingerprint "$date"
+        printf '\n## Source\n\n'
+        printf '`%s`\n' "$(distill_sources_fingerprint "$date")"
     } >"$out"
     rm -f "$items"
 }
@@ -984,20 +953,25 @@ distill_kind_title() {
     esac
 }
 
-# distill_date_items DATE — every machine's items for one day, flattened.
+# distill_date_items DATE — the day's items, flattened.
 distill_date_items() {
     local f
-    while IFS= read -r f; do
-        [ -n "$f" ] || continue
-        jq -c '.items[]?' "$f" 2>/dev/null
-    done < <(distill_extract_files "$1")
+    f="$(distill_extract_file "$1")"
+    [ -f "$f" ] || return 0
+    jq -c '.items[]?' "$f" 2>/dev/null
 }
 
 # ─── Git ──────────────────────────────────────────────────────────────────────
 #
-# Being offline is not an error: the work is done, committed locally, and pushed
-# by whichever run next has a network. Only the vault is touched, never the repo
-# this script ships in.
+# Two repos, and the difference between them is the whole point. The vault has a
+# remote and carries the reports. Memory and state share a local repo with NO
+# remote: it exists so `--undo` still means something now that MAIN.md lives
+# outside the vault, and its extracts — near-verbatim conversation text — have
+# nowhere to be pushed to.
+#
+# Being offline is not an error for the vault either: the work is done, committed
+# locally, and pushed by whichever run next has a network. Neither path ever
+# touches the repo this script ships in.
 
 # Never let the network block a headless job. Without these an unreachable remote
 # makes git sit on an SSH or credential prompt forever, and a launchd job has no
@@ -1010,9 +984,61 @@ distill_git_env() {
 
 distill_git_pull() {
     [ "${DRY_RUN:-0}" = "1" ] && return 0
+    distill_have_vault || return 0
     distill_git_env
     git -C "$DISTILL_VAULT" pull --rebase --autostash >/dev/null 2>&1 ||
         distill_warn "could not pull the vault (offline?) — continuing locally"
+}
+
+# distill_commit_local MESSAGE — commit the state dir. No remote, so no push, no
+# pull, and no way for this to fail on a network.
+#
+# Only state is tracked, not memory. MAIN.md, Topics/ and Candidates.md are a
+# pure function of the ledger and the extracts, so reverting the inputs and
+# re-rendering puts the memory tier back exactly — which is what `--undo` does.
+# Versioning derived output alongside its input would just be two copies of the
+# same decision, free to disagree.
+distill_commit_local() {
+    local repo="" msg="$1"
+    repo="$(distill_state_dir)"
+    [ "${DRY_RUN:-0}" = "1" ] && {
+        dim "dry-run \$ git -C $repo commit -m '$msg'"
+        return 0
+    }
+    [ -d "$repo" ] || return 0
+
+    distill_state_repo_init || return 0
+    git -C "$repo" add -A >/dev/null 2>&1 || true
+    git -C "$repo" diff --cached --quiet 2>/dev/null && return 0
+    git -C "$repo" commit -q -m "$msg" >/dev/null 2>&1 ||
+        distill_warn "could not commit the state repo"
+    return 0
+}
+
+# distill_state_repo_init — a repo with no remote, created on first use.
+# `logs/` is excluded: launchd's stdout is noise, and it is the one thing here
+# that grows without bound.
+#
+# Identity and signing are pinned locally rather than inherited. A global
+# `commit.gpgsign = true` backed by 1Password's op-ssh-sign raises a GUI approval
+# prompt, and a launchd job at 01:00 has nobody to approve it — the commit would
+# hang or fail every night. Nothing here is published or attributed to anyone, so
+# there is nothing for a signature to attest to.
+distill_state_repo_init() {
+    local repo
+    repo="$(distill_state_dir)"
+    mkdir -p "$repo" || return 1
+    if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+        git -C "$repo" init -q >/dev/null 2>&1 || {
+            distill_warn "could not init the state repo at $repo — --undo will not work"
+            return 1
+        }
+    fi
+    git -C "$repo" config commit.gpgsign false >/dev/null 2>&1 || true
+    git -C "$repo" config user.name chezdistill >/dev/null 2>&1 || true
+    git -C "$repo" config user.email chezdistill@localhost >/dev/null 2>&1 || true
+    [ -f "$repo/.gitignore" ] || printf 'logs/\n' >"$repo/.gitignore"
+    return 0
 }
 
 # distill_git_push MESSAGE — commit and push, rebasing once on rejection.
@@ -1023,6 +1049,7 @@ distill_git_push() {
         dim "dry-run \$ git commit -m '$msg' && git push"
         return 0
     }
+    distill_have_vault || return 0
 
     distill_git_env
     git -C "$DISTILL_VAULT" add -- "$folder" >/dev/null 2>&1 || true
@@ -1075,20 +1102,23 @@ distill_sync_skills() {
 # ─── Status ───────────────────────────────────────────────────────────────────
 
 distill_status() {
-    local main cap spent ceiling n last line
+    local main cap spent ceiling n last line f
     s_section "chezdistill"
 
-    if distill_preflight; then
-        s_pass "vault    $DISTILL_ROOT"
-    else
-        case "$?" in
-            2) s_warn "vault    not available — the job would exit without doing anything" ;;
-            *) s_fail "vault    unusable" ;;
-        esac
+    if ! distill_preflight; then
+        s_fail "paths    unusable"
         return 0
     fi
 
-    main="$DISTILL_ROOT/MAIN.md"
+    s_pass "memory   $(distill_memory_dir)"
+    s_pass "state    $(distill_state_dir)"
+    if distill_have_vault; then
+        s_pass "vault    $DISTILL_ROOT"
+    else
+        s_warn "vault    not available — reports would be skipped, memory still renders"
+    fi
+
+    main="$(distill_memory_dir)/MAIN.md"
     cap="$(distill_cfg mainCapBytes 6144)"
     if [ -f "$main" ]; then
         n="$(wc -c <"$main" | tr -d ' ')"
@@ -1104,12 +1134,15 @@ distill_status() {
     n="$(/usr/bin/find "$(distill_ledger_dir)" -name '*.json' 2>/dev/null | wc -l | tr -d ' ')"
     s_note "ledger   ${n} entries"
 
-    n="$(distill_derive | jq -s '[.[] | select(.scope == "unknown")] | length' 2>/dev/null || echo 0)"
+    n="$(distill_eligible | jq -s '[.[] | select(.eligible | not)] | length' 2>/dev/null || echo 0)"
     if [ "${n:-0}" -gt 0 ]; then
-        s_warn "origin   ${n} entries unclassified — add patterns to distill.toml"
-        distill_derive | jq -r 'select(.scope == "unknown") | "           \(.text[0:60])"' 2>/dev/null | head -5
+        s_note "waiting  ${n} entries below the gate or stale — see Candidates.md"
+    fi
+
+    if git -C "$(distill_state_dir)" rev-parse --git-dir >/dev/null 2>&1; then
+        s_pass "undo     state repo is tracking $(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0) commit(s)"
     else
-        s_pass "origin   every entry classified"
+        s_note "undo     no state repo yet — the first run creates it"
     fi
 
     spent="$(distill_spend_7d)"
@@ -1121,7 +1154,7 @@ distill_status() {
         s_note "last run no run recorded yet — see Runs.md once one has"
     else
         line="$(printf '%s' "$last" | jq -r \
-            '"\(.end[0:16] | sub("T"; " ")) UTC · \(.host) · \(.mode) · \(.status)"
+            '"\(.end[0:16] | sub("T"; " ")) UTC · \(.mode) · \(.status)"
              + " · \(.sessions.kept)/\(.sessions.seen) session(s) · $\(.cost * 100 | round / 100)"')"
         case "$(printf '%s' "$last" | jq -r '.status')" in
             ok) s_pass "last run $line" ;;
@@ -1129,10 +1162,9 @@ distill_status() {
         esac
     fi
 
-    for f in "$(distill_state_dir)"/cursor-*.json; do
-        [ -f "$f" ] || continue
-        s_note "cursor   $(basename "$f" .json | sed 's/^cursor-//') → $(jq -r '.cursor // "?"' "$f")"
-    done
+    f="$(distill_cursor_file)"
+    [ -f "$f" ] && s_note "cursor   read up to $(jq -r '.cursor // "?"' "$f")"
+    return 0
 }
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -1178,10 +1210,10 @@ JSON
 # ─── Cursor ───────────────────────────────────────────────────────────────────
 
 distill_cursor_file() {
-    printf '%s/cursor-%s.json\n' "$(distill_state_dir)" "$(distill_host)"
+    printf '%s/cursor.json\n' "$(distill_state_dir)"
 }
 
-# distill_cursor_read — where this machine last read to. The cursor, rather than
+# distill_cursor_read — where the job last read to. The cursor, rather than
 # "yesterday", is what makes a laptop that slept through 01:00 lose nothing.
 distill_cursor_read() {
     local f
@@ -1199,8 +1231,7 @@ distill_cursor_write() {
     local f
     f="$(distill_cursor_file)"
     mkdir -p "$(dirname "$f")"
-    jq -n --arg c "$1" --arg h "$(distill_host)" \
-        '{host:$h, cursor:$c}' >"$f"
+    jq -n --arg c "$1" '{cursor:$c}' >"$f"
 }
 
 # ─── Nightly ──────────────────────────────────────────────────────────────────
@@ -1218,7 +1249,7 @@ distill_run_daily() {
 }
 
 _distill_daily_body() {
-    local since now host tmp sysfile schema filtered turns origin cwd
+    local since now tmp sysfile schema filtered turns cwd out
     local sess name title mapped date n_items
 
     distill_spend_ok || return 1
@@ -1227,10 +1258,7 @@ _distill_daily_body() {
     since="$(distill_cursor_read)"
     _DISTILL_RUN_SINCE="$since"
     now="$(distill_iso_now)"
-    host="$(distill_host)"
     tmp="$(mktemp -d)"
-    export DISTILL_UNMATCHED="$tmp/unmatched"
-    : >"$DISTILL_UNMATCHED"
 
     sysfile="$tmp/rubric.md"
     distill_rubric >"$sysfile"
@@ -1246,54 +1274,62 @@ _distill_daily_body() {
         filtered="$tmp/$name.ndjson"
         distill_filter "$sess" "$since" | distill_dedupe >"$filtered"
         if [ ! -s "$filtered" ]; then
-            distill_run_session "$name" "-" 0 "nothing new since the cursor" 0
+            distill_run_session "$name" 0 "nothing new since the cursor" 0
             continue
         fi
 
         turns="$(distill_turns <"$filtered")"
         cwd="$(jq -r 'select(.c != null) | .c' <"$filtered" | head -1)"
-        origin="$(distill_classify_origin "$cwd")"
         title="$(distill_session_title "$sess")"
         date="$(jq -r '.t[0:10]' <"$filtered" | head -1)"
 
         if [ "${turns:-0}" -lt "$(distill_cfg minTurns 3)" ]; then
             dim "skip $name — only ${turns} typed turn(s)"
-            distill_run_session "$name" "$origin" "${turns:-0}" "too short, no model call" 0
+            distill_run_session "$name" "${turns:-0}" "too short, no model call" 0
             continue
         fi
 
         mapped="$(distill_claude "$(distill_cfg mapModel sonnet)" "$sysfile" "$schema" \
             "Session title: ${title:-untitled}. Extract durable items, or none." \
             <"$filtered")" || {
-            distill_run_session "$name" "$origin" "$turns" "model call failed" 0
+            distill_run_session "$name" "$turns" "model call failed" 0
             continue
         }
 
         n_items="$(printf '%s' "$mapped" | jq -r '.items | length')"
         if [ "${n_items:-0}" = "0" ]; then
             dim "skip $name — nothing durable in it"
-            distill_run_session "$name" "$origin" "$turns" "nothing durable in it" 0
+            distill_run_session "$name" "$turns" "nothing durable in it" 0
             continue
         fi
 
         printf '%s\n' "$mapped" |
-            jq -c --arg o "$origin" --arg h "$host" --arg s "$name" \
+            jq -c --arg s "$name" \
                 --arg c "$cwd" --arg tool "${DISTILL_TOOL:-claude-code}" \
-                '.items[] | . + {origin:$o, host:$h, session:$s, cwd:$c, tool:$tool}' \
+                '.items[] | . + {session:$s, cwd:$c, tool:$tool}' \
                 >>"$tmp/items-$date.ndjson"
         DISTILL_RUN_KEPT=$((DISTILL_RUN_KEPT + 1))
         DISTILL_RUN_ITEMS=$((DISTILL_RUN_ITEMS + n_items))
-        distill_run_session "$name" "$origin" "$turns" "kept" "$n_items"
+        distill_run_session "$name" "$turns" "kept" "$n_items"
     done < <(distill_session_files "$since")
 
     ok "$DISTILL_RUN_KEPT of $DISTILL_RUN_SEEN session(s) yielded items"
 
+    # One file per date, merged with what that date already holds: a backfill and
+    # a nightly run can both land on the same day, and `unique` keeps a re-read
+    # session from counting twice.
     for f in "$tmp"/items-*.ndjson; do
         [ -f "$f" ] || continue
         date="$(basename "$f" .ndjson)"
         date="${date#items-}"
-        mkdir -p "$(distill_extracts_dir)/$date"
-        jq -s '{items: .}' "$f" >"$(distill_extracts_dir)/$date/$host.json"
+        out="$(distill_extract_file "$date")"
+        mkdir -p "$(dirname "$out")"
+        if [ -f "$out" ]; then
+            jq -s '{items: (.[0].items + .[1] | unique)}' \
+                "$out" <(jq -s '.' "$f") >"$out.tmp" && mv "$out.tmp" "$out"
+        else
+            jq -s '{items: .}' "$f" >"$out"
+        fi
         DISTILL_RUN_DATES="$DISTILL_RUN_DATES $date"
     done
 
@@ -1307,7 +1343,7 @@ _distill_daily_body() {
 # still leaves its record in the vault.
 distill_finish_dates() {
     local dates="$1" tmp="$2" date before
-    local main="$DISTILL_ROOT/MAIN.md"
+    local main="$(distill_memory_dir)/MAIN.md"
 
     before="$tmp/main-before.md"
     cp -f "$main" "$before" 2>/dev/null || : >"$before"
@@ -1315,7 +1351,7 @@ distill_finish_dates() {
 
     for date in $dates; do
         if distill_sources_match "$date"; then
-            dim "$date already reflects every machine's extracts — nothing to do"
+            dim "$date is already reflected in its report — nothing to do"
             continue
         fi
         distill_narrate "$date" "$tmp"
@@ -1326,7 +1362,8 @@ distill_finish_dates() {
     distill_render_topics
 
     for date in $dates; do
-        distill_main_diff "$before" "$main" >"$DISTILL_ROOT/.state/main-diff-$date.txt"
+        distill_main_diff "$before" "$main" \
+            >"$(distill_state_dir)/main-diff-$date.txt"
         distill_render_daily "$date"
         distill_sources_fingerprint "$date" \
             >"$(distill_state_dir)/narratives/$date.sources"
@@ -1346,17 +1383,23 @@ distill_narrate() {
         jq -r '.summary // empty' >"$out"
 }
 
-# distill_guard_secrets — extracts hold near-verbatim conversation text and must
-# be committed for the two machines to merge, so they are swept too.
+# distill_guard_secrets — the sweep follows the content, not the directory. The
+# extracts moved off the vault's remote but still hold near-verbatim conversation
+# text, and MAIN.md is loaded into every session, so all three are swept and any
+# hit blocks every commit this run would have made.
 distill_guard_secrets() {
+    local d
     command -v gitleaks >/dev/null 2>&1 || {
         warn "gitleaks not installed — skipping the secret sweep"
         return 0
     }
-    if ! gitleaks dir "$DISTILL_ROOT" --redact --no-banner >/dev/null 2>&1; then
-        fail "gitleaks found something in $DISTILL_ROOT — not committing"
-        return 1
-    fi
+    for d in "$(distill_state_dir)" "$(distill_memory_dir)" "${DISTILL_ROOT:-}"; do
+        [ -n "$d" ] && [ -d "$d" ] || continue
+        if ! gitleaks dir "$d" --redact --no-banner >/dev/null 2>&1; then
+            fail "gitleaks found something in $d — not committing"
+            return 1
+        fi
+    done
     return 0
 }
 
@@ -1380,29 +1423,36 @@ _distill_weekly_body() {
 
     week="$(date -u +%G-W%V)"
     DISTILL_RUN_WEEK="$week"
-    out="$DISTILL_ROOT/Weekly/$week.md"
     tmp="$(mktemp -d)"
     distill_rubric >"$tmp/rubric.md"
-    mkdir -p "$(dirname "$out")"
 
     distill_render_main
     distill_render_inbox
     distill_render_topics
 
+    if ! distill_have_vault; then
+        info "vault not available — memory re-rendered, no weekly note written"
+        rm -rf "$tmp"
+        return 0
+    fi
+    out="$DISTILL_ROOT/Weekly/$week.md"
+    mkdir -p "$(dirname "$out")"
+
     {
         printf -- '---\nweek: %s\n---\n\n# %s\n\n' "$week" "$week"
         printf '## Summary\n\n'
         distill_derive |
-            jq -s -r 'map("- [\(.scope)] \(.text)") | join("\n")' |
+            jq -s -r 'map("- [\(.kind)] \(.text)") | join("\n")' |
             distill_claude "$(distill_cfg narrateModel opus)" "$tmp/rubric.md" \
                 <(distill_schema_narrative) \
                 "Write the weekly review for $week from these ledger entries." |
             jq -r '.summary // empty'
         printf '\n## Not in MAIN.md\n\n'
-        printf 'Below the promotion gate, stale, or unclassified — see [[Candidates]].\n\n'
+        printf 'Below the promotion gate or gone stale. The full list is in\n'
+        printf '`%s/Candidates.md`.\n\n' "$(distill_memory_dir)"
         distill_eligible |
             jq -r 'select(.eligible | not)
-                   | "- \(.text)  ·  \(.scope), \(.hits) hit(s), last seen \(.last_seen)"' |
+                   | "- \(.text)  ·  \(.hits) hit(s), last seen \(.last_seen)"' |
             sort
     } >"$out"
 
