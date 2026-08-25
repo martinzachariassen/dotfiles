@@ -1144,7 +1144,19 @@ distill_render_index() {
             "$(distill_tilde "$(distill_pinned_file)")"
         printf -- '| Last night made a mess | `chezdistill --undo` |\n'
         printf -- '| You changed something and want to see it | `chezdistill --render` — free, no model calls |\n'
-        printf -- '| An entry should be gone entirely | Delete its sightings from `~/.local/state/chezdistill/extracts/` |\n\n'
+        printf -- '| An entry should be gone entirely | Delete its sightings from `~/.local/state/chezdistill/extracts/` |\n'
+        printf -- '| It keeps missing something you wanted | Edit the rubric, not the code — see below |\n\n'
+
+        printf '## Changing what gets captured\n\n'
+        printf 'What counts as worth keeping, and how these notes read, are three Markdown\n'
+        printf 'prompts rather than anything in the code:\n\n'
+        printf -- '| Prompt | Decides |\n|---|---|\n'
+        printf -- '| `skills/distill/SKILL.md` | what gets captured at all |\n'
+        printf -- '| `skills/distill-daily/SKILL.md` | how the daily summary reads |\n'
+        printf -- '| `skills/distill-weekly/SKILL.md` | how the weekly review reads |\n\n'
+        printf 'They live in `~/Developer/personal/dotfiles/src/dot_config/claude/skills/`,\n'
+        printf 'deploy to `~/.config/claude/skills/`, and each doubles as a `/distill`\n'
+        printf 'command you can run on a live conversation.\n\n'
         printf 'Full guide: `~/Developer/personal/dotfiles/docs/distill.md`.\n'
     } >"$out"
 }

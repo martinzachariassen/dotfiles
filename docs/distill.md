@@ -170,6 +170,49 @@ applies to everything else. An open thread is worth knowing *tomorrow*, which is
 exactly the horizon that test rejects — before the carve-out, the corpus held
 nineteen gotchas and zero open threads.
 
+## The three rubrics — where the behaviour actually lives
+
+Everything the job *decides* is bash. Everything it *writes in prose* comes from
+one of three prompts, and those prompts are ordinary Markdown files you can edit:
+
+| Skill | Drives | Change it to affect |
+|---|---|---|
+| [`distill`](../src/dot_config/claude/skills/distill/SKILL.md) | one call per session | **what gets captured at all** — the item kinds, what counts, what never counts, how long a rule may be |
+| [`distill-daily`](../src/dot_config/claude/skills/distill-daily/SKILL.md) | one call per date | how the daily `## Summary` reads |
+| [`distill-weekly`](../src/dot_config/claude/skills/distill-weekly/SKILL.md) | one call per week | how the weekly review reads |
+
+They are deployed to `~/.config/claude/skills/<name>/SKILL.md` by an apply, and
+each doubles as an interactive slash command — `/distill` on a live conversation
+runs the same rubric by hand.
+
+**The job reads them as files, not as skills.** Every model call runs with
+`--tools ""`, which removes the Skill tool along with everything else, so the body
+is `cat`-ed into `--system-prompt-file`. That flag *replaces* the default system
+prompt rather than appending to it, which is where the roughly tenfold cost drop
+came from: no persona, no tool guidance, just the rubric.
+
+**One rubric per job, because they are different jobs.** Extraction wants
+compression and ends with "answer with the schema and nothing else". A summary
+wants readable prose for someone with no memory of the day. Both narrative calls
+ran under the *extraction* rubric until recently, and that is exactly why
+summaries came out as one dense paragraph.
+
+### Editing one
+
+Edit the source under `src/`, `chezapply`, and the next run picks it up. To see
+the effect you have to pay for a run — rendering is free, extraction is not.
+
+Two things that look like prompt problems and are not:
+
+- **A length limit belongs in the JSON schema, not the prompt.** Asking for 200
+  characters is ignored often enough to matter; `maxLength` is not. That is why
+  the rule cap and the summary lede cap both live in
+  [`distill_schema_map`](../scripts/lib/distill.sh) rather than in the rubric.
+- **A horizon in the rubric silently filters whole categories.** "Worth knowing a
+  month from now" is right for a rule and wrong for an open thread, which matters
+  most the day after. Before that carve-out the corpus held 19 gotchas and zero
+  open threads — the instruction was working exactly as written.
+
 ## Three tiers, priced differently
 
 | Tier | Where | What it costs |

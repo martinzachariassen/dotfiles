@@ -52,9 +52,18 @@ sessions, so a single misreading can't become a rule applied to every session.
 The job never creates the vault; when it is missing, the reports are skipped and
 the memory tier still renders.
 
+What it captures, and how the reports read, are not in the code — they are three
+Markdown prompts under
+[`src/dot_config/claude/skills/`](../src/dot_config/claude/skills/): `distill`
+decides what counts as worth keeping, `distill-daily` and `distill-weekly` write
+the summaries. Each is deployed to `~/.config/claude/skills/` and doubles as an
+interactive `/distill` command. Editing one changes the job's behaviour without
+touching a line of bash — it is the first place to look when the output is not
+what you wanted.
+
 **Full guide: [distill.md](distill.md)** — turning it on, migrating an older
-layout, what happens each night, how to correct a wrong rule, cost, and
-troubleshooting.
+layout, what happens each night, the three rubrics and how to tune them, how to
+correct a wrong rule, cost, and troubleshooting.
 
 ## The status line
 
