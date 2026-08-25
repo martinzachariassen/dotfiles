@@ -65,6 +65,30 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   and ~40 GB — don't move it into an apply hook or a Brewfile. Its read-only
   probes live in `scripts/lib/xcode.sh` and are shared with `chezdoctor` so the
   two can't disagree; add checks there, not in either caller.
+- **`chezdistill` writes to three places, none of them this repo.** The memory tier
+  (`MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md`) goes to
+  `~/.config/claude/memory`, beside the persona that `@`-imports it; the extract
+  corpus, `Pinned.md`, cursor, spend and run log to `~/.local/state/chezdistill`, in a git repo
+  whose remote is optional (add one and every run pushes, so a replacement Mac
+  clones the corpus instead of starting empty); and
+  only the reports you read (`Daily/`, `Weekly/`, `Runs.md`) to
+  `~/Documents/TheArchive/30-Claude`. Keep that split — putting `Topics/` in the
+  vault makes it unreadable to Claude, and putting extracts back in the vault puts
+  transcript text on a remote.
+  **It never creates the vault**: an uncloned one looks exactly like an empty
+  directory, so a missing vault means "skip the reports, render the memory, exit 0",
+  never "create it". `chezdistill --setup`, the confirm-gated on-switch, may create
+  `30-Claude/` and only that, and only once the vault and its `.obsidian` dir are
+  already there — don't extend it to the vault, and don't move any of it into
+  preflight. Memory and state are ordinary local directories and are simply created.
+  Its guiding rule is *the model extracts and narrates, bash decides and writes*:
+  every judgement (hit counts, what enters `MAIN.md`, what is demoted) is computed in
+  `scripts/lib/distill.sh`, and every `claude -p` call runs `--tools ""` with no
+  write access. `hits` is **derived** from the extract corpus, never incremented —
+  that is what makes `--render`, `--since 7d` and a repeated nightly run idempotent.
+  Don't move a decision into a prompt, and don't make `--undo` revert the rendered
+  files: `MAIN.md` is derived, so undo reverts the corpus and re-renders. Full guide
+  in [docs/distill.md](docs/distill.md).
 - **storecode is the work-only exception.** It's installed by its own hook
   (`run_onchange_after_05-storecode`, work profile only) via an installer set in
   `src/.chezmoidata/storecode.toml` — **never** a Brewfile package — and

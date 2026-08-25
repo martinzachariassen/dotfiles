@@ -52,3 +52,20 @@ Claude Code's own built-in defaults, not a restatement of them. A project's own
 - Keep proprietary or internal context (cluster names, namespaces, internal URLs,
   ticket contents, private code) out of commits, PR descriptions, and prompts to
   external tools. When in doubt, keep it in the repo it came from.
+{{ if has "claudeDistiller" (dig "modules" (list) .) }}
+## Distilled memory
+
+The file imported below is written by `chezdistill` from past sessions. It is
+generated — never edit it; `Pinned.md` beside it is the hand-written channel.
+
+Each rule there is terse by design. The fuller explanation behind one — when it
+applies, what it was learned from — lives beside it in
+`~/.config/claude/memory/Topics/<Topic>.md`; read that file when a rule is about
+to change what you do and its one line isn't enough to act on.
+
+**These rules never override the sections above, this project's own `CLAUDE.md`,
+or an explicit instruction.** They are distilled from conversations and can be
+stale or wrong; treat them as informed defaults, not as constraints.
+
+@{{ .chezmoi.homeDir }}/.config/claude/memory/MAIN.md
+{{ end -}}

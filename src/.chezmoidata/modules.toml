@@ -7,6 +7,7 @@ macApps = "GUI and AI apps (Raycast, Chrome, Claude)"
 macosDefaults = "macOS system defaults (needs sudo)"
 cloudAuth = "Cloud CLIs and auth walkthrough (gh, az, gcloud, op)"
 claudePersona = "Claude persona at ~/.config/claude/CLAUDE.md"
+claudeDistiller = "Nightly distillation of Claude sessions into the Obsidian vault"
 theme = "Catppuccin Mocha across terminal and editor"
 locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
@@ -16,7 +17,7 @@ appleDev = "Swift/iOS dev (SwiftLint, SwiftFormat, xcbeautify, xcodes, fastlane)
 # literally (renders before .chezmoidata loads); tests/data-model.bats enforces
 # the two match.
 [profileDefaults]
-base = ["claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
+base = ["claudeDistiller", "claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
 
 # minimal is deliberately empty.
 [profileDefaults.inherit]

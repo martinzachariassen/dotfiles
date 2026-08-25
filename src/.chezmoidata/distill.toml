@@ -1,0 +1,70 @@
+# chezdistill — nightly/weekly distillation of Claude Code transcripts into the
+# Obsidian vault. Read by scripts/lib/distill.sh via `chezmoi execute-template`,
+# the same way clean.sh reads cleanup.toml.
+#
+# .chezmoidata can't be templated; keep this namespace disjoint from prompted
+# answers (packages.toml/modules.toml) so merges don't collide.
+
+[distill]
+# Three destinations, because the three have nothing in common. See docs/ai.md.
+#
+# memoryPath is what Claude loads: the persona @-imports MAIN.md from here, so it
+# has to resolve whether or not the vault is mounted. statePath is the extract
+# corpus, the hand-written Pinned.md, the cursor, spend and run log. The extracts ARE the memory — every rule and
+# hit count is derived from them — so this is the directory worth backing up. Both
+# are ordinary local directories and are created on demand.
+memoryPath = "~/.config/claude/memory"
+statePath = "~/.local/state/chezdistill"
+
+# The vault is NOT chezmoi-managed and is never created by the job. It holds only
+# the reports you read; when it is missing they are skipped and the memory tier
+# still renders.
+vaultPath = "~/Documents/TheArchive"
+folder = "30-Claude"
+
+# Where transcripts live. A list so a second Claude Code install can be added
+# without touching the code. Tildes are expanded by the reader.
+transcriptRoots = ["~/.config/claude/projects"]
+
+# Model tiers. One call per session — `items: []` is itself the "nothing durable
+# here" verdict. A separate cheap triage pass measured WORSE: it cost $0.05/session
+# while saving a $0.23 map call only sometimes, because every call re-pays ~19k
+# tokens of cached harness context. The free gate is `minTurns` below.
+mapModel = "sonnet"
+narrateModel = "opus"
+
+# Cost brakes. maxBudgetUsd caps a single `claude -p`; maxSpendUsd7d is a rolling
+# ceiling read from spend.jsonl and checked in preflight, so a runaway can't
+# quietly bill for a week before anyone notices.
+maxBudgetUsd = 2.0
+maxSpendUsd7d = 25.0
+
+# Sessions with fewer than this many typed human turns are dropped in bash,
+# before any model call.
+minTurns = 3
+
+# MAIN.md budget. Every byte here is paid for in EVERY session, forever — that's
+# why the cap is enforced in bash and not left to the model.
+mainCapBytes = 6144
+
+# Promotion gate: an entry must be seen in this many distinct sessions before it
+# is rendered into MAIN.md. Below the bar it sits in Candidates.md, where
+# it affects nothing. This is what stops one misreading becoming a global rule.
+minHits = 2
+
+# Eviction: entries not reinforced for this long, and still under minHits, are
+# demoted from MAIN.md to Topics/. Demotion never deletes.
+demoteAfterDays = 21
+
+# Run log. Every run appends one record to runs.jsonl and Runs.md is re-rendered
+# from it, so a night the job skipped everything is still visible.
+# runsShown bounds the table; runRetentionDays bounds the records behind it.
+runsShown = 30
+runRetentionDays = 90
+
+# Extracts hold the DISTILLED item — a model-written rule and explanation — plus
+# one short `evidence` quote and the `cwd` it came from. After this many days the
+# quote and the path are stripped; the rule itself is kept forever, because `hits`
+# and `first_seen` are derived from the corpus and deleting an old sighting would
+# evict an established rule from MAIN.md.
+extractRetentionDays = 90

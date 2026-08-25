@@ -16,7 +16,7 @@ Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
 ## The global defaults (claudePersona module)
 
 The file at
-[`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md) →
+[`src/dot_config/claude/CLAUDE.md.tmpl`](../src/dot_config/claude/CLAUDE.md.tmpl) →
 `~/.config/claude/CLAUDE.md` is the **project-agnostic** working agreement
 Claude Code loads for **every** project on the machine: git/Conventional-Commit
 conventions, code style, communication, verification posture, and secrets
@@ -27,6 +27,43 @@ project's own `CLAUDE.md`, and project-level instructions always win over it.
 ([source](../src/dot_config/claude/settings.json)) carries the Claude Code
 harness config — model, theme, and a read-only permission allowlist (git
 status/diff/log/show, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
+
+## The nightly distiller (claudeDistiller module)
+
+`chezdistill` reads the Claude Code transcripts this Mac wrote and renders a
+size-capped `MAIN.md` that the persona above `@`-imports — so what you and Claude
+worked out yesterday is in context tomorrow. launchd runs it at 01:00, and the
+weekly review on Sunday at 02:00.
+
+It writes to three places, because the three have nothing in common. The memory
+tier — `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` — goes to
+`~/.config/claude/memory`, beside the persona that imports it, so it resolves
+whether or not the vault happens to be mounted. The extract corpus, cursor,
+spend and run log go to `~/.local/state/chezdistill`, in a git repo with no
+remote unless you add one — see the guide for backing the corpus up to a private
+repo. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
+[TheArchive](https://github.com/martinzachariassen/TheArchive)'s `30-Claude/`.
+
+Its guiding rule is that **the model extracts and narrates while bash decides and
+writes**: every judgement is computed in
+[`scripts/lib/distill.sh`](../scripts/lib/distill.sh), and no model call has
+write access. Nothing reaches `MAIN.md` until it has been seen in two distinct
+sessions, so a single misreading can't become a rule applied to every session.
+The job never creates the vault; when it is missing, the reports are skipped and
+the memory tier still renders.
+
+What it captures, and how the reports read, are not in the code — they are three
+Markdown prompts under
+[`src/dot_config/claude/skills/`](../src/dot_config/claude/skills/): `distill`
+decides what counts as worth keeping, `distill-daily` and `distill-weekly` write
+the summaries. Each is deployed to `~/.config/claude/skills/` and doubles as an
+interactive `/distill` command. Editing one changes the job's behaviour without
+touching a line of bash — it is the first place to look when the output is not
+what you wanted.
+
+**Full guide: [distill.md](distill.md)** — turning it on, migrating an older
+layout, what happens each night, the three rubrics and how to tune them, how to
+correct a wrong rule, cost, and troubleshooting.
 
 ## The status line
 
@@ -76,5 +113,5 @@ change.
 > [!NOTE]
 > Two files named `CLAUDE.md`, not to be confused: the root
 > [`CLAUDE.md`](../CLAUDE.md) is the contributor rulebook for editing **this
-> repo**; [`src/dot_config/claude/CLAUDE.md`](../src/dot_config/claude/CLAUDE.md)
+> repo**; [`src/dot_config/claude/CLAUDE.md.tmpl`](../src/dot_config/claude/CLAUDE.md.tmpl)
 > is the global defaults deployed to `$HOME` for use across **all** projects.

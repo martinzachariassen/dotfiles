@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  chezdistill, nightly. launchd fires a missed StartCalendarInterval on WAKE and
+  coalesces several missed firings into ONE run, which is why the job is built
+  around a cursor rather than around "yesterday": a laptop that slept through
+  three nights still loses nothing.
+
+  EnvironmentVariables is not optional. launchd does not read .zshenv, so
+  CLAUDE_CONFIG_DIR (set in src/dot_zshenv) would be absent and the harvester
+  would look in ~/.claude, which does not exist on this machine.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>no.mlz.chezdistill.nightly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{{ .chezmoi.workingTree }}/scripts/bin/distill.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
+        <key>CLAUDE_CONFIG_DIR</key>
+        <string>{{ .chezmoi.homeDir }}/.config/claude</string>
+        <key>DOTFILES_DIR</key>
+        <string>{{ .chezmoi.workingTree }}</string>
+        <key>DISTILL_TRIGGER</key>
+        <string>launchd</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>1</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LowPriorityIO</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/chezdistill/logs/nightly.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/chezdistill/logs/nightly.log</string>
+</dict>
+</plist>

@@ -588,6 +588,16 @@ chezxcode() {
     _chez_run scripts/bin/xcode.sh "$@"
 }
 {{- end }}
+{{- if has "claudeDistiller" (dig "modules" (list) .) }}
+
+# Distil Claude Code conversations into the MAIN.md every future session loads,
+# and the reports you read in the vault. Never creates the vault: if it is
+# missing the reports are skipped and the memory tier still renders.
+# Knobs: --setup · --weekly · --since 7d · --status · --render · --undo · -n.
+chezdistill() {
+    _chez_run scripts/bin/distill.sh "$@"
+}
+{{- end }}
 
 # Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
 chezbump() {
@@ -896,6 +906,13 @@ chezhelp() {
 {{- if has "appleDev" (dig "modules" (list) .) }}
     chezxcode        Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
                        --check  report the five readiness checks; changes nothing.
+{{- end }}
+{{- if has "claudeDistiller" (dig "modules" (list) .) }}
+    chezdistill      Distil Claude conversations; render MAIN.md and the reports.
+                       --setup   turn it on here: migrate, module, apply, timers.
+                       --status  where things live, MAIN size vs cap, spend, runs.
+                       --weekly  weekly review  ·  --render  rebuild, no API calls.
+                       --since 7d  backfill     ·  --undo  revert + re-render.
 {{- end }}
 
   Maintenance (packages & drift)
