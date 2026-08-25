@@ -599,6 +599,34 @@ item() {
     [[ "$output" != *"cursor.json"* ]]
 }
 
+# A global url.<ssh>.pushInsteadOf rewrites HTTPS pushes to SSH, and this
+# machine's key is behind 1Password. At 01:00 the agent is locked, so the push
+# fails and the backup silently stops happening. The repo opts itself out.
+@test "an https remote gets a matching push url" {
+    load_lib
+    distill_state_repo_init
+    git -C "$STATE" remote add origin https://example.invalid/x.git
+    distill_state_repo_pushurl
+    [ "$(git -C "$STATE" config --get remote.origin.pushurl)" = "https://example.invalid/x.git" ]
+}
+
+@test "an ssh remote is left exactly as configured" {
+    load_lib
+    distill_state_repo_init
+    git -C "$STATE" remote add origin git@example.invalid:x.git
+    distill_state_repo_pushurl
+    [ -z "$(git -C "$STATE" config --get remote.origin.pushurl 2>/dev/null)" ]
+}
+
+@test "an existing push url is never overwritten" {
+    load_lib
+    distill_state_repo_init
+    git -C "$STATE" remote add origin https://example.invalid/x.git
+    git -C "$STATE" config remote.origin.pushurl git@chosen.invalid:x.git
+    distill_state_repo_pushurl
+    [ "$(git -C "$STATE" config --get remote.origin.pushurl)" = "git@chosen.invalid:x.git" ]
+}
+
 # ─── Undo ─────────────────────────────────────────────────────────────────────
 #
 # MAIN.md is derived, so undo reverts the extract corpus that produced it

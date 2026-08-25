@@ -1062,6 +1062,26 @@ distill_git_pull() {
         distill_warn "could not pull the vault (offline?) — continuing locally"
 }
 
+# distill_state_repo_pushurl — push this repo over the URL it was cloned from.
+#
+# A global `url.git@github.com:.pushinsteadof https://github.com/` rewrites every
+# HTTPS push to SSH, and this machine's SSH key lives behind 1Password. At 01:00
+# the Mac is asleep or locked, so the agent is locked, so the push fails and the
+# corpus quietly stops leaving the machine until someone runs the job by hand —
+# which is the opposite of what a backup is for.
+#
+# Pinning the push URL to the fetch URL opts this one repo out of that rewrite.
+# It is set only when the remote is already HTTPS and no push URL was configured,
+# so an SSH remote is left exactly as the user set it up.
+distill_state_repo_pushurl() {
+    local repo fetch
+    repo="$(distill_state_dir)"
+    fetch="$(git -C "$repo" remote get-url origin 2>/dev/null)" || return 0
+    case "$fetch" in https://*) ;; *) return 0 ;; esac
+    [ -z "$(git -C "$repo" config --get remote.origin.pushurl 2>/dev/null)" ] || return 0
+    git -C "$repo" config remote.origin.pushurl "$fetch" >/dev/null 2>&1 || true
+}
+
 # distill_commit_local MESSAGE — commit the state dir. No remote, so no push, no
 # pull, and no way for this to fail on a network.
 #
@@ -1126,6 +1146,7 @@ distill_state_repo_init() {
     git -C "$repo" config commit.gpgsign false >/dev/null 2>&1 || true
     git -C "$repo" config user.name chezdistill >/dev/null 2>&1 || true
     git -C "$repo" config user.email chezdistill@localhost >/dev/null 2>&1 || true
+    distill_state_repo_pushurl
     # Ensure each rule, rather than only writing the file when absent: a repo
     # initialised by an older version keeps its old .gitignore forever, and a
     # rule added later would never reach it. Untrack too — .gitignore has no

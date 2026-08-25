@@ -379,6 +379,21 @@ The ignore list is re-applied on every run rather than written once, and anythin
 it newly covers is untracked — a rule added after the repo exists otherwise never
 reaches it, and the file stays published.
 
+**A note on push authentication.** A global
+`url.git@github.com:.pushinsteadof https://github.com/` rewrites every HTTPS push
+to SSH, and the SSH key here lives behind 1Password. At 01:00 the Mac is asleep or
+locked, so the agent is locked, so the push fails and the backup quietly stops
+happening — the opposite of what a backup is for. The state repo therefore pins
+its own push URL to whatever it was cloned from, when that is HTTPS and no push
+URL is already set; an SSH remote is left exactly as you configured it. Do the
+same for the vault by hand if you want its nightly push to survive a locked
+agent:
+
+```sh
+git -C ~/Documents/TheArchive config remote.origin.pushurl \
+    https://github.com/<you>/TheArchive.git
+```
+
 On the new Mac: run `install.sh` for the dotfiles, clone TheArchive, clone this
 repo into `~/.local/state/chezdistill`, then `chezdistill --render`. That rebuilds
 `MAIN.md`, `Topics/` and `Candidates.md` from the corpus for free — they are pure
