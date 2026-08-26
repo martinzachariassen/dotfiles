@@ -494,8 +494,12 @@ if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" claude
         fi
 
         # A corpus with no remote is one disk failure from gone, and it is the
-        # only thing here that cannot be regenerated.
-        if [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
+        # only thing here that cannot be regenerated. Worse than no remote is the
+        # other profile's remote: it looks like a backup, and it isn't — it is
+        # work memory promoted into personal sessions, one push past undoing.
+        if distill_foreign="$(distill_remote_conflict 2>/dev/null)"; then
+            fail "corpus pushes to the $distill_foreign remote, but this is a $(distill_profile) Mac. See: chezdistill --status"
+        elif [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
             pass "corpus backed up to $(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)"
         else
             warn "corpus has no remote — this Mac is the only copy. See docs/distill.md"

@@ -948,3 +948,115 @@ window_setup() {
     [ "$status" -eq 0 ]
     [[ "$output" != *"sub.jsonl"* ]]
 }
+
+# ─── One corpus per profile ───────────────────────────────────────────────────
+#
+# `hits` is counted over the WHOLE corpus, so two profiles sharing a remote is
+# not untidy — a work rule seen in two work sessions is promoted into a personal
+# Mac's MAIN.md the moment the histories meet, and a push cannot be taken back.
+# Adopting the right remote is the convenience; refusing the wrong one is the
+# point. Every check downstream reports a green "corpus backed up" either way.
+
+PERSONAL_URL="https://github.com/me/claude-memory-personal.git"
+WORK_URL="https://github.com/me/claude-memory-work.git"
+
+# profile_setup PROFILE — the engine loaded as if this Mac were that profile.
+profile_setup() {
+    DISTILL_PROFILE="$1"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg p "$PERSONAL_URL" --arg w "$WORK_URL" \
+        '{remotes:{personal:$p, work:$w}}')")"
+    export DISTILL_PROFILE DISTILL_CONFIG_JSON
+    load_lib
+}
+
+origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
+
+@test "a fresh state repo adopts the corpus its profile owns" {
+    profile_setup work
+    run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ "$(origin_of)" = "$WORK_URL" ]
+}
+
+@test "the other profile picks the other corpus" {
+    profile_setup personal
+    distill_state_repo_init
+    [ "$(origin_of)" = "$PERSONAL_URL" ]
+}
+
+@test "another profile's corpus is refused, by name" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    run distill_state_repo_init
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"personal"* ]]
+    [ "$(origin_of)" = "$PERSONAL_URL" ]
+}
+
+@test "nothing is committed while the corpus points at another profile" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    extract 2026-08-22 "[$(item 'a work rule' s1)]"
+    run distill_commit_local "chore(distill): test"
+    [ "$status" -eq 0 ]
+    run git -C "$STATE" rev-list --count HEAD
+    [ "$status" -ne 0 ]
+}
+
+@test "preflight refuses to run against another profile's corpus" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    run distill_preflight
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"personal"* ]]
+}
+
+@test "--status still reports when the remote is what is wrong" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    run distill_status
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"paths    unusable"* ]]
+    [[ "$output" == *"personal corpus"* ]]
+}
+
+@test "the same repo written as ssh is the same repo" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "git@github.com:me/claude-memory-work.git"
+    run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ "$(origin_of)" = "git@github.com:me/claude-memory-work.git" ]
+}
+
+@test "spellings GitHub treats as one repo compare as one repo" {
+    profile_setup work
+    a="$(distill_remote_id "https://github.com/Me/Claude-Memory-Work.git")"
+    [ "$a" = "github.com/me/claude-memory-work" ]
+    [ "$(distill_remote_id "git@github.com:me/claude-memory-work")" = "$a" ]
+    [ "$(distill_remote_id "ssh://git@github.com/me/claude-memory-work.git")" = "$a" ]
+    [ "$(distill_remote_id "https://github.com/me/claude-memory-work/")" = "$a" ]
+    [ "$(distill_remote_id "https://github.com/me/claude-memory-personal")" != "$a" ]
+}
+
+@test "a remote that is nobody else's profile is left alone, not overwritten" {
+    profile_setup work
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin "https://git.example.com/me/my-own-mirror.git"
+    run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ "$(origin_of)" = "https://git.example.com/me/my-own-mirror.git" ]
+}
+
+@test "with no remotes configured nothing is adopted and nothing is refused" {
+    DISTILL_PROFILE=work
+    export DISTILL_PROFILE
+    load_lib
+    run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ -z "$(origin_of)" ]
+}

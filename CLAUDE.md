@@ -69,8 +69,9 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   (`MAIN.md`, `Topics/`, `Candidates.md`) goes to `~/.config/claude/memory`, beside
   the persona that `@`-imports it; the extract corpus, the hand-written `Pinned.md`,
   the cursor, spend and run log go to `~/.local/state/chezdistill`, in a git repo
-  whose remote is optional (add one and every run pushes, so a replacement Mac
-  clones the corpus instead of starting empty). Keep that split: memory is derived
+  that pushes to the corpus its **profile** owns (`[distill.remotes]` in
+  `src/.chezmoidata/distill.toml`, keyed by `.profile`), so a replacement Mac clones
+  the corpus instead of starting empty. Keep that split: memory is derived
   and disposable, state is the source of truth and the only thing worth backing up.
   Inside state the split repeats: **only `extracts/` and `Pinned.md` are tracked.**
   `cursor.json`, `spend.jsonl`, `runs.jsonl` and `logs/` are per-machine, append-only
@@ -80,6 +81,13 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   `hits` counts sightings over the whole corpus — one private repo each
   (`claude-memory-personal`, `claude-memory-work`). Read the date with
   `distill_extract_date`, never by stripping `.json`, so pre-sharding files still work.
+  **The profile picks the remote, and a foreign one is a hard stop.** A state repo
+  with no origin adopts its profile's; one already set by hand is left alone; one
+  pointing at *another profile's* URL makes `distill_preflight` (and so every mode,
+  plus `chezdistill --status` and `chezdoctor`) fail loudly, because "backed up to
+  the wrong repo" otherwise reports as a green tick and cannot be un-pushed. Compare
+  remotes with `distill_remote_id`, never as strings — SSH and HTTPS spellings of one
+  repo must not read as a conflict.
   **It has no human-facing output and no vault** — it produced daily and weekly
   notes in Obsidian once, and that half was removed deliberately. Don't reintroduce
   a reporting destination; if you want to read what it knows, read `MAIN.md`,

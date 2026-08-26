@@ -60,3 +60,21 @@ runRetentionDays = 90
 # and `first_seen` are derived from the corpus and deleting an old sighting would
 # evict an established rule from MAIN.md.
 extractRetentionDays = 90
+
+# One corpus remote per profile, keyed by `.profile`. The state repo takes its
+# origin from this table on first use, so a fresh Mac backs itself up without
+# anyone remembering to run `git remote add` — and a Mac pointed at the *other*
+# profile's repo is refused rather than quietly distilled into it.
+#
+# They must stay separate repos. `hits` counts sightings across the WHOLE corpus,
+# so a work rule seen in two work sessions would be promoted into a personal
+# Mac's MAIN.md — mixing the two isn't untidy, it leaks. Two Macs on the SAME
+# profile sharing one remote is fine and intended: extracts are sharded per host.
+#
+# Both are private: extracts carry short verbatim quotes from transcripts.
+#
+# Keep this table LAST. TOML scopes every bare key that follows a [table] header
+# into that table, so a key added below this line would become a remote.
+[distill.remotes]
+personal = "https://github.com/martinzachariassen/claude-memory-personal.git"
+work = "https://github.com/martinzachariassen/claude-memory-work.git"

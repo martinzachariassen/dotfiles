@@ -21,6 +21,18 @@ __DOTFILES_DISTILL_SH=1
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 _DISTILL_CFG=""
+_DISTILL_DATA=""
+_DISTILL_PROFILE=""
+
+# _distill_data — all of `chezmoi data`, fetched once. Two callers want different
+# parts of it (`.distill` and `.profile`) and it costs a subprocess each time.
+_distill_data() {
+    if [ -z "$_DISTILL_DATA" ]; then
+        _DISTILL_DATA="$(chezmoi data --format=json 2>/dev/null)"
+        [ -n "$_DISTILL_DATA" ] || _DISTILL_DATA='{}'
+    fi
+    printf '%s\n' "$_DISTILL_DATA"
+}
 
 # distill_config — the `.distill` table from .chezmoidata, fetched once.
 distill_config() {
@@ -28,12 +40,28 @@ distill_config() {
         if [ -n "${DISTILL_CONFIG_JSON:-}" ]; then
             _DISTILL_CFG="$DISTILL_CONFIG_JSON"
         else
-            _DISTILL_CFG="$(chezmoi data --format=json 2>/dev/null |
-                jq -c '.distill // {}' 2>/dev/null)"
+            _DISTILL_CFG="$(_distill_data | jq -c '.distill // {}' 2>/dev/null)"
         fi
         [ -n "$_DISTILL_CFG" ] || _DISTILL_CFG='{}'
     fi
     printf '%s\n' "$_DISTILL_CFG"
+}
+
+# distill_profile — which profile this Mac was set up as: "personal" or "work".
+#
+# The only thing in this file that reads outside the `.distill` table, and it
+# earns it: the corpus a machine pushes to is a property of the machine, not of
+# the config. Empty when chezmoi is not on PATH, which every caller treats as
+# "no opinion" rather than as an error.
+distill_profile() {
+    if [ -z "$_DISTILL_PROFILE" ]; then
+        if [ -n "${DISTILL_PROFILE:-}" ]; then
+            _DISTILL_PROFILE="$DISTILL_PROFILE"
+        else
+            _DISTILL_PROFILE="$(_distill_data | jq -r '.profile // empty' 2>/dev/null)"
+        fi
+    fi
+    printf '%s\n' "$_DISTILL_PROFILE"
 }
 
 # distill_cfg KEY [DEFAULT] — one scalar.
@@ -114,6 +142,15 @@ distill_can_write() {
 # to be refused by macOS privacy protection.
 # 0 = go · 1 = broken/unwritable (a real failure)
 distill_preflight() {
+    _distill_preflight_paths || return 1
+    distill_remote_check || return 1
+    return 0
+}
+
+# _distill_preflight_paths — the half `--status` still needs when the other half
+# is what's broken. A status run that refuses to say anything because the corpus
+# points at the wrong remote is a status run that can't help you fix it.
+_distill_preflight_paths() {
     local d
 
     if ! command -v jq >/dev/null 2>&1; then
@@ -872,8 +909,8 @@ distill_extract_file() {
 #
 # One repo: the state dir. It exists so `--undo` still means something, since the
 # memory tier is derived and can always be re-rendered from the corpus. Its
-# remote is optional — add one and the corpus survives the machine. This path
-# never touches the repo this script ships in.
+# remote comes from the profile, so the corpus survives the machine without
+# anyone opting in. This path never touches the repo this script ships in.
 
 # Never let the network block a headless job. Without these an unreachable remote
 # makes git sit on an SSH or credential prompt forever, and a launchd job has no
@@ -882,6 +919,94 @@ distill_git_env() {
     export GIT_TERMINAL_PROMPT=0
     export GIT_ASKPASS=/usr/bin/true
     export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
+}
+
+# ─── Which corpus is this Mac's? ──────────────────────────────────────────────
+#
+# One remote per profile, from `[distill.remotes]` in .chezmoidata. Not one
+# shared repo with a branch each: `hits` is counted over the whole corpus, so a
+# work rule seen in two work sessions would be promoted into a personal Mac's
+# MAIN.md the moment the two histories met. Two Macs on the SAME profile sharing
+# a remote is the case this is built for — extracts are sharded per host.
+
+# distill_remote_url [PROFILE] — the corpus this profile belongs to, or empty
+# when the table has no entry for it (a third profile, or chezmoi unavailable).
+distill_remote_url() {
+    local p="${1:-$(distill_profile)}"
+    [ -n "$p" ] || return 0
+    distill_config | jq -r --arg p "$p" '(.remotes // {})[$p] // empty'
+}
+
+# distill_remote_id URL — host/owner/repo, lowercased.
+#
+# Comparing remote URLs as strings gets this wrong in the one direction that
+# matters: `git@github.com:me/x.git` and `https://github.com/me/X` are the same
+# repo, and a mismatch here would refuse to run on a machine that is set up
+# correctly. Reduce both to the identity GitHub actually uses before comparing.
+distill_remote_id() {
+    local u="$1"
+    u="${u%.git}"
+    u="${u%/}"
+    u="${u#https://}"
+    u="${u#http://}"
+    u="${u#ssh://}"
+    u="${u#git://}"
+    u="${u#*@}" # git@host, or a token baked into an https URL
+    u="${u/://}"
+    printf '%s\n' "$u" | tr '[:upper:]' '[:lower:]'
+}
+
+# distill_remote_adopt — give a remote-less state repo the origin its profile
+# says it should have. Never overwrites: an origin that is already set was set by
+# someone, and this is not the code to second-guess it.
+distill_remote_adopt() {
+    local repo url
+    repo="$(distill_state_dir)"
+    [ -z "$(git -C "$repo" remote 2>/dev/null)" ] || return 0
+    url="$(distill_remote_url)"
+    [ -n "$url" ] || return 0
+    git -C "$repo" remote add origin "$url" >/dev/null 2>&1 || return 0
+    info "corpus backup set to $url ($(distill_profile) profile)"
+}
+
+# distill_remote_conflict — true, printing the offending profile's name, when
+# origin is demonstrably ANOTHER profile's corpus.
+#
+# This is the half that matters. Attaching a work Mac to the personal repo is a
+# single successful-looking command; every check downstream then reports a green
+# "corpus backed up" while work transcripts are distilled into personal memory,
+# and no push can be taken back. Only a URL that appears in the table under a
+# different key is an error — any other remote is someone's own mirror, and this
+# has no business having an opinion about it.
+distill_remote_conflict() {
+    local repo cur want mine entry key
+    repo="$(distill_state_dir)"
+    cur="$(git -C "$repo" remote get-url origin 2>/dev/null)" || return 1
+    [ -n "$cur" ] || return 1
+    mine="$(distill_profile)"
+    want="$(distill_remote_url "$mine")"
+    [ -n "$want" ] || return 1
+    [ "$(distill_remote_id "$cur")" = "$(distill_remote_id "$want")" ] && return 1
+
+    while IFS=$'\t' read -r key entry; do
+        [ -n "$key" ] || continue
+        [ "$key" = "$mine" ] && continue
+        [ "$(distill_remote_id "$cur")" = "$(distill_remote_id "$entry")" ] || continue
+        printf '%s\n' "$key"
+        return 0
+    done < <(distill_config | jq -r '(.remotes // {}) | to_entries[] | "\(.key)\t\(.value)"')
+    return 1
+}
+
+# distill_remote_check — the conflict rendered as a refusal. 1 = do not proceed.
+distill_remote_check() {
+    local foreign
+    foreign="$(distill_remote_conflict)" || return 0
+    fail "the corpus at $(distill_state_dir) pushes to the $foreign remote, but this is a $(distill_profile) Mac"
+    info "nothing will be distilled until that is settled. To adopt this Mac's own corpus:"
+    info "  git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
+    info "  git -C $(distill_state_dir) remote set-url --push origin $(distill_remote_url)"
+    return 1
 }
 
 # distill_state_repo_pushurl — push this repo over the URL it was cloned from.
@@ -904,8 +1029,8 @@ distill_state_repo_pushurl() {
     git -C "$repo" config remote.origin.pushurl "$fetch" >/dev/null 2>&1 || true
 }
 
-# distill_commit_local MESSAGE — commit the state dir, and push if a remote was
-# added by hand. The commit is what matters and it is made first, so the network
+# distill_commit_local MESSAGE — commit the state dir, and push to the profile's
+# corpus remote. The commit is what matters and it is made first, so the network
 # can never cost you a night's work: a failed push is reported and retried by the
 # next run, never treated as a failed run.
 #
@@ -1005,9 +1130,11 @@ distill_render_state_readme() {
     } >"$out"
 }
 
-# distill_state_repo_init — created on first use. A remote is optional: add one
-# by hand (`git -C <state> remote add origin …`) and every run pushes to it, so a
-# replacement Mac clones the corpus instead of starting from an empty memory.
+# distill_state_repo_init — created on first use, and pointed at the corpus its
+# profile owns (`[distill.remotes]`), so a replacement Mac clones the corpus
+# instead of starting from an empty memory and nobody has to remember a
+# `git remote add`. A remote already set by hand is left alone unless it is
+# another profile's, which is refused — see distill_remote_conflict.
 #
 # What is tracked is exactly what cannot be regenerated: the extract corpus and
 # `Pinned.md`. Everything else here is per-machine telemetry and is excluded —
@@ -1038,6 +1165,10 @@ distill_state_repo_init() {
     git -C "$repo" config commit.gpgsign false >/dev/null 2>&1 || true
     git -C "$repo" config user.name chezdistill >/dev/null 2>&1 || true
     git -C "$repo" config user.email chezdistill@localhost >/dev/null 2>&1 || true
+    # Adopt before checking: a repo with no origin is not in conflict with
+    # anything, it just doesn't know where it lives yet.
+    distill_remote_adopt
+    distill_remote_check || return 1
     distill_state_repo_pushurl
     distill_render_state_readme
     distill_seed_pinned
@@ -1057,10 +1188,12 @@ distill_state_repo_init() {
 # ─── Status ───────────────────────────────────────────────────────────────────
 
 distill_status() {
-    local main cap spent ceiling n last line f
+    local main cap spent ceiling n last line f foreign
     s_section "chezdistill"
 
-    if ! distill_preflight; then
+    # Paths only. A remote conflict is reported below as its own line rather than
+    # cutting the report short — it is the thing you opened --status to see.
+    if ! _distill_preflight_paths; then
         s_fail "paths    unusable"
         return 0
     fi
@@ -1094,7 +1227,10 @@ distill_status() {
 
     if git -C "$(distill_state_dir)" rev-parse --git-dir >/dev/null 2>&1; then
         n="$(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0)"
-        if [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
+        if foreign="$(distill_remote_conflict)"; then
+            s_fail "backup   origin is the $foreign corpus, but this is a $(distill_profile) Mac — nothing will run"
+            s_note "         git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
+        elif [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
             s_pass "backup   $n commit(s), pushed to $(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)"
         else
             s_warn "backup   $n commit(s), no remote — this Mac is the only copy"

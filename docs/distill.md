@@ -15,14 +15,14 @@ Gated on the `claudeDistiller` module. Verb reference in
 | Where | What | Git |
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Topics/`, `Candidates.md` | none — rendered from state |
-| `~/.local/state/chezdistill/` | the extract corpus and `Pinned.md` — plus cursor, spend, run log and logs, which are gitignored | a local repo, remote optional |
+| `~/.local/state/chezdistill/` | the extract corpus and `Pinned.md` — plus cursor, spend, run log and logs, which are gitignored | a local repo, pushed to the profile's private corpus |
 
 Three consequences worth knowing before changing anything:
 
 **The extracts are the memory.** Every rule, hit count and date is derived from
 them on each render, so they are what a replacement Mac actually needs. They are
-in a local repo so `--undo` works, and that repo has no remote unless you add
-one.
+in a local repo so `--undo` works, and that repo pushes to a private remote
+chosen by the machine's profile.
 
 **Everything under `memory/` is derived and disposable.** Delete it and
 `chezdistill --render` puts it back, for free. Never edit it — the next run
@@ -104,7 +104,7 @@ the night.
   ├─ PRUNE       age out evidence quotes past extractRetentionDays
   ├─ RECORD      append the run to state/runs.jsonl
   ├─ GITLEAKS    over state and memory → abort on any hit
-  └─ COMMIT      the state repo, locally; pushed if a remote was added
+  └─ COMMIT      the state repo, locally; then pushed to the profile's corpus
 ```
 
 Every step from RECORD down runs whether the run succeeded or failed — a failure
@@ -245,7 +245,8 @@ output is a job you stop thinking about. So the health check you already run for
 everything else carries a **chezdistill** section: the agent registered with
 launchd, how long ago the last run was (a failure fails, more than three days
 warns), whether `MAIN.md` exists and how it sits against the cap, and whether the
-state repo has a remote. It is read-only and makes no API calls.
+state repo is backed up — to *its own* profile's corpus. It is read-only and
+makes no API calls.
 
 ## The promotion gate
 
@@ -323,8 +324,7 @@ Watch `chezdistill --status` for the first week.
 
 ## Offline
 
-Not an error, and only relevant if you gave the state repo a remote. The work is
-done and committed locally, and the next run pushes it. Git runs with prompts
+Not an error. The work is done and committed locally, and the next run pushes it. Git runs with prompts
 disabled and a 10-second SSH connect timeout — a headless job has no terminal to
 answer a credential prompt, and would otherwise hang until the machine was
 rebooted.
@@ -362,34 +362,51 @@ Two repos between them hold everything a replacement Mac needs:
 | this dotfiles repo | the persona, `settings.json`, the skill, the distiller itself, the plist |
 | a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
 
-The second is optional and has no remote by default, which means the corpus lives
-on exactly one Mac. To set one up, create a private repo and point the state dir
-at it:
-
-```sh
-gh repo create claude-memory-personal --private
-git -C ~/.local/state/chezdistill remote add origin git@github.com:<you>/claude-memory-personal.git
-git -C ~/.local/state/chezdistill push -u origin main
-```
-
-Every run pushes it from then on, and `chezdistill --status` says so — it warns
-`no remote — this Mac is the only copy` until you do.
-
-**One repo per profile, never one shared.** `hits` is derived by counting
-sightings across the whole corpus, so a work Mac and a personal one sharing a
-remote does not merely mix the two — it merges them irreversibly, and a rule
-learned at work starts being applied to personal sessions. `statePath` is
-per-machine and is never overridden per profile; giving a state repo a remote is
-a manual step, and the rule is one remote each:
+The second one you do not have to set up. The state repo takes its remote from
+the machine's profile the first time it is used, so a fresh Mac backs itself up
+without anyone remembering a `git remote add`:
 
 | Profile | Remote |
 |---|---|
 | personal | `claude-memory-personal`, private |
 | work | `claude-memory-work`, private |
 
-That separation is by remote, not by mechanism — nothing in the code knows which
-profile it is running under. Point two machines at the same remote and it will
-work; it just merges two memories that should not be merged.
+The table lives in
+[`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml) under
+`[distill.remotes]`, keyed by `.profile`. Both repos must exist and be private —
+extracts carry short verbatim quotes from your transcripts. Create them once:
+
+```sh
+gh repo create claude-memory-personal --private
+gh repo create claude-memory-work --private
+```
+
+A profile with no entry in the table gets no remote and `chezdistill --status`
+warns `no remote — this Mac is the only copy`, which is the old behaviour. A
+remote you set by hand — your own mirror, a self-hosted host — is never
+overwritten.
+
+**One repo per profile, never one shared.** `hits` is derived by counting
+sightings across the whole corpus, so a work Mac and a personal one sharing a
+remote does not merely mix the two — it merges them irreversibly, and a rule
+learned at work starts being applied to personal sessions.
+
+Which is why the interesting half of the table is not the adopting but the
+**refusing**. If `origin` is another profile's repo — a `set-url` typo, a state
+dir copied off an old machine — chezdistill stops before it extracts anything:
+
+```
+✗ the corpus at ~/.local/state/chezdistill pushes to the personal remote, but this is a work Mac
+  nothing will be distilled until that is settled. To adopt this Mac's own corpus:
+    git -C ~/.local/state/chezdistill remote set-url origin https://github.com/<you>/claude-memory-work.git
+    git -C ~/.local/state/chezdistill remote set-url --push origin https://github.com/<you>/claude-memory-work.git
+```
+
+`chezdoctor` and `chezdistill --status` fail on the same condition. Without the
+check both of them reported a cheerful `✓ corpus backed up` at it, because it is
+backed up — to the wrong place, one push past undoing. URLs are compared as
+`host/owner/repo`, so `git@github.com:you/x.git` and `https://github.com/you/X`
+are recognised as the same repo and do not trip it.
 
 **Nothing pushes outside a run.** The push is the last step of `distill_run_end`,
 after the secret sweep, and it is the same commit that carries the run record —
@@ -443,7 +460,8 @@ Nothing needs migrating. `distill_extract_date` reads the date off the front of
 the filename, so a pre-sharding `extracts/<date>.json` written before this keeps
 deriving, ageing and pruning identically alongside the new ones.
 
-What is *not* safe is one remote across profiles — see the table above.
+What is *not* safe is one remote across profiles, which is why the profile picks
+the remote and a foreign one is refused — see the table above.
 
 ## Configuration
 
