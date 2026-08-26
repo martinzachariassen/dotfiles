@@ -22,6 +22,39 @@ setup() {
     [ "$tmpl_names" = "$catalog_names" ]
 }
 
+# ─── modulesSeen: the key chezup's new-module gate reads and writes ─────────
+# A key the template doesn't emit is wiped by the next `chezmoi init`, so this
+# one has to be both emitted and round-tripped through `dig`. Without that,
+# chezup would re-offer every declined module after any `chezsetup` run.
+@test "the config template emits and round-trips modulesSeen" {
+    grep -qE '^ +modulesSeen += +\[\{\{ range' "$TMPL"
+    grep -qF 'dig "modulesSeen"' "$TMPL"
+}
+
+# On a fresh init the wizard showed every box, so nothing is new; on a machine
+# whose config predates the key, only what it already has counts as seen and
+# the rest gets its one offer. `profile` discriminates the two — it has been in
+# [data] since v1, so its absence uniquely means "never initialised".
+@test "modulesSeen defaults to the whole catalog only on a fresh init" {
+    grep -qF 'hasKey . "profile"' "$TMPL"
+    grep -qF '$seenDefault = $allModules' "$TMPL"
+    grep -qF '$seenDefault := $modules' "$TMPL"
+}
+
+# scripts/lib/modules.sh rewrites these two lines in the *generated* config, so
+# its rendering must be byte-identical to the template's or an edit and a later
+# init would fight over formatting. Same range expression = same output.
+@test "modules and modulesSeen render through the same array expression" {
+    local shape
+    shape="$(grep -E '^ +modules(Seen)? += +\[\{\{ range' "$TMPL" \
+        | sed -E 's/^ +modules(Seen)? += +//; s/[$]modulesSeen/VAR/g; s/[$]modules/VAR/g' \
+        | sort -u)"
+    [ "$(printf '%s\n' "$shape" | grep -c .)" -eq 1 ]
+    # …and that shape is what modules_toml_array emits.
+    run bash -c ". '$REPO_ROOT/scripts/lib/modules.sh'; modules_toml_array a b"
+    [ "$output" = '["a", "b"]' ]
+}
+
 @test "profile default module sets reference known modules" {
     local known defaults bad
     known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
