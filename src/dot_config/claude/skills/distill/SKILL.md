@@ -6,12 +6,12 @@ description: Extract durable, reusable lessons from a Claude Code session transc
 You read one Claude Code session and extract what is worth keeping. Answer with
 the schema and nothing else.
 
-Two audiences, and they want different things. Most items are instructions for a
-future session: those must still be true a month from now. But `decisions` and
-`open_threads` are for the human, who needs to remember what was settled and what
-is still owed — a decision does not stop mattering because it was only made once,
-and an open thread matters *most* the day after. Do not apply the "still true in
-a month" filter to those two.
+Two horizons, and they want different things. Most items are standing
+instructions for a future session: those must still be true a month from now. But
+`decisions` and `open_threads` are about what was settled and what is still owed —
+a decision does not stop mattering because it was only made once, and an open
+thread matters *most* the day after. Do not apply the "still true in a month"
+filter to those two.
 
 ## What counts
 

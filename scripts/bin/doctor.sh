@@ -79,6 +79,11 @@ if [ -r "$_DOCTOR_DIR/../lib/xcode.sh" ]; then
     . "$_DOCTOR_DIR/../lib/xcode.sh"
 fi
 
+# shellcheck source=../lib/distill.sh
+if [ -r "$_DOCTOR_DIR/../lib/distill.sh" ]; then
+    . "$_DOCTOR_DIR/../lib/distill.sh"
+fi
+
 section "Source repo"
 if [ -d "$SOURCE_DIR/.git" ]; then
     pass "repo at $SOURCE_DIR"
@@ -443,6 +448,62 @@ if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" appleD
         pass "~/.swiftformat present"
     else
         warn "~/.swiftformat missing — run: chezapply"
+    fi
+fi
+
+# chezdistill has no human-facing output by design — the reports it used to write
+# into an Obsidian vault were removed. That took away the one passive signal that
+# the nightly job was still alive: if the launchd agent is gone, or the Mac was
+# off for a fortnight, MAIN.md simply stops growing and nothing says so. This
+# section is that signal. `chezdistill --status` has the detail; this answers only
+# "is it still running", which is the question you never think to ask.
+if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" claudeDistiller; then
+    section "Claude memory (claudeDistiller)"
+    if ! command -v distill_last_run >/dev/null 2>&1; then
+        warn "scripts/lib/distill.sh missing — chezdistill checks skipped"
+    else
+        if [ "$(uname -s)" = "Darwin" ]; then
+            if launchctl print "gui/$(id -u)/no.mlz.chezdistill.nightly" >/dev/null 2>&1; then
+                pass "nightly agent registered (01:00)"
+            else
+                fail "nightly agent not registered — nothing distils. Run: chezdistill --setup"
+            fi
+        fi
+
+        distill_last="$(distill_last_run 2>/dev/null || true)"
+        if [ -z "$distill_last" ]; then
+            note "no run recorded yet — backfill with: chezdistill --since 7d"
+        else
+            distill_when="$(printf '%s' "$distill_last" | jq -r '.end // .t' 2>/dev/null)"
+            distill_age="$(distill_days_since "$distill_when" 2>/dev/null || echo 0)"
+            distill_verdict="$(printf '%s' "$distill_last" | jq -r '.status' 2>/dev/null)"
+            if [ "$distill_verdict" != "ok" ]; then
+                fail "last run failed ($(printf '%s' "$distill_when" | cut -c1-10)) — see: chezdistill --status"
+            elif [ "${distill_age:-0}" -gt 3 ]; then
+                warn "last run was ${distill_age} days ago — the timer may not be firing. See: chezdistill --status"
+            else
+                pass "last run ${distill_age} day(s) ago, ok"
+            fi
+        fi
+
+        distill_main="$(distill_memory_dir)/MAIN.md"
+        if [ -f "$distill_main" ]; then
+            pass "MAIN.md present: $(wc -c <"$distill_main" | tr -d ' ')B of $(distill_cfg mainCapBytes 6144)B"
+        else
+            warn "MAIN.md not rendered — the persona imports nothing. Run: chezdistill --render"
+        fi
+
+        # A corpus with no remote is one disk failure from gone, and it is the
+        # only thing here that cannot be regenerated. Worse than no remote is the
+        # other profile's remote: it looks like a backup, and it isn't — it is
+        # work memory promoted into personal sessions, one push past undoing.
+        if distill_foreign="$(distill_remote_conflict 2>/dev/null)"; then
+            fail "corpus pushes to the $distill_foreign remote, but this is a $(distill_profile) Mac. See: chezdistill --status"
+        elif [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
+            pass "corpus backed up to $(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)"
+        else
+            warn "corpus has no remote — this Mac is the only copy. See docs/distill.md"
+        fi
     fi
 fi
 

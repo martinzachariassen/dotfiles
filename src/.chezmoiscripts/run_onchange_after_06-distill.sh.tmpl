@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Registers the chezdistill launchd agents when the job, its engine or either
-# plist changes. Re-registering is how an edited plist takes effect at all —
-# launchd caches the loaded copy, so a rewritten file alone changes nothing.
+# Registers the chezdistill launchd agent when the job, its engine or the plist
+# changes. Re-registering is how an edited plist takes effect at all — launchd
+# caches the loaded copy, so a rewritten file alone changes nothing.
 #
 # scripts/bin/distill.sh  hash: {{ include "../scripts/bin/distill.sh" | sha256sum }}
 # scripts/lib/distill.sh  hash: {{ include "../scripts/lib/distill.sh" | sha256sum }}
 # nightly plist           hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.nightly.plist.tmpl" | sha256sum }}
-# weekly plist            hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.weekly.plist.tmpl" | sha256sum }}
 
 set -euo pipefail
 
@@ -28,20 +27,31 @@ echo "▶ chezdistill"
 # launchd writes stdout/stderr to these paths and will not create the directory.
 mkdir -p "$home/.local/state/chezdistill/logs"
 
-for label in nightly weekly; do
-    plist="$agents/no.mlz.chezdistill.$label.plist"
-    if [ ! -f "$plist" ]; then
-        echo "  ! $plist missing — apply did not render it"
-        continue
-    fi
-    launchctl bootout "gui/$(id -u)/no.mlz.chezdistill.$label" 2>/dev/null || true
-    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
-        echo "  ✓ $label agent registered"
-    else
-        echo "  ! could not register the $label agent — check: launchctl print gui/$(id -u)"
-    fi
-done
+# The weekly review is gone. An apply never deletes, so a Mac set up before this
+# would keep a registered agent invoking `distill.sh --weekly` — now an unknown
+# option — and fail every Sunday. Unregister and remove it here, once.
+#
+# EXPIRES: delete this block once every Mac has applied it (`chezdoctor` shows
+# the registered agents). It is a migration, not a rule — left in place it reads
+# like the repo still has an opinion about a weekly agent.
+stale="$agents/no.mlz.chezdistill.weekly.plist"
+if [ -f "$stale" ]; then
+    launchctl bootout "gui/$(id -u)/no.mlz.chezdistill.weekly" 2>/dev/null || true
+    rm -f "$stale"
+    echo "  ✓ removed the retired weekly agent"
+fi
 
-echo "  Nightly at 01:00, weekly on Sunday at 02:00."
-echo "  MAIN.md renders to ~/.config/claude/memory; reports need the vault, which"
-echo "  the job never creates. Check: chezdistill --status"
+plist="$agents/no.mlz.chezdistill.nightly.plist"
+if [ ! -f "$plist" ]; then
+    echo "  ! $plist missing — apply did not render it"
+else
+    launchctl bootout "gui/$(id -u)/no.mlz.chezdistill.nightly" 2>/dev/null || true
+    if launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null; then
+        echo "  ✓ nightly agent registered"
+    else
+        echo "  ! could not register the nightly agent — check: launchctl print gui/$(id -u)"
+    fi
+fi
+
+echo "  Nightly at 01:00. MAIN.md renders to ~/.config/claude/memory."
+echo "  Check: chezdistill --status"

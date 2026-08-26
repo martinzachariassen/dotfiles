@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # distill.sh — chezdistill: distil Claude Code conversations into the memory tier
-# every future session loads, and the reports you read in the vault.
+# every future session loads.
 # Env: DRY_RUN=1 print instead of run; YES=1 skip confirm gates; DOTFILES_DIR;
 #      DISTILL_SINCE=ISO override the cursor.
 
@@ -29,32 +29,24 @@ ui_init_status
 
 _distill_help() {
     cat <<'EOF'
-usage: chezdistill [--setup] [--weekly] [--since SPEC] [--status] [--render]
-                   [--undo] [-n]
+usage: chezdistill [--setup] [--since SPEC] [--status] [--render] [--undo] [-n]
 
-Distil recent Claude Code conversations into three places:
+Distil recent Claude Code conversations into two places:
 
   ~/.config/claude/memory     MAIN.md, Topics/, Candidates.md — read by Claude
   ~/.local/state/chezdistill  the extract corpus, Pinned.md, cursor, spend, runs
-  the vault's 30-Claude       Daily/, Weekly/, Runs.md — read by you
 
   (no flags)        run the nightly job now — the same code path launchd uses
-  --setup           turn it on for this Mac: migrate an older layout, create the
-                    vault folder, enable the module, apply, register the timers.
-                    Idempotent, no API calls
-  --weekly          run the weekly review and compaction now
+  --setup           turn it on for this Mac: enable the module, apply, register
+                    the timer. Idempotent, no API calls
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
   --status          where everything lives, MAIN size vs cap, spend, last run
-  --render          rebuild MAIN.md, Topics, Candidates and Runs from the
-                    corpus; no API calls
+  --render          rebuild MAIN.md, Topics and Candidates from the corpus;
+                    no API calls
   --undo            revert the state repo's last chezdistill commit and
                     re-render the memory tier from it
   -n, --dry-run     show what would be read and run, without calling the model
   -h, --help        this text
-
-The vault is never created by this command — not even by --setup. If it is
-missing, the reports are skipped and the memory tier still renders, so Claude
-keeps its MAIN.md either way.
 
 Before the module is enabled the `chezdistill` shell verb does not exist yet, so
 the very first run goes through the script:
@@ -117,13 +109,8 @@ _distill_undo() {
 
 # ─── Setup ────────────────────────────────────────────────────────────────────
 #
-# `--setup` is the one code path allowed to create the `30-Claude` folder. The
-# "creates nothing in the vault" rule exists so a report is never written into a
-# vault that is unmounted or was never cloned — a state that looks exactly like an
-# empty directory. That guard is the vault + `.obsidian` check, and it stays:
-# setup refuses just as hard when either is missing.
-#
-# The memory dir and the state dir are a different matter: they are ordinary local
+# `--setup` turns the feature on for this Mac and nothing more: the module list,
+# an apply, the launchd timer. The memory dir and the state dir are ordinary local
 # directories with no mount to be wrong about, so they are simply created.
 
 # _distill_confirm PROMPT — 0 to proceed. Nothing here is destructive, so a
@@ -138,148 +125,6 @@ _distill_confirm() {
         n | N | no | NO) return 1 ;;
         *) return 0 ;;
     esac
-}
-
-# _distill_setup_folder — the vault half. 0 = ready · 1 = the vault is not here.
-_distill_setup_folder() {
-    local vault folder
-    vault="$(distill_expand "$(distill_cfg vaultPath)")"
-    folder="$(distill_cfg folder 30-Claude)"
-
-    if [ -z "$vault" ] || [ ! -d "$vault" ]; then
-        s_fail "vault    not found at ${vault:-<unset>}"
-        explain "Setup never creates the vault. Clone or mount TheArchive, then re-run."
-        return 1
-    fi
-    if [ ! -d "$vault/.obsidian" ]; then
-        s_fail "vault    $vault has no .obsidian"
-        explain "That is an unmounted or half-synced vault, not an empty one." \
-            "Open it in Obsidian once, then re-run."
-        return 1
-    fi
-    s_pass "vault    $vault"
-
-    if [ -d "$vault/$folder" ]; then
-        s_pass "folder   $folder already exists"
-    else
-        if ! _distill_confirm "Create $vault/$folder?"; then
-            s_warn "folder   $folder not created — the job will keep exiting early"
-            return 1
-        fi
-        run mkdir -p "$vault/$folder" || {
-            s_fail "folder   could not create $vault/$folder"
-            return 1
-        }
-        s_pass "folder   created $vault/$folder"
-    fi
-
-    if ! git -C "$vault" rev-parse --git-dir >/dev/null 2>&1; then
-        s_fail "git      $vault is not a git repo — the reports would never be backed up"
-        return 1
-    fi
-    if [ -z "$(git -C "$vault" remote 2>/dev/null)" ]; then
-        s_fail "git      $vault has no remote — the reports would never leave this Mac"
-        return 1
-    fi
-    s_pass "git      vault is a repo with a remote"
-    return 0
-}
-
-# _distill_setup_migrate — move a pre-split installation into place, once.
-#
-# The old layout kept everything under the vault's 30-Claude, including the
-# extracts, because two machines merged through git. One machine needs no merge,
-# so the state comes out of the vault entirely and the memory tier moves next to
-# the persona that imports it. Idempotent: with nothing old to find, it is silent.
-_distill_setup_migrate() {
-    local vault folder old mem state date host f moved=0
-    vault="$(distill_expand "$(distill_cfg vaultPath)")"
-    folder="$(distill_cfg folder 30-Claude)"
-    old="$vault/$folder"
-    mem="$(distill_memory_dir)"
-    state="$(distill_state_dir)"
-
-    [ -d "$old" ] || return 0
-    if [ ! -d "$old/.state" ] && [ ! -f "$old/MAIN.md" ]; then
-        s_pass "layout   nothing to migrate"
-        return 0
-    fi
-
-    s_note "layout   found the old single-folder layout in $old"
-    dim "           .state/  →  $state"
-    dim "           MAIN.md, Pinned.md, Topics/, Inbox/  →  $mem"
-    if ! _distill_confirm "Move them?"; then
-        s_warn "layout   left in place — the job would start from an empty corpus"
-        return 1
-    fi
-    if [ "$DRY_RUN" = "1" ]; then
-        dim "dry-run \$ migrate $old"
-        return 0
-    fi
-
-    mkdir -p "$mem" "$state" || {
-        s_fail "layout   could not create $mem or $state"
-        return 1
-    }
-
-    if [ -d "$old/.state" ]; then
-        for f in "$old"/.state/*; do
-            [ -e "$f" ] || continue
-            case "$(basename "$f")" in
-                extracts | spend | runs | cursor-*.json) continue ;;
-            esac
-            cp -R "$f" "$state/" 2>/dev/null || true
-        done
-        # extracts/<date>/<host>.json → extracts/<date>.json. With more than one
-        # host the local one wins: the others' transcripts are gone anyway, and
-        # merging two machines' extracts is not worth a conflict here.
-        host="$(hostname -s)"
-        for date in "$old"/.state/extracts/*/; do
-            [ -d "$date" ] || continue
-            f="$date/$host.json"
-            [ -f "$f" ] || f="$(/usr/bin/find "$date" -name '*.json' | sort | head -1)"
-            [ -n "$f" ] && [ -f "$f" ] || continue
-            mkdir -p "$state/extracts"
-            cp -f "$f" "$state/extracts/$(basename "${date%/}").json"
-        done
-        # One file per machine collapses into one file, oldest first.
-        for f in spend runs; do
-            [ -d "$old/.state/$f" ] || continue
-            cat "$old"/.state/"$f"/*.jsonl 2>/dev/null |
-                jq -s -c 'sort_by(.t)[]' >"$state/$f.jsonl" 2>/dev/null || true
-        done
-        f="$old/.state/cursor-$host.json"
-        [ -f "$f" ] && cp -f "$f" "$state/cursor.json"
-        # The fingerprint that makes an already-distilled day free used to be
-        # "<host>  <hash>", one line per contributing machine. Left in the old
-        # format nothing ever matches, and the next run silently re-narrates
-        # every migrated day — one paid model call each.
-        for f in "$state"/narratives/*.sources; do
-            [ -f "$f" ] || continue
-            awk '{print $NF}' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
-        done
-        moved=1
-    fi
-
-    [ -f "$old/MAIN.md" ] && cp -f "$old/MAIN.md" "$mem/MAIN.md" && moved=1
-    # Pinned.md follows the inputs, not the output — see distill_pinned_file.
-    for f in "$old/Pinned.md" "$mem/Pinned.md"; do
-        [ -f "$f" ] || continue
-        [ -f "$(distill_pinned_file)" ] || cp -f "$f" "$(distill_pinned_file)"
-        moved=1
-    done
-    [ -d "$old/Topics" ] && cp -R "$old/Topics" "$mem/" && moved=1
-    [ -f "$old/Inbox/Candidates.md" ] &&
-        cp -f "$old/Inbox/Candidates.md" "$mem/Candidates.md" && moved=1
-
-    distill_state_repo_init && distill_commit_local "chore(distill): migrate to the split layout"
-
-    if [ "$moved" -eq 1 ]; then
-        s_pass "layout   migrated — the old copies are still in $old"
-        explain "Nothing was deleted. Once a run looks right, remove the old" \
-            "MAIN.md, Pinned.md, Topics/, Inbox/ and .state/ from the vault by hand."
-    fi
-    return 0
 }
 
 # _distill_setup_module — put claudeDistiller into the chezmoi module list.
@@ -338,13 +183,13 @@ _distill_setup_module() {
     return 3
 }
 
-# _distill_setup_agents — the launchd half. The plists are rendered by an apply,
-# and hook 06 registers them; 3 means "they are not on disk yet, apply first".
-# 0 = both registered · 3 = a plist is missing · 1 = a registration failed.
+# _distill_setup_agents — the launchd half. The plist is rendered by an apply,
+# and hook 06 registers it; 3 means "it is not on disk yet, apply first".
+# 0 = registered · 3 = the plist is missing · 1 = registration failed.
 _distill_setup_agents() {
-    local uid rc=0 label plist
+    local uid plist
     [ "$(uname -s)" = "Darwin" ] || {
-        s_note "agents   not macOS — no launchd agents to register"
+        s_note "agents   not macOS — no launchd agent to register"
         return 0
     }
     command -v launchctl >/dev/null 2>&1 || {
@@ -352,68 +197,53 @@ _distill_setup_agents() {
         return 1
     }
     uid="$(id -u)"
-    for label in nightly weekly; do
-        plist="$HOME/Library/LaunchAgents/no.mlz.chezdistill.$label.plist"
-        if [ ! -f "$plist" ]; then
-            s_warn "agents   $label plist not rendered yet"
-            [ "$rc" -eq 1 ] || rc=3
-            continue
-        fi
-        if launchctl print "gui/$uid/no.mlz.chezdistill.$label" >/dev/null 2>&1; then
-            s_pass "agents   $label registered"
-            continue
-        fi
-        if run launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
-            s_pass "agents   $label registered"
-        else
-            s_warn "agents   could not register $label"
-            rc=1
-        fi
-    done
-    return "$rc"
+    plist="$HOME/Library/LaunchAgents/no.mlz.chezdistill.nightly.plist"
+    if [ ! -f "$plist" ]; then
+        s_warn "agents   nightly plist not rendered yet"
+        return 3
+    fi
+    if launchctl print "gui/$uid/no.mlz.chezdistill.nightly" >/dev/null 2>&1; then
+        s_pass "agents   nightly registered"
+        return 0
+    fi
+    if run launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+        s_pass "agents   nightly registered"
+        return 0
+    fi
+    s_warn "agents   could not register nightly"
+    return 1
 }
 
 _distill_setup() {
-    local folder_rc module_rc agents_rc needs_apply=0
+    local module_rc agents_rc needs_apply=0
 
     echo
     printf '%s%s%s  %sSetting up chezdistill on this Mac%s\n' \
         "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
     explain \
-        "Creates the vault folder, turns on the module, and registers the timers." \
-        "It never creates the vault itself, and it makes no API calls."
+        "Turns on the module, applies, and registers the nightly timer." \
+        "It makes no API calls."
 
     s_section "chezdistill setup"
-
-    _distill_setup_folder
-    folder_rc=$?
-
-    [ "$folder_rc" -eq 0 ] && _distill_setup_migrate
 
     _distill_setup_module
     module_rc=$?
     [ "$module_rc" -eq 3 ] && needs_apply=1
 
-    # An apply is also what puts the plists on disk, so a machine whose module
+    # An apply is also what puts the plist on disk, so a machine whose module
     # was already on but never applied gets offered the same fix.
     _distill_setup_agents
     agents_rc=$?
     [ "$agents_rc" -eq 3 ] && needs_apply=1
 
     if [ "$needs_apply" -eq 1 ]; then
-        s_note "apply    needed — the plists and the MAIN.md import render there"
+        s_note "apply    needed — the plist and the MAIN.md import render there"
         if _distill_confirm "Run chezmoi apply now?"; then
             run chezmoi apply --force || s_warn "apply    chezmoi apply reported an error"
             _distill_setup_agents || true
         else
-            s_warn "apply    skipped — run chezup before the timers can fire"
+            s_warn "apply    skipped — run chezup before the timer can fire"
         fi
-    fi
-
-    if [ "$folder_rc" -ne 0 ]; then
-        echo
-        fail "setup incomplete — the vault is not ready on this machine"
-        return 1
     fi
 
     # DISTILL_MEMORY and DISTILL_STATE are exported by preflight, and only by
@@ -448,7 +278,7 @@ _distill_setup() {
     explain \
         "Backfill the last week now:  chezdistill --since 7d" \
         "Preview without paying:      chezdistill -n" \
-        "Otherwise the nightly job runs at 01:00, the weekly one Sunday at 02:00."
+        "Otherwise the nightly job runs at 01:00."
     return 0
 }
 
@@ -458,7 +288,6 @@ _distill_main() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --setup) mode=setup ;;
-            --weekly) mode=weekly ;;
             --status) mode=status ;;
             --render) mode=render ;;
             --undo) mode=undo ;;
@@ -511,17 +340,11 @@ _distill_main() {
     case "$mode" in
         render)
             distill_render_all
-            distill_render_dailies
-            distill_have_vault && distill_render_runs
-            ok "rendered the memory tier and every vault note from the corpus"
-            ;;
-        weekly)
-            distill_run_weekly || return 1
-            ok "weekly review written"
+            ok "rendered the memory tier from the corpus"
             ;;
         run)
             distill_run_daily || return 1
-            ok "daily report written"
+            ok "memory tier updated"
             ;;
     esac
     return 0

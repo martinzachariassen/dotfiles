@@ -32,38 +32,42 @@ status/diff/log/show, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
 `chezdistill` reads the Claude Code transcripts this Mac wrote and renders a
 size-capped `MAIN.md` that the persona above `@`-imports — so what you and Claude
-worked out yesterday is in context tomorrow. launchd runs it at 01:00, and the
-weekly review on Sunday at 02:00.
+worked out yesterday is in context tomorrow. launchd runs it at 01:00.
 
-It writes to three places, because the three have nothing in common. The memory
-tier — `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` — goes to
-`~/.config/claude/memory`, beside the persona that imports it, so it resolves
-whether or not the vault happens to be mounted. The extract corpus, cursor,
-spend and run log go to `~/.local/state/chezdistill`, in a git repo with no
-remote unless you add one — see the guide for backing the corpus up to a private
-repo. Only the reports you read — `Daily/`, `Weekly/`, `Runs.md` — land in
-[TheArchive](https://github.com/martinzachariassen/TheArchive)'s `30-Claude/`.
+It writes to two places, because the two have nothing in common. The memory
+tier — `MAIN.md`, `Topics/`, `Candidates.md` — goes to
+`~/.config/claude/memory`, beside the persona that imports it. The extract
+corpus, the hand-written `Pinned.md`, the cursor, spend and run log go to
+`~/.local/state/chezdistill`, in a git repo that pushes to a private corpus
+chosen by the machine's profile — `claude-memory-personal` or
+`claude-memory-work`, never one shared, because `hits` is counted over the whole
+corpus. That second one is the source
+of truth: the memory tier is derived from it on every render, so it is the only
+half worth backing up — and only the corpus and `Pinned.md` are tracked, because
+the cursor, spend and run log describe one machine and nothing else.
 
-Its guiding rule is that **the model extracts and narrates while bash decides and
-writes**: every judgement is computed in
+There is no human-facing output. Nothing is written into an Obsidian vault or
+anywhere else you would browse — the audience is Claude, and what it knows you
+read with `chezdistill --status`, `MAIN.md` or a note in `Topics/`. Because a job
+with no output is a job you stop thinking about, `chezdoctor` carries a
+chezdistill section: agent registered, last run recent and successful, `MAIN.md`
+present and under its cap, corpus backed up — to its own profile's repo.
+
+Its guiding rule is that **the model extracts while bash decides and writes**:
+every judgement is computed in
 [`scripts/lib/distill.sh`](../scripts/lib/distill.sh), and no model call has
 write access. Nothing reaches `MAIN.md` until it has been seen in two distinct
 sessions, so a single misreading can't become a rule applied to every session.
-The job never creates the vault; when it is missing, the reports are skipped and
-the memory tier still renders.
 
-What it captures, and how the reports read, are not in the code — they are three
-Markdown prompts under
-[`src/dot_config/claude/skills/`](../src/dot_config/claude/skills/): `distill`
-decides what counts as worth keeping, `distill-daily` and `distill-weekly` write
-the summaries. Each is deployed to `~/.config/claude/skills/` and doubles as an
-interactive `/distill` command. Editing one changes the job's behaviour without
-touching a line of bash — it is the first place to look when the output is not
-what you wanted.
+What it captures is not in the code — it is one Markdown prompt,
+[`skills/distill/SKILL.md`](../src/dot_config/claude/skills/distill/SKILL.md),
+deployed to `~/.config/claude/skills/` and doubling as an interactive `/distill`
+command. Editing it changes the job's behaviour without touching a line of bash —
+it is the first place to look when the output is not what you wanted.
 
-**Full guide: [distill.md](distill.md)** — turning it on, migrating an older
-layout, what happens each night, the three rubrics and how to tune them, how to
-correct a wrong rule, cost, and troubleshooting.
+**Full guide: [distill.md](distill.md)** — turning it on, what happens each
+night, the rubric and how to tune it, how to correct a wrong rule, cost, and
+troubleshooting.
 
 ## The status line
 

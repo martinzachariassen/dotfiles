@@ -65,24 +65,37 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   and ~40 GB — don't move it into an apply hook or a Brewfile. Its read-only
   probes live in `scripts/lib/xcode.sh` and are shared with `chezdoctor` so the
   two can't disagree; add checks there, not in either caller.
-- **`chezdistill` writes to three places, none of them this repo.** The memory tier
-  (`MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md`) goes to
-  `~/.config/claude/memory`, beside the persona that `@`-imports it; the extract
-  corpus, `Pinned.md`, cursor, spend and run log to `~/.local/state/chezdistill`, in a git repo
-  whose remote is optional (add one and every run pushes, so a replacement Mac
-  clones the corpus instead of starting empty); and
-  only the reports you read (`Daily/`, `Weekly/`, `Runs.md`) to
-  `~/Documents/TheArchive/30-Claude`. Keep that split — putting `Topics/` in the
-  vault makes it unreadable to Claude, and putting extracts back in the vault puts
-  transcript text on a remote.
-  **It never creates the vault**: an uncloned one looks exactly like an empty
-  directory, so a missing vault means "skip the reports, render the memory, exit 0",
-  never "create it". `chezdistill --setup`, the confirm-gated on-switch, may create
-  `30-Claude/` and only that, and only once the vault and its `.obsidian` dir are
-  already there — don't extend it to the vault, and don't move any of it into
-  preflight. Memory and state are ordinary local directories and are simply created.
-  Its guiding rule is *the model extracts and narrates, bash decides and writes*:
-  every judgement (hit counts, what enters `MAIN.md`, what is demoted) is computed in
+- **`chezdistill` writes to two places, neither of them this repo.** The memory tier
+  (`MAIN.md`, `Topics/`, `Candidates.md`) goes to `~/.config/claude/memory`, beside
+  the persona that `@`-imports it; the extract corpus, the hand-written `Pinned.md`,
+  the cursor, spend and run log go to `~/.local/state/chezdistill`, in a git repo
+  that pushes to the corpus its **profile** owns (`[distill.remotes]` in
+  `src/.chezmoidata/distill.toml`, keyed by `.profile`), so a replacement Mac clones
+  the corpus instead of starting empty. Keep that split: memory is derived
+  and disposable, state is the source of truth and the only thing worth backing up.
+  Inside state the split repeats: **only `extracts/` and `Pinned.md` are tracked.**
+  `cursor.json`, `spend.jsonl`, `runs.jsonl` and `logs/` are per-machine, append-only
+  telemetry — tracking them makes two Macs conflict on every line and silently kills
+  the backup. The corpus is sharded per host (`extracts/<date>.<host>.json`) so two
+  Macs in the *same* profile can share a remote; across profiles they must not, since
+  `hits` counts sightings over the whole corpus — one private repo each
+  (`claude-memory-personal`, `claude-memory-work`). Read the date with
+  `distill_extract_date`, never by stripping `.json`, so pre-sharding files still work.
+  **The profile picks the remote, and a foreign one is a hard stop.** A state repo
+  with no origin adopts its profile's; one already set by hand is left alone; one
+  pointing at *another profile's* URL makes `distill_preflight` (and so every mode,
+  plus `chezdistill --status` and `chezdoctor`) fail loudly, because "backed up to
+  the wrong repo" otherwise reports as a green tick and cannot be un-pushed. Compare
+  remotes with `distill_remote_id`, never as strings — SSH and HTTPS spellings of one
+  repo must not read as a conflict.
+  **It has no human-facing output and no vault** — it produced daily and weekly
+  notes in Obsidian once, and that half was removed deliberately. Don't reintroduce
+  a reporting destination; if you want to read what it knows, read `MAIN.md`,
+  `Topics/` or `chezdistill --status`. The one concession to having no output is a
+  `chezdistill` section in `chezdoctor` — passive liveness only, read-only, no API
+  calls. Both directories are ordinary local ones and are simply created.
+  Its guiding rule is *the model extracts, bash decides and writes*: every
+  judgement (hit counts, what enters `MAIN.md`, what is demoted) is computed in
   `scripts/lib/distill.sh`, and every `claude -p` call runs `--tools ""` with no
   write access. `hits` is **derived** from the extract corpus, never incremented —
   that is what makes `--render`, `--since 7d` and a repeated nightly run idempotent.
