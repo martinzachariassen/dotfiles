@@ -135,7 +135,7 @@ Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](sr
 | `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. The deliberate, manual undo an apply never does. |
 | `chezreconcile` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
 | `chezxcode` | Install Xcode.app, select it, accept the licence, fetch a simulator runtime. Needs an Apple ID; ~40 GB. |
-| `chezdistill` | Distil this Mac's Claude Code conversations nightly: the `MAIN.md` every future session loads goes to `~/.config/claude/memory`, the reports to TheArchive. Never creates the vault. |
+| `chezdistill` | Distil this Mac's Claude Code conversations nightly into the `MAIN.md` every future session loads (`~/.config/claude/memory`), from a corpus in `~/.local/state/chezdistill`. |
 
 Full reference including `DRY_RUN=1`/`YES=1` and what each verb touches: [docs/commands.md](docs/commands.md).
 
