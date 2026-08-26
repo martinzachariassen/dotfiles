@@ -128,7 +128,7 @@ Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](sr
 | Command | What it does |
 | --- | --- |
 | `chezup` | Converge this Mac to the repo. Pull latest → preview the drift → apply. |
-| `chezdoctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout. |
+| `chezdoctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout, distiller. |
 | `chezstatus` / `chezapply` | Explain pending drift, or apply without pulling. Both read the same `chezmoi status`. |
 | `chezsetup` | Re-run the wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added keys. |
 | `chezsign` | Set **only** the git signing key, replaying every other answer untouched. |

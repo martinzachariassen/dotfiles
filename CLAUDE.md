@@ -72,11 +72,20 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   whose remote is optional (add one and every run pushes, so a replacement Mac
   clones the corpus instead of starting empty). Keep that split: memory is derived
   and disposable, state is the source of truth and the only thing worth backing up.
+  Inside state the split repeats: **only `extracts/` and `Pinned.md` are tracked.**
+  `cursor.json`, `spend.jsonl`, `runs.jsonl` and `logs/` are per-machine, append-only
+  telemetry — tracking them makes two Macs conflict on every line and silently kills
+  the backup. The corpus is sharded per host (`extracts/<date>.<host>.json`) so two
+  Macs in the *same* profile can share a remote; across profiles they must not, since
+  `hits` counts sightings over the whole corpus — one private repo each
+  (`claude-memory-personal`, `claude-memory-work`). Read the date with
+  `distill_extract_date`, never by stripping `.json`, so pre-sharding files still work.
   **It has no human-facing output and no vault** — it produced daily and weekly
   notes in Obsidian once, and that half was removed deliberately. Don't reintroduce
   a reporting destination; if you want to read what it knows, read `MAIN.md`,
-  `Topics/` or `chezdistill --status`. Both directories are ordinary local ones and
-  are simply created.
+  `Topics/` or `chezdistill --status`. The one concession to having no output is a
+  `chezdistill` section in `chezdoctor` — passive liveness only, read-only, no API
+  calls. Both directories are ordinary local ones and are simply created.
   Its guiding rule is *the model extracts, bash decides and writes*: every
   judgement (hit counts, what enters `MAIN.md`, what is demoted) is computed in
   `scripts/lib/distill.sh`, and every `claude -p` call runs `--tools ""` with no

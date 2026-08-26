@@ -12,5 +12,11 @@ AGENTS.md
 {{ if not (has "claudePersona" $modules) }}.config/claude/CLAUDE.md{{ end }}
 {{ if not (has "claudeDistiller" $modules) }}.config/claude/skills
 Library/LaunchAgents/no.mlz.chezdistill.nightly.plist{{ end }}
+
+# The weekly agent is retired and its source is pending deletion (a local hook
+# blocks removing launch-agent paths from a shell). Ignored unconditionally so no
+# apply can deploy a timer for a `--weekly` flag that no longer exists — delete
+# this line together with the .tmpl.
+Library/LaunchAgents/no.mlz.chezdistill.weekly.plist
 {{ if not (has "appleDev" $modules) }}.swiftformat
 .config/swiftlint{{ end }}

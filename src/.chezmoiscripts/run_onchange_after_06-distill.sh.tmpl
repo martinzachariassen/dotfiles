@@ -30,6 +30,10 @@ mkdir -p "$home/.local/state/chezdistill/logs"
 # The weekly review is gone. An apply never deletes, so a Mac set up before this
 # would keep a registered agent invoking `distill.sh --weekly` — now an unknown
 # option — and fail every Sunday. Unregister and remove it here, once.
+#
+# EXPIRES: delete this block once every Mac has applied it (`chezdoctor` shows
+# the registered agents). It is a migration, not a rule — left in place it reads
+# like the repo still has an opinion about a weekly agent.
 stale="$agents/no.mlz.chezdistill.weekly.plist"
 if [ -f "$stale" ]; then
     launchctl bootout "gui/$(id -u)/no.mlz.chezdistill.weekly" 2>/dev/null || true

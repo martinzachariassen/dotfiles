@@ -73,7 +73,9 @@ refute_file_contains() {
     fi
 }
 
-# extract DATE JSON-ARRAY — the day's extract, one file per date.
+# extract DATE JSON-ARRAY — the day's extract, in the pre-sharding `<date>.json`
+# layout. Deliberately the OLD name: every derivation test then doubles as proof
+# that a corpus written before per-host sharding still reads back identically.
 extract() {
     mkdir -p "$STATE/extracts"
     jq -n --argjson items "$2" '{items:$items}' >"$STATE/extracts/$1.json"
@@ -226,6 +228,68 @@ item() {
     grep -q 'detail' "$MEM/Topics/T.md"
 }
 
+# ─── Two Macs, one remote ─────────────────────────────────────────────────────
+#
+# The corpus is the only thing in the state repo worth keeping, and it is merged
+# in place. If two machines wrote the same path they would conflict on every
+# rebase, the push fallback would give up silently, and the backup would stop —
+# leaving the telemetry, which nobody needs, as the only thing being synced.
+
+@test "this machine writes its own share of a day" {
+    load_lib
+    f="$(distill_extract_file 2026-08-22)"
+    [ "$(dirname "$f")" = "$STATE/extracts" ]
+    [[ "$(basename "$f")" == "2026-08-22."*".json" ]]
+    [ "$(basename "$f")" != "2026-08-22.json" ]
+}
+
+@test "a day both Macs contributed to derives as one day" {
+    load_lib
+    mkdir -p "$STATE/extracts"
+    jq -n --argjson i "[$(item 'shared rule' s1)]" '{items:$i}' \
+        >"$STATE/extracts/2026-08-22.mac-one.json"
+    jq -n --argjson i "[$(item 'shared rule' s2)]" '{items:$i}' \
+        >"$STATE/extracts/2026-08-22.mac-two.json"
+
+    run distill_derive
+    [[ "$output" == *'"hits":2'* ]]
+    # The host suffix must not leak into the date the renderer sorts and ages by.
+    [[ "$output" == *'"first_seen":"2026-08-22"'* ]]
+    [[ "$output" == *'"last_seen":"2026-08-22"'* ]]
+}
+
+@test "retention ages a host-scoped extract by its date, not its filename" {
+    load_lib
+    old_date="$(distill_iso_ago 200 | cut -c1-10)"
+    mkdir -p "$STATE/extracts"
+    jq -n '{items:[{text:"a rule", detail:"why", kind:"learnings", topic:"T",
+                    session:"s1", evidence:"a quoted line", cwd:"/x"}]}' \
+        >"$STATE/extracts/$old_date.mac-one.json"
+    distill_prune_extracts
+    run jq -r '.items[0] | has("evidence")' "$STATE/extracts/$old_date.mac-one.json"
+    [ "$output" = "false" ]
+}
+
+# Every one of these is append-only, so two Macs pushing would conflict on all of
+# them — and none can be regenerated onto a new machine anyway, which is the only
+# reason to back anything up here.
+@test "per-machine telemetry is never committed" {
+    load_lib
+    distill_state_repo_init
+    printf '{"t":"x"}\n' >"$STATE/runs.jsonl"
+    printf '{"t":"x"}\n' >"$STATE/spend.jsonl"
+    distill_cursor_write "2026-08-22T00:00:00Z"
+    extract 2026-08-22 "[$(item 'kept' s1)]"
+    distill_commit_local "chore(distill): test"
+
+    run git -C "$STATE" ls-files
+    [[ "$output" != *"runs.jsonl"* ]]
+    [[ "$output" != *"spend.jsonl"* ]]
+    [[ "$output" != *"cursor.json"* ]]
+    # ...and the one thing that cannot be regenerated still is.
+    [[ "$output" == *"extracts/"* ]]
+}
+
 # ─── Determinism and the cap ──────────────────────────────────────────────────
 
 @test "rendering MAIN twice is byte-identical" {
@@ -287,6 +351,57 @@ item() {
     printf '{"t":"%s","usd":99}\n' "$(distill_iso_ago 30)" >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -eq 0 ]
+}
+
+# a_conversation NAME — a transcript with enough typed turns to be worth a call.
+a_conversation() {
+    local f="$ROOTS/proj/$1.jsonl" now
+    now="$(distill_iso_now)"
+    mkdir -p "$ROOTS/proj"
+    : >"$f"
+    local i
+    for i in 1 2 3; do
+        jq -nc --arg t "$now" --arg s "$1" --arg i "$i" \
+            '{uuid:("u-"+$s+"-"+$i), timestamp:$t,
+              type:"user", promptSource:"typed", sessionId:$s, cwd:"/x",
+              message:{role:"user", content:[{type:"text", text:"a question"}]}}' \
+            >>"$f"
+    done
+    printf '%s\n' "$f"
+}
+
+# A nightly run reads two days and cannot approach the ceiling; `--since 90d`
+# reads hundreds of sessions in one go, and a ceiling checked once before any of
+# them is not a ceiling.
+@test "the ceiling stops a long backfill part-way, and holds the cursor" {
+    ROOTS="$BATS_TEST_TMPDIR/transcripts"
+    mkdir -p "$ROOTS"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg r "$ROOTS" \
+        '{transcriptRoots:[$r], maxSpendUsd7d:1.0}')")"
+    export DISTILL_CONFIG_JSON
+    load_lib
+
+    a_conversation one >/dev/null
+    a_conversation two >/dev/null
+
+    # One session's worth of extraction blows the whole 7-day ceiling.
+    distill_claude() {
+        printf '{"t":"%s","usd":9.0}\n' "$(distill_iso_now)" >>"$STATE/spend.jsonl"
+        printf '%s\n' '{"items":[{"text":"a rule","detail":"why",
+                                  "kind":"learnings","topic":"T"}]}'
+    }
+
+    distill_run_begin
+    run _distill_daily_body
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ceiling reached"* ]]
+    # Exactly one session was paid for; the other was never read...
+    [[ "$output" == *"1 of 2 session(s)"* ]]
+    # ...so the cursor must not claim the window was read to the end.
+    [ ! -f "$STATE/cursor.json" ]
+    [[ "$output" == *"cursor held"* ]]
+    # What was already paid for is still saved.
+    grep -rq 'a rule' "$STATE/extracts"
 }
 
 # ─── Run log ──────────────────────────────────────────────────────────────────
@@ -415,7 +530,10 @@ item() {
 
 @test "extracts are merged into the day they belong to, without double-counting" {
     load_lib
-    extract 2026-08-22 "[$(item 'already here' s1)]"
+    # A backfill and a nightly run on the same Mac land in the same shard.
+    mkdir -p "$STATE/extracts"
+    jq -n --argjson i "[$(item 'already here' s1)]" '{items:$i}' \
+        >"$(distill_extract_file 2026-08-22)"
     tmp="$BATS_TEST_TMPDIR/items"
     mkdir -p "$tmp"
     # s1 again (a re-read session) plus a genuinely new one.
@@ -425,7 +543,7 @@ item() {
     distill_run_begin
     run distill_persist_extracts "$tmp"
     [ "$status" -eq 0 ]
-    [ "$(jq '.items | length' "$STATE/extracts/2026-08-22.json")" -eq 2 ]
+    [ "$(jq '.items | length' "$(distill_extract_file 2026-08-22)")" -eq 2 ]
 }
 
 @test "a failed extract write is fatal, so the caller can hold the cursor" {

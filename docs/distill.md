@@ -15,7 +15,7 @@ Gated on the `claudeDistiller` module. Verb reference in
 | Where | What | Git |
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Topics/`, `Candidates.md` | none — rendered from state |
-| `~/.local/state/chezdistill/` | the extract corpus, `Pinned.md`, cursor, spend, run log, logs | a local repo, remote optional |
+| `~/.local/state/chezdistill/` | the extract corpus and `Pinned.md` — plus cursor, spend, run log and logs, which are gitignored | a local repo, remote optional |
 
 Three consequences worth knowing before changing anything:
 
@@ -96,9 +96,10 @@ the night.
   ├─ FILTER      keep typed human turns + assistant prose; drop tool traffic,
   │                thinking, sidechains, harness noise        ~16x smaller
   ├─ GATE        fewer than minTurns typed turns → skipped, free, no API call
+  ├─ BRAKE       spend ceiling re-checked per session → stop reading, hold cursor
   ├─ MAP         one model call per surviving session → items as JSON
-  │                → state/extracts/<date>.json — a failed write here holds the
-  │                  cursor back: the calls are billed, no re-run recovers them
+  │                → state/extracts/<date>.<host>.json — a failed write here holds
+  │                  the cursor back: calls are billed, no re-run recovers them
   ├─ RENDER      bash builds MAIN.md, Topics/, Candidates.md
   ├─ PRUNE       age out evidence quotes past extractRetentionDays
   ├─ RECORD      append the run to state/runs.jsonl
@@ -222,7 +223,7 @@ There is no report to open, so this is where a run's outcome shows up:
 ✓ MAIN.md  5104B of 6144B
 · corpus   87 sighting(s) of 41 entries, oldest 2026-06-02
 · waiting  22 entries below the gate or stale — see Candidates.md
-✓ backup   58 commit(s), pushed to https://github.com/<you>/claude-memory
+✓ backup   58 commit(s), pushed to https://github.com/<you>/claude-memory-personal
 · spend    $1.87 of $25 over 7 days
 ✓ last run 2026-08-24 01:03 UTC · ok · 3/7 session(s) · 170s · $0.42
            a1b2c3d4  12 turn(s) · kept · 5 item(s)
@@ -236,6 +237,15 @@ can see that six were under `minTurns` and one had nothing durable in it — fre
 and working as designed.
 
 The records behind it are `runs.jsonl`, kept for `runRetentionDays`.
+
+### `chezdoctor` — is it still alive?
+
+`--status` answers only when you think to ask, and a job with no human-facing
+output is a job you stop thinking about. So the health check you already run for
+everything else carries a **chezdistill** section: the agent registered with
+launchd, how long ago the last run was (a failure fails, more than three days
+warns), whether `MAIN.md` exists and how it sits against the cap, and whether the
+state repo has a remote. It is read-only and makes no API calls.
 
 ## The promotion gate
 
@@ -261,7 +271,7 @@ from the corpus. Use these instead:
 | A rule is wrong or badly worded | Write the correct one in `~/.local/state/chezdistill/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
 | Last night's run made a mess | `chezdistill --undo` reverts the state repo's last commit and re-renders the memory from it. |
 | You edited the corpus or `Pinned.md` | `chezdistill --render` rebuilds the memory tier. No API calls. |
-| An entry should be gone entirely | Delete its sightings from `extracts/<date>.json`. Everything about an entry is derived from the corpus, so that is the only place it exists. |
+| An entry should be gone entirely | Delete its sightings from `extracts/<date>.<host>.json` — every shard of that date, if more than one Mac contributed. Everything about an entry is derived from the corpus, so that is the only place it exists. |
 
 `--undo` reverts the corpus rather than the rendered files, because
 `MAIN.md`, `Topics/` and `Candidates.md` are a pure function of them. Reverting
@@ -295,7 +305,12 @@ Measured on real transcripts, not estimated: **$0.16–0.23 per session that yie
 items**, roughly $1–2 a night.
 
 - `maxBudgetUsd` caps a single `claude -p`.
-- `maxSpendUsd7d` is a rolling ceiling over `spend.jsonl`, checked in preflight.
+- `maxSpendUsd7d` is a rolling ceiling over `spend.jsonl`, checked in preflight
+  **and again before every session**. A nightly run reads two days and cannot
+  approach it; `--since 90d` reads hundreds of sessions in one go, and a ceiling
+  checked once before all of them is not a ceiling. Hitting it mid-run stops the
+  loop rather than failing it: the sessions already extracted are kept, and the
+  cursor is held so the ones never reached are read next time.
 - `minTurns` drops short sessions in bash, before any call.
 
 A separate cheap triage model was tried and removed: it cost ~$0.05/session while
@@ -317,6 +332,7 @@ rebooted.
 ## Troubleshooting
 
 ```sh
+chezdoctor                                 # is the agent registered, did it run
 chezdistill --status                       # paths, MAIN vs cap, spend, last run
 chezdistill -n --since 7d                  # what would be read, no API calls
 tail -50 ~/.local/state/chezdistill/logs/nightly.log
@@ -331,6 +347,7 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | Runs but never reaches MAIN | The promotion gate: entries need a second sighting. Check `Candidates.md`. |
 | Ran at 09:00, not 01:00 | The Mac was asleep. launchd fired on wake; the cursor means nothing was lost. |
 | "7-day spend has reached the ceiling" | Raise `maxSpendUsd7d`, or find out what got expensive in `spend.jsonl`. |
+| "spend ceiling reached — stopping after N session(s)" | A backfill hit the ceiling part-way. What it read is saved and the cursor is held; raise the ceiling or wait for the 7-day window to roll, then run again. |
 | Agent not in `launchctl list` | Hook 06 didn't run. `chezapply`, then check its output. |
 | Did it run at all last night? | `chezdistill --status` — `last run`. |
 | It ran but distilled nothing | The per-session lines under `last run` give the reason for each. |
@@ -346,25 +363,33 @@ Two repos between them hold everything a replacement Mac needs:
 | a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
 
 The second is optional and has no remote by default, which means the corpus lives
-on exactly one Mac. On this machine it is
-[`martinzachariassen/claude-memory`](https://github.com/martinzachariassen/claude-memory),
-private. To set one up elsewhere, create a private repo and point the state dir
+on exactly one Mac. To set one up, create a private repo and point the state dir
 at it:
 
 ```sh
-gh repo create claude-memory --private
-git -C ~/.local/state/chezdistill remote add origin git@github.com:<you>/claude-memory.git
+gh repo create claude-memory-personal --private
+git -C ~/.local/state/chezdistill remote add origin git@github.com:<you>/claude-memory-personal.git
 git -C ~/.local/state/chezdistill push -u origin main
 ```
 
 Every run pushes it from then on, and `chezdistill --status` says so — it warns
 `no remote — this Mac is the only copy` until you do.
 
-**One repo per profile, if you run more than one.** A work Mac and a personal one
-answer to different employers, and `hits` is derived by counting sightings across
-the whole corpus — so a shared remote does not merely mix the two, it merges them
-irreversibly. `statePath` is per-machine and is never overridden per profile;
-giving a state repo a remote is a manual step, and the rule is one remote each.
+**One repo per profile, never one shared.** `hits` is derived by counting
+sightings across the whole corpus, so a work Mac and a personal one sharing a
+remote does not merely mix the two — it merges them irreversibly, and a rule
+learned at work starts being applied to personal sessions. `statePath` is
+per-machine and is never overridden per profile; giving a state repo a remote is
+a manual step, and the rule is one remote each:
+
+| Profile | Remote |
+|---|---|
+| personal | `claude-memory-personal`, private |
+| work | `claude-memory-work`, private |
+
+That separation is by remote, not by mechanism — nothing in the code knows which
+profile it is running under. Point two machines at the same remote and it will
+work; it just merges two memories that should not be merged.
 
 **Nothing pushes outside a run.** The push is the last step of `distill_run_end`,
 after the secret sweep, and it is the same commit that carries the run record —
@@ -379,11 +404,17 @@ It is generated, so don't edit it on GitHub; change
 the repo is created, so the "edit `Pinned.md`" instruction in `MAIN.md` points at
 a file that exists.
 
-`logs/`, `cursor.json` and `*.tmp` are gitignored: the cursor answers "how far has
-*this* machine read", which is meaningless anywhere else. The ignore list is
-re-applied on every run rather than written once, and anything it newly covers is
-untracked — a rule added after the repo exists otherwise never reaches it, and the
-file stays published.
+**Only the corpus and `Pinned.md` are tracked.** `cursor.json`, `spend.jsonl`,
+`runs.jsonl`, `logs/` and `*.tmp` are gitignored, for one reason each way: none of
+them answers a question about anywhere but *this* machine ("how far have I read",
+"what did I bill", "did my 01:00 fire"), and all three files are append-only, so
+two Macs pushing to one remote would conflict on every line of them and the
+backup that actually matters would stop. Nothing there can be regenerated;
+everything ignored can be lived without.
+
+The ignore list is re-applied on every run rather than written once, and anything
+it newly covers is untracked — a rule added after the repo exists otherwise never
+reaches it, and the file stays published.
 
 **A note on push authentication.** A global
 `url.git@github.com:.pushinsteadof https://github.com/` rewrites every HTTPS push
@@ -399,11 +430,20 @@ On the new Mac: run `install.sh` for the dotfiles, clone this repo into
 output and are deliberately not tracked. The cursor starts fresh, so the first
 run reads the last 24 hours rather than re-reading everything.
 
-**This assumes one machine at a time.** Two Macs distilling into the same repo
-would collide: they would write the same `extracts/<date>.json` from different
-transcripts. The machinery that made that safe — per-host extracts, per-host
-fingerprints — was removed on purpose. Restoring or replacing is fine; running
-both is not.
+### Two Macs on one remote
+
+Within a profile this is safe, and the corpus layout is the reason. Each machine
+writes `extracts/<date>.<host>.json` — its own file — so a day both Macs
+contributed to is two files that merge without a conflict, and the derivation
+groups by entry id across all of them, counting **distinct sessions**. A rule seen
+once on each Mac is a rule with two hits, which is exactly right; a day re-read on
+one Mac still counts once, which is also right.
+
+Nothing needs migrating. `distill_extract_date` reads the date off the front of
+the filename, so a pre-sharding `extracts/<date>.json` written before this keeps
+deriving, ageing and pruning identically alongside the new ones.
+
+What is *not* safe is one remote across profiles — see the table above.
 
 ## Configuration
 

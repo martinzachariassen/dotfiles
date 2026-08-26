@@ -546,7 +546,6 @@ distill_run_end() {
     _DISTILL_SESSIONS=""
 
     distill_guard_secrets || return 1
-    distill_sync_skills
     distill_commit_local "$msg"
     return 0
 }
@@ -584,6 +583,26 @@ distill_extracts_dir() {
     printf '%s/extracts\n' "$(distill_state_dir)"
 }
 
+# distill_extract_date FILE — the day an extract file belongs to.
+#
+# The name is `<date>.<host>.json`, and the host is there so two Macs sharing one
+# remote never write the same path: these files are merged in place, so a shared
+# name is a rebase conflict on the only thing in the repo worth keeping. Reading
+# the date as the leading 10 characters also accepts the older `<date>.json`,
+# which is why no migration is needed — old files keep deriving exactly as before.
+distill_extract_date() {
+    local base
+    base="$(basename "$1")"
+    printf '%s\n' "${base:0:10}"
+}
+
+# distill_host — this machine, as a filename component.
+distill_host() {
+    local h
+    h="$(hostname -s 2>/dev/null || echo unknown)"
+    printf '%s\n' "${h//[^A-Za-z0-9_-]/-}"
+}
+
 # distill_derive — the single source of truth for every rendering decision.
 # Aggregates the extract corpus into one NDJSON stream:
 #   {id, text, kind, topic, hits, first_seen, last_seen}
@@ -597,7 +616,7 @@ distill_derive() {
 
     /usr/bin/find "$ex" -type f -name '*.json' 2>/dev/null |
         while IFS= read -r f; do
-            jq -c --arg date "$(basename "$f" .json)" \
+            jq -c --arg date "$(distill_extract_date "$f")" \
                 '.items[]? | {text, detail, kind, topic, session, date:$date}' \
                 "$f" 2>/dev/null
         done |
@@ -640,7 +659,7 @@ distill_prune_extracts() {
 
     for f in "$(distill_extracts_dir)"/*.json; do
         [ -f "$f" ] || continue
-        date="$(basename "$f" .json)"
+        date="$(distill_extract_date "$f")"
         [ "$date" '<' "$cutoff" ] || continue
         jq -e '[.items[]? | select(has("evidence") or has("cwd")
                or has("origin") or has("host"))] | length > 0' \
@@ -841,9 +860,12 @@ distill_render_all() {
     distill_render_topics
 }
 
-# distill_extract_file DATE — one day of the corpus.
+# distill_extract_file DATE — this machine's share of one day of the corpus.
+#
+# Writes are always host-scoped; reads (distill_derive) take the whole directory,
+# so a day that two Macs both contributed to still derives as one day.
 distill_extract_file() {
-    printf '%s/%s.json\n' "$(distill_extracts_dir)" "$1"
+    printf '%s/%s.%s.json\n' "$(distill_extracts_dir)" "$1" "$(distill_host)"
 }
 
 # ─── Git ──────────────────────────────────────────────────────────────────────
@@ -882,8 +904,10 @@ distill_state_repo_pushurl() {
     git -C "$repo" config remote.origin.pushurl "$fetch" >/dev/null 2>&1 || true
 }
 
-# distill_commit_local MESSAGE — commit the state dir. No remote, so no push, no
-# pull, and no way for this to fail on a network.
+# distill_commit_local MESSAGE — commit the state dir, and push if a remote was
+# added by hand. The commit is what matters and it is made first, so the network
+# can never cost you a night's work: a failed push is reported and retried by the
+# next run, never treated as a failed run.
 #
 # Only state is tracked, not memory. MAIN.md, Topics/ and Candidates.md are a
 # pure function of the extract corpus, so reverting the inputs and
@@ -930,13 +954,16 @@ distill_commit_local() {
 # Deterministic like every other render, so a run that changed nothing produces
 # no commit.
 distill_render_state_readme() {
-    local out="${1:-$(distill_state_dir)/README.md}" remote
+    local out="${1:-$(distill_state_dir)/README.md}" remote title
     # Read back from git rather than a config key, so the clone line in the
     # README can never name a remote this repo does not actually push to.
     remote="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+    # There is one of these repo per profile (…-personal, …-work), and a heading
+    # that names the wrong one on the wrong remote is worse than no heading.
+    title="$(basename "${remote:-claude-memory}" .git)"
     mkdir -p "$(dirname "$out")"
     {
-        printf '# claude-memory\n\n'
+        printf '# %s\n\n' "$title"
         printf 'The corpus behind my Claude Code memory. Written by `chezdistill`, a\n'
         printf 'nightly job in [dotfiles](https://github.com/martinzachariassen/dotfiles);\n'
         printf 'nothing here is edited by hand.\n\n'
@@ -949,14 +976,15 @@ distill_render_state_readme() {
 
         printf '## What is in here\n\n'
         printf -- '| Path | What it is |\n|---|---|\n'
-        printf -- '| `extracts/<date>.json` | One file per day: every item the model kept, with a short quote as evidence. **The source of truth** — everything else is derived from this. |\n'
-        printf -- '| `runs.jsonl` | One record per run: when, how long, what it cost, what broke. |\n'
-        printf -- '| `spend.jsonl` | Per-call cost, which the rolling 7-day ceiling reads back. |\n'
+        printf -- '| `extracts/<date>.<host>.json` | Every item the model kept, with a short quote as evidence. One file per day **per Mac**, so two machines never write the same path. **The source of truth** — everything else is derived from this. |\n'
         printf -- '| `Pinned.md` | The hand-written rules. Copied here because they are the one thing that cannot be regenerated. |\n\n'
 
-        printf 'Deliberately absent: `cursor.json` (how far *this* Mac has read — meaningless\n'
-        printf 'on another) and `logs/` (launchd noise, and the only thing here that grows\n'
-        printf 'without bound).\n\n'
+        printf 'That is the whole repo, and the rule is simple: if a machine can regenerate\n'
+        printf 'it or nobody else can use it, it is not here. Deliberately absent are\n'
+        printf '`cursor.json` (how far *this* Mac has read), `spend.jsonl` (what *this* Mac\n'
+        printf 'was billed), `runs.jsonl` (what *this* Mac did at 01:00) and `logs/`. All\n'
+        printf 'three files are append-only, so tracking them would make two Macs conflict\n'
+        printf 'on every line and quietly stop the backup that matters.\n\n'
 
         printf '## Restoring onto a new Mac\n\n'
         printf 'Set the dotfiles up first, then:\n\n'
@@ -981,9 +1009,16 @@ distill_render_state_readme() {
 # by hand (`git -C <state> remote add origin …`) and every run pushes to it, so a
 # replacement Mac clones the corpus instead of starting from an empty memory.
 #
-# `logs/` is excluded because launchd's stdout is noise and the one thing here
-# that grows without bound. `cursor.json` is excluded because it answers "how far
-# has THIS machine read", which is meaningless on any other one.
+# What is tracked is exactly what cannot be regenerated: the extract corpus and
+# `Pinned.md`. Everything else here is per-machine telemetry and is excluded —
+# `cursor.json` ("how far has THIS Mac read"), `spend.jsonl` (what THIS Mac was
+# billed), `runs.jsonl` (what THIS Mac did at 01:00) and `logs/` (launchd noise,
+# and the one thing here that grows without bound).
+#
+# That split is not only about tidiness. All three telemetry files are append-only,
+# so two Macs pushing to one remote would conflict on every line of them, and the
+# rebase-then-push fallback below would fail silently and stop backing up the one
+# thing that mattered. Tracking only the corpus makes the shared case work.
 #
 # Identity and signing are pinned locally rather than inherited. A global
 # `commit.gpgsign = true` backed by 1Password's op-ssh-sign raises a GUI approval
@@ -1010,46 +1045,13 @@ distill_state_repo_init() {
     # initialised by an older version keeps its old .gitignore forever, and a
     # rule added later would never reach it. Untrack too — .gitignore has no
     # effect on a path that is already in the index.
-    for pat in 'logs/' 'cursor.json' '*.tmp'; do
+    for pat in 'logs/' 'cursor.json' 'runs.jsonl' 'spend.jsonl' '*.tmp'; do
         grep -qxF "$pat" "$repo/.gitignore" 2>/dev/null && continue
         printf '%s\n' "$pat" >>"$repo/.gitignore"
     done
     git -C "$repo" ls-files -z --cached -i --exclude-standard 2>/dev/null |
         xargs -0 -r git -C "$repo" rm -q --cached -- 2>/dev/null || true
     return 0
-}
-
-# ─── Skills ───────────────────────────────────────────────────────────────────
-#
-# Skill discovery is exactly one level deep — verified on this install:
-# ~/.config/claude/skills/<name>/SKILL.md is found, skills/generated/<name>/ is
-# not. So generated skills are mirrored FLAT under a `distilled-` prefix, which
-# is also the only glob this mirror is allowed to touch: `skills/distill/` is
-# chezmoi-managed and sits in the same directory.
-
-distill_skills_target() {
-    printf '%s/skills\n' "${CLAUDE_CONFIG_DIR:-$HOME/.config/claude}"
-}
-
-distill_sync_skills() {
-    local src dest name
-    src="$(distill_state_dir)/skills"
-    dest="$(distill_skills_target)"
-    [ -d "$src" ] || return 0
-    mkdir -p "$dest"
-
-    for d in "$dest"/distilled-*/; do
-        [ -d "$d" ] || continue
-        name="$(basename "$d")"
-        [ -d "$src/${name#distilled-}" ] || rm -rf "$d"
-    done
-
-    for d in "$src"/*/; do
-        [ -d "$d" ] || continue
-        name="$(basename "$d")"
-        mkdir -p "$dest/distilled-$name"
-        cp -f "$d/SKILL.md" "$dest/distilled-$name/SKILL.md" 2>/dev/null || true
-    done
 }
 
 # ─── Status ───────────────────────────────────────────────────────────────────
@@ -1198,7 +1200,7 @@ distill_run_daily() {
 
 _distill_daily_body() {
     local since now tmp sysfile schema filtered turns cwd out
-    local sess name title mapped date n_items persisted=1
+    local sess name title mapped date n_items persisted=1 halted=0
 
     distill_spend_ok || return 1
 
@@ -1236,6 +1238,18 @@ _distill_daily_body() {
             continue
         fi
 
+        # Re-checked per session, not only in preflight. A nightly run reads two
+        # days and cannot approach the ceiling, but `--since 90d` reads hundreds
+        # of sessions in one go — and a ceiling checked once before any of them
+        # is not a ceiling. Stop reading rather than fail: the sessions already
+        # extracted are worth keeping, and the cursor stays where it was.
+        if ! distill_spend_ok >/dev/null 2>&1; then
+            distill_warn "7-day spend ceiling reached — stopping after $DISTILL_RUN_KEPT session(s)"
+            distill_run_session "$name" "$turns" "spend ceiling reached" 0
+            halted=1
+            break
+        fi
+
         mapped="$(distill_claude "$(distill_cfg mapModel sonnet)" "$sysfile" "$schema" \
             "Session title: ${title:-untitled}. Extract durable items, or none." \
             <"$filtered")" || {
@@ -1266,7 +1280,10 @@ _distill_daily_body() {
 
     distill_render_all
     distill_prune_extracts
-    if [ "$persisted" -eq 1 ]; then
+    # The cursor only advances over a window that was read to the end. Stopping
+    # early — a failed write, or the spend ceiling — must hold it, or the sessions
+    # never reached are skipped for good and the gap is invisible.
+    if [ "$persisted" -eq 1 ] && [ "$halted" -eq 0 ]; then
         distill_cursor_write "$now"
     else
         distill_warn "cursor held at $since — the next run re-reads this window"
@@ -1276,9 +1293,11 @@ _distill_daily_body() {
 }
 
 # distill_persist_extracts TMPDIR — write this run's items into the corpus, one
-# file per date, merged with whatever that date already holds. A backfill and a
-# nightly run can both land on the same day, and `unique` keeps a session that was
-# read twice from counting twice.
+# file per date and machine, merged with whatever this machine already wrote for
+# that date. A backfill and a nightly run can both land on the same day, and
+# `unique` keeps a session that was read twice from counting twice. Two Macs never
+# touch each other's file, so a shared remote merges without a conflict; their
+# overlap is settled at derive time, which counts distinct sessions.
 #
 # Appends each date it wrote to DISTILL_RUN_DATES. Returns non-zero if any write
 # failed, which is the one failure in this job that loses money: the model calls
