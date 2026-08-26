@@ -19,7 +19,7 @@ The three things this job produces have nothing in common, so they live apart.
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Pinned.md`, `Topics/`, `Candidates.md` | none — rendered from state |
 | `~/.local/state/chezdistill/` | the extract corpus, `Pinned.md`, cursor, spend, run log, logs | a local repo, remote optional |
-| `~/Documents/TheArchive/30-Claude/` | `README.md`, `Decisions.md`, `Open threads.md`, `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
+| `~/Documents/TheArchive/30-Claude/`<br>(work: `~/Documents/WorkArchive/30-Claude/`) | `README.md`, `Decisions.md`, `Open threads.md`, `Daily/`, `Weekly/`, `Runs.md` | the vault's own repo, pushed |
 
 Three consequences worth knowing before changing anything:
 
@@ -35,6 +35,60 @@ that repo has no remote so there is nothing to leak into.
 **`Topics/` sits next to `MAIN.md`, not in the vault.** It is the other half of
 each rule, and MAIN carries one line pointing at it. Put it in the vault and
 Claude cannot read it.
+
+## Profiles: one corpus per Mac, never shared
+
+A work Mac and a personal one do not share a memory. They answer to different
+employers: a rule derived at work has no business loading at home, and a personal
+report has no business on a work laptop. So the **profile picks the
+destinations** — the split is at the storage, not a filter over the content.
+
+| Tier | Isolated by |
+|---|---|
+| memory `~/.config/claude/memory/` | being local, and rendered from state |
+| state `~/.local/state/chezdistill/` | being local, and having **no remote by default** |
+| vault | a different vault per profile, each with its own remote |
+
+The first two are already per-machine and identical on both profiles: nothing in
+the code ever gives the state repo a remote. The vault is the one that had to
+change, because it *does* push. `[distill.byProfile.work]` in
+[`distill.toml`](../src/.chezmoidata/distill.toml) points work at
+`~/Documents/WorkArchive`; everything else falls through to the base table.
+
+Overrides are a shallow merge, right wins, resolved by `distill_merge_profile` —
+the same lookup shape as `[brewfiles.byProfile]`, and for the same reason:
+`.chezmoidata` cannot be templated, so per-profile variation has to be data you
+index into. `chezdistill --status` prints the active profile above the three
+resolved paths, so "where did this report go" is one command.
+
+**Keep overrides to the destinations.** Two profiles differing on `minHits` or
+`mainCapBytes` would be two memories built to different standards — much harder
+to reason about than two memories in different places. `memoryPath` and
+`statePath` are never overridden, and
+[`tests/distill.bats`](../tests/distill.bats) fails the build if they are: that
+would be the one config change able to point two profiles at one corpus.
+
+### Setting up the work vault
+
+Nothing creates it — same rule as the personal one. Until you clone it, the job
+reports `vault not found`, renders the memory tier and exits 0. That is the
+intended state, not a broken one, so there is no hurry.
+
+```sh
+gh repo create work-archive --private
+git clone git@github.com:<you>/work-archive.git ~/Documents/WorkArchive
+```
+
+Open it in Obsidian once (that creates `.obsidian`, which is how the job tells a
+real vault from an unmounted one), then:
+
+```sh
+chezdistill --setup     # creates 30-Claude/, registers the timers
+chezdistill --status    # profile, and the three resolved paths
+```
+
+The folder name stays `30-Claude` on both profiles — separate vaults mean there
+is no collision to rename around.
 
 ## Turning it on
 
@@ -459,8 +513,8 @@ Three repos between them hold everything a replacement Mac needs:
 | Repo | Gives you |
 |---|---|
 | this dotfiles repo | the persona, `settings.json`, the skills, the distiller itself, the plists |
-| TheArchive | the `Daily/`, `Weekly/` and `Runs.md` reports |
-| a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
+| the vault for this profile (`TheArchive`, or `WorkArchive` on work) | the `Daily/`, `Weekly/` and `Runs.md` reports |
+| a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md`. One per profile; see the warning below. |
 
 The third is optional and has no remote by default, which means the corpus lives
 on exactly one Mac. On this machine it is
@@ -476,6 +530,20 @@ git -C ~/.local/state/chezdistill push -u origin main
 
 Every run pushes it from then on, and `chezdistill --status` says so — it warns
 `no remote — this Mac is the only copy` until you do.
+
+> [!warning] One remote per profile — never one shared between them
+> This is the single manual step that can undo the profile split. The state repo
+> holds the extract corpus, which carries near-verbatim conversation text, and it
+> is the tier the code deliberately never gives a remote. Point a work Mac and a
+> personal Mac at the *same* `claude-memory` and you have merged the two memories
+> permanently: `hits` is derived by counting sightings across the whole corpus, so
+> a work rule reaching two sessions is promoted into the `MAIN.md` your personal
+> Mac loads, and nothing downstream can tell the two apart again.
+>
+> Use a separate private repo per profile — `claude-memory` and
+> `claude-memory-work`, say. The generated `README.md` in each state repo names
+> the profile it belongs to for exactly this reason, so a clone can't be restored
+> onto the wrong machine by mistake.
 
 **Nothing pushes outside a run.** The push is the last step of `distill_run_end`,
 after the secret sweep, and it is the same commit that carries the run record —
@@ -569,6 +637,7 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 | `extractRetentionDays` | `90` | After this, an extract's `evidence` quote and `cwd` are stripped. The rule itself is kept. |
 | `runsShown` | `30` | Rows in the `Runs.md` table. |
 | `runRetentionDays` | `90` | How long the run records behind it are kept. |
+| `[byProfile.<profile>]` | `work` → `vaultPath = "~/Documents/WorkArchive"` | Shallow overlay on everything above, right wins. See [Profiles](#profiles-one-corpus-per-mac-never-shared). |
 
 Change a value, then `chezup` and `chezdistill --render` to see the effect without
 spending anything.

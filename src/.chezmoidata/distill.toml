@@ -68,3 +68,28 @@ runRetentionDays = 90
 # and `first_seen` are derived from the corpus and deleting an old sighting would
 # evict an established rule from MAIN.md.
 extractRetentionDays = 90
+
+# Per-profile overrides. Shallow merge over everything above, right wins, applied
+# by distill_merge_profile — the same lookup shape as [brewfiles.byProfile], which
+# exists for the same reason: .chezmoidata cannot be templated, so variation has
+# to be data you index into rather than a condition you write.
+#
+# Keep this to the DESTINATIONS. Two profiles differing on minHits or mainCapBytes
+# would be two memories built to different standards, which is a much harder thing
+# to reason about than two memories in different places.
+[distill.byProfile.work]
+# Work sessions get their own vault with its own remote. They are not a subset of
+# the personal corpus: a rule derived at work has no business loading at home, and
+# a personal report has no business on a work Mac. Keeping them in one repo with a
+# subfolder would still mean one remote holding both, so the split is at the vault.
+#
+# The job never creates this. Until it is cloned here the vault simply looks
+# missing, preflight says so and the run continues memory-only — which is the
+# correct behaviour, not a degraded one. See docs/distill.md.
+vaultPath = "~/Documents/WorkArchive"
+
+# memoryPath and statePath are deliberately NOT overridden. They are already
+# per-machine — ~/.local/state/chezdistill is local, and no code ever gives it a
+# remote — so the corpora cannot mix as long as you don't point two Macs at the
+# same one. That is the single manual step that could break this; docs/distill.md
+# says so where it tells you how to add the remote.

@@ -75,6 +75,18 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   `~/Documents/TheArchive/30-Claude`. Keep that split — putting `Topics/` in the
   vault makes it unreadable to Claude, and putting extracts back in the vault puts
   transcript text on a remote.
+  **All three are profile-scoped, and the two corpora are never shared.** A work
+  Mac and a personal one answer to different employers, so the profile picks the
+  *destinations* rather than filtering content: `[distill.byProfile.work]` in
+  `src/.chezmoidata/distill.toml` points work at `~/Documents/WorkArchive`,
+  resolved by `distill_merge_profile` as a shallow overlay (the same lookup shape
+  as `brewfiles.byProfile`, because `.chezmoidata` can't be templated). Confine
+  overrides to the destinations — two profiles differing on `minHits` would be two
+  memories built to different standards. `memoryPath`/`statePath` are never
+  overridden (a test enforces it): they're already per-machine, and no code ever
+  gives the state repo a remote. Adding one is manual and must be **one repo per
+  profile** — a shared remote merges the corpora irreversibly, since `hits` is
+  derived by counting sightings across the whole corpus.
   **It never creates the vault**: an uncloned one looks exactly like an empty
   directory, so a missing vault means "skip the reports, render the memory, exit 0",
   never "create it". `chezdistill --setup`, the confirm-gated on-switch, may create

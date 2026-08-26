@@ -24,16 +24,67 @@ __DOTFILES_DISTILL_SH=1
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 _DISTILL_CFG=""
+_DISTILL_DATA=""
 
-# distill_config — the `.distill` table from .chezmoidata, fetched once.
+# _distill_data — `chezmoi data` as JSON, fetched once. `{}` when unavailable,
+# so callers get a valid document to query rather than an empty string.
+_distill_data() {
+    if [ -z "$_DISTILL_DATA" ]; then
+        _DISTILL_DATA="$(chezmoi data --format=json 2>/dev/null)"
+        [ -n "$_DISTILL_DATA" ] || _DISTILL_DATA='{}'
+    fi
+    printf '%s' "$_DISTILL_DATA"
+}
+
+# distill_profile — which chezmoi profile this Mac was set up with; "" when it
+# cannot be resolved, which resolves to the base config alone.
+#
+# This is what keeps two Macs' corpora apart. Work sessions and personal ones
+# are not two halves of one memory: they answer to different employers, and a
+# rule derived from one has no business loading in the other. So the profile
+# picks the destinations rather than filtering the content — separate vaults,
+# separate remotes, no shared state to leak through.
+#
+# DISTILL_PROFILE overrides it. Set (even to empty) it wins, so a test can ask
+# for "no profile" as distinct from "not overridden".
+distill_profile() {
+    if [ -n "${DISTILL_PROFILE+x}" ]; then
+        printf '%s\n' "$DISTILL_PROFILE"
+        return 0
+    fi
+    _distill_data | jq -r '.profile // empty' 2>/dev/null
+}
+
+# distill_merge_profile JSON PROFILE — the profile overlay, resolved.
+#
+# .chezmoidata cannot be templated, so per-profile variation has to be a lookup
+# rather than a condition — the same shape as `index .brewfiles.byProfile .profile`
+# in the brew-bundle hook. Shallow merge, right wins, generic over every key:
+# nothing here enumerates which keys may be overridden, so no list can fall out
+# of sync with the TOML.
+#
+# `byProfile` is deleted from the result, so an override is indistinguishable
+# from a plain value downstream and no caller can accidentally read the raw map.
+distill_merge_profile() {
+    printf '%s' "$1" | jq -c --arg p "${2:-}" '
+        ((.byProfile // {})[$p] // {}) as $over
+        | (. + $over) | del(.byProfile)' 2>/dev/null
+}
+
+# distill_config — the `.distill` table from .chezmoidata with this Mac's
+# profile overlay applied, fetched once.
 distill_config() {
+    local raw
     if [ -z "$_DISTILL_CFG" ]; then
         if [ -n "${DISTILL_CONFIG_JSON:-}" ]; then
-            _DISTILL_CFG="$DISTILL_CONFIG_JSON"
+            raw="$DISTILL_CONFIG_JSON"
         else
-            _DISTILL_CFG="$(chezmoi data --format=json 2>/dev/null |
-                jq -c '.distill // {}' 2>/dev/null)"
+            raw="$(_distill_data | jq -c '.distill // {}' 2>/dev/null)"
         fi
+        [ -n "$raw" ] || raw='{}'
+        # The test entry point goes through the merge too, so it exercises the
+        # same resolution the real one does. Without `byProfile` it is a no-op.
+        _DISTILL_CFG="$(distill_merge_profile "$raw" "$(distill_profile)")"
         [ -n "$_DISTILL_CFG" ] || _DISTILL_CFG='{}'
     fi
     printf '%s\n' "$_DISTILL_CFG"
@@ -1422,16 +1473,26 @@ distill_commit_local() {
 # Deterministic like every other render, so a run that changed nothing produces
 # no commit.
 distill_render_state_readme() {
-    local out="${1:-$(distill_state_dir)/README.md}" remote
+    local out="${1:-$(distill_state_dir)/README.md}" remote profile
     # Read back from git rather than a config key, so the clone line in the
     # README can never name a remote this repo does not actually push to.
     remote="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+    profile="$(distill_profile)"
     mkdir -p "$(dirname "$out")"
     {
         printf '# claude-memory\n\n'
         printf 'The corpus behind my Claude Code memory. Written by `chezdistill`, a\n'
         printf 'nightly job in [dotfiles](https://github.com/martinzachariassen/dotfiles);\n'
         printf 'nothing here is edited by hand.\n\n'
+
+        # Which corpus this is. Two profiles keep two of these, and a clone that
+        # cannot say which one it is is a clone you cannot safely restore.
+        if [ -n "$profile" ]; then
+            printf '> [!important] This is the **%s** corpus.\n' "$profile"
+            printf '> One per profile, never shared. Restore it only onto a Mac set up with\n'
+            printf '> the same profile — pointing two profiles at one remote merges the two\n'
+            printf '> memories, and nothing downstream can tell them apart again.\n\n'
+        fi
 
         printf 'Each night the job reads the Claude Code sessions written since it last\n'
         printf 'looked, asks a model what is worth keeping, and stores the answer. The\n'
@@ -1574,7 +1635,7 @@ distill_sync_skills() {
 # ─── Status ───────────────────────────────────────────────────────────────────
 
 distill_status() {
-    local main cap spent ceiling n last line f
+    local main cap spent ceiling n last line f profile
     s_section "chezdistill"
 
     if ! distill_preflight; then
@@ -1582,12 +1643,22 @@ distill_status() {
         return 0
     fi
 
+    # The profile picks the destinations, so it is the first thing to check when
+    # a report lands somewhere unexpected — print it above them, not buried.
+    profile="$(distill_profile)"
+    if [ -n "$profile" ]; then
+        s_pass "profile  $profile"
+    else
+        s_note "profile  unset — using the base config"
+    fi
     s_pass "memory   $(distill_memory_dir)"
     s_pass "state    $(distill_state_dir)"
     if distill_have_vault; then
         s_pass "vault    $DISTILL_ROOT"
     else
-        s_warn "vault    not available — reports would be skipped, memory still renders"
+        # Name the path: it is the one destination the profile changes, so
+        # "not available" without it is the least useful half of the answer.
+        s_warn "vault    $(distill_expand "$(distill_cfg vaultPath)") — reports skipped, memory still renders"
     fi
 
     main="$(distill_memory_dir)/MAIN.md"

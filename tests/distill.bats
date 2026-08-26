@@ -35,6 +35,12 @@ setup() {
 
     export DISTILL_CONFIG_JSON
     DISTILL_CONFIG_JSON="$(cfg)"
+
+    # Pin the profile so no test shells out to the real `chezmoi data` and picks
+    # up whichever profile the machine running the suite happens to have. Empty
+    # means "no overlay", which is what every test below the profile section
+    # assumes. Set, not unset: distill_profile treats those differently.
+    export DISTILL_PROFILE=""
 }
 
 # cfg [EXTRA-JSON] — the config every test starts from, optionally overridden.
@@ -126,6 +132,126 @@ item() {
     [ "$status" -eq 2 ]
 }
 
+# ─── Profiles: two Macs, two corpora, no shared destination ───────────────────
+#
+# A work Mac and a personal one must not distil into the same places. The risk is
+# not abstract: the vault has a git remote, so one wrong path pushes work-session
+# reports into a personal GitHub repo. The profile picks the destinations, and
+# these cases hold the mechanism to that job.
+
+@test "a profile override wins over the base value" {
+    load_lib
+    run distill_merge_profile \
+        '{"vaultPath":"~/Documents/TheArchive","byProfile":{"work":{"vaultPath":"~/Documents/WorkArchive"}}}' \
+        work
+    [ "$(jq -r .vaultPath <<<"$output")" = "~/Documents/WorkArchive" ]
+}
+
+@test "keys with no override fall through to the base" {
+    load_lib
+    run distill_merge_profile \
+        '{"vaultPath":"/base","minHits":2,"byProfile":{"work":{"vaultPath":"/work"}}}' \
+        work
+    [ "$(jq -r .vaultPath <<<"$output")" = "/work" ]
+    [ "$(jq -r .minHits <<<"$output")" = "2" ]
+}
+
+@test "byProfile never survives into the resolved config" {
+    # Downstream reads keys by name; a leaked map would let `distill_cfg` return
+    # the wrong profile's value to anything that guessed at the shape.
+    load_lib
+    run distill_merge_profile \
+        '{"vaultPath":"/base","byProfile":{"work":{"vaultPath":"/work"}}}' work
+    [ "$(jq -r 'has("byProfile")' <<<"$output")" = "false" ]
+}
+
+@test "an unknown or empty profile resolves to the base alone" {
+    load_lib
+    local p
+    for p in personal "" nosuchprofile; do
+        run distill_merge_profile \
+            '{"vaultPath":"/base","byProfile":{"work":{"vaultPath":"/work"}}}' "$p"
+        [ "$(jq -r .vaultPath <<<"$output")" = "/base" ] || {
+            echo "profile '$p' resolved to $output"
+            false
+        }
+    done
+}
+
+@test "a config with no byProfile is passed through unchanged" {
+    # Every pre-existing test feeds a flat table; the merge must be a no-op on it.
+    load_lib
+    run distill_merge_profile '{"vaultPath":"/base","minHits":2}' work
+    [ "$(jq -r .vaultPath <<<"$output")" = "/base" ]
+    [ "$(jq -r .minHits <<<"$output")" = "2" ]
+}
+
+@test "distill_cfg resolves through the profile overlay" {
+    # The overlay is wired into distill_config, not only reachable by hand.
+    DISTILL_CONFIG_JSON="$(cfg '{"byProfile":{"work":{"vaultPath":"/work-vault"}}}')"
+    export DISTILL_CONFIG_JSON DISTILL_PROFILE=work
+    load_lib
+    [ "$(distill_cfg vaultPath)" = "/work-vault" ]
+    # …and the same config on a personal Mac keeps the base vault. Clearing the
+    # memo is what re-runs the resolution; without it this would still read work.
+    _DISTILL_CFG=""
+    DISTILL_PROFILE=personal
+    [ "$(distill_cfg vaultPath)" = "$VAULT" ]
+}
+
+@test "distill_profile prefers DISTILL_PROFILE over chezmoi data" {
+    # Including when it is set to empty — "no profile" has to be expressible, or
+    # a test could never assert the un-overlaid behaviour.
+    load_lib
+    DISTILL_PROFILE=work
+    [ "$(distill_profile)" = "work" ]
+    DISTILL_PROFILE=""
+    [ -z "$(distill_profile)" ]
+}
+
+# ── The shipped table, not a fixture ─────────────────────────────────────────
+
+toml_get() { # toml_get DOTTED.KEY — read src/.chezmoidata/distill.toml
+    python3 - "$REPO_ROOT/src/.chezmoidata/distill.toml" "$1" <<'PY'
+import sys, tomllib
+with open(sys.argv[1], "rb") as fh:
+    node = tomllib.load(fh)
+for part in sys.argv[2].split("."):
+    node = node.get(part) if isinstance(node, dict) else None
+    if node is None:
+        sys.exit(0)
+print(node)
+PY
+}
+
+@test "the shipped config gives work its own vault" {
+    command -v python3 >/dev/null || skip "python3 not installed"
+    [ "$(toml_get distill.vaultPath)" = "~/Documents/TheArchive" ]
+    [ "$(toml_get distill.byProfile.work.vaultPath)" = "~/Documents/WorkArchive" ]
+}
+
+@test "no profile overrides memoryPath or statePath" {
+    # The corpus and the memory tier are per-machine and have no remote, which is
+    # what keeps a work Mac out of the personal memory. An override here would be
+    # the one config change able to point two profiles at one corpus, so it is
+    # refused in the test rather than only discouraged in a comment.
+    command -v python3 >/dev/null || skip "python3 not installed"
+    run python3 - "$REPO_ROOT/src/.chezmoidata/distill.toml" <<'PY'
+import sys, tomllib
+with open(sys.argv[1], "rb") as fh:
+    data = tomllib.load(fh)
+bad = [
+    f"{prof}.{key}"
+    for prof, over in (data.get("distill", {}).get("byProfile") or {}).items()
+    for key in ("memoryPath", "statePath")
+    if key in over
+]
+print(" ".join(bad))
+PY
+    [ "$status" -eq 0 ]
+    [ -z "$output" ] || { echo "profile overrides a private path: $output"; false; }
+}
+
 # ─── Preflight: never create the vault, always render the memory ──────────────
 
 @test "a missing vault exits 0 and creates nothing in its place" {
@@ -156,7 +282,10 @@ item() {
     rmdir "$VAULT/30-Claude"
     run bash "$BIN" --status
     [ "$status" -eq 0 ]
-    [[ "$output" == *"not available"* ]]
+    # Names the path, because that is the destination the profile changes — and
+    # says the memory tier is unaffected, so this doesn't read as an outage.
+    [[ "$output" == *"$VAULT"* ]]
+    [[ "$output" == *"reports skipped, memory still renders"* ]]
 }
 
 # The reason the vault stopped being fatal: the persona @-imports MAIN.md, so a

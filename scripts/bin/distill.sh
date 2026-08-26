@@ -142,13 +142,16 @@ _distill_confirm() {
 
 # _distill_setup_folder — the vault half. 0 = ready · 1 = the vault is not here.
 _distill_setup_folder() {
-    local vault folder
+    local vault folder profile
     vault="$(distill_expand "$(distill_cfg vaultPath)")"
     folder="$(distill_cfg folder 30-Claude)"
+    profile="$(distill_profile)"
 
     if [ -z "$vault" ] || [ ! -d "$vault" ]; then
         s_fail "vault    not found at ${vault:-<unset>}"
-        explain "Setup never creates the vault. Clone or mount TheArchive, then re-run."
+        explain "Setup never creates the vault. Clone or mount it, then re-run." \
+            "The path is per profile${profile:+ (this Mac is '$profile')} —" \
+            "src/.chezmoidata/distill.toml decides which vault this is."
         return 1
     fi
     if [ ! -d "$vault/.obsidian" ]; then
@@ -374,7 +377,7 @@ _distill_setup_agents() {
 }
 
 _distill_setup() {
-    local folder_rc module_rc agents_rc needs_apply=0
+    local folder_rc module_rc agents_rc needs_apply=0 profile
 
     echo
     printf '%s%s%s  %sSetting up chezdistill on this Mac%s\n' \
@@ -384,6 +387,15 @@ _distill_setup() {
         "It never creates the vault itself, and it makes no API calls."
 
     s_section "chezdistill setup"
+
+    # Stated before anything is created, because it decides where: a work Mac
+    # and a personal one distil into different vaults on purpose.
+    profile="$(distill_profile)"
+    if [ -n "$profile" ]; then
+        s_pass "profile  $profile"
+    else
+        s_note "profile  unset — using the base config"
+    fi
 
     _distill_setup_folder
     folder_rc=$?
