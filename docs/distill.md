@@ -507,6 +507,7 @@ reproducing tokens, keys and `.env` values.
 `chezsetup`, untick *claudeDistiller*, `chezup`. That stops future applies from
 deploying the agent, but launchd keeps what it already loaded — unload it by hand:
 
+
 ```sh
 launchctl bootout gui/$(id -u)/no.mlz.chezdistill.nightly
 ```
