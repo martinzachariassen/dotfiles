@@ -17,24 +17,64 @@ delegate to the scripts in [`scripts/bin/`](../scripts/bin).
 
 | Command | What it does |
 |---|---|
-| `chezup` | **Converge this Mac to the repo:** pull the latest changes, preview file drift and pending hooks, then apply. The everyday command, and the way to retry a partial install. |
+| `chezup` | **Converge this Mac to the repo:** pull the latest changes, offer any module added since this Mac was set up, preview file drift and pending hooks, then apply. The everyday command, and the way to retry a partial install. |
 | `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood — see [install.md](install.md)). |
 | `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, and shell layout. |
 
-**`chezup` runs in three phases**, honouring `DRY_RUN=1` (print, don't run) and
+**`chezup` runs in four phases**, honouring `DRY_RUN=1` (print, don't run) and
 `YES=1` (skip the confirm gate), and passing any trailing arguments through to
 `chezmoi apply` (e.g. `chezup -v`):
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many
    commits arrived.
-2. **Review pending changes** — two questions, because they fail
+2. **Offer new modules** — see below. Runs after the pull, because that's when
+   the catalog may have grown, and before the drift check, so a module enabled
+   here is applied in the same run.
+3. **Review pending changes** — two questions, because they fail
    independently: `chezmoi status --exclude scripts` lists file drift between
    repo and `$HOME` (`A` add, `M` modify, `D` remove), and
    `chezmoi status --include scripts` lists pending apply hooks. Stops here only
    when **both** are empty. A partial install (a brew bundle that died mid-way)
    leaves no file drift at all, so gating on files alone would make `chezup` a
    no-op exactly when a retry is needed.
-3. **Apply** — one confirmation gate, then `chezmoi apply --force`.
+4. **Apply** — one confirmation gate, then `chezmoi apply --force`.
+
+### New modules since this Mac was set up
+
+Module choices are saved by `promptMultichoiceOnce`, which reads the saved answer
+back on every later run, and `chezup` only ever calls `chezmoi apply` — never
+`init`. So a module **added to the catalog after a machine was set up** would stay
+invisible on it forever; the only way in was `chezsetup --reset`, which re-asks
+about everything.
+
+Phase 2 closes that gap. It diffs `[moduleCatalog]` against two saved lists —
+`modules` (enabled here) and `modulesSeen` (offered here at least once) — and
+offers the difference:
+
+```text
+ℹ 1 new module since this Mac was set up:
+    claudeDistiller — Nightly distillation of Claude sessions into memory + the vault
+  Enable claudeDistiller? [y/N]
+```
+
+- **`[y/N]`, defaulting to no** — unlike the apply gate's `[Y/n]`. This rewrites
+  your configuration rather than installing something you already asked for.
+- **Every module offered is written to `modulesSeen`, accepted or not.** That is
+  what stops a declined module being asked about on every single run. Enabling it
+  later is `chezsetup` (tick the box); the gate itself asks exactly once.
+- **`YES=1` or no TTY: nothing is enabled.** The new modules are listed and the
+  run continues to the apply. `YES=1` means "don't ask before applying", not
+  "decide my configuration for me" — an unattended `chezreconcile` or a cron job
+  must not silently take on a module.
+- **`DRY_RUN=1`**: lists what's new, asks nothing, writes nothing.
+- If `jq` is missing or `chezmoi data` can't be read, the phase stays silent
+  rather than guessing — it fails closed, offering nothing.
+
+Both lists live in `~/.config/chezmoi/chezmoi.toml`, are emitted by
+[`src/.chezmoi.toml.tmpl`](../src/.chezmoi.toml.tmpl) (so `chezmoi init`
+round-trips them rather than wiping them), and are read and rewritten through
+[`scripts/lib/modules.sh`](../scripts/lib/modules.sh), shared with
+`chezdistill --setup` so the two can't write the list differently.
 
 ## When a command says its script is missing
 

@@ -24,6 +24,8 @@ ui_init_status
 . "$_DIR/../lib/distill.sh"
 # shellcheck source=../lib/chezmoi-data.sh
 . "$_DIR/../lib/chezmoi-data.sh"
+# shellcheck source=../lib/modules.sh
+. "$_DIR/../lib/modules.sh"
 
 _distill_help() {
     cat <<'EOF'
@@ -283,65 +285,55 @@ _distill_setup_migrate() {
 # _distill_setup_module — put claudeDistiller into the chezmoi module list.
 # Edits the single `modules = [...]` line rather than re-running `chezmoi init`:
 # init re-derives every other saved answer, and this has to change exactly one.
+# The edit itself lives in scripts/lib/modules.sh, shared with chezup's
+# new-module gate so the two cannot write the list differently.
 # 0 = already on · 3 = turned on now (an apply is needed) · 1 = could not.
 _distill_setup_module() {
-    local cfg line old new
+    local cfg json enabled seen
     if ! command -v chezmoi >/dev/null 2>&1; then
         s_warn "module   chezmoi is not on PATH — skipping the module check"
         return 1
     fi
-    if cm_has_module "$(cm_data_json)" claudeDistiller; then
+    json="$(cm_data_json)"
+    if cm_has_module "$json" claudeDistiller; then
         s_pass "module   claudeDistiller is enabled"
         return 0
     fi
 
-    cfg="${CHEZMOI_CONFIG_FILE:-$HOME/.config/chezmoi/chezmoi.toml}"
+    cfg="$(modules_config_file)"
     if [ ! -w "$cfg" ]; then
         s_fail "module   claudeDistiller is off, and $cfg is not writable"
         explain "Turn it on by hand instead: chezsetup, and tick claudeDistiller."
         return 1
     fi
-
-    line="$(grep -n '^[[:space:]]*modules[[:space:]]*=' "$cfg" | head -1)"
-    if [ -z "$line" ]; then
+    if ! grep -q '^[[:space:]]*modules[[:space:]]*=' "$cfg"; then
         s_fail "module   no 'modules =' line in $cfg"
         explain "Turn it on by hand instead: chezsetup, and tick claudeDistiller."
         return 1
     fi
-    # Rewrite the whole line, indent included, so the edit is byte-identical to
-    # what the wizard would have written.
-    old="${line#*:}"
-    case "$old" in
-        *"[]" | *"[ ]")
-            new="$(printf '%s' "$old" |
-                sed 's/\[[[:space:]]*\][[:space:]]*$/["claudeDistiller"]/')"
-            ;;
-        *)
-            new="$(printf '%s' "$old" |
-                sed 's/][[:space:]]*$/, "claudeDistiller"]/')"
-            ;;
-    esac
+
+    enabled="$(modules_enabled "$json" | tr '\n' ' ')claudeDistiller"
+    seen="$(modules_seen "$json" | tr '\n' ' ')claudeDistiller"
 
     s_note "module   claudeDistiller is off in $cfg"
-    dim "           $old"
-    dim "        →  $new"
+    dim "           $(modules_toml_array $(modules_enabled "$json"))"
+    dim "        →  $(modules_toml_array $enabled)"
     if ! _distill_confirm "Add claudeDistiller to the module list?"; then
         s_warn "module   left off — nothing else here will take effect"
         return 1
     fi
     if [ "$DRY_RUN" = "1" ]; then
         dim "dry-run \$ edit $cfg"
-    else
-        # ed-style in-place rewrite of exactly the one line found above.
-        awk -v n="${line%%:*}" -v repl="$new" \
-            'NR == n { print repl; next } { print }' \
-            "$cfg" >"$cfg.chezdistill.tmp" &&
-            mv "$cfg.chezdistill.tmp" "$cfg" || {
-            rm -f "$cfg.chezdistill.tmp"
-            s_fail "module   could not rewrite $cfg"
-            return 1
-        }
+        s_pass "module   claudeDistiller enabled"
+        return 3
     fi
+    if ! modules_write_list "$cfg" modules $enabled; then
+        s_fail "module   could not rewrite $cfg"
+        return 1
+    fi
+    # Record it as offered too, so chezup's gate stays quiet about a module
+    # that has just been answered here.
+    modules_write_list "$cfg" modulesSeen $seen || true
     s_pass "module   claudeDistiller enabled"
     return 3
 }

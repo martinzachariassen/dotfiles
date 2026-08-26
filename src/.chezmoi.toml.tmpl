@@ -47,6 +47,36 @@
      as [""], so normalise it back to an empty list. */ -}}
 {{- $modules = without $modules "" -}}
 
+{{/* Which modules this Mac has already been *offered* — not the same as which it
+     has enabled. promptMultichoiceOnce reads the saved answer back and chezup
+     only ever runs `apply`, so a module added to the catalog after a machine was
+     set up would otherwise stay invisible on it forever. chezup diffs the
+     catalog against this list and offers the difference exactly once, recording
+     the answer either way. Round-tripped through dig so a plain `chezmoi init`
+     preserves what chezup wrote.
+
+     The default when the key is absent depends on WHY it is absent, and `profile`
+     tells the two cases apart because it has been saved since v1 of this config:
+
+       no saved profile  → a fresh init, where the wizard just showed every box.
+                           Everything is seen; nothing is new.
+       saved profile     → a machine set up before this key existed. Only what it
+                           already has is seen, so whatever the catalog gained in
+                           the meantime gets its one offer. This is the case that
+                           makes claudeDistiller reachable on an existing Mac.
+
+     Edge case, deliberately left: the wizard shows every box, but cannot record
+     that (wizard.sh ends in `exec chezmoi init`, so nothing runs after it). A
+     module already in the list is fine — dig round-trips it, so unticking it in
+     `chezsetup` sticks. Only one that was never seen *and* was left unticked
+     there gets offered once more by chezup. One extra question, never a wrong
+     answer. */ -}}
+{{- $seenDefault := $modules -}}
+{{- if not (hasKey . "profile") -}}
+{{-   $seenDefault = $allModules -}}
+{{- end -}}
+{{- $modulesSeen := dig "modulesSeen" $seenDefault . -}}
+
 {{/* Derive from the checkout chezmoi was actually initialised against, so a
      DOTFILES_DIR clone (honoured by install.sh, wizard.sh, chezup.sh and
      doctor.sh) doesn't end up writing a config that points somewhere else.
@@ -62,6 +92,7 @@ sourceDir = {{ .chezmoi.workingTree | quote }}
     signingMode = {{ $signingMode | quote }}
     signingKey  = {{ $signingKey | quote }}
     modules     = [{{ range $i, $m := $modules }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
+    modulesSeen = [{{ range $i, $m := $modulesSeen }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
 
 # delta is always in the core Brewfile, so no lookPath gating needed.
 [diff]

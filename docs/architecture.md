@@ -86,6 +86,7 @@ the chezmoi hooks reach them across the source/root boundary via
 | `vscode.sh` | extension set-diff helpers (`vscode_read_manifest`, `vscode_untracked`, `vscode_missing`) | `run_onchange_after_03-vscode`, doctor |
 | `git-signing.sh` | `git_signing_smoke_test` (1Password SSH-signing probe) | doctor, bootstrap-auth |
 | `dry-run.sh` | `run` (DRY_RUN command wrapper) | chezup, clean |
+| `modules.sh` | this Mac's module selection: `modules_unseen` (catalog − enabled − seen), `modules_label`, `modules_write_list` (rewrite one `key = [...]` line in the generated chezmoi config) | chezup (new-module gate), distill (`--setup`) |
 
 The everyday scripts share the tiny logging library `log.sh`:
 

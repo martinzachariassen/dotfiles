@@ -86,7 +86,10 @@ duplicated one.
 
 1. **Create the folder in Obsidian**: `30-Claude` at the vault root.
 2. **Enable the module**: `chezsetup`, tick *claudeDistiller*. It's in the base
-   profile, so new machines get it by default.
+   profile, so new machines get it by default. A machine set up *before* the
+   module existed is offered it once by `chezup` itself — see
+   [the new-module gate](commands.md#new-modules-since-this-mac-was-set-up);
+   answer `y` there and this step is done.
 3. **Apply**: `chezup`. Hook 06 registers both launchd agents.
 4. **Check**: `chezdistill --status`.
 
@@ -593,6 +596,7 @@ extraction rubric forbids reproducing tokens, keys and `.env` values.
 `chezsetup`, untick *claudeDistiller*, `chezup`. That stops future applies from
 deploying the agents, but launchd keeps what it already loaded — unload it by hand:
 
+
 ```sh
 launchctl bootout gui/$(id -u)/no.mlz.chezdistill.nightly
 launchctl bootout gui/$(id -u)/no.mlz.chezdistill.weekly
@@ -601,3 +605,7 @@ launchctl bootout gui/$(id -u)/no.mlz.chezdistill.weekly
 The vault folder, the memory dir and the state dir are yours; nothing removes
 them. Drop the `@`-import by removing the module, and the persona stops loading
 `MAIN.md`.
+
+Unticking it stays unticked: `chezup`'s new-module gate only offers modules this
+Mac has *never been asked about*, and the module is recorded as offered whether
+you said yes or no.

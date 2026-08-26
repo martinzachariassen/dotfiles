@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# chezup.sh — converge this Mac to the repo: pull, preview drift, apply. No
-# package version bumps (that's chezbump).
+# chezup.sh — converge this Mac to the repo: pull, offer any module the catalog
+# gained since setup, preview drift, apply. No package version bumps (that's
+# chezbump).
 # Env: DRY_RUN=1 print instead of run; YES=1 skip the confirm gate; DOTFILES_DIR.
 
 set -uo pipefail
@@ -20,6 +21,89 @@ fi
 ui_init_logging
 # shellcheck source=../lib/dry-run.sh
 . "$_DIR/../lib/dry-run.sh"
+# shellcheck source=../lib/modules.sh
+. "$_DIR/../lib/modules.sh"
+
+# offer_new_modules — offer every catalog module this Mac has never been asked
+# about, exactly once.
+#
+# promptMultichoiceOnce keeps the first answer forever and chezup only ever runs
+# `apply`, so without this a module added to the catalog after a machine was set
+# up is reachable only through `chezsetup --reset`, which re-asks everything.
+# Runs after the pull (the catalog may have just grown) and before the drift
+# check, so a module enabled here is applied in the same run.
+#
+# Every module offered is recorded in `modulesSeen` whether or not it was
+# accepted — that is what stops a declined module being asked about every run.
+offer_new_modules() {
+    local json cfg fresh enabled seen accepted="" m label reply count=0
+
+    command -v jq >/dev/null 2>&1 || return 0
+    json="$(chezmoi data --format=json 2>/dev/null)"
+    [ -n "$json" ] || return 0
+
+    fresh="$(modules_unseen "$json" | tr '\n' ' ' | sed 's/ *$//')"
+    [ -n "${fresh// /}" ] || return 0
+    for m in $fresh; do count=$((count + 1)); done
+
+    if [ "$count" -eq 1 ]; then
+        info "1 new module since this Mac was set up:"
+    else
+        info "$count new modules since this Mac was set up:"
+    fi
+    for m in $fresh; do
+        label="$(modules_label "$json" "$m")"
+        dim "    $m — ${label:-no description}"
+    done
+
+    if [ "$DRY_RUN" = "1" ]; then
+        explain "dry-run — not asking, and not touching the module list."
+        return 0
+    fi
+
+    # Enabling a module rewrites this Mac's configuration rather than just
+    # installing what it already asked for, so it is never done unattended:
+    # YES=1 means "don't ask before applying", not "decide for me".
+    if [ "$ASSUME_YES" = "1" ] || [ ! -r /dev/tty ]; then
+        explain "Not enabling anything unattended — run chezup from a terminal to choose."
+        return 0
+    fi
+
+    cfg="$(modules_config_file)"
+    if [ ! -w "$cfg" ]; then
+        warn "$cfg is not writable — cannot record an answer"
+        explain "Choose modules by hand instead: chezsetup --reset"
+        return 0
+    fi
+
+    for m in $fresh; do
+        printf '%s  Enable %s? [y/N] ' "$(line_prefix)" "$m" >/dev/tty
+        IFS= read -r reply </dev/tty || reply=""
+        case "$reply" in
+            y | Y | yes | YES) accepted="${accepted:+$accepted }$m" ;;
+        esac
+    done
+
+    enabled="$(modules_enabled "$json" | tr '\n' ' ')${accepted:+ $accepted}"
+    seen="$(modules_seen "$json" | tr '\n' ' ')$fresh"
+
+    # modulesSeen first: if the second write fails, the worst case is being
+    # asked again — the reverse would silently enable a module and forget it.
+    if ! modules_write_list "$cfg" modulesSeen $seen; then
+        warn "could not record the answer in $cfg — you will be asked again"
+        return 0
+    fi
+    [ -n "$accepted" ] || {
+        ok "left off: $fresh"
+        return 0
+    }
+    if modules_write_list "$cfg" modules $enabled; then
+        ok "enabled: $accepted"
+    else
+        fail "could not write the module list to $cfg"
+    fi
+    return 0
+}
 
 echo
 printf '%s%s%s  %sConverging this Mac to the repo%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
@@ -49,11 +133,14 @@ else
     ok "pulled $pulled commit(s) (${before:0:7} → ${after:0:7})"
 fi
 
-# ─── 2. Review drift ─────────────────────────────────────────────────────────
+# ─── 2. Offer modules this Mac has never been asked about ────────────────────
 if ! command -v chezmoi >/dev/null 2>&1; then
     fail "chezmoi is not on PATH — run install.sh, or brew install chezmoi"
     exit 1
 fi
+offer_new_modules
+
+# ─── 3. Review drift ─────────────────────────────────────────────────────────
 # Two questions, not one: managed files can be perfectly in sync while apply
 # hooks (brew bundle, mise, VS Code, macOS defaults) still have work to do —
 # a partial install leaves no file drift at all. Gating only on file drift is
@@ -82,7 +169,7 @@ if [ "$hook_count" -gt 0 ]; then
     explain "Hooks are idempotent — a re-run installs only what is still missing."
 fi
 
-# ─── 3. Apply (single confirm gate) ──────────────────────────────────────────
+# ─── 4. Apply (single confirm gate) ──────────────────────────────────────────
 if [ "$ASSUME_YES" != "1" ] && [ -r /dev/tty ]; then
     if [ "$count" -gt 0 ]; then
         gate="Apply these $count change(s)? [Y/n] "
