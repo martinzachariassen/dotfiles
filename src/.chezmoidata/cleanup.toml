@@ -21,7 +21,6 @@ keepConfig = [
     "kafkactl",       # work profile only
     "obsidian",
     "raycast",
-    "rest-client",
     "siyuan",
     ".wrangler",      # Cloudflare Wrangler
     "cagent",
@@ -67,16 +66,10 @@ binary = "code"
 
 # Kept while the extension is installed (03 hook uninstalls it when dropped from
 # the manifest).
-[cleanup.owners.".sonarlint"]
-extension = "sonarsource.sonarlint-vscode"
 [cleanup.owners.".sts4"]
 extension = "vmware.vscode-spring-boot"
-[cleanup.owners.".codetogether"]
-extension = "genuitecllc.codetogether"
 [cleanup.owners.".lemminx"]
 extension = "redhat.vscode-xml"
-[cleanup.owners.".vs-kubernetes"]
-extension = "ms-kubernetes-tools.vscode-kubernetes-tools"
 
 # JVM tool caches — kept while mvn is on PATH, not extension-owned.
 [cleanup.owners.".hawtjni"]

@@ -122,9 +122,9 @@ _render_storecode_body() { # $1 = fake HOME
     # .m2 has no package (mise); the empty middle field must survive rendering
     # or the "mvn" binary would be lost.
     grep -qxF $'.m2\t\tmvn\t' <<<"$owners"
-    # .sonarlint is extension-only (empty package+binary, three tabs before the
+    # .sts4 is extension-only (empty package+binary, three tabs before the
     # ID) — a collapsed middle field would land the extension in the binary slot.
-    grep -qxF $'.sonarlint\t\t\tsonarsource.sonarlint-vscode' <<<"$owners"
+    grep -qxF $'.sts4\t\t\tvmware.vscode-spring-boot' <<<"$owners"
 }
 
 @test "at least one owners row maps a binary that differs from its dir stem (alias exercised)" {
@@ -155,7 +155,7 @@ _render_storecode_body() { # $1 = fake HOME
     local owners
     owners="$(_render_owners)"
     local dir
-    for dir in .sonarlint .sts4 .codetogether .lemminx .vs-kubernetes; do
+    for dir in .sts4 .lemminx; do
         awk -F'\t' -v d="$dir" '$1 == d && $4 != "" { found=1 } END { exit found ? 0 : 1 }' <<<"$owners" || {
             echo "extension-owned dir missing its extension ID: $dir"
             return 1

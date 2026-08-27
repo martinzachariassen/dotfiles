@@ -8,10 +8,10 @@ tap "hashicorp/tap"
 brew "azure-cli"                 # account/subscription CLI
 brew "Azure/kubelogin/kubelogin" # AKS auth plugin for kubectl
 brew "hashicorp/tap/terraform"  # official tap (BUSL build)
-brew "helm"                     # backs the helm-intellisense ext
+brew "helm"                     # chart install/template/lint from the terminal
 brew "kubectx"                  # + kubens
 brew "kubernetes-cli"           # kubectl
-brew "minikube"                 # avoids VS Code ext's own download
+brew "minikube"                 # local single-node cluster
 cask "gcloud-cli"               # GCP account/project CLI
 
 # ─── Work apps ────────────────────────────────────────────────────────────────

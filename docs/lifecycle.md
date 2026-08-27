@@ -74,7 +74,7 @@ exception: they carry no data and are trivial to reinstall, so
 `run_onchange_after_03-vscode` mirrors them outright — installing what
 `packages/vscode-extensions.txt` lists and pruning what it doesn't — with
 `chezdoctor` surfacing the drift read-only. Some extensions also drop a
-top-level dir in `$HOME` (`.sonarlint`, `.lemminx`, …); those are **not**
+top-level dir in `$HOME` (`.sts4`, `.lemminx`, …); those are **not**
 touched by an apply — `chezclean` removes them on demand once their owning
 extension is gone (the `extension` field in `cleanup.owners` links each dir
 to its extension). Other custom logic lives in `scripts/lib/` so it stays
@@ -114,7 +114,7 @@ leftovers re-surface as removable. Most tools are matched by a stem
 heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the
 `cleanup.owners` map supplies only the aliases where the dir name and the
 tool's command/package/extension diverge (`.kube`→`kubectl`, `.m2`→`mvn`
-from mise, `.sonarlint`→the `sonarsource.sonarlint-vscode` extension).
+from mise, `.lemminx`→the `redhat.vscode-xml` extension).
 `cleanup.toml` is the single source of truth for all three lists
 (`keepConfig`, `keepHome`, `owners`), so the two scopes can't drift apart.
 
