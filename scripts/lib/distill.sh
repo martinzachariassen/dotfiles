@@ -34,6 +34,27 @@ _distill_data() {
     printf '%s\n' "$_DISTILL_DATA"
 }
 
+# distill_config_ok — did the config actually load, or is `{}` standing in?
+#
+# `{}` is indistinguishable from a real config at every call site: every
+# distill_cfg falls back to its built-in default, transcriptRoots comes back
+# empty (so distill_sources_ok reads it as the deliberate harvest-nothing), and
+# remotes comes back empty (so the foreign-corpus hard stop cannot fire). One
+# unreadable file therefore disarms both input guards and every threshold at
+# once, quietly — chezmoi off PATH, a moved checkout, or a syntax error in any
+# .chezmoidata file is enough. "No config" and "a config that says nothing" are
+# different facts, exactly like "no transcripts" and "a quiet night".
+distill_config_ok() {
+    [ -n "${DISTILL_CONFIG_JSON:-}" ] && return 0
+    [ "$(distill_config)" != "{}" ] && return 0
+    distill_fail "could not read the distill config — every limit and guard is at its default"
+    explain \
+        "\`chezmoi data\` returned nothing usable. Check that chezmoi is on PATH," \
+        "that the checkout is where chezmoi expects, and that the files in" \
+        "src/.chezmoidata/ parse: bash scripts/ci/lint-config.sh \"\$PWD\""
+    return 1
+}
+
 # distill_config — the `.distill` table from .chezmoidata, fetched once.
 distill_config() {
     if [ -z "$_DISTILL_CFG" ]; then
@@ -320,7 +341,23 @@ distill_sources_ok() {
         total=$((total + n))
     done < <(distill_source_roots)
 
-    [ "$configured" -eq 0 ] && return 0
+    # An empty list is only legitimate when it was really CONFIGURED empty. If
+    # the config itself failed to load, distill_cfg_list returns nothing for
+    # every key, and this guard would wave through precisely the outage it was
+    # written to catch — a run that reads zero transcripts and calls it ok.
+    if [ "$configured" -eq 0 ]; then
+        distill_config_ok || return 1
+        return 0
+    fi
+
+    # A missing root is NOT worth a warning on its own. transcriptRoots is a
+    # CANDIDATE list — the two places Claude Code might keep transcripts — and
+    # only one of them is ever real on a given machine, so the other is expected
+    # to be absent. Warning about it would print the same line every night
+    # forever, and a warning that is always on is one you stop reading. That is
+    # the disease that let this job report green for its whole life; curing it
+    # with a permanent yellow tick would be no cure. The absence only becomes a
+    # fact worth stating when it is the reason there is nothing to read, below.
     [ "$total" -gt 0 ] && return 0
 
     if [ -n "$missing" ]; then
@@ -400,6 +437,14 @@ distill_claude() {
         return 0
     fi
 
+    # stderr to its own file, NOT folded into the capture with 2>&1. Merging them
+    # means any chatter on an otherwise successful call — an update notice, a
+    # plugin sync, a node deprecation warning — lands in front of the JSON and
+    # makes `jq -e .` reject it. That call is already billed at that point, so the
+    # merge converts "we paid and got an answer" into "we paid and dropped it",
+    # and the diagnostic prints the notice instead of the problem.
+    local errfile
+    errfile="$(mktemp)"
     envelope="$(claude -p \
         --model "$model" \
         --no-session-persistence \
@@ -408,16 +453,24 @@ distill_claude() {
         --json-schema "$(cat "$schemafile")" \
         --max-budget-usd "$budget" \
         --output-format json \
-        "$prompt" 2>&1)" || {
+        "$prompt" 2>"$errfile")" || {
         distill_fail "claude invocation failed for model $model"
+        [ -s "$errfile" ] && head -3 "$errfile" >&2
+        rm -f "$errfile"
         return 1
     }
 
     if ! printf '%s' "$envelope" | jq -e . >/dev/null 2>&1; then
-        distill_fail "claude returned non-JSON output"
+        # Loud, because this is the one branch that can burn money and keep
+        # nothing: claude exited 0, so the call was made and billed, but the
+        # answer is unusable and no cost line gets written either.
+        distill_fail "claude exited 0 but returned non-JSON — the call was billed and the result is lost"
         printf '%s\n' "$envelope" | head -3 >&2
+        [ -s "$errfile" ] && head -3 "$errfile" >&2
+        rm -f "$errfile"
         return 1
     fi
+    rm -f "$errfile"
 
     distill_spend_record "$(printf '%s' "$envelope" | jq -r '.total_cost_usd // 0')"
 
@@ -454,16 +507,33 @@ distill_spend_record() {
 }
 
 # distill_spend_since DAYS — total spend over a trailing window.
+#
+# Read as RAW lines and `fromjson?` each one, not `jq -s` over the file. This is
+# an append-only log written by a job that can be killed mid-write, so a torn
+# final line is an ordinary event, not a corruption scare. Slurping makes ONE bad
+# line abort the whole parse, and the total then comes back 0 — which the ceiling
+# below reads as "spent nothing, go ahead". A cost brake that fails open on the
+# most likely form of damage is not a brake. Per-line, a torn record costs you
+# that record's dollars and nothing else.
 distill_spend_since() {
-    local since f
+    local since f total
     since="$(distill_iso_ago "$1")"
     f="$(distill_spend_file)"
     [ -f "$f" ] || {
         echo 0
         return 0
     }
-    jq -s --arg since "$since" \
-        '[.[] | select(.t > $since) | .usd] | add // 0' "$f" 2>/dev/null || echo 0
+    total="$(jq -R -s --arg since "$since" '
+        [ split("\n")[]
+          | select(length > 0)
+          | (fromjson? // empty)
+          | select(.t > $since)
+          | (.usd // 0) ]
+        | add // 0' "$f" 2>/dev/null)"
+    case "$total" in
+        '' | null) echo 0 ;;
+        *) printf '%s\n' "$total" ;;
+    esac
 }
 
 # distill_spend_7d — the window the rolling ceiling is defined over. Named
@@ -475,14 +545,36 @@ distill_spend_7d() {
 # distill_spend_ok — the rolling ceiling, checked in preflight so a runaway
 # cannot quietly bill for a week before anyone notices.
 distill_spend_ok() {
-    local spent ceiling
+    local spent ceiling verdict
     spent="$(distill_spend_7d)"
     ceiling="$(distill_cfg maxSpendUsd7d 15.0)"
-    if jq -n --argjson s "$spent" --argjson c "$ceiling" -e '$s >= $c' >/dev/null 2>&1; then
-        distill_fail "7-day spend \$$spent has reached the \$$ceiling ceiling — refusing to start"
-        return 1
-    fi
-    return 0
+
+    # Fail CLOSED. The old form asked jq one question — `$s >= $c` — and read a
+    # non-zero exit as "under the ceiling". But jq also exits non-zero when
+    # --argjson is handed something that is not JSON, which is what an unreadable
+    # spend file or a missing config key produces. The one condition that must
+    # never be silently satisfied was satisfied by every error. Ask for the answer
+    # as a VALUE instead, and treat "no answer" as a refusal.
+    verdict="$(jq -n --argjson s "${spent:-null}" --argjson c "${ceiling:-null}" \
+        'if ($s|type) == "number" and ($c|type) == "number"
+         then (if $s >= $c then "over" else "under" end)
+         else "unknown" end' 2>/dev/null | tr -d '"')"
+
+    case "$verdict" in
+        under) return 0 ;;
+        over)
+            distill_fail "7-day spend \$$spent has reached the \$$ceiling ceiling — refusing to start"
+            return 1
+            ;;
+        *)
+            distill_fail "could not evaluate the spend ceiling (spent='$spent', ceiling='$ceiling') — refusing to start"
+            explain \
+                "The rolling cost brake could not be read, so nothing is stopping a" \
+                "runaway. Check maxSpendUsd7d in src/.chezmoidata/distill.toml and" \
+                "~/.local/state/chezdistill/spend.jsonl, then: chezdistill --status"
+            return 1
+            ;;
+    esac
 }
 
 # ─── Run log ──────────────────────────────────────────────────────────────────
@@ -822,10 +914,42 @@ distill_eligible() {
     minhits="$(distill_cfg minHits 2)"
     cutoff="$(date -u -v-"$(distill_cfg demoteAfterDays 21)"d +%Y-%m-%d 2>/dev/null ||
         date -u -d "$(distill_cfg demoteAfterDays 21) days ago" +%Y-%m-%d)"
-    distill_derive | jq -c --argjson minhits "$minhits" --arg cutoff "$cutoff" '
+    # `tonumber?` and the `// 0`, because last_seen is the first 10 characters of
+    # a filename and nothing validates it. A bare tonumber on one stray file in
+    # extracts/ aborts the WHOLE jq — not just that record — and every consumer
+    # then sees an empty stream: MAIN.md renders with no rules at all, the write
+    # succeeds, and the run reports ok. The tie-break is not worth that.
+    #
+    # 1000000 on both terms, not 100000: six digits is what a YYYYMMDD needs for
+    # the decade to survive the modulo (2030-01-01 sorted BELOW 2029-12-31), and
+    # the hits multiplier has to stay above the date term or recency would start
+    # outranking the promotion gate.
+    #
+    # Buffered through a temp file rather than piped straight out, because a jq
+    # that aborts halfway has already written the records before the bad one.
+    # A truncated stream is worse than no stream: it looks exactly like a corpus
+    # that legitimately holds fewer entries, and MAIN.md would be rendered from
+    # it without a word. Emit all of it or none of it, and say so.
+    local src out
+    src="$(mktemp)"
+    out="$(mktemp)"
+    distill_derive >"$src"
+    if ! jq -c --argjson minhits "$minhits" --arg cutoff "$cutoff" '
         . + { eligible: (.hits >= $minhits
                          and .last_seen >= $cutoff),
-              score: (.hits * 100000 + (.last_seen | gsub("-";"") | tonumber % 100000)) }'
+              score: (.hits * 1000000
+                      + (((.last_seen | gsub("-";"") | tonumber?) // 0) % 1000000)) }' \
+        "$src" >"$out" 2>/dev/null; then
+        rm -f "$src" "$out"
+        distill_fail "could not score the extract corpus — it may be corrupt"
+        explain \
+            "Every rendering decision reads this. Find the bad file with:" \
+            "for f in \$(chezdistill --status >/dev/null; echo ~/.local/state/chezdistill/extracts/*.json);" \
+            "do jq -e . \"\$f\" >/dev/null || echo \"\$f\"; done"
+        return 1
+    fi
+    cat "$out"
+    rm -f "$src" "$out"
 }
 
 # The one line in MAIN that points at the tier below it. Every byte here is
@@ -852,8 +976,20 @@ _distill_topics_pointer() {
 distill_render_main() {
     local out="${1:-$(distill_memory_dir)/MAIN.md}"
     local pinned="$(distill_pinned_file)"
-    local cap base tmp chosen line used
+    local cap base tmp chosen line used scored n_eligible
     cap="$(distill_cfg mainCapBytes 6144)"
+
+    # Score first, and bail before touching $out if scoring failed. MAIN.md is
+    # derived, which cuts both ways: a render is free to run any time, and a
+    # render from a broken corpus will happily replace a good file with an empty
+    # one and report success. Refusing to write leaves the last good MAIN.md in
+    # place, which is the safe stale state.
+    scored="$(mktemp)"
+    if ! distill_eligible >"$scored"; then
+        rm -f "$scored"
+        return 1
+    fi
+
     tmp="$(mktemp)"
     chosen="$(mktemp)"
     mkdir -p "$(dirname "$out")"
@@ -878,8 +1014,8 @@ distill_render_main() {
     # unconditionally keeps the cap a guarantee rather than an estimate.
     used=$((base + ${#_DISTILL_MAIN_HEADING} + 3))
     # Highest score first, ties broken by id so the order is stable.
-    distill_eligible |
-        jq -r 'select(.eligible) | [(.score|tostring), .topic, .id, .text] | @tsv' |
+    jq -r 'select(.eligible) | [(.score|tostring), .topic, .id, .text] | @tsv' \
+        <"$scored" |
         sort -t"$(printf '\t')" -k1,1nr -k3,3 |
         while IFS=$'\t' read -r _ topic id text; do
             line="- $text"
@@ -887,6 +1023,22 @@ distill_render_main() {
             used=$((used + ${#line} + 1))
             printf '%s\t%s\t%s\n' "$topic" "$id" "$text"
         done >"$chosen"
+
+    # The floor. An empty MAIN.md is legitimate on a young corpus — nothing has
+    # cleared the promotion gate yet — but it is NOT legitimate when entries did
+    # clear it and none of them made the file. That gap can only mean the byte
+    # budget was exhausted by Pinned.md, and it is the exact shape of this job's
+    # signature failure: a real result, silently replaced by nothing, reported ok.
+    n_eligible="$(jq -r 'select(.eligible) | .id' <"$scored" | wc -l | tr -d ' ')"
+    if [ "${n_eligible:-0}" -gt 0 ] && [ ! -s "$chosen" ]; then
+        rm -f "$tmp" "$chosen" "$scored"
+        distill_fail \
+            "$n_eligible entr(ies) qualify for MAIN.md and none fit in ${cap}B — refusing to write an empty one"
+        explain \
+            "Pinned.md plus the header already fill the budget. Either trim" \
+            "Pinned.md or raise mainCapBytes in src/.chezmoidata/distill.toml."
+        return 1
+    fi
 
     if [ -s "$chosen" ]; then
         printf '\n## %s\n\n' "$_DISTILL_MAIN_HEADING" >>"$tmp"
@@ -896,7 +1048,7 @@ distill_render_main() {
             done
     fi
 
-    rm -f "$chosen"
+    rm -f "$chosen" "$scored"
     if ! mv "$tmp" "$out" 2>/dev/null; then
         rm -f "$tmp"
         distill_fail "could not write $out"
@@ -1282,11 +1434,16 @@ distill_state_repo_init() {
 # second implementation that could drift from the harvester.
 distill_status_sources() {
     local root n total=0 configured=0 window
+    # A configured root that does not exist is reported dim, not red. The list is
+    # a set of candidates for where Claude Code keeps transcripts and only one is
+    # ever real, so a red tick here would be permanent — and a check that is
+    # always failing is a check nobody reads. Red is reserved for the state that
+    # actually breaks a run: nothing readable anywhere.
     while IFS= read -r root; do
         [ -n "$root" ] || continue
         configured=$((configured + 1))
         if [ ! -d "$root" ]; then
-            s_fail "sources  $(distill_tilde "$root") does not exist"
+            dim "         $(distill_tilde "$root") — not present on this Mac"
             continue
         fi
         n="$(distill_source_count "$root")"
@@ -1294,7 +1451,7 @@ distill_status_sources() {
         if [ "$n" -gt 0 ]; then
             s_pass "sources  $(distill_tilde "$root") — $n transcript(s)"
         else
-            s_warn "sources  $(distill_tilde "$root") — empty"
+            dim "         $(distill_tilde "$root") — present but empty"
         fi
     done < <(distill_source_roots)
 
@@ -1656,6 +1813,7 @@ distill_run_daily() {
 _distill_daily_body() {
     local since now tmp sysfile schema filtered turns cwd out
     local sess name title mapped date n_items persisted=1 halted=0
+    local n_called=0 n_failed=0 outage=0
 
     distill_spend_ok || return 1
     # Before the cursor, before the temp dir, before anything: a run with nowhere
@@ -1711,9 +1869,11 @@ _distill_daily_body() {
             break
         fi
 
+        n_called=$((n_called + 1))
         mapped="$(distill_claude "$(distill_cfg mapModel sonnet)" "$sysfile" "$schema" \
             "Session title: ${title:-untitled}. Extract durable items, or none." \
             <"$filtered")" || {
+            n_failed=$((n_failed + 1))
             distill_run_session "$name" "$turns" "model call failed" 0
             continue
         }
@@ -1737,20 +1897,52 @@ _distill_daily_body() {
 
     ok "$DISTILL_RUN_KEPT of $DISTILL_RUN_SEEN session(s) yielded items"
 
+    # Every call attempted, every one failed. That is not this window being
+    # unlucky, it is the model being unreachable — no credentials under launchd,
+    # no network, a bad model name. Individually a failure is forgiven (one poison
+    # session must not wedge the cursor and re-bill forever), but "all of them"
+    # means nothing about this window was actually tried, and advancing over it
+    # would skip the sessions for good.
+    if [ "$n_called" -gt 0 ] && [ "$n_failed" -eq "$n_called" ]; then
+        outage=1
+        distill_fail "every model call failed ($n_failed of $n_called) — treating this as an outage, not an empty night"
+        explain \
+            "The nightly job runs under launchd, which does not read your shell" \
+            "config, so provider variables set in ~/.zshenv are absent there." \
+            "Check the last error with: chezdistill --logs 40"
+    elif [ "$n_failed" -gt 0 ]; then
+        distill_warn "$n_failed of $n_called model call(s) failed — those sessions were skipped, not retried"
+    fi
+
+    # A dry run must not consume the very window it is previewing. Everything
+    # above this point is read-only (distill_claude short-circuits under DRY_RUN);
+    # everything below writes. Without this guard `chezdistill -n` advanced the
+    # cursor and re-rendered the memory tier, so the "free preview" step in the
+    # docs destroyed the window you were about to validate for real.
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+        dim "dry-run — corpus, cursor and rendered memory left untouched"
+        rm -rf "$tmp"
+        return 0
+    fi
+
     distill_persist_extracts "$tmp" || persisted=0
 
     distill_render_all
     distill_prune_extracts
     # The cursor only advances over a window that was read to the end. Stopping
-    # early — a failed write, or the spend ceiling — must hold it, or the sessions
-    # never reached are skipped for good and the gap is invisible.
-    if [ "$persisted" -eq 1 ] && [ "$halted" -eq 0 ]; then
+    # early — a failed write, the spend ceiling, or a total model outage — must
+    # hold it, or the sessions never reached are skipped for good and the gap is
+    # invisible.
+    if [ "$persisted" -eq 1 ] && [ "$halted" -eq 0 ] && [ "$outage" -eq 0 ]; then
         distill_cursor_write "$now"
     else
         distill_warn "cursor held at $since — the next run re-reads this window"
     fi
     rm -rf "$tmp"
-    [ "$persisted" -eq 1 ]
+    # An outage fails the run; the spend ceiling does not. Hitting the ceiling is
+    # the brake working as designed and the sessions read before it are kept, so
+    # that stays a warning — but it still holds the cursor, above.
+    [ "$persisted" -eq 1 ] && [ "$outage" -eq 0 ]
 }
 
 # distill_persist_extracts TMPDIR — write this run's items into the corpus, one

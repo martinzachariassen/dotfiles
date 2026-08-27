@@ -91,9 +91,15 @@ chezdistill --logs [N]   # tail launchd's own log (default 50); -f follows
 ```
 
 `-n` first is the cheap habit: it prints the sessions that would be read and the
-calls that would be made without spending anything. A session already read is
-skipped by the cursor, so running the job by hand does not double-bill you for
-the night.
+calls that would be made without spending anything, and it leaves the corpus, the
+cursor and the rendered memory exactly as it found them — so the real run that
+follows still sees the same window. A session already read is skipped by the
+cursor, so running the job by hand does not double-bill you for the night.
+
+One thing `-n` cannot tell you: whether a session holds anything worth keeping.
+The model is never called, so every session reports the same "nothing durable in
+it" a real skip would. `-n` answers *what would be read*, not *what would be
+learned*.
 
 ## What happens each night
 
@@ -420,6 +426,9 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | Green every night, but nothing distilled | Look at `sources` in `--status`: if a configured `transcriptRoot` does not exist there is nothing to read, and the run now fails rather than recording `ok`. `--runs` shows the whole streak. |
 | "no transcripts to read — configured root(s) do not exist" | `transcriptRoots` in `src/.chezmoidata/distill.toml` is wrong for this machine. Claude Code writes to `~/.claude/projects`; `CLAUDE_CONFIG_DIR` moves settings, skills and the persona, not transcripts. |
 | It ran but distilled nothing | The per-session lines under `last run` give the reason for each. |
+| "N seen, 0 kept" most nights | Usually `minTurns`: a turn counts only if you *typed* it, and plenty of real sessions are one or two prompts long. This is the filter working, not a fault. Lower `minTurns` in `src/.chezmoidata/distill.toml` if you want the short ones too. |
+| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chezdistill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash scripts/bin/distill.sh`. |
+| A root shows as "not present on this Mac" | Expected. `transcriptRoots` is a candidate list and only one entry is ever real; it is only a problem when *no* root has transcripts, which fails the run outright. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 
 ## Backing it up, and moving to a new Mac
