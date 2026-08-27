@@ -117,6 +117,32 @@ item() {
     [ "$status" -eq 2 ]
 }
 
+# --logs and --runs take an OPTIONAL count, which is the parser's one real
+# hazard: a naive `shift` eats whatever follows, and the damage is silent —
+# `--logs -f` quietly stops following, `--logs --nope` quietly stops erroring.
+# The lookahead therefore consumes only a bare integer, and these pin that.
+
+@test "an optional count never swallows the flag behind it" {
+    run bash "$BIN" --logs --nope
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown option: --nope"* ]]
+}
+
+@test "a non-numeric count is refused rather than read as a flag" {
+    run bash "$BIN" --runs 7d
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unknown option: 7d"* ]]
+
+    run bash "$BIN" --runs=abc
+    [ "$status" -eq 2 ]
+}
+
+@test "-f outside --logs is refused, not ignored" {
+    run bash "$BIN" --status -f
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"only applies to --logs"* ]]
+}
+
 # ─── Preflight ────────────────────────────────────────────────────────────────
 #
 # Both destinations are ordinary local directories the job owns outright, so
@@ -947,6 +973,211 @@ window_setup() {
     run distill_session_files "$(distill_iso_ago 30)"
     [ "$status" -eq 0 ]
     [[ "$output" != *"sub.jsonl"* ]]
+}
+
+# ─── Somewhere to read from ───────────────────────────────────────────────────
+#
+# This job reported `status: ok` every night of its life with transcriptRoots
+# pointing at a directory that has never existed. Nothing caught it, because
+# "nothing new in tonight's window" and "nothing reachable, ever" produced
+# byte-identical output — every precondition in the engine guarded an output,
+# and none guarded an input. These pin the distinction apart.
+
+@test "a root that does not exist fails the run, and is named" {
+    ROOTS="$BATS_TEST_TMPDIR/nowhere"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg r "$ROOTS" '{transcriptRoots:[$r]}')")"
+    export DISTILL_CONFIG_JSON
+    load_lib
+    distill_run_begin
+    run _distill_daily_body
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"do not exist"* ]]
+    [[ "$output" == *"nowhere"* ]]
+}
+
+@test "a root that exists but holds no transcripts fails the run" {
+    window_setup
+    distill_run_begin
+    run _distill_daily_body
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"no transcripts"* ]]
+}
+
+# The counterweight, and the more important half: a quiet night must stay quiet.
+@test "zero sessions in the window is still an ok run" {
+    window_setup
+    a_transcript 30 >/dev/null
+    distill_run_begin
+    run _distill_daily_body
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"no transcripts"* ]]
+}
+
+# The bats suite configures no roots at all, and so does anyone reading the
+# corpus on a machine that has never run Claude Code. Unconfigured is a choice;
+# configured-and-wrong is the bug.
+@test "an empty transcriptRoots list is not a failure" {
+    load_lib
+    distill_run_begin
+    run distill_sources_ok
+    [ "$status" -eq 0 ]
+}
+
+@test "the reason a run had nothing to read survives into the record" {
+    ROOTS="$BATS_TEST_TMPDIR/nowhere"
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg r "$ROOTS" '{transcriptRoots:[$r]}')")"
+    export DISTILL_CONFIG_JSON
+    load_lib
+    distill_run_begin
+    _distill_daily_body >/dev/null 2>&1 || true
+    distill_run_record failed
+
+    run jq -r '.status, (.notes[] | .text)' "$STATE/runs.jsonl"
+    [[ "$output" == *"failed"* ]]
+    [[ "$output" == *"do not exist"* ]]
+}
+
+# The check belongs in the run path, never in preflight: --render rebuilds the
+# memory tier from the corpus alone, and that is exactly what a replacement Mac
+# does before it has ever opened Claude Code.
+@test "--render still works on a machine with no transcripts at all" {
+    run bash "$BIN" --render
+    [ "$status" -eq 0 ]
+    [ -f "$MEM/MAIN.md" ]
+}
+
+@test "--status reports what it can read, before anything has run" {
+    window_setup
+    a_transcript 0 >/dev/null
+    run distill_status
+    [[ "$output" == *"sources"* ]]
+    [[ "$output" == *"1 transcript"* ]]
+}
+
+# chezdoctor is the only passive liveness signal this job has, so the input side
+# has to reach it too — otherwise the next silent outage passes it green again.
+@test "chezdoctor checks that there is anything to read" {
+    sect="$BATS_TEST_TMPDIR/sect.sh"
+    awk '/claudeDistiller/,/^fi$/' "$REPO_ROOT/scripts/bin/doctor.sh" >"$sect"
+    grep -q 'distill_source_count' "$sect"
+    grep -q 'distill_source_roots' "$sect"
+}
+
+# ─── Looking at it ────────────────────────────────────────────────────────────
+#
+# There is no human-facing report by design, so everything here is on demand and
+# read-only. --runs matters most: runs.jsonl has always held 90 days and nothing
+# read past the newest record, which is why "green and empty, every night, for
+# weeks" was invisible until someone opened the file by hand.
+
+# a_run ISO STATUS SEEN KEPT — one synthetic record in the run log.
+a_run() {
+    jq -nc --arg t "$1" --arg s "$2" --argjson seen "$3" --argjson kept "$4" \
+        '{t:$t, end:$t, trigger:"launchd", status:$s,
+          sessions:{seen:$seen, kept:$kept}, items:0, dur:4, cost:0}' \
+        >>"$STATE/runs.jsonl"
+}
+
+@test "--runs reads back more than the newest record" {
+    load_lib
+    a_run "$(distill_iso_ago 2)" ok 5 2
+    a_run "$(distill_iso_ago 1)" failed 0 0
+    run distill_runs 10
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"5"* ]]
+    [[ "$output" == *"failed"* ]]
+}
+
+@test "--runs N shows at most N" {
+    load_lib
+    a_run "$(distill_iso_ago 3)" ok 1 1
+    a_run "$(distill_iso_ago 2)" ok 2 2
+    a_run "$(distill_iso_ago 1)" ok 3 3
+    run distill_runs 1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"3/3"* ]]
+    [[ "$output" != *"1/1"* ]]
+}
+
+# The exact shape of this bug: every run succeeded, not one of them read a thing.
+@test "--runs says so when not one run saw a session" {
+    load_lib
+    a_run "$(distill_iso_ago 1)" ok 0 0
+    run distill_runs 10
+    [[ "$output" == *"not one of these runs"* ]]
+}
+
+@test "--runs on an empty log says so and exits 0" {
+    load_lib
+    run distill_runs 10
+    [ "$status" -eq 0 ]
+}
+
+@test "--logs prints the tail, not the whole file" {
+    load_lib
+    mkdir -p "$STATE/logs"
+    printf 'first\nsecond\nthird\n' >"$STATE/logs/nightly.log"
+    run distill_logs 2 0
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"third"* ]]
+    [[ "$output" != *"first"* ]]
+}
+
+@test "--logs before the first run says so and exits 0" {
+    load_lib
+    run distill_logs 50 0
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nightly.log"* ]]
+}
+
+# Runtime-tested this would hang CI forever on a regression, and macOS ships no
+# `timeout`. The guarantee is structural: -n must reach the plain tail.
+@test "a dry run prints the log rather than following it" {
+    fn="$BATS_TEST_TMPDIR/logs.sh"
+    awk '/^distill_logs\(\) \{/,/^\}/' "$LIB" >"$fn"
+    grep -q 'DRY_RUN' "$fn"
+    grep -q 'tail -f' "$fn"
+}
+
+# "Past the promotion gate" and "in MAIN.md" are different sets — the byte cap
+# evicts eligible entries silently, by design. Conflating the two would make
+# --stats most wrong exactly where the number matters.
+@test "--stats does not claim a cap-evicted entry is in MAIN" {
+    DISTILL_CONFIG_JSON="$(cfg '{"mainCapBytes":700}')"
+    export DISTILL_CONFIG_JSON
+    _DISTILL_CFG=""
+    load_lib
+    items=""
+    for i in 1 2 3 4 5 6 7 8 9; do
+        items="$items$(item "a fairly long rule number $i that eats into the byte budget" s1),"
+        items="$items$(item "a fairly long rule number $i that eats into the byte budget" s2),"
+    done
+    extract "$(date -u +%Y-%m-%d)" "[${items%,}]"
+    distill_render_all
+
+    eligible="$(distill_eligible | jq -s '[.[] | select(.eligible)] | length')"
+    [ "$eligible" -eq 9 ]
+    [ "$(_distill_main_entries)" -lt "$eligible" ]
+
+    run distill_stats
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"evicted"* ]]
+}
+
+@test "--stats survives an empty corpus" {
+    load_lib
+    run distill_stats
+    [ "$status" -eq 0 ]
+}
+
+@test "the thirty-day window sees spend the seven-day one does not" {
+    load_lib
+    jq -nc --arg t "$(distill_iso_ago 3)" '{t:$t, usd:1.0}' >"$STATE/spend.jsonl"
+    jq -nc --arg t "$(distill_iso_ago 20)" '{t:$t, usd:2.0}' >>"$STATE/spend.jsonl"
+    [ "$(distill_spend_since 7 | jq '. == 1')" = "true" ]
+    [ "$(distill_spend_since 30 | jq '. == 3')" = "true" ]
+    # The rolling ceiling is defined over 7 days and must stay that way.
+    [ "$(distill_spend_7d)" = "$(distill_spend_since 7)" ]
 }
 
 # ─── One corpus per profile ───────────────────────────────────────────────────

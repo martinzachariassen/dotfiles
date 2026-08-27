@@ -250,13 +250,89 @@ distill_session_files() {
         fi
         days=$((days + 1))
     fi
+    # Deduped by basename because transcriptRoots now lists two paths. Session
+    # filenames are UUIDs, so the same basename under two roots is the same
+    # session — reached twice via a symlink, or by a second Claude Code install
+    # sharing a directory. Mapping it twice would bill twice for one session and
+    # `hits` would not even notice, since it counts distinct session ids.
     while IFS= read -r root; do
         [ -n "$root" ] || continue
         expanded="$(distill_expand "$root")"
         [ -d "$expanded" ] || continue
         /usr/bin/find "$expanded" -type f -name '*.jsonl' \
             -not -path '*/subagents/*' -mtime -"${DISTILL_MTIME_DAYS:-$days}" 2>/dev/null
+    done < <(distill_cfg_list transcriptRoots) | awk -F/ '!seen[$NF]++'
+}
+
+# ─── Sources ──────────────────────────────────────────────────────────────────
+#
+# Every precondition in this file used to guard an OUTPUT: can the memory dir be
+# written, can the state dir, is the corpus pointed at the right remote. None
+# guarded an input. So when transcriptRoots shipped pointing at a directory that
+# has never existed, the nightly job read zero transcripts, recorded `status:
+# ok`, and both --status and chezdoctor showed green — for its entire life.
+#
+# "Nothing was worth keeping last night" and "there is nowhere to read from" are
+# different facts and only one of them is fine. These functions are what keeps
+# them apart.
+
+# distill_source_roots — the configured roots, tilde-expanded, one per line.
+distill_source_roots() {
+    local root
+    while IFS= read -r root; do
+        [ -n "$root" ] || continue
+        distill_expand "$root"
     done < <(distill_cfg_list transcriptRoots)
+}
+
+# distill_source_count ROOT — transcripts under one root.
+#
+# Deliberately the same find predicate as distill_session_files, minus the mtime
+# window: a count that can disagree with what the harvester actually opens is
+# worse than no count, because it would make a broken run look explained.
+distill_source_count() {
+    [ -d "$1" ] || {
+        echo 0
+        return 0
+    }
+    /usr/bin/find "$1" -type f -name '*.jsonl' \
+        -not -path '*/subagents/*' 2>/dev/null | wc -l | tr -d ' '
+}
+
+# distill_sources_ok — refuse to call a run with no inputs a quiet night.
+#
+# An EMPTY transcriptRoots list is not a failure: it is the deliberate "harvest
+# nothing" the test suite runs on, and the honest reading of a list with nothing
+# in it. What is never legitimate is a root that was configured and isn't there,
+# or a set of roots that between them hold no transcript at all.
+# 0 = go · 1 = there is nowhere to read from
+distill_sources_ok() {
+    local root total=0 n configured=0 missing=""
+
+    while IFS= read -r root; do
+        [ -n "$root" ] || continue
+        configured=$((configured + 1))
+        if [ ! -d "$root" ]; then
+            missing="$missing $(distill_tilde "$root")"
+            continue
+        fi
+        n="$(distill_source_count "$root")"
+        total=$((total + n))
+    done < <(distill_source_roots)
+
+    [ "$configured" -eq 0 ] && return 0
+    [ "$total" -gt 0 ] && return 0
+
+    if [ -n "$missing" ]; then
+        distill_fail "no transcripts to read — configured root(s) do not exist:${missing}"
+    else
+        distill_fail "no transcripts under any configured root — nothing can be distilled"
+    fi
+    explain \
+        "Claude Code writes transcripts to ~/.claude/projects. CLAUDE_CONFIG_DIR" \
+        "moves settings and skills, not these. Check transcriptRoots in" \
+        "src/.chezmoidata/distill.toml, then: chezdistill --status"
+    return 1
 }
 
 # distill_filter FILE SINCE_ISO — the 16x reduction.
@@ -377,10 +453,10 @@ distill_spend_record() {
     printf '{"t":"%s","usd":%s}\n' "$(distill_iso_now)" "$usd" >>"$f"
 }
 
-# distill_spend_7d — total spend over the last 7 days.
-distill_spend_7d() {
+# distill_spend_since DAYS — total spend over a trailing window.
+distill_spend_since() {
     local since f
-    since="$(distill_iso_ago 7)"
+    since="$(distill_iso_ago "$1")"
     f="$(distill_spend_file)"
     [ -f "$f" ] || {
         echo 0
@@ -388,6 +464,12 @@ distill_spend_7d() {
     }
     jq -s --arg since "$since" \
         '[.[] | select(.t > $since) | .usd] | add // 0' "$f" 2>/dev/null || echo 0
+}
+
+# distill_spend_7d — the window the rolling ceiling is defined over. Named
+# separately because it is a policy, not just a report: maxSpendUsd7d means this.
+distill_spend_7d() {
+    distill_spend_since 7
 }
 
 # distill_spend_ok — the rolling ceiling, checked in preflight so a runaway
@@ -416,6 +498,13 @@ distill_spend_ok() {
 
 distill_run_file() {
     printf '%s/runs.jsonl\n' "$(distill_state_dir)"
+}
+
+# distill_log_file — where launchd sends the nightly job's stdout AND stderr
+# (both keys in the plist point here). Gitignored: it describes one machine's
+# 01:00, and two Macs appending to one file would conflict on every line.
+distill_log_file() {
+    printf '%s/logs/nightly.log\n' "$(distill_state_dir)"
 }
 
 # distill_run_all — every record, oldest first.
@@ -1187,6 +1276,40 @@ distill_state_repo_init() {
 
 # ─── Status ───────────────────────────────────────────────────────────────────
 
+# distill_status_sources — one line per configured transcript root, plus how many
+# of them the next run would actually open. The window figure comes from
+# distill_session_files and the cursor, so it is the real answer rather than a
+# second implementation that could drift from the harvester.
+distill_status_sources() {
+    local root n total=0 configured=0 window
+    while IFS= read -r root; do
+        [ -n "$root" ] || continue
+        configured=$((configured + 1))
+        if [ ! -d "$root" ]; then
+            s_fail "sources  $(distill_tilde "$root") does not exist"
+            continue
+        fi
+        n="$(distill_source_count "$root")"
+        total=$((total + n))
+        if [ "$n" -gt 0 ]; then
+            s_pass "sources  $(distill_tilde "$root") — $n transcript(s)"
+        else
+            s_warn "sources  $(distill_tilde "$root") — empty"
+        fi
+    done < <(distill_source_roots)
+
+    if [ "$configured" -eq 0 ]; then
+        s_warn "sources  no transcriptRoots configured — nothing will be harvested"
+        return 0
+    fi
+    if [ "$total" -eq 0 ]; then
+        s_fail "sources  nothing to read — a run would fail rather than report ok"
+        return 0
+    fi
+    window="$(distill_session_files "$(distill_cursor_read)" 2>/dev/null | wc -l | tr -d ' ')"
+    s_note "         ${window:-0} in the window the next run would read"
+}
+
 distill_status() {
     local main cap spent ceiling n last line f foreign
     s_section "chezdistill"
@@ -1200,6 +1323,10 @@ distill_status() {
 
     s_pass "memory   $(distill_memory_dir)"
     s_pass "state    $(distill_state_dir)"
+
+    # The inputs, reported as plainly as the outputs. Without this line a machine
+    # reading nothing at all looks exactly like a machine having a quiet week.
+    distill_status_sources
 
     main="$(distill_memory_dir)/MAIN.md"
     cap="$(distill_cfg mainCapBytes 6144)"
@@ -1266,6 +1393,198 @@ distill_status() {
 
     f="$(distill_cursor_file)"
     [ -f "$f" ] && s_note "cursor   read up to $(jq -r '.cursor // "?"' "$f")"
+    return 0
+}
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+
+# distill_logs [N] [FOLLOW] — the tail of the nightly log.
+#
+# The path was only ever written down in a troubleshooting table, which means it
+# was only reachable by someone who already suspected something was wrong. It is
+# read-only, so it does not go through the `run` wrapper — same as --status.
+distill_logs() {
+    local n="${1:-50}" follow="${2:-0}" f
+    f="$(distill_log_file)"
+    s_section "chezdistill logs"
+
+    if [ ! -f "$f" ]; then
+        s_note "no log yet at $(distill_tilde "$f")"
+        explain "launchd writes it on the first nightly run. Run one now: chezdistill"
+        return 0
+    fi
+    if [ ! -s "$f" ]; then
+        s_note "$(distill_tilde "$f") is empty"
+        return 0
+    fi
+
+    s_note "$(distill_tilde "$f") · last $n line(s)"
+    hr
+    tail -n "$n" "$f"
+
+    if [ "$follow" = "1" ]; then
+        if [ "${DRY_RUN:-0}" = "1" ]; then
+            dim "dry-run \$ tail -f $f"
+            return 0
+        fi
+        hr
+        s_note "following — ^C to stop"
+        tail -f -n 0 "$f"
+    fi
+    return 0
+}
+
+# ─── Run history ──────────────────────────────────────────────────────────────
+#
+# runs.jsonl already kept 90 days of records and nothing read it but --status,
+# which shows the last one. One record is enough to answer "did it run last
+# night" and useless for "has it been doing anything all week" — which is the
+# question that would have caught the empty-transcriptRoots bug on night two.
+
+# distill_runs [N] — the last N runs, newest last so the eye lands on it.
+distill_runs() {
+    local n="${1:-14}" f rows failed quiet
+    f="$(distill_run_file)"
+    s_section "chezdistill runs"
+
+    if [ ! -s "$f" ]; then
+        s_note "no run recorded yet — the first run creates one"
+        return 0
+    fi
+
+    printf '     %s%-16s  %-8s  %-6s  %9s  %5s  %6s  %7s%s\n' \
+        "$DIM" date trigger status kept/seen items dur cost "$RESET"
+
+    distill_run_all | jq -s -r --argjson n "$n" '
+        sort_by(.t) | (if $n > 0 then .[-$n:] else . end) | .[]
+        | [ ((.end // .t) | .[0:16] | sub("T"; " ")),
+            (.trigger // "?"),
+            .status,
+            "\(.sessions.kept // 0)/\(.sessions.seen // 0)",
+            ((.items // 0) | tostring),
+            "\(.dur // 0)s",
+            (.cost // 0) ] | @tsv' 2>/dev/null |
+        while IFS=$'\t' read -r d tr st ks it du co; do
+            if [ "$st" = "ok" ]; then
+                printf '     %-16s  %-8s  %-6s  %9s  %5s  %6s  %7s\n' \
+                    "$d" "$tr" "$st" "$ks" "$it" "$du" "$(printf '$%.2f' "$co")"
+            else
+                printf '     %-16s  %-8s  %s%-6s%s  %9s  %5s  %6s  %7s\n' \
+                    "$d" "$tr" "$RED" "$st" "$RESET" "$ks" "$it" "$du" \
+                    "$(printf '$%.2f' "$co")"
+            fi
+        done
+
+    local total items cost
+    rows="$(distill_run_all | jq -s -r --argjson n "$n" '
+        (sort_by(.t) | (if $n > 0 then .[-$n:] else . end)) as $r
+        | [ ($r | length),
+            ([$r[].items] | add // 0),
+            ([$r[].cost] | add // 0),
+            ([$r[] | select(.status != "ok")] | length),
+            ([$r[] | select((.sessions.seen // 0) > 0)] | length) ] | @tsv' 2>/dev/null)"
+    IFS=$'\t' read -r total items cost failed quiet <<<"$rows"
+
+    s_note "$(printf '%s run(s) · %s item(s) · $%.2f' \
+        "${total:-0}" "${items:-0}" "${cost:-0}")"
+
+    # The two shapes a table doesn't make obvious on its own.
+    [ "${failed:-0}" -gt 0 ] &&
+        s_fail "${failed} of the above failed — the reason is in the run record"
+    if [ "${quiet:-0}" -eq 0 ] && [ "${total:-0}" -gt 0 ]; then
+        s_warn "not one of these runs saw a single session — check: chezdistill --status"
+    fi
+    return 0
+}
+
+# ─── Stats ────────────────────────────────────────────────────────────────────
+
+# _distill_main_entries — how many rules are ACTUALLY in MAIN.md.
+#
+# Not the same as "eligible": distill_render_main stops selecting the moment the
+# byte cap is reached, so an eligible entry can still be evicted. Counting the
+# rendered file rather than trusting eligibility is what keeps --stats honest.
+# Only the generated section is counted — Pinned.md bullets sit above it.
+_distill_main_entries() {
+    local main
+    main="$(distill_memory_dir)/MAIN.md"
+    [ -f "$main" ] || {
+        echo 0
+        return 0
+    }
+    awk -v h="## $_DISTILL_MAIN_HEADING" \
+        '$0 == h {seg=1; next} seg && /^- / {n++} END {print n+0}' "$main"
+}
+
+# distill_stats — the corpus, aggregated. Read-only, no API calls.
+distill_stats() {
+    local minhits cap main_bytes in_main eligible evicted line
+    s_section "chezdistill stats"
+
+    _distill_preflight_paths || {
+        s_fail "paths    unusable"
+        return 0
+    }
+
+    minhits="$(distill_cfg minHits 2)"
+    cap="$(distill_cfg mainCapBytes 6144)"
+
+    line="$(distill_derive | jq -s -r 'if length == 0 then "" else
+        "\(length) entr\(if length == 1 then "y" else "ies" end) from \([.[].hits] | add) sighting(s), \([.[].first_seen] | min) → \([.[].last_seen] | max)"
+        end' 2>/dev/null)"
+    if [ -z "$line" ]; then
+        s_note "corpus   nothing extracted yet — nothing to report on"
+        return 0
+    fi
+    s_pass "corpus   $line"
+
+    in_main="$(_distill_main_entries)"
+    main_bytes=0
+    [ -f "$(distill_memory_dir)/MAIN.md" ] &&
+        main_bytes="$(wc -c <"$(distill_memory_dir)/MAIN.md" | tr -d ' ')"
+    s_note "in MAIN  ${in_main} entr$([ "$in_main" = "1" ] && echo y || echo ies) · ${main_bytes}B of ${cap}B"
+
+    eligible="$(distill_eligible | jq -s '[.[] | select(.eligible)] | length' 2>/dev/null || echo 0)"
+    evicted=$((eligible - in_main))
+    [ "$evicted" -gt 0 ] &&
+        s_warn "evicted  ${evicted} eligible entr$([ "$evicted" = "1" ] && echo y || echo ies) did not fit the cap — see Topics/"
+
+    s_note "$(distill_eligible | jq -s -r --argjson m "$minhits" \
+        '"waiting  \([.[] | select(.hits < $m)] | length) below the gate (< \($m) hits) · " +
+         "\([.[] | select(.hits >= $m and (.eligible | not))] | length) stale"' 2>/dev/null)"
+
+    s_note "$(distill_derive | jq -s -r '
+        "topics   " + (if length == 0 then "none" else
+        (group_by(.topic) | sort_by(-length) | .[0:5]
+         | map("\(.[0].topic) \(length)") | join(" · "))
+        + (if (group_by(.topic) | length) > 5
+           then " · (+\((group_by(.topic) | length) - 5) more)" else "" end)
+        end)' 2>/dev/null)"
+
+    # `// "unknown"` because distill_derive takes .kind straight from the
+    # extract with no fallback (unlike .topic), so an extract written before the
+    # schema settled groups under a literal null.
+    s_note "$(distill_derive | jq -s -r '
+        "kinds    " + (if length == 0 then "none" else
+        (group_by(.kind // "unknown") | sort_by(-length)
+         | map("\(.[0].kind // "unknown") \(length)") | join(" · ")) end)' 2>/dev/null)"
+
+    s_note "$(distill_derive | jq -s -r '
+        "hits     " + (if length == 0 then "none" else
+        ([.[] | if .hits >= 4 then "4+" else (.hits | tostring) end]
+         | group_by(.) | sort_by(.[0]) | map("\(.[0])× \(length)") | join(" · ")) end)' 2>/dev/null)"
+
+    s_note "$(printf 'spend    $%s over 7d · $%s over 30d' \
+        "$(distill_spend_since 7 | jq -r '. * 100 | round / 100')" \
+        "$(distill_spend_since 30 | jq -r '. * 100 | round / 100')")"
+
+    line="$(distill_run_all | jq -s -r --arg since "$(distill_iso_ago 7)" '
+        [.[] | select(.t > $since)] as $r
+        | if ($r | length) == 0 then "runs     none in the last 7 days"
+          else "runs     \($r | length) in 7d · \([$r[] | select(.status != "ok")] | length) failed · " +
+               "\((([$r[].sessions.kept // 0] | add // 0) * 10 / ($r | length) | round) / 10) session(s) kept per run"
+          end' 2>/dev/null)"
+    s_note "${line:-runs     none recorded}"
     return 0
 }
 
@@ -1339,6 +1658,12 @@ _distill_daily_body() {
     local sess name title mapped date n_items persisted=1 halted=0
 
     distill_spend_ok || return 1
+    # Before the cursor, before the temp dir, before anything: a run with nowhere
+    # to read from is a failure, not a quiet night. Going through distill_fail
+    # puts the reason in the run record, so it reaches --status, --runs,
+    # chezdoctor and the commit pushed to the corpus — rather than scrolling past
+    # in a launchd log nobody opens.
+    distill_sources_ok || return 1
 
     since="$(distill_cursor_read)"
     _DISTILL_RUN_SINCE="$since"

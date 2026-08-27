@@ -29,7 +29,8 @@ ui_init_status
 
 _distill_help() {
     cat <<'EOF'
-usage: chezdistill [--setup] [--since SPEC] [--status] [--render] [--undo] [-n]
+usage: chezdistill [--setup] [--since SPEC] [--status] [--stats] [--runs [N]]
+                   [--logs [N] [-f]] [--render] [--undo] [-n]
 
 Distil recent Claude Code conversations into two places:
 
@@ -40,13 +41,21 @@ Distil recent Claude Code conversations into two places:
   --setup           turn it on for this Mac: enable the module, apply, register
                     the timer. Idempotent, no API calls
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
-  --status          where everything lives, MAIN size vs cap, spend, last run
   --render          rebuild MAIN.md, Topics and Candidates from the corpus;
                     no API calls
   --undo            revert the state repo's last chezdistill commit and
                     re-render the memory tier from it
   -n, --dry-run     show what would be read and run, without calling the model
   -h, --help        this text
+
+Looking at it, rather than running it — all read-only, none cost anything:
+
+  --status          paths, transcript sources, MAIN size vs cap, spend, last run
+  --stats           the corpus: how many rules, what reached MAIN, what is still
+                    waiting on a second sighting, by topic and kind, spend
+  --runs [N]        the last N runs as a table (default 14) — the view that shows
+                    a job that has been reporting ok and doing nothing
+  --logs [N] [-f]   tail the nightly launchd log (default 50 lines); -f follows
 
 Before the module is enabled the `chezdistill` shell verb does not exist yet, so
 the very first run goes through the script:
@@ -282,8 +291,20 @@ _distill_setup() {
     return 0
 }
 
+# _distill_count ARG — an optional numeric argument, or empty.
+#
+# `--logs -f` and `--runs --stats` must not have their next flag eaten as a
+# count, so the lookahead only consumes a token that is entirely digits. Anything
+# else is left in place for the parser to handle as the flag it is.
+_distill_count() {
+    case "${1:-}" in
+        '' | *[!0-9]*) return 1 ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
+
 _distill_main() {
-    local mode=run
+    local mode=run count="" follow=0
 
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -291,6 +312,24 @@ _distill_main() {
             --status) mode=status ;;
             --render) mode=render ;;
             --undo) mode=undo ;;
+            --stats) mode=stats ;;
+            --runs)
+                mode=runs
+                if _distill_count "${2:-}" >/dev/null; then
+                    count="$2"
+                    shift
+                fi
+                ;;
+            --runs=*) mode=runs count="${1#--runs=}" ;;
+            --logs)
+                mode=logs
+                if _distill_count "${2:-}" >/dev/null; then
+                    count="$2"
+                    shift
+                fi
+                ;;
+            --logs=*) mode=logs count="${1#--logs=}" ;;
+            -f | --follow) follow=1 ;;
             --since=*) DISTILL_SINCE="$(_distill_since "${1#--since=}")" ;;
             --since)
                 [ $# -ge 2 ] || {
@@ -315,18 +354,49 @@ _distill_main() {
     done
     export DISTILL_SINCE DRY_RUN
 
+    if [ -n "$count" ] && ! _distill_count "$count" >/dev/null; then
+        fail "--$mode takes a number of lines, not '$count'"
+        return 2
+    fi
+
+    # Following anything but the log means nothing, and quietly ignoring a flag
+    # someone typed is how `chezdistill -f` becomes a bug report about a job that
+    # "stopped streaming".
+    if [ "$follow" = "1" ] && [ "$mode" != "logs" ]; then
+        fail "-f/--follow only applies to --logs"
+        return 2
+    fi
+
     if [ "$mode" = "setup" ]; then
         _distill_setup
         return $?
-    fi
-    if [ "$mode" = "status" ]; then
-        distill_status
-        return 0
     fi
     if [ "$mode" = "undo" ]; then
         _distill_undo
         return $?
     fi
+
+    # The read-only modes, dispatched before preflight. None of them needs the
+    # corpus remote to be right, and --logs in particular has to work on a machine
+    # whose remote is what's wrong — that is exactly when you want the log.
+    case "$mode" in
+        status)
+            distill_status
+            return 0
+            ;;
+        stats)
+            distill_stats
+            return 0
+            ;;
+        runs)
+            distill_runs "${count:-14}"
+            return 0
+            ;;
+        logs)
+            distill_logs "${count:-50}" "$follow"
+            return 0
+            ;;
+    esac
 
     echo
     printf '%s%s%s  %sDistilling Claude Code conversations%s\n' \

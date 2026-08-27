@@ -89,9 +89,12 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   remotes with `distill_remote_id`, never as strings — SSH and HTTPS spellings of one
   repo must not read as a conflict.
   **It has no human-facing output and no vault** — it produced daily and weekly
-  notes in Obsidian once, and that half was removed deliberately. Don't reintroduce
-  a reporting destination; if you want to read what it knows, read `MAIN.md`,
-  `Topics/` or `chezdistill --status`. The one concession to having no output is a
+  notes in Obsidian once, and that half was removed deliberately. The boundary is
+  a *written* destination: no generated notes, no digest, no file anyone but
+  Claude reads. Asking it questions from a terminal is fine and is how you read
+  what it knows — `chezdistill --status`, `--stats`, `--runs`, `--logs`, plus
+  `MAIN.md` and `Topics/`. All of those are read-only, make no API calls and
+  write nothing. The one concession to having no output is a
   `chezdistill` section in `chezdoctor` — passive liveness only, read-only, no API
   calls. Both directories are ordinary local ones and are simply created.
   Its guiding rule is *the model extracts, bash decides and writes*: every
