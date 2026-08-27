@@ -97,7 +97,7 @@
 
     // NOT "afterDelay": VS Code skips save participants on the delayed-autosave
     // path, which silently disables editor.formatOnSave and every
-    // codeActionsOnSave below (organizeImports, fixAll.eslint, fixAll.ruff,
+    // codeActionsOnSave below (organizeImports, fixAll.eslint,
     // java.cleanup.actionsOnSave). "onFocusChange" still autosaves but runs them.
     "files.autoSave": "onFocusChange",
 
@@ -401,7 +401,7 @@
             "commands": ["editor.action.goToTypeDefinition"]
         },
 
-        // ── Diagnostics (LazyVim ]d / [d) — the payoff for ErrorLens+SonarLint ──
+        // ── Diagnostics (LazyVim ]d / [d) — the payoff for ErrorLens ──
         {
             "before": ["]", "d"],
             "commands": ["editor.action.marker.next"]
@@ -429,15 +429,15 @@
     ],
 
     // Run VSCodeVim in its own extension host process: keystroke handling stops
-    // queueing behind the Java/Sonar/ErrorLens extensions in the shared host.
+    // queueing behind the Java/ErrorLens extensions in the shared host.
     // Upstream's one documented perf lever. Cost: the extension reloads on every
     // settings.json write, which `chezmoi apply` does often.
     //
-    // Group 2 does the same for the Java/Kotlin/Spring toolchain: JDT LS,
-    // the Kotlin LSP, and SonarLint's analyzer are the heaviest extensions in
-    // this setup, so they get their own host too, away from both the vim host
-    // and the shared default host (ESLint, Copilot, cSpell, ...). Same cost —
-    // one more process to reload on every settings.json write.
+    // Group 2 does the same for the Java/Kotlin/Spring toolchain: JDT LS and the
+    // Kotlin LSP are the heaviest extensions in this setup, so they get their own
+    // host too, away from both the vim host and the shared default host (ESLint,
+    // Copilot, cSpell, ...). Same cost — one more process to reload on every
+    // settings.json write.
     "extensions.experimental.affinity": {
         "vscodevim.vim": 1,
         "redhat.java": 2,
@@ -447,10 +447,8 @@
         "vscjava.vscode-java-test": 2,
         "vscjava.vscode-maven": 2,
         "vscjava.vscode-spring-boot-dashboard": 2,
-        "vscjava.vscode-spring-initializr": 2,
         "vmware.vscode-spring-boot": 2,
-        "jetbrains.kotlin-server": 2,
-        "sonarsource.sonarlint-vscode": 2
+        "jetbrains.kotlin-server": 2
     },
 
     // ── AI / Copilot ──
@@ -546,8 +544,6 @@
     // Lombok via redhat.java's built-in support, not the deprecated extension.
     "java.jdt.ls.lombokSupport.enabled": true,
 
-    "sonarlint.disableTelemetry": true,
-
     "spring-boot.ls.problem.application-properties.enabled": true,
     "spring-boot.ls.problem.application-yaml.enabled": true,
 
@@ -565,8 +561,6 @@
     // telemetry opt-outs below.
     "intellij.region": "europe",
     "intellij.dataSharing": "none",
-
-    "terraform.languageServer.enable": true,
 
     "yaml.validate": true,
     "yaml.format.enable": true,
@@ -628,6 +622,9 @@
     // Each of these is a file type this setup actually opens: build.gradle
     // (groovy), application.properties (properties/spring-boot-properties),
     // Makefiles, .gitignore (ignore), and interactive-rebase todo lists.
+    // [python] joined this list when Ruff was dropped (see vscode-extensions.txt):
+    // no Python extension is installed, but python3 heredocs in scripts/ still get
+    // opened, and Prettier would error on save without the opt-out.
     "[groovy]": { "editor.formatOnSave": false },
     "[properties]": { "editor.formatOnSave": false },
     "[spring-boot-properties]": { "editor.formatOnSave": false },
@@ -636,6 +633,7 @@
     "[makefile]": { "editor.formatOnSave": false },
     "[ignore]": { "editor.formatOnSave": false },
     "[git-rebase]": { "editor.formatOnSave": false },
+    "[python]": { "editor.formatOnSave": false },
 
     "[json]": {
         "editor.defaultFormatter": "vscode.json-language-features"
@@ -675,14 +673,6 @@
 
     "[shellscript]": {
         "editor.defaultFormatter": "foxundermoon.shell-format"
-    },
-
-    "[terraform]": {
-        "editor.defaultFormatter": "hashicorp.terraform"
-    },
-
-    "[terraform-vars]": {
-        "editor.defaultFormatter": "hashicorp.terraform"
     },
 
     "[spring-boot-properties-yaml]": {
@@ -741,16 +731,6 @@
         "editor.codeActionsOnSave": {
             "source.organizeImports": "explicit",
             "source.fixAll.eslint": "explicit"
-        }
-    },
-
-    // Ruff handles both lint-fix and formatting + import sorting on save.
-    "[python]": {
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "editor.formatOnType": true,
-        "editor.codeActionsOnSave": {
-            "source.organizeImports.ruff": "explicit",
-            "source.fixAll.ruff": "explicit"
         }
     },
 

@@ -7,66 +7,68 @@
 # see docs/editors.md.
 # eamodio.gitlens was removed 2026-08: VS Code's built-in git/blame/timeline covers
 # what was actually used, and the rest was noise.
-# ms-python.debugpy and ms-python.vscode-pylance are auto-installed by
-# ms-python.python; they must be listed or the prune step uninstalls them on every
-# apply and VS Code reinstalls them on next launch. Same for the lldb pair below.
+# 15 extensions were removed 2026-08: unused in practice. Uninstalled by hand first,
+# then dropped here — the mirror is 1:1, so leaving them listed would have reinstalled
+# them on the next apply. By theme:
+#   Python      ms-python.python, ms-python.debugpy, ms-python.vscode-pylance,
+#               charliermarsh.ruff — no Python is written on these machines. The
+#               [python] block now just opts out of formatOnSave (Prettier, the global
+#               default formatter, cannot parse Python and would error on every save).
+#   IaC / k8s   hashicorp.terraform, hashicorp.hcl,
+#               ms-kubernetes-tools.vscode-kubernetes-tools, tim-koehler.helm-intellisense
+#               — the CLIs stay in Brewfile.work; only the editor integrations go.
+#   Other       sonarsource.sonarlint-vscode (ErrorLens covers the diagnostics that were
+#               read), humao.rest-client, genuitecllc.codetogether, wmaurer.change-case,
+#               vivaxy.vscode-conventional-commits (the commit-msg hook and CI enforce
+#               the convention; this was only an input popup),
+#               vscjava.vscode-spring-initializr (scaffolding, used once).
+#   bierner.markdown-mermaid was the only one of the four mermaid extensions that
+#   injected rendering into VS Code's *built-in* markdown preview, which
+#   workbench.editorAssociations makes the default for .md. Accepted: mermaid fences no
+#   longer render there. The three kept mermaid extensions supply syntax highlighting
+#   and their own preview panels instead.
 # GitHub Copilot is deliberately absent: github.copilot was deprecated in VS Code
 # 1.109 (auto-uninstalled on upgrade), and Copilot Chat has been a built-in system
 # extension since 1.116 — built-ins never appear in `code --list-extensions`, so
 # there is nothing here to track or prune.
 catppuccin.catppuccin-vsc
 anthropic.claude-code
-bierner.markdown-mermaid
 bpruitt-goddard.mermaid-markdown-syntax-highlighting
-charliermarsh.ruff
 davidanson.vscode-markdownlint
 dbaeumer.vscode-eslint
 editorconfig.editorconfig
 esbenp.prettier-vscode
 exiasr.hadolint
 foxundermoon.shell-format
-genuitecllc.codetogether
 github.vscode-pull-request-github
 github.vscode-github-actions
 gruntfuggly.todo-tree
-hashicorp.hcl
-hashicorp.terraform
-humao.rest-client
 hverlin.mise-vscode
 jetbrains.kotlin-server
 llvm-vs-code-extensions.lldb-dap
 mermaidchart.vscode-mermaid-chart
 ms-azuretools.vscode-containers
-ms-kubernetes-tools.vscode-kubernetes-tools
 ms-ossdata.vscode-pgsql
-ms-python.debugpy
-ms-python.python
-ms-python.vscode-pylance
 ms-vscode-remote.remote-containers
 oderwat.indent-rainbow
 pkief.material-icon-theme
 redhat.java
 redhat.vscode-xml
 redhat.vscode-yaml
-sonarsource.sonarlint-vscode
 streetsidesoftware.code-spell-checker
 streetsidesoftware.code-spell-checker-norwegian-bokmal
 sweetpad.sweetpad
 swiftlang.swift-vscode
 tamasfe.even-better-toml
-tim-koehler.helm-intellisense
 timonwong.shellcheck
 usernamehw.errorlens
 vadimcn.vscode-lldb
-vivaxy.vscode-conventional-commits
 vscjava.vscode-gradle
 vscjava.vscode-java-debug
 vscjava.vscode-java-dependency
 vscjava.vscode-java-test
 vscjava.vscode-maven
 vscjava.vscode-spring-boot-dashboard
-vscjava.vscode-spring-initializr
 vscodevim.vim
 vmware.vscode-spring-boot
 vstirbu.vscode-mermaid-preview
-wmaurer.change-case

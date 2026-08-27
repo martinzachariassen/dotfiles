@@ -109,13 +109,13 @@ not_declares() {
     declares "$WORK" brew kubernetes-cli
 }
 @test "work Brewfile declares helm" {
-    # The vscode-kubernetes extension (+ helm-intellisense) assumes helm on
-    # PATH; without it VS Code downloads an unmanaged copy to ~/.vs-kubernetes.
+    # Terminal-side companion to kubectl; the VS Code extensions that used to
+    # justify it were dropped 2026-08, the CLI stands on its own.
     declares "$WORK" brew helm
 }
 @test "work Brewfile declares minikube" {
-    # Same contract as helm — keep the local cluster CLI brew-managed instead
-    # of letting the k8s extension fetch its own.
+    # Same story as helm — the local cluster CLI stays brew-managed so its
+    # version is pinned with the rest of the toolchain.
     declares "$WORK" brew minikube
 }
 @test "work Brewfile declares kubectx" {

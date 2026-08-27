@@ -26,11 +26,12 @@ extensions are managed by chezmoi.
   `chezdoctor` reports drift in both directions read-only; the set logic
   lives in [`scripts/lib/vscode.sh`](../scripts/lib/vscode.sh) (unit-tested
   by `tests/vscode.bats`). The set covers the language toolchain: the
-  Java/Spring pack, Kotlin, Gradle/Maven, plus Terraform, Kubernetes, Helm,
-  Docker, Postgres, Python/Ruff, and shell/YAML/TOML tooling. Several
-  extensions are backed by CLIs from the Brewfile (hadolint, shellcheck,
-  shfmt, helm, minikube) so they use the pinned binary instead of
-  downloading their own. A few entries are **module-gated** in the hook —
+  Java/Spring pack, Kotlin, Gradle/Maven, plus Docker, Postgres, and
+  shell/YAML/TOML tooling. The IaC/Kubernetes and Python extensions were
+  dropped 2026-08 as unused — their CLIs stay in the Brewfile, only the
+  editor integrations went. Several extensions are backed by CLIs from the
+  Brewfile (hadolint, shellcheck, shfmt) so they use the pinned binary
+  instead of downloading their own. A few entries are **module-gated** in the hook —
   excluded from install *and* prune when the module is off: the Norwegian
   dictionary (`locale`), and the Swift/iOS extensions (`appleDev`, below).
 
@@ -102,13 +103,13 @@ Four settings that aren't obvious:
   runs Error Lens, ESLint, and Copilot — keystroke handling otherwise queues
   behind them. The Java/Kotlin/Spring toolchain (`redhat.java`, the
   `vscjava.*` pack, `vmware.vscode-spring-boot`, `jetbrains.kotlin-server`)
-  and SonarLint get a second group (2), isolating the heaviest extensions in
+  gets a second group (2), isolating the heaviest extensions in
   this setup from both the vim host and the shared default host. The cost of
   each group is the same: the extensions in it reload whenever
   `settings.json` is written, which `chezmoi apply` does often. Extensions
   that already run their language server as a separate OS process outside
-  the extension host — ESLint, Terraform, Pylance — don't benefit from
-  affinity and are deliberately left out of group 2.
+  the extension host — ESLint, for one — don't benefit from affinity and are
+  deliberately left out of group 2.
 - **Relative line numbers** are two settings, not one:
   `editor.lineNumbers: relative` does the rendering and
   `vim.smartRelativeLine` flips back to absolute in insert mode. Either alone

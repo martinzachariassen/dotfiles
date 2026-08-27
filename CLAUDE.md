@@ -51,7 +51,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   `code --list-extensions` — matching most tools by a stem heuristic
   (`command -v <name-minus-dot>`) and the `cleanup.owners` map for
   name↔command/package/extension aliases (`.kube`→`kubectl`, `.m2`→`mvn` from mise,
-  `.sonarlint`→`sonarsource.sonarlint-vscode`). Adding a tool = track it
+  `.lemminx`→`redhat.vscode-xml`). Adding a tool = track it
   (`chezmoi add`), add it to a keep-list, or (if its dir name diverges from its
   command) add an `owners` alias; `keepConfig`/`keepHome`/`owners` all live in
   `cleanup.toml` so they can't drift. Full model in
