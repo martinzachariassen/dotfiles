@@ -76,7 +76,9 @@ module only), and `mkcd` (mkdir + cd). `mkdir` and `find` are deliberately
 ## Runtimes (mise)
 
 mise owns language runtimes — never asdf/nvm/jenv/pyenv/SDKMAN, and not
-Homebrew. Global defaults live in
+Homebrew. It also owns the handful of tools whose version a *project* wants to
+pin (`just`), which is exactly the property a Brewfile can't give. Global
+defaults live in
 [`src/dot_config/mise/config.toml.tmpl`](../src/dot_config/mise/config.toml.tmpl)
 and apply in any directory that doesn't pin its own; per-project versions
 and env vars go in that project's committed `mise.toml` (its `[env]` block,
@@ -91,6 +93,7 @@ The defaults:
 | Python | `latest` | Tracks the newest stable release on each `mise install`. |
 | Bun | `latest` | Tracks the newest stable release on each `mise install`. |
 | Maven / Gradle | `latest` | `jvmStack` module. Project wrappers (`mvnw`/`gradlew`) still win. |
+| just | `latest` | Command runner (Make-shaped). Here rather than in a Brewfile so a project's `mise.toml` can pin the version its `justfile` was written against. |
 
 mise installs to stable paths
 (`~/.local/share/mise/installs/<tool>/<version>`), so VS Code's Java server

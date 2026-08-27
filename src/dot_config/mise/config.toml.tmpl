@@ -12,6 +12,11 @@ pnpm = "latest"
 bun = "latest"
 python = "latest"
 
+# just — a Make-shaped command runner. Not a language runtime, but it belongs
+# beside them: recipes are per-project, so a project's mise.toml can pin the
+# version it was written against and override this global default on `cd`.
+just = "latest"
+
 {{ if has "jvmStack" (dig "modules" (list) .) -}}
 kotlin = "latest"
 maven = "latest"
