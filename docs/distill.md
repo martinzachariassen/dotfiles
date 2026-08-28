@@ -88,6 +88,15 @@ anything:
 chezdistill --stats      # the corpus: funnel, topics, hit spread, spend, runs
 chezdistill --runs [N]   # the last N nights, one row each (default 14)
 chezdistill --logs [N]   # tail launchd's own log (default 50); -f follows
+chezdistill --remote     # where this corpus backs up, or that it is local only
+```
+
+And one that changes where it backs up. It is confirm-gated, and `-n` stops
+before the first write:
+
+```sh
+chezdistill --remote <url>   # attach: restore, or join a corpus two Macs share
+chezdistill --remote none    # detach: everything stays here, nothing is deleted
 ```
 
 `-n` first is the cheap habit: it prints the sessions that would be read and the
@@ -563,6 +572,66 @@ It only applies to a repo with no commits of its own. One that already has a
 history is reconciled by the merge above; if that history is unrelated to the
 remote's there is no safe automatic answer, so it says so rather than picking
 one.
+
+### A corpus says who it is
+
+Every corpus carries a tracked `corpus.json`: a `schema`, an `id`, the `profile`
+it was stamped with, and when. It holds **no URL and nothing derived from one**,
+which is the whole point. The guard it replaces compared the origin URL against a
+table of known ones, and that failed in the direction that actually happened
+here — GitHub renamed the repo, so the URL changed, every string comparison still
+passed, and the push had been failing for two days behind a green tick. A
+location is not an identity.
+
+It is written once, when a corpus is created, and never rewritten — two machines
+editing it would be the only way to manufacture a conflict in the one file whose
+job is to be agreed on. From it come two different questions:
+
+- **`profile` is the leak boundary.** `hits` counts sightings across the whole
+  corpus, so a rule seen in two work sessions would be promoted into a personal
+  Mac's `MAIN.md`. A mismatch is a hard stop, checked from the *local* copy so it
+  costs nothing and works offline at 01:00.
+- **`id` answers "is this the same corpus?"** — which tells a repo that merely
+  moved (adopt it and carry on) from a different one (do not merge without being
+  asked).
+
+A corpus older than this file has no stamp. It is adopted and then stamped with
+the attaching machine's profile, so the window is one machine wide and closes
+permanently. While it is open nothing can check it for you, which is why
+`--remote` prints what it found and makes you say yes.
+
+### Attaching, moving and detaching
+
+```sh
+chezdistill --remote                       # where does this back up?
+chezdistill --remote https://github.com/…  # attach, restore, or join
+chezdistill --remote none                  # local only
+```
+
+Four shapes, decided by what is at each end rather than by a flag: an empty
+remote takes what this Mac has and that becomes the corpus; a corpus with nothing
+local is checked out, which is the replacement-Mac restore; the same `id` at a
+new URL is just re-pointed; and **both populated is a replay**.
+
+That last one is worth explaining, because the obvious approach is wrong. Merging
+the two histories is what produces unrelated-histories errors and half-finished
+rebases. But nobody reads this git history — `--undo` walks back one commit and
+the memory tier is derived — so origin's history is taken as the base and this
+machine's `extracts/` land on top as one commit. Shards are `<date>.<host>.json`
+and disjoint across machines, so in the normal case it is pure file addition; a
+shard both machines wrote is unioned item-by-item. That union is safe for the
+same reason the whole design is: `hits` counts **distinct sessions**, so the same
+item arriving twice cannot inflate anything, and `unique` keeps the file
+byte-stable so re-running produces no commit. Nothing is lost from either side.
+
+Before any of it, the old tip is tagged `chezdistill/pre-attach`, the secret
+sweep runs, and a `pushurl` pinned to the *previous* remote is cleared — without
+that, changing the remote would leave every push going to the old one, silently.
+
+`--remote none` removes the origin and records the decision in the state repo's
+own git config, so the next run does not helpfully re-attach what you just
+detached. Nothing is deleted and nothing is rewritten; re-attaching later is the
+same one command.
 
 ### Two Macs on one remote
 

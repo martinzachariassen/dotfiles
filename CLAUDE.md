@@ -100,6 +100,18 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   `git init` follows `init.defaultBranch`, which is set here and unset in CI — and
   keep anything written into a *tracked* file normalised, or two Macs spelling one
   remote differently rewrite it against each other every night.
+  **A corpus states its own identity, and a URL is not one.** Every corpus carries a
+  tracked `corpus.json` — `id` + `profile`, **never a URL or anything derived from
+  one** — written once at creation and never rewritten. `profile` is the leak
+  boundary and is checked from the *local* copy, so the nightly guard stays offline;
+  the remote's copy is read only at attach time. A matching `id` at a different URL
+  means the repo moved (adopt it); a different `profile` is a hard stop. A corpus
+  with no stamp predates the file: adopt it, stamp it, and say that nothing could
+  check it. Joining two corpora is a **data replay, not a history merge** — origin's
+  history is the base and this Mac's shards land on top, unioned per shard, which is
+  safe only because `hits` counts distinct sessions. Detaching is recorded in the
+  state repo's git config so the next run cannot helpfully undo it, and changing a
+  remote must clear any `pushurl` pinned to the old one.
   **It has no human-facing output and no vault** — it produced daily and weekly
   notes in Obsidian once, and that half was removed deliberately. The boundary is
   a *written* destination: no generated notes, no digest, no file anyone but

@@ -164,7 +164,11 @@ distill_can_write() {
 # 0 = go · 1 = broken/unwritable (a real failure)
 distill_preflight() {
     _distill_preflight_paths || return 1
+    # Two guards on purpose, and both offline. The URL one knows the other
+    # profile's address; the corpus one knows what the corpus says it is, which
+    # is the half that survives a repo being renamed.
     distill_remote_check || return 1
+    distill_corpus_check_local || return 1
     return 0
 }
 
@@ -1365,6 +1369,327 @@ distill_state_restore() {
     return 0
 }
 
+# ─── Corpus identity ──────────────────────────────────────────────────────────
+#
+# A corpus says who it belongs to, in a tracked file that travels with it.
+#
+# The guard this replaces compared the origin URL against a table of known ones,
+# which fails in the direction that actually happened: GitHub renamed the repo,
+# the URL changed, and every string comparison still passed while the push had
+# been failing for two days. A URL is a location, not an identity — so this file
+# holds neither one nor anything derived from one.
+#
+# `profile` is the leak boundary: work extracts distilled into personal memory
+# cannot be un-pushed, so a mismatch is a hard stop. `id` is the weaker question
+# — "is this the same corpus I was attached to?" — which is what tells a rename
+# (adopt it) from a different repo (refuse to merge without being asked).
+
+distill_corpus_file() {
+    printf '%s/corpus.json\n' "$(distill_state_dir)"
+}
+
+# distill_corpus_new_id — unique enough, from tools both macOS and CI have.
+# `uuidgen` is not on a bare ubuntu runner and /dev/urandom formatting differs;
+# distill_sha is already used elsewhere here and works on both.
+distill_corpus_new_id() {
+    printf 'c-%s\n' "$(printf '%s|%s|%s|%s' \
+        "$(distill_host)" "$(distill_iso_now)" "$$" "${RANDOM}${RANDOM}" |
+        distill_sha)"
+}
+
+distill_corpus_field() {
+    local f
+    f="$(distill_corpus_file)"
+    [ -r "$f" ] || return 0
+    jq -r --arg k "$1" '.[$k] // empty' "$f" 2>/dev/null
+}
+
+distill_corpus_id() { distill_corpus_field id; }
+distill_corpus_profile() { distill_corpus_field profile; }
+
+# distill_corpus_seed — stamp a corpus that has none. Written once, at creation,
+# and never rewritten: two machines that both edited it would be the only way to
+# manufacture a conflict in the one file whose whole job is to be agreed on.
+distill_corpus_seed() {
+    local f
+    f="$(distill_corpus_file)"
+    [ -e "$f" ] && return 0
+    mkdir -p "$(dirname "$f")" || return 0
+    jq -n --arg id "$(distill_corpus_new_id)" \
+        --arg p "$(distill_profile)" \
+        --arg c "$(distill_iso_now)" \
+        --arg by "$(distill_host)" \
+        '{schema: 1, id: $id, profile: $p, created: $c, createdBy: $by}' \
+        >"$f" 2>/dev/null || true
+}
+
+# distill_corpus_read_ref REF — the corpus.json a git ref carries, or empty when
+# it has none (a corpus older than this file, which is adopted and stamped).
+distill_corpus_read_ref() {
+    git -C "$(distill_state_dir)" show "$1:corpus.json" 2>/dev/null
+}
+
+# distill_corpus_check_local — the offline half of the guard, and the one that
+# runs every night. Reads the tracked file this machine already has, so it costs
+# nothing and works at 01:00 with no network. 1 = do not proceed.
+#
+# It fires when a state dir came from somewhere else — restored from another
+# Mac's backup, copied between profiles — and when `.profile` itself changed
+# under an existing corpus, which is a real thing to do and needs both exits
+# spelled out rather than a nightly refusal with no way forward.
+distill_corpus_check_local() {
+    local mine theirs
+    mine="$(distill_profile)"
+    theirs="$(distill_corpus_profile)"
+    [ -n "$mine" ] && [ -n "$theirs" ] || return 0
+    [ "$mine" = "$theirs" ] && return 0
+
+    fail "the corpus at $(distill_state_dir) was stamped $theirs, but this is a $mine Mac"
+    info "nothing will be distilled until that is settled. Either attach this Mac to its own corpus:"
+    info "  chezdistill --remote <$mine corpus url>"
+    info "or start a fresh one here, keeping what is already backed up:"
+    info "  chezdistill --remote none"
+    return 1
+}
+
+# distill_corpus_detached — did someone deliberately unhook this Mac?
+#
+# Kept in the state repo's own git config, because that is the only per-machine
+# store that survives a chezmoi apply and is not the corpus itself. Without it
+# `--remote none` would be undone by the next run, which re-adopts whatever the
+# configured remote is.
+distill_corpus_detached() {
+    [ "$(git -C "$(distill_state_dir)" config --get distill.detached 2>/dev/null)" = "true" ]
+}
+
+# distill_extract_union A B OUT — one spelling of "these two shards are the same
+# day, keep everything". Shared by the nightly merge and by an attach, so the
+# rule that decides what a corpus contains cannot exist in two versions that
+# disagree. Both inputs are {items: [...]}.
+#
+# Safe because hits counts DISTINCT SESSIONS at derive time: the same item
+# arriving twice cannot inflate anything, and `unique` keeps the file byte-stable
+# so re-running produces no commit.
+distill_extract_union() {
+    local a="$1" b="$2" out="$3" tmp
+    tmp="$out.union.tmp"
+    jq -s '{items: ((.[0].items // []) + (.[1].items // []) | unique)}' \
+        "$a" "$b" >"$tmp" 2>/dev/null || {
+        rm -f "$tmp"
+        return 1
+    }
+    mv "$tmp" "$out" 2>/dev/null || {
+        rm -f "$tmp"
+        return 1
+    }
+    return 0
+}
+
+# ─── Attaching a corpus ───────────────────────────────────────────────────────
+
+# distill_remote_survey URL — what is at the other end, before anything is
+# changed. Prints "<populated> <branch> <profile> <id>"; populated is 0 or 1.
+distill_remote_survey() {
+    local url="$1" branch json scratch
+
+    if ! branch="$(distill_remote_probe "$url")"; then
+        printf '0  \n'
+        return 0
+    fi
+    branch="$(distill_state_branch "$branch")"
+
+    # Into a throwaway repo, not the state dir. `--remote` with no argument has to
+    # answer before anything is created, and `-n` must not leave a git repo behind
+    # on a machine that has none — surveying through the real one made a populated
+    # corpus read as empty on exactly the machine most likely to be asking.
+    scratch="$(mktemp -d)" || {
+        printf '0 %s  \n' "$branch"
+        return 0
+    }
+    distill_git_env
+    if git -C "$scratch" init -q -b main >/dev/null 2>&1 &&
+        git -C "$scratch" fetch --quiet --depth 1 "$url" "$branch" >/dev/null 2>&1; then
+        json="$(git -C "$scratch" show FETCH_HEAD:corpus.json 2>/dev/null)"
+        rm -rf "$scratch"
+        printf '1 %s %s %s\n' "$branch" \
+            "$(printf '%s' "$json" | jq -r '.profile // empty' 2>/dev/null)" \
+            "$(printf '%s' "$json" | jq -r '.id // empty' 2>/dev/null)"
+        return 0
+    fi
+    rm -rf "$scratch"
+    printf '0 %s  \n' "$branch"
+}
+
+# distill_remote_detach — stop pushing, keep everything.
+#
+# Nothing is rewritten and nothing is deleted, so re-attaching later is the same
+# one command. The marker is what stops the next run silently re-adopting.
+distill_remote_detach() {
+    local repo
+    repo="$(distill_state_dir)"
+    git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || return 0
+    git -C "$repo" remote remove origin >/dev/null 2>&1 || true
+    git -C "$repo" config distill.detached true >/dev/null 2>&1 || true
+    ok "detached — the corpus stays here and stops being pushed anywhere"
+    info "re-attach whenever with: chezdistill --remote <url>"
+    return 0
+}
+
+# distill_remote_attach URL — point this Mac's corpus at a backup repo.
+#
+# Four shapes, decided by what is at each end rather than by a flag:
+#
+#   remote empty                     push what is here, and this becomes the corpus
+#   remote has a corpus, local none  check it out — the replacement-Mac restore
+#   same corpus id, new URL          it only moved; re-point and carry on
+#   both populated                   replay this Mac's shards onto the remote's
+#                                    history
+#
+# The last is the interesting one, and it is a data replay rather than a history
+# merge: nobody reads this git history, so origin's is taken as the base and this
+# machine's extracts land on top as one commit. No unrelated-histories merge, no
+# conflict markers, and nothing that can leave a rebase half-finished.
+distill_remote_attach() {
+    local url="$1" repo branch populated rprofile rid mine tmp f base shard moved=0
+    local local_populated=0
+    repo="$(distill_state_dir)"
+    mine="$(distill_profile)"
+
+    distill_state_repo_init || return 1
+    if distill_state_wedged >/dev/null; then
+        fail "the corpus repo is stuck mid-operation — settle that first"
+        return 1
+    fi
+
+    read -r populated branch rprofile rid <<<"$(distill_remote_survey "$url")"
+    branch="$(distill_state_branch "$branch")"
+
+    # The leak boundary, checked before a single byte is sent.
+    if [ -n "$rprofile" ] && [ -n "$mine" ] && [ "$rprofile" != "$mine" ]; then
+        fail "that corpus is stamped $rprofile and this is a $mine Mac — refusing"
+        explain \
+            "hits are counted over the whole corpus, so a rule seen twice in $rprofile" \
+            "sessions would be promoted into this Mac's MAIN.md. Keep one repo each."
+        return 1
+    fi
+
+    git -C "$repo" remote remove origin >/dev/null 2>&1 || true
+    git -C "$repo" remote add origin "$url" >/dev/null 2>&1 || {
+        fail "could not point the corpus at $url"
+        return 1
+    }
+    # A pushurl pinned to the PREVIOUS remote would silently keep pushing there.
+    git -C "$repo" config --unset remote.origin.pushurl >/dev/null 2>&1 || true
+    git -C "$repo" config --unset distill.detached >/dev/null 2>&1 || true
+    distill_state_repo_pushurl
+
+    if [ "${populated:-0}" != "1" ]; then
+        distill_corpus_seed
+        distill_state_repo_init >/dev/null || true
+        git -C "$repo" add -A >/dev/null 2>&1 || true
+        git -C "$repo" diff --cached --quiet 2>/dev/null ||
+            git -C "$repo" commit -q -m "chore(corpus): start this corpus" >/dev/null 2>&1 || true
+        git -C "$repo" push -q -u origin "HEAD:$branch" >/dev/null 2>&1 || {
+            fail "could not push to $url"
+            return 1
+        }
+        ok "attached — this Mac's corpus now backs up to $url"
+        return 0
+    fi
+
+    distill_git_env
+    git -C "$repo" fetch --quiet origin "$branch" >/dev/null 2>&1 || {
+        fail "could not fetch $url"
+        return 1
+    }
+
+    # Same corpus, new address: exactly the repo-rename case. Nothing to merge.
+    if [ -n "$rid" ] && [ "$rid" = "$(distill_corpus_id)" ]; then
+        git -C "$repo" branch --set-upstream-to "origin/$branch" >/dev/null 2>&1 || true
+        distill_state_sync || true
+        git -C "$repo" push -q -u origin "HEAD:$branch" >/dev/null 2>&1 || true
+        ok "same corpus at a new address — re-pointed to $url"
+        return 0
+    fi
+
+    # "Populated" means holding corpus data, NOT holding commits. A Mac that ran
+    # local-only has shards on disk and no history at all, and its work counts
+    # exactly as much as a committed machine's — classifying on HEAD would send it
+    # down the restore path and quietly drop everything it had collected.
+    local_populated=0
+    for f in "$repo"/extracts/*.json; do
+        [ -f "$f" ] && {
+            local_populated=1
+            break
+        }
+    done
+
+    # Nothing of our own to keep: adopt origin's tree wholesale. --force is safe
+    # and necessary here — the only untracked files in the way are the scaffolding
+    # (README.md, .gitignore, Pinned.md, corpus.json) that state_repo_init just
+    # generated, and the remote's copies of those are the ones that should win.
+    if [ "$local_populated" = "0" ]; then
+        git -C "$repo" checkout -q -B "$branch" --force "origin/$branch" >/dev/null 2>&1 || {
+            fail "could not check out the corpus from $url"
+            return 1
+        }
+        git -C "$repo" branch --set-upstream-to "origin/$branch" >/dev/null 2>&1 || true
+        distill_state_repo_init >/dev/null || true
+        ok "restored the corpus from $url"
+        return 0
+    fi
+
+    # Both populated — replay. Keep this machine's shards aside, adopt origin's
+    # history wholesale, then put them back, unioning any the two share.
+    tmp="$(mktemp -d)" || return 1
+    [ -d "$repo/extracts" ] && cp -R "$repo/extracts" "$tmp/extracts" 2>/dev/null
+    git -C "$repo" rev-parse --quiet --verify HEAD >/dev/null 2>&1 &&
+        git -C "$repo" tag -f "chezdistill/pre-attach" HEAD >/dev/null 2>&1
+
+    if ! git -C "$repo" checkout -q -B "$branch" --force "origin/$branch" >/dev/null 2>&1; then
+        rm -rf "$tmp"
+        fail "could not adopt the history at $url"
+        return 1
+    fi
+    git -C "$repo" branch --set-upstream-to "origin/$branch" >/dev/null 2>&1 || true
+
+    mkdir -p "$repo/extracts"
+    for f in "$tmp/extracts"/*.json; do
+        [ -f "$f" ] || continue
+        shard="$(basename "$f")"
+        base="$repo/extracts/$shard"
+        if [ -f "$base" ]; then
+            distill_extract_union "$base" "$f" "$base" || {
+                rm -rf "$tmp"
+                fail "could not merge $shard"
+                return 1
+            }
+        else
+            cp "$f" "$base" 2>/dev/null || continue
+        fi
+        moved=$((moved + 1))
+    done
+    rm -rf "$tmp"
+
+    distill_state_repo_init >/dev/null || true
+    distill_guard_secrets || {
+        fail "not pushing — the sweep found something. This Mac's corpus is at the tag chezdistill/pre-attach"
+        return 1
+    }
+
+    git -C "$repo" add -A >/dev/null 2>&1 || true
+    if ! git -C "$repo" diff --cached --quiet 2>/dev/null; then
+        git -C "$repo" commit -q -m "chore(corpus): replay $(distill_host) onto the shared corpus" \
+            >/dev/null 2>&1 || true
+    fi
+    git -C "$repo" push -q -u origin "HEAD:$branch" >/dev/null 2>&1 || {
+        fail "merged locally but could not push to $url — retry, or run chezdistill"
+        return 1
+    }
+    ok "joined the corpus at $url — $moved shard(s) of this Mac's carried over"
+    return 0
+}
+
 # ─── Which corpus is this Mac's? ──────────────────────────────────────────────
 #
 # One remote per profile, from `[distill.remotes]` in .chezmoidata. Not one
@@ -1407,6 +1732,9 @@ distill_remote_adopt() {
     local repo url
     repo="$(distill_state_dir)"
     [ -z "$(git -C "$repo" remote 2>/dev/null)" ] || return 0
+    # `chezdistill --remote none` is a decision, not a gap to be filled in. Without
+    # this the next run would silently re-attach whatever the config points at.
+    distill_corpus_detached && return 0
     url="$(distill_remote_url)"
     [ -n "$url" ] || return 0
     git -C "$repo" remote add origin "$url" >/dev/null 2>&1 || return 0
@@ -1632,7 +1960,15 @@ distill_state_repo_init() {
     repo="$(distill_state_dir)"
     mkdir -p "$repo" || return 1
     if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
-        git -C "$repo" init -q >/dev/null 2>&1 || {
+        # `-b main` rather than whatever init.defaultBranch happens to be. This
+        # repo is private plumbing, so the name only has to be PREDICTABLE: an
+        # empty remote publishes no branch to follow, and inheriting the local
+        # default there means one machine creates the corpus on `main` and
+        # another on `master`, on a remote whose HEAD names only one of them. A
+        # remote that already has a branch is still followed, whatever it calls
+        # it — see distill_remote_probe.
+        git -C "$repo" init -q -b main >/dev/null 2>&1 ||
+            git -C "$repo" init -q >/dev/null 2>&1 || {
             distill_warn "could not init the state repo at $repo — --undo will not work"
             return 1
         }
@@ -1648,6 +1984,10 @@ distill_state_repo_init() {
     distill_state_restore
     distill_render_state_readme
     distill_seed_pinned
+    # After the restore, so a corpus that already has an identity keeps it and
+    # only a genuinely new one is stamped.
+    distill_corpus_seed
+    distill_corpus_check_local || return 1
     # Ensure each rule, rather than only writing the file when absent: a repo
     # initialised by an older version keeps its old .gitignore forever, and a
     # rule added later would never reach it. Untrack too — .gitignore has no
@@ -2212,12 +2552,13 @@ distill_persist_extracts() {
         mkdir -p "$(dirname "$out")" 2>/dev/null
 
         if [ -f "$out" ]; then
-            if jq -s '{items: (.[0].items + .[1] | unique)}' \
-                "$out" <(jq -s '.' "$f") >"$out.tmp" 2>/dev/null &&
-                mv "$out.tmp" "$out" 2>/dev/null; then
-                :
+            # Through the same union an attach uses, so what a corpus contains is
+            # decided in one place rather than by two jq expressions free to drift.
+            if jq -s '{items: .}' "$f" >"$out.new" 2>/dev/null &&
+                distill_extract_union "$out" "$out.new" "$out"; then
+                rm -f "$out.new"
             else
-                rm -f "$out.tmp"
+                rm -f "$out.new" "$out.tmp"
                 rc=1
             fi
         else

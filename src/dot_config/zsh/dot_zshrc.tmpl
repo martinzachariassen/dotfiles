@@ -591,8 +591,8 @@ chezxcode() {
 {{- if has "claudeDistiller" (dig "modules" (list) .) }}
 
 # Distil Claude Code conversations into the MAIN.md every future session loads.
-# Knobs: --setup · --since 7d · --render · --undo · -n.
-# Read-only, free: --status · --stats · --runs [N] · --logs [N] [-f].
+# Knobs: --setup · --since 7d · --render · --undo · --remote [URL|none] · -n.
+# Read-only, free: --status · --stats · --runs [N] · --logs [N] [-f] · --remote.
 chezdistill() {
     _chez_run scripts/bin/distill.sh "$@"
 }
@@ -914,6 +914,7 @@ chezhelp() {
                        --stats   the corpus: funnel, topics, spend, runs.
                        --runs [N]  a row per night ·  --logs [N] [-f]  the log.
                        --since 7d  backfill     ·  --undo  revert + re-render.
+                       --remote [URL|none]  back the corpus up, or stop.
 {{- end }}
 
   Maintenance (packages & drift)
