@@ -470,6 +470,22 @@ if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" claude
             fi
         fi
 
+        # Are there any inputs? Every other check here is on the output side, and
+        # that is how a job whose transcriptRoots pointed at a directory that has
+        # never existed passed this whole section, green, every day of its life:
+        # registered, ran, wrote a MAIN.md, backed the corpus up — and read
+        # nothing. "Could it have worked" is not "did it work".
+        distill_sources=0
+        while IFS= read -r distill_root; do
+            [ -n "$distill_root" ] || continue
+            distill_sources=$((distill_sources + $(distill_source_count "$distill_root")))
+        done < <(distill_source_roots 2>/dev/null)
+        if [ "$distill_sources" -eq 0 ]; then
+            fail "no transcripts under any transcriptRoot — nothing can be distilled. See: chezdistill --status"
+        else
+            pass "$distill_sources transcript(s) to read from"
+        fi
+
         distill_last="$(distill_last_run 2>/dev/null || true)"
         if [ -z "$distill_last" ]; then
             note "no run recorded yet — backfill with: chezdistill --since 7d"
@@ -483,6 +499,13 @@ if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" claude
                 warn "last run was ${distill_age} days ago — the timer may not be firing. See: chezdistill --status"
             else
                 pass "last run ${distill_age} day(s) ago, ok"
+            fi
+            # Succeeded, and opened nothing, while transcripts sit there unread.
+            # The exact shape of the transcriptRoots bug, and of the next thing
+            # that quietly stops the harvester reaching the files.
+            if [ "$distill_verdict" = "ok" ] && [ "$distill_sources" -gt 0 ] &&
+                [ "$(printf '%s' "$distill_last" | jq -r '.sessions.seen // 0')" = "0" ]; then
+                warn "the last run read 0 of $distill_sources transcript(s) — see: chezdistill --runs"
             fi
         fi
 

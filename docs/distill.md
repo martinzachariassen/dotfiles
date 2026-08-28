@@ -32,8 +32,9 @@ therefore lives in state, with the other inputs.
 **There is no human-facing output.** The audience is Claude. This job wrote
 daily and weekly notes into an Obsidian vault once; that half was removed
 deliberately, and reintroducing a reporting destination is a design change, not
-a feature. To see what it knows, read `MAIN.md`, a note in `Topics/`, or
-`chezdistill --status`.
+a feature. To see what it knows, read `MAIN.md`, a note in `Topics/`, or ask on
+demand: `chezdistill --status`, `--stats`, `--runs`, `--logs`. Those print to a
+terminal you asked at; they write nothing and nobody has to read them.
 
 ## Turning it on
 
@@ -80,10 +81,25 @@ chezdistill --status     # where things live, MAIN size vs cap, spend, last run
 chezdistill --undo       # revert the last state commit and re-render
 ```
 
+And to look at it rather than run it — all read-only, none of them costs
+anything:
+
+```sh
+chezdistill --stats      # the corpus: funnel, topics, hit spread, spend, runs
+chezdistill --runs [N]   # the last N nights, one row each (default 14)
+chezdistill --logs [N]   # tail launchd's own log (default 50); -f follows
+```
+
 `-n` first is the cheap habit: it prints the sessions that would be read and the
-calls that would be made without spending anything. A session already read is
-skipped by the cursor, so running the job by hand does not double-bill you for
-the night.
+calls that would be made without spending anything, and it leaves the corpus, the
+cursor and the rendered memory exactly as it found them — so the real run that
+follows still sees the same window. A session already read is skipped by the
+cursor, so running the job by hand does not double-bill you for the night.
+
+One thing `-n` cannot tell you: whether a session holds anything worth keeping.
+The model is never called, so every session reports the same "nothing durable in
+it" a real skip would. `-n` answers *what would be read*, not *what would be
+learned*.
 
 ## What happens each night
 
@@ -220,6 +236,8 @@ There is no report to open, so this is where a run's outcome shows up:
 ```text
 ✓ memory   ~/.config/claude/memory
 ✓ state    ~/.local/state/chezdistill
+✓ sources  ~/.claude/projects — 85 transcript(s)
+·          27 in the window the next run would read
 ✓ MAIN.md  5104B of 6144B
 · corpus   87 sighting(s) of 41 entries, oldest 2026-06-02
 · waiting  22 entries below the gate or stale — see Candidates.md
@@ -238,6 +256,60 @@ and working as designed.
 
 The records behind it are `runs.jsonl`, kept for `runRetentionDays`.
 
+**`sources` is the line that has to be green before any of the rest means
+anything.** It exists because it once wasn't: `transcriptRoots` shipped pointing
+at a directory that has never existed, so the job ran every night, read nothing,
+recorded `ok`, and showed every other tick above in green for its entire life.
+Nothing in the engine noticed, because every precondition it had guarded an
+*output* — can memory be written, can state, is the corpus pointed at the right
+remote — and none guarded an input. Now a run with nowhere to read from fails
+loudly instead of passing as a quiet night, and both `--status` and `chezdoctor`
+count the transcripts first.
+
+### `--runs` — what has it been doing?
+
+`runs.jsonl` has always held 90 days; until now only its newest record was ever
+read. One row per night is the view that makes an outage obvious at a glance
+rather than after opening a file by hand:
+
+```text
+── chezdistill runs ──
+     date              trigger   status  kept/seen  items     dur     cost
+     2026-08-25 01:02  launchd   ok            2/9      5    142s    $0.38
+     2026-08-26 01:01  launchd   ok           3/12      7    171s    $0.63
+  •  2 run(s) · 12 item(s) · $1.01
+```
+
+Defaults to 14 rows; `chezdistill --runs 60` for more. If nothing seen a session
+all window, it says so — that is the failure this whole section was added for.
+
+### `--stats` — what is in the corpus?
+
+The promotion funnel, plus what it cost to get there:
+
+```text
+── chezdistill stats ──
+  ✓  corpus   41 entries from 87 sighting(s), 2026-06-02 → 2026-08-27
+  •  in MAIN  19 entries · 5104B of 6144B
+  !  evicted  2 eligible entries did not fit the cap — see Topics/
+  •  waiting  22 below the gate (< 2 hits) · 0 stale
+  •  topics   Kotlin 8 · Git 6 · Jackson 5 · Gradle 4 · (+9 more)
+  •  kinds    learnings 18 · gotchas 11 · decisions 7 · preferences 5
+  •  hits     1× 22 · 2× 12 · 3× 5 · 4+× 2
+  •  spend    $1.87 over 7d · $6.4 over 30d
+  •  runs     12 in 7d · 0 failed · 2.4 session(s) kept per run
+```
+
+`in MAIN` counts what is actually in the file, not what is eligible for it — the
+byte cap evicts by design, and `evicted` is the difference. Reporting eligibility
+as presence would be a lie in exactly the case where the number matters.
+
+### `--logs` — what did launchd see?
+
+`tail` for `~/.local/state/chezdistill/logs/nightly.log`, which is per-machine
+and gitignored, so nothing else can show it to you. `-f` follows. Under `-n` it
+prints the tail and says why it is not following: a preview has to return.
+
 ### `chezdoctor` — is it still alive?
 
 `--status` answers only when you think to ask, and a job with no human-facing
@@ -245,8 +317,8 @@ output is a job you stop thinking about. So the health check you already run for
 everything else carries a **chezdistill** section: the agent registered with
 launchd, how long ago the last run was (a failure fails, more than three days
 warns), whether `MAIN.md` exists and how it sits against the cap, and whether the
-state repo is backed up — to *its own* profile's corpus. It is read-only and
-makes no API calls.
+state repo is backed up — to *its own* profile's corpus, and whether there are
+any transcripts to read at all. It is read-only and makes no API calls.
 
 ## The promotion gate
 
@@ -335,7 +407,8 @@ rebooted.
 chezdoctor                                 # is the agent registered, did it run
 chezdistill --status                       # paths, MAIN vs cap, spend, last run
 chezdistill -n --since 7d                  # what would be read, no API calls
-tail -50 ~/.local/state/chezdistill/logs/nightly.log
+chezdistill --runs                         # the last fortnight, one row a night
+chezdistill --logs 50                      # launchd's log (~/.local/state/…)
 launchctl print gui/$(id -u)/no.mlz.chezdistill.nightly
 launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 ```
@@ -350,7 +423,12 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | "spend ceiling reached — stopping after N session(s)" | A backfill hit the ceiling part-way. What it read is saved and the cursor is held; raise the ceiling or wait for the 7-day window to roll, then run again. |
 | Agent not in `launchctl list` | Hook 06 didn't run. `chezapply`, then check its output. |
 | Did it run at all last night? | `chezdistill --status` — `last run`. |
+| Green every night, but nothing distilled | Look at `sources` in `--status`: if a configured `transcriptRoot` does not exist there is nothing to read, and the run now fails rather than recording `ok`. `--runs` shows the whole streak. |
+| "no transcripts to read — configured root(s) do not exist" | `transcriptRoots` in `src/.chezmoidata/distill.toml` is wrong for this machine. Claude Code writes to `~/.claude/projects`; `CLAUDE_CONFIG_DIR` moves settings, skills and the persona, not transcripts. |
 | It ran but distilled nothing | The per-session lines under `last run` give the reason for each. |
+| "N seen, 0 kept" most nights | Usually `minTurns`: a turn counts only if you *typed* it, and plenty of real sessions are one or two prompts long. This is the filter working, not a fault. Lower `minTurns` in `src/.chezmoidata/distill.toml` if you want the short ones too. |
+| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chezdistill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash scripts/bin/distill.sh`. |
+| A root shows as "not present on this Mac" | Expected. `transcriptRoots` is a candidate list and only one entry is ever real; it is only a problem when *no* root has transcripts, which fails the run outright. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 
 ## Backing it up, and moving to a new Mac
@@ -471,7 +549,7 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 |---|---|---|
 | `memoryPath` | `~/.config/claude/memory` | MAIN, Topics, Candidates. Created on demand. |
 | `statePath` | `~/.local/state/chezdistill` | Extracts, Pinned, cursor, spend, runs, logs. |
-| `transcriptRoots` | `~/.config/claude/projects` | A list, so a second install can be added. |
+| `transcriptRoots` | `~/.claude/projects`, `~/.config/claude/projects` | Both, because which one is live depends on the install. A root that does not exist is skipped; *no* root existing fails the run. |
 | `mainCapBytes` | `6144` | Hard limit on MAIN, enforced before writing. |
 | `minHits` | `2` | The promotion gate. |
 | `demoteAfterDays` | `21` | Not reinforced this long → demoted to `Topics/`. |

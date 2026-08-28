@@ -17,8 +17,17 @@ memoryPath = "~/.config/claude/memory"
 statePath = "~/.local/state/chezdistill"
 
 # Where transcripts live. A list so a second Claude Code install can be added
-# without touching the code. Tildes are expanded by the reader.
-transcriptRoots = ["~/.config/claude/projects"]
+# without touching the code. Tildes are expanded by the reader, and a root that
+# does not exist is skipped — so listing both costs nothing.
+#
+# BOTH, and ~/.claude/projects first, because CLAUDE_CONFIG_DIR does NOT move
+# them. It relocates settings, skills and the persona; `projects/` (and
+# history.jsonl, shell-snapshots, todos) stay under ~/.claude regardless. This
+# file shipped with only the XDG path, which has never existed on any machine
+# here, so the nightly job read zero transcripts and reported `ok` every night —
+# see distill_sources_ok in scripts/lib/distill.sh, which now refuses to let a
+# run with nowhere to read from pass as a quiet night.
+transcriptRoots = ["~/.claude/projects", "~/.config/claude/projects"]
 
 # The one model tier. One call per session — `items: []` is itself the "nothing
 # durable here" verdict. A separate cheap triage pass measured WORSE: it cost
