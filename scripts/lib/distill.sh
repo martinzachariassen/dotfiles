@@ -1162,6 +1162,209 @@ distill_git_env() {
     export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
 }
 
+# distill_state_branch [OVERRIDE] — the branch this corpus lives on, named out
+# loud.
+#
+# Nothing here used to name one, which worked only by luck. `git init` follows
+# `init.defaultBranch`, so a Mac that sets it to `main` and a runner that sets
+# nothing — and so gets `master` — disagree about what to fetch, check out and
+# push, and the disagreement surfaces as a push that is rejected forever. Prefer
+# what the remote already calls it, then what this repo is already on.
+distill_state_branch() {
+    local repo b="${1:-}"
+    [ -n "$b" ] && {
+        printf '%s\n' "$b"
+        return 0
+    }
+    repo="$(distill_state_dir)"
+    b="$(git -C "$repo" symbolic-ref --quiet --short HEAD 2>/dev/null)"
+    [ -n "$b" ] || b="$(git -C "$repo" config --get init.defaultBranch 2>/dev/null)"
+    printf '%s\n' "${b:-main}"
+}
+
+# distill_remote_probe URL — one network call, two answers: has this remote
+# anything in it yet, and what does it call its default branch?
+#
+# Exit 1 means empty, unreachable or unreadable — every caller treats those the
+# same way, because none of them can fetch in any of those cases. Exit 0 prints
+# the branch name (possibly empty, if the remote publishes no symbolic HEAD).
+distill_remote_probe() {
+    local url="$1" out
+    [ -n "$url" ] || return 1
+    distill_git_env
+    out="$(git ls-remote --symref "$url" HEAD 2>/dev/null)" || return 1
+    [ -n "$out" ] || return 1
+    printf '%s\n' "$out" |
+        sed -n 's#^ref: refs/heads/\([^[:space:]]*\).*#\1#p' | head -n1
+    return 0
+}
+
+# distill_state_wedged — is the corpus repo stuck mid-rebase or mid-merge?
+#
+# Left behind by the `push || pull --rebase || push` fallback this file used to
+# use: when the rebase stopped, `.git/rebase-merge` stayed and HEAD was detached,
+# so every later run committed onto a branch that no longer pointed anywhere and
+# pushed nothing. It ran that way for two days on this machine, reporting a green
+# tick throughout.
+#
+# Deliberately only detected, never repaired. `--abort` would restore the branch
+# but overwrite the working copy of files an older layout tracked; `--quit` would
+# keep the tree but drop whatever had not been replayed yet — and that can be
+# corpus nobody else has. Both are judgement calls, so this says so and stops.
+distill_state_wedged() {
+    local repo gd
+    repo="$(distill_state_dir)"
+    gd="$(git -C "$repo" rev-parse --git-dir 2>/dev/null)" || return 1
+    case "$gd" in /*) ;; *) gd="$repo/$gd" ;; esac
+
+    if [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then
+        printf 'rebase\n'
+        return 0
+    fi
+    [ -f "$gd/MERGE_HEAD" ] && {
+        printf 'merge\n'
+        return 0
+    }
+    [ -f "$gd/CHERRY_PICK_HEAD" ] && {
+        printf 'cherry-pick\n'
+        return 0
+    }
+
+    # The state the machine was actually found in: `rebase --quit` clears the
+    # directory above but leaves HEAD detached, and a detached HEAD accepts
+    # commits happily — they just belong to no branch and push nowhere. An
+    # unborn branch is not detached, so check that HEAD resolves first.
+    if git -C "$repo" rev-parse --quiet --verify HEAD >/dev/null 2>&1 &&
+        ! git -C "$repo" symbolic-ref --quiet HEAD >/dev/null 2>&1; then
+        printf 'detached\n'
+        return 0
+    fi
+    return 1
+}
+
+# distill_state_sync — reconcile with the remote, atomically or not at all.
+#
+# Merge, not rebase. Nobody reads this history — `--undo` walks back one commit
+# and the memory tier is derived — so rebase buys nothing and has exactly one
+# failure mode, the one above. A merge either succeeds or is undone whole by
+# `--abort`. Extract shards are per-host, so in the ordinary two-Mac case the
+# merge is a union of files that do not overlap.
+distill_state_sync() {
+    local repo branch wedge
+    repo="$(distill_state_dir)"
+
+    if wedge="$(distill_state_wedged)"; then
+        distill_warn "the corpus repo is stuck mid-$wedge — not syncing until that is settled"
+        return 1
+    fi
+
+    branch="$(distill_state_branch)"
+    distill_git_env
+    git -C "$repo" fetch --quiet origin "$branch" >/dev/null 2>&1 || return 1
+    git -C "$repo" rev-parse --quiet --verify "origin/$branch" >/dev/null 2>&1 || return 0
+
+    git -C "$repo" merge --quiet --ff-only "origin/$branch" >/dev/null 2>&1 && return 0
+
+    if ! git -C "$repo" merge --quiet --no-edit "origin/$branch" >/dev/null 2>&1; then
+        git -C "$repo" merge --abort >/dev/null 2>&1 || true
+        distill_warn "the corpus and its remote have diverged in a way that needs a hand"
+        return 1
+    fi
+    return 0
+}
+
+# distill_backup_state — is the corpus actually reaching its remote?
+#
+# The question `--status` never asked. It printed the remote's URL and called
+# that a pass, so a push that had been failing for days still rendered as backed
+# up. Read-only and offline — it compares what is committed against what was last
+# known to be on the remote, so it is safe for `--status` and `chezdoctor`.
+#
+# Prints one verdict: no-repo · no-remote · wedged · no-upstream · synced ·
+# ahead N · behind N · diverged N M.
+distill_backup_state() {
+    local repo branch counts ahead behind
+    repo="$(distill_state_dir)"
+
+    git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || {
+        printf 'no-repo\n'
+        return 0
+    }
+    [ -n "$(git -C "$repo" remote 2>/dev/null)" ] || {
+        printf 'no-remote\n'
+        return 0
+    }
+    distill_state_wedged >/dev/null && {
+        printf 'wedged\n'
+        return 0
+    }
+
+    branch="$(distill_state_branch)"
+    counts="$(git -C "$repo" rev-list --left-right --count \
+        "origin/$branch...HEAD" 2>/dev/null)" || {
+        printf 'no-upstream\n'
+        return 0
+    }
+    [ -n "$counts" ] || {
+        printf 'no-upstream\n'
+        return 0
+    }
+
+    behind="${counts%%[[:space:]]*}"
+    ahead="${counts##*[[:space:]]}"
+    if [ "${behind:-0}" -gt 0 ] && [ "${ahead:-0}" -gt 0 ]; then
+        printf 'diverged %s %s\n' "$ahead" "$behind"
+    elif [ "${ahead:-0}" -gt 0 ]; then
+        printf 'ahead %s\n' "$ahead"
+    elif [ "${behind:-0}" -gt 0 ]; then
+        printf 'behind %s\n' "$behind"
+    else
+        printf 'synced\n'
+    fi
+    return 0
+}
+
+# distill_state_restore — put an existing corpus back on a machine that has none.
+#
+# The half that was only ever described. Its absence is why a rebuilt Mac never
+# came back: `git init` starts an unrelated history, so the first push is rejected
+# as non-fast-forward and so is every one after it, forever, while the corpus it
+# was meant to inherit sits on the remote untouched.
+#
+# Fetch and check out rather than `git clone`, because by the time this runs the
+# state dir is not empty — cursor.json, logs/ and today's extracts are already in
+# it, and clone refuses a non-empty target.
+#
+# Only for a repo with no commits of its own. One that already has a history is
+# reconciled by distill_state_sync; if that history is unrelated to the remote's
+# there is no safe automatic answer, so it says so rather than picking one.
+distill_state_restore() {
+    local repo branch remote
+    repo="$(distill_state_dir)"
+
+    git -C "$repo" rev-parse --quiet --verify HEAD >/dev/null 2>&1 && return 0
+
+    remote="$(git -C "$repo" remote get-url origin 2>/dev/null)" || return 0
+    [ -n "$remote" ] || return 0
+
+    branch="$(distill_remote_probe "$remote")" || return 0
+    branch="$(distill_state_branch "$branch")"
+
+    distill_git_env
+    git -C "$repo" fetch --quiet origin "$branch" >/dev/null 2>&1 || return 0
+    git -C "$repo" rev-parse --quiet --verify "origin/$branch" >/dev/null 2>&1 || return 0
+
+    # Git refuses this rather than overwriting an untracked file that the remote
+    # also has — a same-host, same-day rebuild is the only way that happens, and
+    # refusing is the right answer: the local copy is this machine's own work.
+    git -C "$repo" checkout -q -B "$branch" --track "origin/$branch" >/dev/null 2>&1 || {
+        distill_warn "could not restore the corpus from $remote without overwriting local work"
+        return 0
+    }
+    info "restored the corpus from $remote"
+    return 0
+}
+
 # ─── Which corpus is this Mac's? ──────────────────────────────────────────────
 #
 # One remote per profile, from `[distill.remotes]` in .chezmoidata. Not one
@@ -1281,7 +1484,7 @@ distill_state_repo_pushurl() {
 # Versioning derived output alongside its input would just be two copies of the
 # same decision, free to disagree.
 distill_commit_local() {
-    local repo="" msg="$1"
+    local repo="" msg="$1" branch="" wedge=""
     repo="$(distill_state_dir)"
     [ "${DRY_RUN:-0}" = "1" ] && {
         dim "dry-run \$ git -C $repo commit -m '$msg'"
@@ -1290,6 +1493,19 @@ distill_commit_local() {
     [ -d "$repo" ] || return 0
 
     distill_state_repo_init || return 0
+
+    # Before `add -A`, not after. A wedged repo takes commits without complaint —
+    # onto a detached HEAD, or on top of a half-finished rebase — and that is
+    # precisely how two days of nightly runs ended up on a branch that did not
+    # exist. Leaving the work uncommitted on disk loses nothing: the corpus is
+    # the files, and the next run commits them once the repo is untangled.
+    if wedge="$(distill_state_wedged)"; then
+        distill_warn "the corpus repo is stuck mid-$wedge — not committing onto it"
+        info "settle it by hand, then the next run picks up where this one stopped:"
+        info "  git -C $repo status"
+        return 0
+    fi
+
     git -C "$repo" add -A >/dev/null 2>&1 || true
     if ! git -C "$repo" diff --cached --quiet 2>/dev/null; then
         git -C "$repo" commit -q -m "$msg" >/dev/null 2>&1 || {
@@ -1302,11 +1518,23 @@ distill_commit_local() {
     # is already made, and the next run carries it.
     [ -n "$(git -C "$repo" remote 2>/dev/null)" ] || return 0
     distill_git_env
-    git -C "$repo" push -q >/dev/null 2>&1 || {
-        git -C "$repo" pull --rebase --autostash >/dev/null 2>&1 || true
-        git -C "$repo" push -q >/dev/null 2>&1 ||
-            info "state push deferred — the next run will carry it"
+
+    # -u every time, not just the first: a repo created by `git init` and pointed
+    # at a remote by hand has no upstream at all, and without one `git push` has
+    # nothing to push to and the old fallback's `pull --rebase` failed outright
+    # with "no tracking information". That is the whole of why a rebuilt Mac never
+    # re-attached to its corpus.
+    branch="$(distill_state_branch)"
+    git -C "$repo" push -q -u origin "$branch" >/dev/null 2>&1 && return 0
+
+    # Rejected almost always means the other Mac pushed first. Reconcile and retry
+    # once; anything left after that is for a human, not for 01:00.
+    distill_state_sync || {
+        info "state push deferred — the next run will carry it"
+        return 0
     }
+    git -C "$repo" push -q -u origin "$branch" >/dev/null 2>&1 ||
+        info "state push deferred — the next run will carry it"
     return 0
 }
 
@@ -1324,6 +1552,12 @@ distill_render_state_readme() {
     # Read back from git rather than a config key, so the clone line in the
     # README can never name a remote this repo does not actually push to.
     remote="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+    # Normalised, because this file is TRACKED. Two Macs on one corpus that spell
+    # the same remote differently — one `git@github.com:…`, one `https://…` —
+    # would otherwise rewrite this line against each other on every run: a commit
+    # each night that changes nothing, and a merge conflict in the one file that
+    # has no business having one.
+    [ -n "$remote" ] && remote="https://$(distill_remote_id "$remote")"
     # There is one of these repo per profile (…-personal, …-work), and a heading
     # that names the wrong one on the wrong remote is worse than no heading.
     title="$(basename "${remote:-claude-memory}" .git)"
@@ -1411,6 +1645,7 @@ distill_state_repo_init() {
     distill_remote_adopt
     distill_remote_check || return 1
     distill_state_repo_pushurl
+    distill_state_restore
     distill_render_state_readme
     distill_seed_pinned
     # Ensure each rule, rather than only writing the file when absent: a repo
@@ -1468,7 +1703,7 @@ distill_status_sources() {
 }
 
 distill_status() {
-    local main cap spent ceiling n last line f foreign
+    local main cap spent ceiling n last line f foreign url verdict va vb
     s_section "chezdistill"
 
     # Paths only. A remote conflict is reported below as its own line rather than
@@ -1509,18 +1744,29 @@ distill_status() {
         s_note "waiting  ${n} entries below the gate or stale — see Candidates.md"
     fi
 
-    if git -C "$(distill_state_dir)" rev-parse --git-dir >/dev/null 2>&1; then
-        n="$(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0)"
-        if foreign="$(distill_remote_conflict)"; then
-            s_fail "backup   origin is the $foreign corpus, but this is a $(distill_profile) Mac — nothing will run"
-            s_note "         git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
-        elif [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
-            s_pass "backup   $n commit(s), pushed to $(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)"
-        else
-            s_warn "backup   $n commit(s), no remote — this Mac is the only copy"
-        fi
+    # What the remote actually has, not what it is called. This line used to print
+    # the origin URL and call that a pass, so a push that had been failing for two
+    # days still rendered a green tick — see distill_backup_state.
+    if foreign="$(distill_remote_conflict)"; then
+        s_fail "backup   origin is the $foreign corpus, but this is a $(distill_profile) Mac — nothing will run"
+        s_note "         git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
     else
-        s_note "backup   no state repo yet — the first run creates it"
+        n="$(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0)"
+        url="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+        read -r verdict va vb <<<"$(distill_backup_state)"
+        case "$verdict" in
+            no-repo) s_note "backup   no state repo yet — the first run creates it" ;;
+            no-remote) s_warn "backup   $n commit(s), no remote — this Mac is the only copy" ;;
+            wedged)
+                s_fail "backup   the corpus repo is stuck mid-operation — nothing is being pushed"
+                s_note "         git -C $(distill_state_dir) status"
+                ;;
+            no-upstream) s_fail "backup   $n commit(s), never pushed to $url" ;;
+            ahead) s_warn "backup   $va commit(s) not yet on $url — the push is not getting through" ;;
+            behind) s_warn "backup   $va commit(s) behind $url — the next run catches up" ;;
+            diverged) s_fail "backup   diverged from $url — $va unpushed, $vb unpulled" ;;
+            *) s_pass "backup   $n commit(s), pushed to $url" ;;
+        esac
     fi
 
     # Rounded for display. The raw sum is a float accumulated from per-call

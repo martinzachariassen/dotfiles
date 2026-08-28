@@ -520,12 +520,26 @@ if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" claude
         # only thing here that cannot be regenerated. Worse than no remote is the
         # other profile's remote: it looks like a backup, and it isn't — it is
         # work memory promoted into personal sessions, one push past undoing.
+        # Whether it is REACHING the remote, not merely which remote it names.
+        # This line used to pass on the strength of an origin URL existing, so a
+        # push that had been rejected every night for two days still read green.
+        # The verdict is computed once, in distill_backup_state, and only
+        # rendered here — chezdistill --status renders the same one.
         if distill_foreign="$(distill_remote_conflict 2>/dev/null)"; then
             fail "corpus pushes to the $distill_foreign remote, but this is a $(distill_profile) Mac. See: chezdistill --status"
-        elif [ -n "$(git -C "$(distill_state_dir)" remote 2>/dev/null)" ]; then
-            pass "corpus backed up to $(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)"
         else
-            warn "corpus has no remote — this Mac is the only copy. See docs/distill.md"
+            distill_url="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+            read -r distill_bv distill_bn _ <<<"$(distill_backup_state 2>/dev/null)"
+            case "$distill_bv" in
+                no-repo) note "no corpus repo yet — the first run creates it" ;;
+                no-remote) warn "corpus has no remote — this Mac is the only copy. See docs/distill.md" ;;
+                wedged) fail "the corpus repo is stuck mid-operation — nothing is being pushed. See: chezdistill --status" ;;
+                no-upstream) fail "corpus has never reached $distill_url. See: chezdistill --status" ;;
+                ahead) warn "$distill_bn corpus commit(s) not yet on $distill_url. See: chezdistill --status" ;;
+                behind) warn "corpus is $distill_bn commit(s) behind $distill_url — the next run catches up" ;;
+                diverged) fail "corpus has diverged from $distill_url. See: chezdistill --status" ;;
+                *) pass "corpus backed up to $distill_url" ;;
+            esac
         fi
     fi
 fi
