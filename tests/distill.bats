@@ -1740,21 +1740,28 @@ local_shard() {
     [ "$(distill_corpus_id)" = "c-known" ]
 }
 
-# The property the whole design rests on: joining a corpus loses nothing from
-# either side, and cannot inflate a hit count, because hits counts sessions.
-@test "joining a corpus keeps both Macs' work, and counts it once" {
+# The property the whole design rests on: joining loses nothing from either side.
+#
+# Asserted on the ONE entry it is about, with jq — a substring match for
+# `"hits":2` also passes on any other entry that happens to have two, which is
+# how an earlier version of this went green locally while the number it meant to
+# check was wrong. The two sides are given DISJOINT sessions in the shard whose
+# name they share, so a union that dropped either one shows up as a hit count of
+# 1 rather than as a passing test.
+@test "joining a corpus loses nothing from either side" {
     load_lib
     isolate_git
     bare="$(bare_remote main)"
+    # The remote knows the rule from its own session, s-2026-07-01.other-mac.
     seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
     DISTILL_PROFILE=personal
 
-    # One shard only this Mac has, and one the two Macs share the name of.
-    local_shard 2026-08-20.this-mac 'a local rule' loc1
-    jq -n --argjson i "[$(item 'a shared rule' s-other)]" '{items:$i}' \
-        >"$STATE/extracts/2026-07-01.other-mac.json"
+    mkdir -p "$STATE/extracts"
+    # This Mac wrote the SAME shard name, from a different session.
     jq -n --argjson i "[$(item 'a shared rule' s-mine)]" '{items:$i}' \
-        >"$STATE/extracts/2026-07-02.this-mac.json"
+        >"$STATE/extracts/2026-07-01.other-mac.json"
+    # ...and a shard only this Mac has at all.
+    local_shard 2026-08-20.this-mac 'a local rule' loc1
 
     run distill_remote_attach "$bare"
     [ "$status" -eq 0 ]
@@ -1762,13 +1769,12 @@ local_shard() {
     run git -C "$bare" ls-tree -r --name-only main
     [[ "$output" == *"2026-07-01.other-mac.json"* ]]
     [[ "$output" == *"2026-08-20.this-mac.json"* ]]
-    [[ "$output" == *"2026-07-02.this-mac.json"* ]]
 
-    # Seen in two distinct sessions across the two Macs — two hits, not four.
-    run distill_derive
-    [[ "$output" == *'"hits":2'* ]]
-    [[ "$output" != *'"hits":3'* ]]
-    [[ "$output" != *'"hits":4'* ]]
+    # Both sessions survived the collision — 1 would mean one side was dropped.
+    hits="$(distill_derive | jq -r 'select(.text == "a shared rule") | .hits')"
+    [ "$hits" = "2" ]
+    hits="$(distill_derive | jq -r 'select(.text == "a local rule") | .hits')"
+    [ "$hits" = "1" ]
 }
 
 @test "a shard both Macs wrote is unioned, not replaced" {
