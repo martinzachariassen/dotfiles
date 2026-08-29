@@ -88,6 +88,18 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   the wrong repo" otherwise reports as a green tick and cannot be un-pushed. Compare
   remotes with `distill_remote_id`, never as strings — SSH and HTTPS spellings of one
   repo must not read as a conflict.
+  **A backup reports what the remote HAS, never what it is called.** Naming an origin
+  is not evidence of a push, and treating it as evidence is how two days of rejected
+  pushes rendered as `✓ backup`. The verdict is computed once in
+  `distill_backup_state` (`HEAD` vs the remote-tracking ref, offline) and only
+  *rendered* by `chezdistill --status` and `chezdoctor` — never re-derived in either,
+  or the two drift and the weaker one wins. Reconciling is a **merge, never a
+  rebase**: a stopped rebase leaves a detached `HEAD` that silently accepts commits
+  forever, so a repo found mid-rebase or detached stops before committing rather than
+  being repaired by guesswork. Name the branch explicitly in every git call —
+  `git init` follows `init.defaultBranch`, which is set here and unset in CI — and
+  keep anything written into a *tracked* file normalised, or two Macs spelling one
+  remote differently rewrite it against each other every night.
   **It has no human-facing output and no vault** — it produced daily and weekly
   notes in Obsidian once, and that half was removed deliberately. The boundary is
   a *written* destination: no generated notes, no digest, no file anyone but

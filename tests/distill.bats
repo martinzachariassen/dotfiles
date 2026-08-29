@@ -903,7 +903,22 @@ a_conversation() {
     git -C "$STATE" init -q
     git -C "$STATE" remote add origin https://example.invalid/claude-memory.git
     distill_render_state_readme
-    grep -q 'https://example.invalid/claude-memory.git' "$STATE/README.md"
+    grep -q 'https://example.invalid/claude-memory' "$STATE/README.md"
+}
+
+# README.md is tracked, so two Macs that spell one remote differently would
+# rewrite this file against each other every night — a commit that changes
+# nothing, and a merge conflict in the one file that should never have one.
+@test "one remote spelled two ways renders one README" {
+    load_lib
+    git -C "$STATE" init -q
+    git -C "$STATE" remote add origin git@github.com:Me/Claude-Memory.git
+    distill_render_state_readme
+    ssh_form="$(cat "$STATE/README.md")"
+
+    git -C "$STATE" remote set-url origin https://github.com/me/claude-memory
+    distill_render_state_readme
+    [ "$ssh_form" = "$(cat "$STATE/README.md")" ]
 }
 
 @test "rendering the state README twice is byte-identical" {
@@ -1456,4 +1471,188 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     run distill_state_repo_init
     [ "$status" -eq 0 ]
     [ -z "$(origin_of)" ]
+}
+
+# ─── The corpus actually reaching its remote ──────────────────────────────────
+#
+# Every test above this line points its remote at a URL nobody ever contacts, so
+# for three years nothing exercised a push, a fetch or a restore — which is
+# exactly how a backup that had never once worked kept reporting a green tick.
+# These use local bare repos, so they are real git operations and still offline.
+#
+# Every one names its branch. `git init` follows init.defaultBranch, which is set
+# on the author's Mac and unset on CI, so a test that omitted it would exercise
+# `main` locally and `master` in CI.
+
+# isolate_git — run against a git that has been configured by nobody.
+#
+# Not optional. This machine sets push.autoSetupRemote=true globally, which
+# quietly sets the upstream that the old code never set, so three of the tests
+# below passed against the very bug they exist to catch. CI sets neither that nor
+# init.defaultBranch. Without this the suite would prove the fix works here and
+# ship the failure to every machine configured differently.
+isolate_git() {
+    export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gitconfig-none"
+    export GIT_CONFIG_SYSTEM=/dev/null
+    : >"$GIT_CONFIG_GLOBAL"
+}
+
+bare_remote() {
+    local b="${1:-main}" d
+    isolate_git
+    d="$BATS_TEST_TMPDIR/bare-$b-$RANDOM.git"
+    git init -q --bare -b "$b" "$d"
+    printf '%s\n' "$d"
+}
+
+# seed_remote BARE BRANCH SHARD… — a corpus that already exists, as if another
+# Mac had been running for months.
+seed_remote() {
+    local bare="$1" branch="$2" work shard
+    shift 2
+    work="$BATS_TEST_TMPDIR/seed-$RANDOM"
+    git clone -q -b "$branch" "$bare" "$work" 2>/dev/null || {
+        git init -q -b "$branch" "$work"
+        git -C "$work" remote add origin "$bare"
+    }
+    mkdir -p "$work/extracts"
+    for shard in "$@"; do
+        jq -n --argjson i "[$(item 'a remembered rule' "s-$shard")]" '{items:$i}' \
+            >"$work/extracts/$shard.json"
+    done
+    git -C "$work" -c user.name=t -c user.email=t@t add -A
+    git -C "$work" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \
+        commit -q -m "seed"
+    git -C "$work" push -q origin "$branch"
+}
+
+attach_state() {
+    local bare="$1" branch="${2:-main}"
+    isolate_git
+    git -C "$STATE" init -q -b "$branch"
+    git -C "$STATE" remote add origin "$bare"
+}
+
+@test "the first push sets an upstream" {
+    load_lib
+    bare="$(bare_remote main)"
+    attach_state "$bare" main
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    distill_commit_local "chore(distill): test"
+
+    [ "$(git -C "$STATE" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" = "origin/main" ]
+    [ "$(git -C "$bare" rev-list --count main)" -ge 1 ]
+}
+
+@test "a corpus that already exists is restored onto a machine that has none" {
+    load_lib
+    bare="$(bare_remote main)"
+    seed_remote "$bare" main 2026-08-01.mac-a
+    attach_state "$bare" main
+
+    distill_state_repo_init
+    [ -f "$STATE/extracts/2026-08-01.mac-a.json" ]
+    [ "$(git -C "$STATE" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" = "origin/main" ]
+}
+
+@test "a restored corpus keeps deriving what the other Mac wrote" {
+    load_lib
+    bare="$(bare_remote main)"
+    seed_remote "$bare" main 2026-08-01.mac-a
+    attach_state "$bare" main
+    distill_state_repo_init
+
+    run distill_derive
+    [[ "$output" == *"a remembered rule"* ]]
+}
+
+@test "a remote on master is followed, not overwritten with main" {
+    load_lib
+    bare="$(bare_remote master)"
+    seed_remote "$bare" master 2026-08-01.mac-a
+    attach_state "$bare" master
+    distill_state_repo_init
+
+    [ -f "$STATE/extracts/2026-08-01.mac-a.json" ]
+    [ "$(git -C "$STATE" symbolic-ref --short HEAD)" = "master" ]
+}
+
+@test "a remote that moved ahead is merged, and never left mid-rebase" {
+    load_lib
+    bare="$(bare_remote main)"
+    attach_state "$bare" main
+    extract 2026-08-22 "[$(item 'mine' s1)]"
+    distill_commit_local "chore(distill): mine"
+
+    # Another Mac pushes its own shard in the meantime.
+    seed_remote "$bare" main 2026-08-23.mac-b
+
+    extract 2026-08-24 "[$(item 'mine later' s2)]"
+    distill_commit_local "chore(distill): mine later"
+
+    [ ! -d "$STATE/.git/rebase-merge" ]
+    [ ! -d "$STATE/.git/rebase-apply" ]
+    # Both Macs' work is on the remote.
+    run git -C "$bare" ls-tree -r --name-only main
+    [[ "$output" == *"2026-08-23.mac-b.json"* ]]
+    [[ "$output" == *"2026-08-24."* ]]
+}
+
+@test "an unreachable remote defers instead of wedging the repo" {
+    load_lib
+    attach_state "$BATS_TEST_TMPDIR/nope.git" main
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    run distill_commit_local "chore(distill): test"
+
+    [ "$status" -eq 0 ]
+    [ ! -d "$STATE/.git/rebase-merge" ]
+    [ "$(git -C "$STATE" rev-list --count HEAD)" -ge 1 ]
+}
+
+@test "a wedged repo is reported, and never committed onto" {
+    load_lib
+    bare="$(bare_remote main)"
+    attach_state "$bare" main
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    distill_commit_local "chore(distill): first"
+
+    # The state the machine was found in: HEAD detached, no branch to push.
+    git -C "$STATE" checkout -q --detach HEAD
+
+    before="$(git -C "$STATE" rev-list --count HEAD)"
+    extract 2026-08-23 "[$(item 'later' s2)]"
+    run distill_commit_local "chore(distill): second"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"detached"* ]]
+    [ "$(git -C "$STATE" rev-list --count HEAD)" -eq "$before" ]
+}
+
+@test "commits that never reached the remote do not read as backed up" {
+    load_lib
+    bare="$(bare_remote main)"
+    attach_state "$bare" main
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    distill_commit_local "chore(distill): test"
+
+    # The remote goes away underneath us, exactly as a rename does.
+    rm -rf "$bare"
+    git -C "$STATE" commit -q --allow-empty -m "chore(distill): later"
+
+    run distill_backup_state
+    [[ "$output" == ahead* ]]
+
+    run distill_status
+    [[ "$output" != *"commit(s), pushed to"* ]]
+}
+
+@test "a corpus in step with its remote reads as backed up" {
+    load_lib
+    bare="$(bare_remote main)"
+    attach_state "$bare" main
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    distill_commit_local "chore(distill): test"
+
+    run distill_backup_state
+    [ "$output" = "synced" ]
 }

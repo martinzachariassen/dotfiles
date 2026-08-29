@@ -256,6 +256,17 @@ and working as designed.
 
 The records behind it are `runs.jsonl`, kept for `runRetentionDays`.
 
+**`backup` reports what the remote actually has**, not which remote it is
+pointed at. It used to print the origin URL and call that a pass, so a push that
+had been rejected every night for two days still rendered a green tick — the one
+failure a backup cannot afford to hide. It now compares `HEAD` against the
+remote-tracking ref and says which way they differ: `N commit(s) not yet on
+<url>` when the push is not getting through, `never pushed` when nothing tracks
+the remote at all, `stuck mid-operation` when a half-finished rebase or merge has
+left the repo unable to commit anywhere useful. `chezdoctor` renders the same
+verdict from the same function, so the two cannot drift apart. Both stay offline
+— the freshness comes from the nightly run's own fetch.
+
 **`sources` is the line that has to be green before any of the rest means
 anything.** It exists because it once wasn't: `transcriptRoots` shipped pointing
 at a directory that has never existed, so the job ran every night, read nothing,
@@ -317,8 +328,8 @@ output is a job you stop thinking about. So the health check you already run for
 everything else carries a **chezdistill** section: the agent registered with
 launchd, how long ago the last run was (a failure fails, more than three days
 warns), whether `MAIN.md` exists and how it sits against the cap, and whether the
-state repo is backed up — to *its own* profile's corpus, and whether there are
-any transcripts to read at all. It is read-only and makes no API calls.
+corpus is *reaching* its remote — to *its own* profile's corpus, and whether there
+are any transcripts to read at all. It is read-only and makes no API calls.
 
 ## The promotion gate
 
@@ -492,6 +503,20 @@ so a night that failed still lands on the remote with its reason attached. If th
 machine is offline the commit is made locally anyway and the next run carries it;
 "deferred" in the output is not an error.
 
+**Reconciling is a merge, and never leaves the repo half-done.** When a push is
+rejected — almost always because the other Mac pushed first — the run fetches,
+merges and retries once. It used to rebase instead, and a rebase that stops for
+any reason leaves `.git/rebase-merge` behind and `HEAD` detached; every later run
+then committed onto a branch that no longer pointed anywhere, pushed nothing, and
+reported success. Nobody reads this history, so a rebase bought nothing and had
+exactly that one failure mode. A merge either succeeds or is undone whole.
+
+If the repo is ever found mid-rebase or on a detached `HEAD`, the run **stops
+before committing** and says so rather than piling more commits somewhere they
+cannot be pushed from. Untangling it is a judgement call — `--abort` restores the
+branch but overwrites files, `--quit` keeps the files but drops unreplayed
+commits — so it is left to you, and `--status` says so until it is done.
+
 The repo writes its own `README.md` on every run — what each path is, why
 `cursor.json` and `logs/` are deliberately absent, and the two-command restore.
 It is generated, so don't edit it on GitHub; change
@@ -519,11 +544,25 @@ happening — the opposite of what a backup is for. The state repo therefore pin
 its own push URL to whatever it was cloned from, when that is HTTPS and no push
 URL is already set; an SSH remote is left exactly as you configured it.
 
-On the new Mac: run `install.sh` for the dotfiles, clone this repo into
-`~/.local/state/chezdistill`, then `chezdistill --render`. That rebuilds
-`MAIN.md`, `Topics/` and `Candidates.md` from the corpus for free — they are pure
-output and are deliberately not tracked. The cursor starts fresh, so the first
-run reads the last 24 hours rather than re-reading everything.
+On the new Mac: run `install.sh` for the dotfiles, then `chezdistill --render`.
+The first time the state repo is created it now **fetches the corpus its profile
+points at and checks it out**, so the machine inherits everything rather than
+starting empty. `--render` then rebuilds `MAIN.md`, `Topics/` and `Candidates.md`
+from it for free — they are pure output and are deliberately not tracked. The
+cursor starts fresh, so the first run reads the last 24 hours rather than
+re-reading everything.
+
+That restore is new, and it is worth saying what it replaces: the code only ever
+ran `git init`, which starts a history unrelated to the remote's. The first push
+was rejected as non-fast-forward and so was every one after it, forever, while
+the corpus it was meant to inherit sat on the remote untouched — a backup that
+could be written but never read back. Cloning by hand was the only way through,
+and nothing said so.
+
+It only applies to a repo with no commits of its own. One that already has a
+history is reconciled by the merge above; if that history is unrelated to the
+remote's there is no safe automatic answer, so it says so rather than picking
+one.
 
 ### Two Macs on one remote
 
