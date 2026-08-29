@@ -1656,3 +1656,235 @@ attach_state() {
     run distill_backup_state
     [ "$output" = "synced" ]
 }
+
+# ─── Corpus identity, and attaching one ───────────────────────────────────────
+#
+# The guard these replace compared the origin URL against a table of known ones.
+# That fails in the direction that actually happened here: the repo was renamed,
+# the URL changed, and every string comparison still passed while the push had
+# been failing for two days. A corpus now says who it is, in a tracked file that
+# travels with it, so a rename is recognised and a cross-profile mix-up is not.
+
+# seed_corpus BARE BRANCH PROFILE ID SHARD… — a corpus that already exists, with
+# an identity. PROFILE empty means a legacy corpus that predates corpus.json.
+seed_corpus() {
+    local bare="$1" branch="$2" prof="$3" id="$4" work shard
+    shift 4
+    work="$BATS_TEST_TMPDIR/seed-$RANDOM"
+    git init -q -b "$branch" "$work"
+    mkdir -p "$work/extracts"
+    [ -n "$prof" ] && jq -n --arg i "$id" --arg p "$prof" \
+        '{schema:1, id:$i, profile:$p, created:"2026-01-01T00:00:00Z", createdBy:"seed"}' \
+        >"$work/corpus.json"
+    for shard in "$@"; do
+        jq -n --argjson i "[$(item 'a shared rule' "s-$shard")]" '{items:$i}' \
+            >"$work/extracts/$shard.json"
+    done
+    git -C "$work" -c user.name=t -c user.email=t@t add -A
+    git -C "$work" -c user.name=t -c user.email=t@t -c commit.gpgsign=false \
+        commit -q -m seed
+    git -C "$work" push -q "$bare" "$branch"
+}
+
+local_shard() {
+    mkdir -p "$STATE/extracts"
+    jq -n --argjson i "[$(item "${2:-a local rule}" "${3:-loc1}")]" '{items:$i}' \
+        >"$STATE/extracts/$1.json"
+}
+
+@test "a corpus is stamped once, and never re-stamped" {
+    load_lib
+    isolate_git
+    distill_state_repo_init
+    first="$(distill_corpus_id)"
+    [ -n "$first" ]
+    [ "$(distill_corpus_profile)" = "$(distill_profile)" ]
+
+    distill_state_repo_init
+    [ "$(distill_corpus_id)" = "$first" ]
+}
+
+@test "the stamp is tracked, so it travels with the corpus" {
+    load_lib
+    isolate_git
+    distill_state_repo_init
+    extract 2026-08-22 "[$(item 'a rule' s1)]"
+    distill_commit_local "chore(distill): test"
+    run git -C "$STATE" ls-files
+    [[ "$output" == *"corpus.json"* ]]
+}
+
+@test "attaching to an empty remote makes this Mac's corpus the corpus" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    local_shard 2026-08-20.mac-one
+
+    run distill_remote_attach "$bare"
+    [ "$status" -eq 0 ]
+    run git -C "$bare" ls-tree -r --name-only main
+    [[ "$output" == *"extracts/2026-08-20.mac-one.json"* ]]
+    [[ "$output" == *"corpus.json"* ]]
+}
+
+@test "attaching a machine with nothing restores the corpus whole" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
+
+    DISTILL_PROFILE=personal
+    run distill_remote_attach "$bare"
+    [ "$status" -eq 0 ]
+    [ -f "$STATE/extracts/2026-07-01.other-mac.json" ]
+    [ "$(distill_corpus_id)" = "c-known" ]
+}
+
+# The property the whole design rests on: joining loses nothing from either side.
+#
+# Asserted on the ONE entry it is about, with jq — a substring match for
+# `"hits":2` also passes on any other entry that happens to have two, which is
+# how an earlier version of this went green locally while the number it meant to
+# check was wrong. The two sides are given DISJOINT sessions in the shard whose
+# name they share, so a union that dropped either one shows up as a hit count of
+# 1 rather than as a passing test.
+@test "joining a corpus loses nothing from either side" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    # The remote knows the rule from its own session, s-2026-07-01.other-mac.
+    seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
+    DISTILL_PROFILE=personal
+
+    mkdir -p "$STATE/extracts"
+    # This Mac wrote the SAME shard name, from a different session.
+    jq -n --argjson i "[$(item 'a shared rule' s-mine)]" '{items:$i}' \
+        >"$STATE/extracts/2026-07-01.other-mac.json"
+    # ...and a shard only this Mac has at all.
+    local_shard 2026-08-20.this-mac 'a local rule' loc1
+
+    run distill_remote_attach "$bare"
+    [ "$status" -eq 0 ]
+
+    run git -C "$bare" ls-tree -r --name-only main
+    [[ "$output" == *"2026-07-01.other-mac.json"* ]]
+    [[ "$output" == *"2026-08-20.this-mac.json"* ]]
+
+    # Both sessions survived the collision — 1 would mean one side was dropped.
+    hits="$(distill_derive | jq -r 'select(.text == "a shared rule") | .hits')"
+    [ "$hits" = "2" ]
+    hits="$(distill_derive | jq -r 'select(.text == "a local rule") | .hits')"
+    [ "$hits" = "1" ]
+}
+
+@test "a shard both Macs wrote is unioned, not replaced" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    seed_corpus "$bare" main personal c-known 2026-07-01.shared
+    DISTILL_PROFILE=personal
+    mkdir -p "$STATE/extracts"
+    jq -n --argjson i "[$(item 'mine only' s-mine)]" '{items:$i}' \
+        >"$STATE/extracts/2026-07-01.shared.json"
+
+    distill_remote_attach "$bare"
+    run jq -r '[.items[].session] | sort | join(",")' "$STATE/extracts/2026-07-01.shared.json"
+    [ "$output" = "s-2026-07-01.shared,s-mine" ]
+}
+
+@test "another profile's corpus is refused before anything is pushed" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    seed_corpus "$bare" main personal c-personal 2026-07-01.their-mac
+    before="$(git -C "$bare" rev-parse main)"
+
+    DISTILL_PROFILE=work
+    local_shard 2026-08-20.work-mac
+    run distill_remote_attach "$bare"
+
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"personal"* ]]
+    [ "$(git -C "$bare" rev-parse main)" = "$before" ]
+}
+
+# The incident this design exists for: the repo was renamed, so the URL is new
+# and the corpus is not.
+@test "the same corpus at a new address is recognised, not merged" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
+    DISTILL_PROFILE=personal
+    distill_remote_attach "$bare"
+
+    moved="$BATS_TEST_TMPDIR/moved.git"
+    git clone -q --bare "$bare" "$moved"
+
+    run distill_remote_attach "$moved"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"same corpus"* ]]
+    [ "$(git -C "$STATE" remote get-url origin)" = "$moved" ]
+}
+
+@test "a corpus older than identities is adopted, then stamped" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    seed_corpus "$bare" main "" "" 2026-07-01.old-mac
+
+    run distill_remote_attach "$bare"
+    [ "$status" -eq 0 ]
+    [ -f "$STATE/extracts/2026-07-01.old-mac.json" ]
+    [ -n "$(distill_corpus_id)" ]
+    [ "$(distill_corpus_profile)" = "$(distill_profile)" ]
+}
+
+@test "detaching is a decision the next run does not undo" {
+    load_lib
+    isolate_git
+    bare="$(bare_remote main)"
+    local_shard 2026-08-20.mac-one
+    distill_remote_attach "$bare"
+    [ -n "$(origin_of)" ]
+
+    distill_remote_detach
+    [ -z "$(origin_of)" ]
+
+    # A configured remote is exactly what would re-attach it, unguarded.
+    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg p "$bare" '{remotes:{personal:$p}}')")"
+    _DISTILL_CFG=""
+    DISTILL_PROFILE=personal
+    distill_state_repo_init
+    [ -z "$(origin_of)" ]
+}
+
+@test "a corpus stamped for another profile stops the run, offline" {
+    load_lib
+    isolate_git
+    distill_state_repo_init
+    jq -n '{schema:1, id:"c-x", profile:"work", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+        >"$(distill_corpus_file)"
+    DISTILL_PROFILE=personal
+
+    run distill_corpus_check_local
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"work"* ]]
+
+    run distill_preflight
+    [ "$status" -eq 1 ]
+}
+
+@test "unioning a shard twice changes nothing the second time" {
+    load_lib
+    mkdir -p "$STATE/extracts"
+    a="$STATE/extracts/a.json"
+    b="$STATE/extracts/b.json"
+    jq -n --argjson i "[$(item 'one' s1)]" '{items:$i}' >"$a"
+    jq -n --argjson i "[$(item 'two' s2)]" '{items:$i}' >"$b"
+
+    distill_extract_union "$a" "$b" "$a"
+    once="$(cat "$a")"
+    distill_extract_union "$a" "$b" "$a"
+    [ "$once" = "$(cat "$a")" ]
+}

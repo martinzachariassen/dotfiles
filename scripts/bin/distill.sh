@@ -30,7 +30,7 @@ ui_init_status
 _distill_help() {
     cat <<'EOF'
 usage: chezdistill [--setup] [--since SPEC] [--status] [--stats] [--runs [N]]
-                   [--logs [N] [-f]] [--render] [--undo] [-n]
+                   [--logs [N] [-f]] [--render] [--remote [URL|none]] [--undo] [-n]
 
 Distil recent Claude Code conversations into two places:
 
@@ -43,6 +43,9 @@ Distil recent Claude Code conversations into two places:
   --since SPEC      backfill from a point in time: 7d, 24h, or an ISO timestamp
   --render          rebuild MAIN.md, Topics and Candidates from the corpus;
                     no API calls
+  --remote URL      back this Mac's corpus up to URL. Restores an existing corpus
+                    onto a new Mac, and joins one that two Macs share
+  --remote none     stop pushing — everything stays here, nothing is deleted
   --undo            revert the state repo's last chezdistill commit and
                     re-render the memory tier from it
   -n, --dry-run     show what would be read and run, without calling the model
@@ -56,6 +59,7 @@ Looking at it, rather than running it — all read-only, none cost anything:
   --runs [N]        the last N runs as a table (default 14) — the view that shows
                     a job that has been reporting ok and doing nothing
   --logs [N] [-f]   tail the nightly launchd log (default 50 lines); -f follows
+  --remote          where this corpus backs up, or that it is local only
 
 Before the module is enabled the `chezdistill` shell verb does not exist yet, so
 the very first run goes through the script:
@@ -303,8 +307,79 @@ _distill_count() {
     esac
 }
 
+# _distill_remote [URL|none] — where this corpus backs up, and changing it.
+#
+# With no argument it only reports, so it is safe to type when you cannot
+# remember. With one it is a network write, so it is confirm-gated like every
+# other verb here that reaches outside this machine, and it says what it found at
+# the other end BEFORE asking — for a corpus with no identity of its own that
+# display is the only check available, so it has to be a human one.
+_distill_remote() {
+    local arg="${1:-}" repo url populated branch rprofile rid mine
+    distill_preflight || return $?
+    repo="$(distill_state_dir)"
+    mine="$(distill_profile)"
+
+    if [ -z "$arg" ]; then
+        url="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
+        if [ -n "$url" ]; then
+            say "this corpus backs up to $url"
+        elif distill_corpus_detached; then
+            say "this corpus is local only — detached by hand"
+        else
+            say "this corpus is local only — this Mac is the only copy"
+        fi
+        [ -n "$(distill_corpus_id)" ] &&
+            dim "  identity $(distill_corpus_id) · stamped $(distill_corpus_profile)"
+        explain "Attach one with: chezdistill --remote <url>"
+        return 0
+    fi
+
+    if [ "$arg" = "none" ]; then
+        say "would stop pushing this corpus anywhere"
+        explain "Nothing is deleted and nothing is rewritten — re-attach with the same command."
+        [ "$DRY_RUN" = "1" ] && return 0
+        _distill_confirm "Detach it?" || {
+            info "aborted — nothing changed"
+            return 0
+        }
+        distill_state_repo_init >/dev/null || true
+        distill_remote_detach
+        return 0
+    fi
+
+    say "would back this Mac's corpus up to $arg"
+    read -r populated branch rprofile rid <<<"$(distill_remote_survey "$arg")"
+    if [ "${populated:-0}" = "1" ]; then
+        dim "  found a corpus there: ${rprofile:-no profile stamp} · ${rid:-no identity} · branch ${branch:-?}"
+        if [ -n "$rprofile" ] && [ -n "$mine" ] && [ "$rprofile" != "$mine" ]; then
+            fail "that corpus is stamped $rprofile and this is a $mine Mac — refusing"
+            return 1
+        fi
+        [ -z "$rid" ] &&
+            explain \
+                "It carries no identity yet, so nothing can check it for you." \
+                "Confirm it is yours before saying yes — this is the only check there is."
+    else
+        dim "  nothing there yet — this Mac's corpus becomes the corpus"
+    fi
+
+    [ "$DRY_RUN" = "1" ] && {
+        dim "dry-run — stopping before the first write"
+        return 0
+    }
+    _distill_confirm "Attach it?" || {
+        info "aborted — nothing changed"
+        return 0
+    }
+
+    distill_remote_attach "$arg" || return 1
+    distill_render_all
+    return 0
+}
+
 _distill_main() {
-    local mode=run count="" follow=0
+    local mode=run count="" follow=0 remote=""
 
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -329,6 +404,18 @@ _distill_main() {
                 fi
                 ;;
             --logs=*) mode=logs count="${1#--logs=}" ;;
+            --remote)
+                mode=remote
+                # Same lookahead as --runs/--logs: a value only if it is one.
+                case "${2:-}" in
+                    "" | -*) ;;
+                    *)
+                        remote="$2"
+                        shift
+                        ;;
+                esac
+                ;;
+            --remote=*) mode=remote remote="${1#--remote=}" ;;
             -f | --follow) follow=1 ;;
             --since=*) DISTILL_SINCE="$(_distill_since "${1#--since=}")" ;;
             --since)
@@ -373,6 +460,10 @@ _distill_main() {
     fi
     if [ "$mode" = "undo" ]; then
         _distill_undo
+        return $?
+    fi
+    if [ "$mode" = "remote" ]; then
+        _distill_remote "$remote"
         return $?
     fi
 
