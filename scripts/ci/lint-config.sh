@@ -96,9 +96,15 @@ run() {
 }
 
 # cached + untracked so gitignored locals stay unlinted; `./` prefix matches VSCODE_DIR.
+#
+# chezmoi's `remove_` sources are tombstones — the attribute names a target to
+# delete and the file's contents are never read, so an empty remove_x.json is
+# correct and parsing it as JSON is not.
 list_paths() {
     local pattern="$1"
-    git ls-files -co --exclude-standard -- "$pattern" | sed 's|^|./|' | sort
+    git ls-files -co --exclude-standard -- "$pattern" |
+        grep -v '/remove_[^/]*$' |
+        sed 's|^|./|' | sort
 }
 
 while IFS= read -r f; do

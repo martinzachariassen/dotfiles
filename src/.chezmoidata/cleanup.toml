@@ -34,7 +34,7 @@ keepHome = [
     ".config",            # own scope, see keepConfig
     ".cache",
     ".local",
-    ".docker",            # daemon.json is managed; rest is runtime state
+    ".docker",            # cli-plugins symlinks are managed; rest is runtime state
     ".swiftpm",           # SwiftPM state; ships with the Xcode toolchain, no `swiftpm` binary to match
     ".cups",
     ".CFUserTextEncoding",

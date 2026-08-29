@@ -113,6 +113,45 @@ a runtime version therefore needs no editor change, but **an editor already
 running when this landed must be fully quit and relaunched** — the resolved env
 is captured once, at app start.
 
+## Containers (colima)
+
+Docker Desktop is gone. `colima` runs dockerd inside a Lima VM and the plain
+Homebrew `docker` CLI talks to it over the `colima` docker context — no GUI, no
+licence terms, no `com.docker.vmnetd` privileged helper.
+
+Four pieces, all in the core tier:
+
+| Piece | Where |
+|---|---|
+| VM shape | [`src/dot_config/colima/_templates/default.yaml`](../src/dot_config/colima/_templates/default.yaml) |
+| Start at login | [`src/Library/LaunchAgents/no.mlz.colima.plist.tmpl`](../src/Library/LaunchAgents/no.mlz.colima.plist.tmpl), registered by `run_onchange_after_07-colima` |
+| CLI + plugins | `colima`, `docker`, `docker-compose`, `docker-buildx` in [`packages/Brewfile`](../packages/Brewfile) |
+| Plugin wiring | `symlink_docker-{compose,buildx}` under [`src/dot_docker/cli-plugins`](../src/dot_docker/cli-plugins) |
+
+The VM is 6 CPU / 8 GiB / 100 GiB sparse disk on `vz` (Apple's
+Virtualization.framework) with `virtiofs` mounts and Rosetta on, so amd64 images
+run without qemu's user-mode emulation. `$HOME` is mounted writable.
+
+Two things are easy to get wrong:
+
+- **The template only shapes a VM at creation.** Editing it does nothing to a VM
+  that already exists — `colima delete && colima start` is what adopts a change.
+- **colima resolves its home from `$XDG_CONFIG_HOME`, but only while `~/.colima`
+  does not exist.** A bare `~/.colima` silently wins and strands the managed
+  template. launchd doesn't read `.zshenv`, so the LaunchAgent exports
+  `XDG_CONFIG_HOME` itself; the apply hook deletes an empty `~/.colima` and warns
+  about a populated one.
+
+Homebrew's plugin caveat suggests `cliPluginsExtraDirs` in `~/.docker/config.json`.
+This repo uses chezmoi symlinks instead, because `docker login` writes credentials
+into that same file and a `--force` apply would clobber them.
+
+`colima start|stop|status` are aliased to `cstart`/`cstop`/`cstat`. `.zshrc` also
+exports `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` — Testcontainers'
+Ryuk bind-mounts the socket by its path *inside* the VM, and dies without it.
+
+Logs: `~/.local/state/colima/logs/startup.log`.
+
 ## git
 
 Config: [`src/dot_config/git/config.tmpl`](../src/dot_config/git/config.tmpl)

@@ -66,6 +66,19 @@ not_declares() {
 @test "core Brewfile declares ripgrep" { declares "$CORE" brew ripgrep; }
 @test "core Brewfile declares zoxide"  { declares "$CORE" brew zoxide; }
 
+# Containers — the LaunchAgent invokes colima by absolute path and the plugin
+# symlinks under dot_docker/cli-plugins point into these formulae's prefixes,
+# so dropping any of them leaves a registered agent or a dangling link behind.
+@test "core Brewfile declares colima"         { declares "$CORE" brew colima; }
+@test "core Brewfile declares docker CLI"     { declares "$CORE" brew docker; }
+@test "core Brewfile declares docker-compose" { declares "$CORE" brew docker-compose; }
+@test "core Brewfile declares docker-buildx"  { declares "$CORE" brew docker-buildx; }
+
+@test "core Brewfile does NOT declare docker-desktop (colima replaced it)" {
+    # Both would install a `docker` binary and fight over ~/.docker/cli-plugins.
+    not_declares "$CORE" cask docker-desktop
+}
+
 # Lint stack — pre-commit + CI both invoke shellcheck/shfmt; render-check
 # depends on shellcheck being present locally.
 @test "core Brewfile declares shellcheck" { declares "$CORE" brew shellcheck; }
