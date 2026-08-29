@@ -1361,56 +1361,97 @@ a_run() {
     [ "$(distill_spend_7d)" = "$(distill_spend_since 7)" ]
 }
 
-# ─── One corpus per profile ───────────────────────────────────────────────────
+# ─── One corpus per Mac ───────────────────────────────────────────────────────
 #
 # `hits` is counted over the WHOLE corpus, so two profiles sharing a remote is
 # not untidy — a work rule seen in two work sessions is promoted into a personal
 # Mac's MAIN.md the moment the histories meet, and a push cannot be taken back.
-# Adopting the right remote is the convenience; refusing the wrong one is the
-# point. Every check downstream reports a green "corpus backed up" either way.
+#
+# What guards that is no longer a table of URLs in this repo. It is the stamp the
+# corpus carries, checked offline from the local copy, plus a prompted seed that
+# only ever points a state repo with no origin. The table could not see a URL it
+# did not already know, which is how a renamed repo walked straight through it.
 
 PERSONAL_URL="https://github.com/me/claude-memory-personal.git"
 WORK_URL="https://github.com/me/claude-memory-work.git"
 
-# profile_setup PROFILE — the engine loaded as if this Mac were that profile.
-profile_setup() {
+# seed_setup PROFILE [SEED-URL] — the engine as if setup had been answered so.
+seed_setup() {
     DISTILL_PROFILE="$1"
-    DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg p "$PERSONAL_URL" --arg w "$WORK_URL" \
-        '{remotes:{personal:$p, work:$w}}')")"
-    export DISTILL_PROFILE DISTILL_CONFIG_JSON
+    DISTILL_CORPUS_REMOTE="${2:-}"
+    export DISTILL_PROFILE DISTILL_CORPUS_REMOTE
     load_lib
 }
 
 origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
 
-@test "a fresh state repo adopts the corpus its profile owns" {
-    profile_setup work
+@test "the seed points a state repo that has no origin" {
+    seed_setup personal "$PERSONAL_URL"
     run distill_state_repo_init
     [ "$status" -eq 0 ]
-    [ "$(origin_of)" = "$WORK_URL" ]
-}
-
-@test "the other profile picks the other corpus" {
-    profile_setup personal
-    distill_state_repo_init
     [ "$(origin_of)" = "$PERSONAL_URL" ]
 }
 
-@test "another profile's corpus is refused, by name" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "$PERSONAL_URL"
+@test "a blank seed leaves the corpus local, and says nothing is wrong" {
+    seed_setup personal ""
     run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ -z "$(origin_of)" ]
+
+    run distill_backup_state
+    [ "$output" = "no-remote" ]
+}
+
+# The seed is a seed, not a setting: origin is the authority once there is one.
+@test "an origin already set is never overwritten by the seed" {
+    seed_setup personal "$PERSONAL_URL"
+    git -C "$STATE" init -q -b main
+    git -C "$STATE" remote add origin "https://git.example.com/me/my-own-mirror.git"
+    run distill_state_repo_init
+    [ "$status" -eq 0 ]
+    [ "$(origin_of)" = "https://git.example.com/me/my-own-mirror.git" ]
+}
+
+# ...but an answer given on an already-attached Mac must not vanish silently.
+@test "a seed naming a different repo than origin is surfaced, not obeyed" {
+    seed_setup personal "$WORK_URL"
+    git -C "$STATE" init -q -b main
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+
+    run distill_remote_drift
+    [ "$status" -eq 0 ]
+    [ "$output" = "$WORK_URL" ]
+
+    run distill_status
+    [[ "$output" == *"chezdistill --remote"* ]]
+}
+
+@test "one repo spelled two ways is not drift" {
+    seed_setup personal "git@github.com:Me/Claude-Memory-Personal.git"
+    git -C "$STATE" init -q -b main
+    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    run distill_remote_drift
+    [ "$status" -eq 1 ]
+}
+
+@test "a corpus stamped for another profile is refused, by name" {
+    seed_setup work
+    distill_state_repo_init
+    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+        >"$(distill_corpus_file)"
+
+    run distill_corpus_check_local
     [ "$status" -eq 1 ]
     [[ "$output" == *"personal"* ]]
-    [ "$(origin_of)" = "$PERSONAL_URL" ]
 }
 
-@test "nothing is committed while the corpus points at another profile" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "$PERSONAL_URL"
+@test "nothing is committed while the corpus is stamped for another profile" {
+    seed_setup work
+    distill_state_repo_init
+    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+        >"$(distill_corpus_file)"
     extract 2026-08-22 "[$(item 'a work rule' s1)]"
+
     run distill_commit_local "chore(distill): test"
     [ "$status" -eq 0 ]
     run git -C "$STATE" rev-list --count HEAD
@@ -1418,59 +1459,36 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
 }
 
 @test "preflight refuses to run against another profile's corpus" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "$PERSONAL_URL"
+    seed_setup work
+    distill_state_repo_init
+    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+        >"$(distill_corpus_file)"
     run distill_preflight
     [ "$status" -eq 1 ]
     [[ "$output" == *"personal"* ]]
 }
 
-@test "--status still reports when the remote is what is wrong" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "$PERSONAL_URL"
+@test "--status still reports when the corpus is what is wrong" {
+    seed_setup work
+    distill_state_repo_init
+    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+        >"$(distill_corpus_file)"
     run distill_status
     [ "$status" -eq 0 ]
     [[ "$output" != *"paths    unusable"* ]]
-    [[ "$output" == *"personal corpus"* ]]
 }
 
-@test "the same repo written as ssh is the same repo" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "git@github.com:me/claude-memory-work.git"
-    run distill_state_repo_init
-    [ "$status" -eq 0 ]
-    [ "$(origin_of)" = "git@github.com:me/claude-memory-work.git" ]
-}
-
+# Kept because the normaliser is still load-bearing — for the tracked README and
+# for the drift advisory above. It is NOT a guard any more; comparing URLs is
+# exactly what a repo rename defeated.
 @test "spellings GitHub treats as one repo compare as one repo" {
-    profile_setup work
+    seed_setup work
     a="$(distill_remote_id "https://github.com/Me/Claude-Memory-Work.git")"
     [ "$a" = "github.com/me/claude-memory-work" ]
     [ "$(distill_remote_id "git@github.com:me/claude-memory-work")" = "$a" ]
     [ "$(distill_remote_id "ssh://git@github.com/me/claude-memory-work.git")" = "$a" ]
     [ "$(distill_remote_id "https://github.com/me/claude-memory-work/")" = "$a" ]
     [ "$(distill_remote_id "https://github.com/me/claude-memory-personal")" != "$a" ]
-}
-
-@test "a remote that is nobody else's profile is left alone, not overwritten" {
-    profile_setup work
-    git -C "$STATE" init -q
-    git -C "$STATE" remote add origin "https://git.example.com/me/my-own-mirror.git"
-    run distill_state_repo_init
-    [ "$status" -eq 0 ]
-    [ "$(origin_of)" = "https://git.example.com/me/my-own-mirror.git" ]
-}
-
-@test "with no remotes configured nothing is adopted and nothing is refused" {
-    DISTILL_PROFILE=work
-    export DISTILL_PROFILE
-    load_lib
-    run distill_state_repo_init
-    [ "$status" -eq 0 ]
-    [ -z "$(origin_of)" ]
 }
 
 # ─── The corpus actually reaching its remote ──────────────────────────────────

@@ -30,13 +30,27 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$output" = "Git commit signing" ]
     run wiz 'prompt_msg modules'
     [ "$output" = "Optional modules" ]
+    run wiz 'prompt_msg corpusRemote'
+    [ "$output" = "Corpus backup repo for the distiller (blank for local only)" ]
+}
+
+# Every prompted key must be replayed on every non-interactive path, whether or
+# not its question was shown. A missing flag drops chezmoi into its raw-mode TUI,
+# which cannot run under `curl | bash` — and on the signing path it would silently
+# reset the answer.
+@test "corpusRemote is replayed by both wizard and signing, unconditionally" {
+    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/wizard.sh"
+    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/signing.sh"
+    # Inside the init_flags array literal, not behind an `if`.
+    run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/scripts/bin/wizard.sh"
+    [[ "$output" == *"prompt_msg corpusRemote"* ]]
 }
 
 # The prompt message doubles as a chezmoi --prompt* flag KEY, and a comma in a
 # key would be misread by cobra's stringToString. None may contain one.
 @test "no prompt message contains a comma" {
     local k
-    for k in name email profile signingMode signingKey modules; do
+    for k in name email profile signingMode signingKey modules corpusRemote; do
         run wiz "prompt_msg $k"
         [ "$status" -eq 0 ]
         [ -n "$output" ]

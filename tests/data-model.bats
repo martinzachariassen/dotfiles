@@ -135,3 +135,39 @@ setup() {
         }
     done
 }
+
+# ─── the corpus remote ────────────────────────────────────────────────────────
+#
+# Blank means "local only", which is a permanent legitimate answer — so it must
+# be PERSISTED, the way signingKey is, and not omitted the way email deliberately
+# is. Omitting it would make chezsetup re-ask forever on every local-only Mac.
+@test "a blank corpusRemote is persisted as a real answer" {
+    grep -q 'corpusRemote = {{ \$corpusRemote | quote }}' "$TMPL"
+    # ...and is NOT wrapped in the emptiness guard email uses.
+    run grep -c '{{- if \$corpusRemote }}' "$TMPL"
+    [ "$output" = "0" ]
+}
+
+# It is asked unconditionally in the template even though the wizard only shows
+# the question when claudeDistiller is on: gating the TEMPLATE would mean a Mac
+# that enables the module later never gets asked at all.
+@test "corpusRemote is prompted unconditionally in the template" {
+    grep -q 'promptStringOnce . "corpusRemote"' "$TMPL"
+}
+
+# promptStringOnce with no default hands back the prompt MESSAGE when it cannot
+# ask — which is every non-interactive path, CI included — so the message itself
+# would be saved and then used as a git URL. The trailing "" is what stops that.
+@test "corpusRemote has an explicit blank default" {
+    grep -q 'promptStringOnce . "corpusRemote" "[^"]*" ""' "$TMPL"
+    command -v chezmoi >/dev/null || skip "chezmoi not installed"
+    run chezmoi execute-template --init <"$TMPL"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'corpusRemote = ""'* ]]
+}
+
+# The public repo must not carry anyone's private corpus URLs.
+@test "no corpus remote is hardcoded in the data files" {
+    run grep -rn "claude-memory" "$BATS_TEST_DIRNAME/../src/.chezmoidata/"
+    [ "$status" -ne 0 ]
+}

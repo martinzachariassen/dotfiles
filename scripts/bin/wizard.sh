@@ -397,6 +397,7 @@ def_email="$(cm_data_string "$DATA_JSON" email)"
 def_profile="$(cm_data_string "$DATA_JSON" profile)"
 def_signing="$(cm_data_string "$DATA_JSON" signingMode)"
 def_signkey="$(cm_data_string "$DATA_JSON" signingKey)"
+def_corpus="$(cm_data_string "$DATA_JSON" corpusRemote)"
 [ -n "$def_profile" ] || def_profile="personal"
 [ -n "$def_signing" ] || def_signing="1password"
 
@@ -481,6 +482,22 @@ ask_step "Optional modules" \
 # shellcheck disable=SC2086  # mod_default is a space-separated key list
 modules="$(select_modules $mod_default)"
 
+# Only worth asking when the distiller is actually on. ask_sub, not ask_step, so
+# QTOTAL stays honest: a numbered question that is sometimes skipped would make
+# the header promise more questions than it asks (tests/setup-ux.bats).
+corpusRemote="$def_corpus"
+case " $modules " in
+    *" claudeDistiller "*)
+        ask_sub "Corpus backup (optional)" \
+            "A private git repo the distiller pushes its corpus to so a new Mac inherits it." \
+            "Leave blank to keep everything on this Mac — you can attach one later with:" \
+            "  chezdistill --remote <url>"
+        printf '  %s[%s]%s ' "$DIM" "${def_corpus:-blank}" "$RESET"
+        IFS= read -r corpusRemote </dev/tty || corpusRemote=""
+        [ -n "$corpusRemote" ] || corpusRemote="$def_corpus"
+        ;;
+esac
+
 ask_step "Commit signing" \
     "Signs your git commits so GitHub shows them as Verified." \
     "  1password  sign via the 1Password app's SSH agent" \
@@ -561,6 +578,7 @@ init_flags=(
     --promptChoice "$(prompt_msg profile)=$profile"
     --promptChoice "$(prompt_msg signingMode)=$signingMode"
     --promptMultichoice "$(prompt_msg modules)=$mods_slash"
+    --promptString "$(prompt_msg corpusRemote)=$corpusRemote"
 )
 if [ "$signingMode" != "off" ]; then
     init_flags+=(--promptString "$(prompt_msg signingKey)=$signingKey")

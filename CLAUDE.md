@@ -69,25 +69,27 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   (`MAIN.md`, `Topics/`, `Candidates.md`) goes to `~/.config/claude/memory`, beside
   the persona that `@`-imports it; the extract corpus, the hand-written `Pinned.md`,
   the cursor, spend and run log go to `~/.local/state/chezdistill`, in a git repo
-  that pushes to the corpus its **profile** owns (`[distill.remotes]` in
-  `src/.chezmoidata/distill.toml`, keyed by `.profile`), so a replacement Mac clones
-  the corpus instead of starting empty. Keep that split: memory is derived
+  that pushes to a private corpus you attach with `chezdistill --remote <url>`, so a
+  replacement Mac fetches the corpus instead of starting empty. Keep that split: memory is derived
   and disposable, state is the source of truth and the only thing worth backing up.
   Inside state the split repeats: **only `extracts/` and `Pinned.md` are tracked.**
   `cursor.json`, `spend.jsonl`, `runs.jsonl` and `logs/` are per-machine, append-only
   telemetry — tracking them makes two Macs conflict on every line and silently kills
   the backup. The corpus is sharded per host (`extracts/<date>.<host>.json`) so two
   Macs in the *same* profile can share a remote; across profiles they must not, since
-  `hits` counts sightings over the whole corpus — one private repo each
-  (`claude-memory-personal`, `claude-memory-work`). Read the date with
+  `hits` counts sightings over the whole corpus — one private repo each. Read the date with
   `distill_extract_date`, never by stripping `.json`, so pre-sharding files still work.
-  **The profile picks the remote, and a foreign one is a hard stop.** A state repo
-  with no origin adopts its profile's; one already set by hand is left alone; one
-  pointing at *another profile's* URL makes `distill_preflight` (and so every mode,
-  plus `chezdistill --status` and `chezdoctor`) fail loudly, because "backed up to
-  the wrong repo" otherwise reports as a green tick and cannot be un-pushed. Compare
-  remotes with `distill_remote_id`, never as strings — SSH and HTTPS spellings of one
-  repo must not read as a conflict.
+  **No corpus URL belongs in this repo — it is public.** Where a Mac backs up is a
+  prompted answer (`corpusRemote`, blank by default, meaning local only). It is a
+  SEED: it points a state repo that has no origin and is never consulted again.
+  `git remote origin` is the authority thereafter, which is why an already-attached
+  Mac needs no answer and nothing has to write back into a generated chezmoi config.
+  A seed disagreeing with origin is surfaced by `--status`, never silently obeyed.
+  Blank is a permanent legitimate answer, so persist it like `signingKey` — never
+  omit-when-empty like `email`, which re-asks forever by design. Do not reintroduce
+  a `[distill.remotes]` table: it shipped two private repo names publicly, handed
+  forks a default they cannot use, and could only recognise URLs it already knew —
+  a renamed repo walked straight through it.
   **A backup reports what the remote HAS, never what it is called.** Naming an origin
   is not evidence of a push, and treating it as evidence is how two days of rejected
   pushes rendered as `✓ backup`. The verdict is computed once in

@@ -331,7 +331,11 @@ _distill_remote() {
         fi
         [ -n "$(distill_corpus_id)" ] &&
             dim "  identity $(distill_corpus_id) · stamped $(distill_corpus_profile)"
-        explain "Attach one with: chezdistill --remote <url>"
+        if [ -n "$url" ]; then
+            explain "Move it with: chezdistill --remote <url> · stop with: --remote none"
+        else
+            explain "Attach one with: chezdistill --remote <url>"
+        fi
         return 0
     fi
 

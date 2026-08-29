@@ -171,6 +171,7 @@ init_flags=(
     --promptChoice "$(prompt_msg profile)=$profile"
     --promptChoice "$(prompt_msg signingMode)=$mode"
     --promptString "$(prompt_msg signingKey)=$new_key"
+    --promptString "$(prompt_msg corpusRemote)=$(cm_data_string "$DATA_JSON" corpusRemote)"
 )
 [ -n "$mods_slash" ] && init_flags+=(--promptMultichoice "$(prompt_msg modules)=$mods_slash")
 

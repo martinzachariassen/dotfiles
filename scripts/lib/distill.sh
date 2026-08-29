@@ -164,10 +164,9 @@ distill_can_write() {
 # 0 = go · 1 = broken/unwritable (a real failure)
 distill_preflight() {
     _distill_preflight_paths || return 1
-    # Two guards on purpose, and both offline. The URL one knows the other
-    # profile's address; the corpus one knows what the corpus says it is, which
-    # is the half that survives a repo being renamed.
-    distill_remote_check || return 1
+    # Offline by construction: it reads the stamp the corpus already carries.
+    # There is no URL comparison left to make — that was the guard a repo rename
+    # walked straight through.
     distill_corpus_check_local || return 1
     return 0
 }
@@ -1692,26 +1691,42 @@ distill_remote_attach() {
 
 # ─── Which corpus is this Mac's? ──────────────────────────────────────────────
 #
-# One remote per profile, from `[distill.remotes]` in .chezmoidata. Not one
-# shared repo with a branch each: `hits` is counted over the whole corpus, so a
-# work rule seen in two work sessions would be promoted into a personal Mac's
-# MAIN.md the moment the two histories met. Two Macs on the SAME profile sharing
-# a remote is the case this is built for — extracts are sharded per host.
+# Not a table in this repo. This repo is PUBLIC, and a table of corpus URLs here
+# is two private repo names shipped to everyone who clones it, plus a default a
+# fork inherits and cannot use. Every other per-person value — name, email,
+# signing key — is prompted and defaults to blank for exactly that reason.
+#
+# So there are three layers and only one of them is authoritative:
+#
+#   corpusRemote (prompted, blank)  a SEED, used only to point a state repo that
+#                                   has no origin. Never consulted again.
+#   git remote origin               THE AUTHORITY. Already per-machine, already
+#                                   persistent, already outside this repo.
+#   corpus.json                     identity, and the guard — see above.
+#
+# That split is what makes an already-attached Mac need no answer at all: origin
+# is set, so it IS the answer, and nothing has to write back into a chezmoi
+# config that is generated. Blank is a real, permanent answer meaning local only.
 
-# distill_remote_url [PROFILE] — the corpus this profile belongs to, or empty
-# when the table has no entry for it (a third profile, or chezmoi unavailable).
-distill_remote_url() {
-    local p="${1:-$(distill_profile)}"
-    [ -n "$p" ] || return 0
-    distill_config | jq -r --arg p "$p" '(.remotes // {})[$p] // empty'
+# distill_remote_seed — the URL setup was given for this Mac, if any. Read like
+# distill_profile, from the prompted answers rather than the .distill table, so
+# it must stay a TOP-LEVEL key: prompted answers and .chezmoidata share one flat
+# namespace and have to stay disjoint.
+distill_remote_seed() {
+    if [ -n "${DISTILL_CORPUS_REMOTE:-}" ]; then
+        printf '%s\n' "$DISTILL_CORPUS_REMOTE"
+        return 0
+    fi
+    _distill_data | jq -r '.corpusRemote // empty' 2>/dev/null
 }
 
 # distill_remote_id URL — host/owner/repo, lowercased.
 #
-# Comparing remote URLs as strings gets this wrong in the one direction that
-# matters: `git@github.com:me/x.git` and `https://github.com/me/X` are the same
-# repo, and a mismatch here would refuse to run on a machine that is set up
-# correctly. Reduce both to the identity GitHub actually uses before comparing.
+# No longer a guard — corpus.json is. It survives as a string normaliser with two
+# callers: the state README, which is tracked and would otherwise flap between
+# two Macs spelling one remote differently, and the advisory that notices the
+# seed naming a different repo than origin. Do not promote it back into a safety
+# check: comparing URLs is precisely what failed when the repo was renamed.
 distill_remote_id() {
     local u="$1"
     u="${u%.git}"
@@ -1725,60 +1740,36 @@ distill_remote_id() {
     printf '%s\n' "$u" | tr '[:upper:]' '[:lower:]'
 }
 
-# distill_remote_adopt — give a remote-less state repo the origin its profile
-# says it should have. Never overwrites: an origin that is already set was set by
-# someone, and this is not the code to second-guess it.
+# distill_remote_adopt — point a remote-less state repo at the seed setup was
+# given. Never overwrites: origin is the authority, and an origin that is already
+# set was set by someone.
 distill_remote_adopt() {
     local repo url
     repo="$(distill_state_dir)"
     [ -z "$(git -C "$repo" remote 2>/dev/null)" ] || return 0
     # `chezdistill --remote none` is a decision, not a gap to be filled in. Without
-    # this the next run would silently re-attach whatever the config points at.
+    # this the next run would silently re-attach what was just detached.
     distill_corpus_detached && return 0
-    url="$(distill_remote_url)"
+    url="$(distill_remote_seed)"
     [ -n "$url" ] || return 0
     git -C "$repo" remote add origin "$url" >/dev/null 2>&1 || return 0
-    info "corpus backup set to $url ($(distill_profile) profile)"
+    info "corpus backup set to $url"
 }
 
-# distill_remote_conflict — true, printing the offending profile's name, when
-# origin is demonstrably ANOTHER profile's corpus.
+# distill_remote_drift — the seed names one repo and origin is another.
 #
-# This is the half that matters. Attaching a work Mac to the personal repo is a
-# single successful-looking command; every check downstream then reports a green
-# "corpus backed up" while work transcripts are distilled into personal memory,
-# and no push can be taken back. Only a URL that appears in the table under a
-# different key is an error — any other remote is someone's own mirror, and this
-# has no business having an opinion about it.
-distill_remote_conflict() {
-    local repo cur want mine entry key
-    repo="$(distill_state_dir)"
-    cur="$(git -C "$repo" remote get-url origin 2>/dev/null)" || return 1
-    [ -n "$cur" ] || return 1
-    mine="$(distill_profile)"
-    want="$(distill_remote_url "$mine")"
-    [ -n "$want" ] || return 1
-    [ "$(distill_remote_id "$cur")" = "$(distill_remote_id "$want")" ] && return 1
-
-    while IFS=$'\t' read -r key entry; do
-        [ -n "$key" ] || continue
-        [ "$key" = "$mine" ] && continue
-        [ "$(distill_remote_id "$cur")" = "$(distill_remote_id "$entry")" ] || continue
-        printf '%s\n' "$key"
-        return 0
-    done < <(distill_config | jq -r '(.remotes // {}) | to_entries[] | "\(.key)\t\(.value)"')
-    return 1
-}
-
-# distill_remote_check — the conflict rendered as a refusal. 1 = do not proceed.
-distill_remote_check() {
-    local foreign
-    foreign="$(distill_remote_conflict)" || return 0
-    fail "the corpus at $(distill_state_dir) pushes to the $foreign remote, but this is a $(distill_profile) Mac"
-    info "nothing will be distilled until that is settled. To adopt this Mac's own corpus:"
-    info "  git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
-    info "  git -C $(distill_state_dir) remote set-url --push origin $(distill_remote_url)"
-    return 1
+# Advisory, never a refusal. The most likely person to answer the prompt is
+# someone whose Mac is ALREADY attached, where the seed is by design ignored —
+# so without this the answer would silently do nothing. Compared through
+# distill_remote_id so two spellings of one repo do not read as drift.
+distill_remote_drift() {
+    local cur seed
+    cur="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null)" || return 1
+    seed="$(distill_remote_seed)"
+    [ -n "$cur" ] && [ -n "$seed" ] || return 1
+    [ "$(distill_remote_id "$cur")" = "$(distill_remote_id "$seed")" ] && return 1
+    printf '%s\n' "$seed"
+    return 0
 }
 
 # distill_state_repo_pushurl — push this repo over the URL it was cloned from.
@@ -1934,10 +1925,10 @@ distill_render_state_readme() {
 }
 
 # distill_state_repo_init — created on first use, and pointed at the corpus its
-# profile owns (`[distill.remotes]`), so a replacement Mac clones the corpus
+# it was attached to (`chezdistill --remote`), so a replacement Mac fetches the corpus
 # instead of starting from an empty memory and nobody has to remember a
 # `git remote add`. A remote already set by hand is left alone unless it is
-# another profile's, which is refused — see distill_remote_conflict.
+# another profile's, which is refused — see distill_corpus_check_local.
 #
 # What is tracked is exactly what cannot be regenerated: the extract corpus and
 # `Pinned.md`. Everything else here is per-machine telemetry and is excluded —
@@ -1979,7 +1970,6 @@ distill_state_repo_init() {
     # Adopt before checking: a repo with no origin is not in conflict with
     # anything, it just doesn't know where it lives yet.
     distill_remote_adopt
-    distill_remote_check || return 1
     distill_state_repo_pushurl
     distill_state_restore
     distill_render_state_readme
@@ -2043,7 +2033,7 @@ distill_status_sources() {
 }
 
 distill_status() {
-    local main cap spent ceiling n last line f foreign url verdict va vb
+    local main cap spent ceiling n last line f url verdict va vb seed
     s_section "chezdistill"
 
     # Paths only. A remote conflict is reported below as its own line rather than
@@ -2087,26 +2077,26 @@ distill_status() {
     # What the remote actually has, not what it is called. This line used to print
     # the origin URL and call that a pass, so a push that had been failing for two
     # days still rendered a green tick — see distill_backup_state.
-    if foreign="$(distill_remote_conflict)"; then
-        s_fail "backup   origin is the $foreign corpus, but this is a $(distill_profile) Mac — nothing will run"
-        s_note "         git -C $(distill_state_dir) remote set-url origin $(distill_remote_url)"
-    else
-        n="$(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0)"
-        url="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
-        read -r verdict va vb <<<"$(distill_backup_state)"
-        case "$verdict" in
-            no-repo) s_note "backup   no state repo yet — the first run creates it" ;;
-            no-remote) s_warn "backup   $n commit(s), no remote — this Mac is the only copy" ;;
-            wedged)
-                s_fail "backup   the corpus repo is stuck mid-operation — nothing is being pushed"
-                s_note "         git -C $(distill_state_dir) status"
-                ;;
-            no-upstream) s_fail "backup   $n commit(s), never pushed to $url" ;;
-            ahead) s_warn "backup   $va commit(s) not yet on $url — the push is not getting through" ;;
-            behind) s_warn "backup   $va commit(s) behind $url — the next run catches up" ;;
-            diverged) s_fail "backup   diverged from $url — $va unpushed, $vb unpulled" ;;
-            *) s_pass "backup   $n commit(s), pushed to $url" ;;
-        esac
+    n="$(git -C "$(distill_state_dir)" rev-list --count HEAD 2>/dev/null || echo 0)"
+    url="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
+    read -r verdict va vb <<<"$(distill_backup_state)"
+    case "$verdict" in
+        no-repo) s_note "backup   no state repo yet — the first run creates it" ;;
+        no-remote) s_warn "backup   $n commit(s), local only — this Mac is the only copy" ;;
+        wedged)
+            s_fail "backup   the corpus repo is stuck mid-operation — nothing is being pushed"
+            s_note "         git -C $(distill_state_dir) status"
+            ;;
+        no-upstream) s_fail "backup   $n commit(s), never pushed to $url" ;;
+        ahead) s_warn "backup   $va commit(s) not yet on $url — the push is not getting through" ;;
+        behind) s_warn "backup   $va commit(s) behind $url — the next run catches up" ;;
+        diverged) s_fail "backup   diverged from $url — $va unpushed, $vb unpulled" ;;
+        *) s_pass "backup   $n commit(s), pushed to $url" ;;
+    esac
+    # The seed is only ever consulted for a repo with no origin, so an answer
+    # given on an already-attached Mac would otherwise vanish without a word.
+    if seed="$(distill_remote_drift)"; then
+        s_note "         setup names $seed — attach it with: chezdistill --remote $seed"
     fi
 
     # Rounded for display. The raw sum is a float accumulated from per-call
