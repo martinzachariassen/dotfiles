@@ -39,8 +39,8 @@ tier — `MAIN.md`, `Topics/`, `Candidates.md` — goes to
 `~/.config/claude/memory`, beside the persona that imports it. The extract
 corpus, the hand-written `Pinned.md`, the cursor, spend and run log go to
 `~/.local/state/chezdistill`, in a git repo that pushes to a private corpus
-chosen by the machine's profile — `claude-memory-personal` or
-`claude-memory-work`, never one shared, because `hits` is counted over the whole
+you attach with `chezdistill --remote <url>` — one private repo per profile,
+never one shared, because `hits` is counted over the whole
 corpus. That second one is the source
 of truth: the memory tier is derived from it on every render, so it is the only
 half worth backing up — and only the corpus and `Pinned.md` are tracked, because

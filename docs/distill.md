@@ -15,14 +15,14 @@ Gated on the `claudeDistiller` module. Verb reference in
 | Where | What | Git |
 |---|---|---|
 | `~/.config/claude/memory/` | `MAIN.md`, `Topics/`, `Candidates.md` | none — rendered from state |
-| `~/.local/state/chezdistill/` | the extract corpus and `Pinned.md` — plus cursor, spend, run log and logs, which are gitignored | a local repo, pushed to the profile's private corpus |
+| `~/.local/state/chezdistill/` | the extract corpus and `Pinned.md` — plus cursor, spend, run log and logs, which are gitignored | a local repo, pushed to a private corpus you attach |
 
 Three consequences worth knowing before changing anything:
 
 **The extracts are the memory.** Every rule, hit count and date is derived from
 them on each render, so they are what a replacement Mac actually needs. They are
-in a local repo so `--undo` works, and that repo pushes to a private remote
-chosen by the machine's profile.
+in a local repo so `--undo` works, and that repo pushes to a private remote you
+attach once — or to nowhere at all, which is a supported, permanent choice.
 
 **Everything under `memory/` is derived and disposable.** Delete it and
 `chezdistill --render` puts it back, for free. Never edit it — the next run
@@ -129,7 +129,7 @@ learned*.
   ├─ PRUNE       age out evidence quotes past extractRetentionDays
   ├─ RECORD      append the run to state/runs.jsonl
   ├─ GITLEAKS    over state and memory → abort on any hit
-  └─ COMMIT      the state repo, locally; then pushed to the profile's corpus
+  └─ COMMIT      the state repo, locally; then fetch, merge and push
 ```
 
 Every step from RECORD down runs whether the run succeeded or failed — a failure
@@ -460,51 +460,69 @@ Two repos between them hold everything a replacement Mac needs:
 | this dotfiles repo | the persona, `settings.json`, the skill, the distiller itself, the plist |
 | a private repo for `~/.local/state/chezdistill` | **the memory** — the extract corpus and `Pinned.md` |
 
-The second one you do not have to set up. The state repo takes its remote from
-the machine's profile the first time it is used, so a fresh Mac backs itself up
-without anyone remembering a `git remote add`:
+**Where it backs up is a question setup asks, not a table in this repo.** This
+repo is public, so a table of corpus URLs here would ship two private repo names
+to everyone who clones it and hand a fork a default it cannot use. Every other
+per-person value — name, email, signing key — is prompted and blank by default,
+and this one now matches:
 
-| Profile | Remote |
+```
+Corpus backup repo for the distiller (blank for local only)
+```
+
+**Blank is a real, permanent answer**, not "not yet decided": the corpus lives
+happily on one machine, `--status` says `local only`, and everything else works
+unchanged. Attach one whenever you like with `chezdistill --remote <url>` — no
+re-running setup.
+
+There are three layers and only one of them is authoritative:
+
+| | |
 |---|---|
-| personal | `claude-memory-personal`, private |
-| work | `claude-memory-work`, private |
+| `corpusRemote` (prompted, blank) | a **seed**. Points a state repo that has no origin, and is never consulted again |
+| `git remote origin` | **the authority** — already per-machine, already persistent, already outside this repo |
+| `corpus.json` | **identity**, and the guard |
 
-The table lives in
-[`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml) under
-`[distill.remotes]`, keyed by `.profile`. Both repos must exist and be private —
-extracts carry short verbatim quotes from your transcripts. Create them once:
+That split is what makes an already-attached Mac need no answer at all: origin is
+set, so it *is* the answer. If you do give one that disagrees with origin,
+`--status` says so and points at `--remote` rather than silently ignoring it or
+silently obeying it.
+
+The repo must be **private** — extracts carry short verbatim quotes from your
+transcripts — and created without a README, so the first attach sees a genuinely
+empty remote:
 
 ```sh
 gh repo create claude-memory-personal --private
-gh repo create claude-memory-work --private
 ```
-
-A profile with no entry in the table gets no remote and `chezdistill --status`
-warns `no remote — this Mac is the only copy`, which is the old behaviour. A
-remote you set by hand — your own mirror, a self-hosted host — is never
-overwritten.
 
 **One repo per profile, never one shared.** `hits` is derived by counting
 sightings across the whole corpus, so a work Mac and a personal one sharing a
 remote does not merely mix the two — it merges them irreversibly, and a rule
 learned at work starts being applied to personal sessions.
 
-Which is why the interesting half of the table is not the adopting but the
-**refusing**. If `origin` is another profile's repo — a `set-url` typo, a state
-dir copied off an old machine — chezdistill stops before it extracts anything:
+That is what the `profile` in `corpus.json` guards, and it is checked from the
+**local** copy, so it costs nothing and works offline at 01:00:
 
 ```
-✗ the corpus at ~/.local/state/chezdistill pushes to the personal remote, but this is a work Mac
-  nothing will be distilled until that is settled. To adopt this Mac's own corpus:
-    git -C ~/.local/state/chezdistill remote set-url origin https://github.com/<you>/claude-memory-work.git
-    git -C ~/.local/state/chezdistill remote set-url --push origin https://github.com/<you>/claude-memory-work.git
+✗ the corpus at ~/.local/state/chezdistill was stamped personal but this is a work Mac
+  nothing will be distilled until that is settled. Either attach this Mac to its own corpus:
+    chezdistill --remote <work corpus url>
+  or start a fresh one here, keeping what is already backed up:
+    chezdistill --remote none
 ```
 
-`chezdoctor` and `chezdistill --status` fail on the same condition. Without the
-check both of them reported a cheerful `✓ corpus backed up` at it, because it is
-backed up — to the wrong place, one push past undoing. URLs are compared as
-`host/owner/repo`, so `git@github.com:you/x.git` and `https://github.com/you/X`
-are recognised as the same repo and do not trip it.
+`chezdoctor` fails on the same condition, and attaching refuses before a single
+byte is sent. Without a check of some kind both reported a cheerful `✓ corpus
+backed up` at it, because it *is* backed up — to the wrong place, one push past
+undoing.
+
+It used to be a URL comparison against a table, and that is worth remembering as
+a design lesson rather than deleting quietly: it could only recognise a URL it
+already knew, so a remote that matched nothing was "someone's own mirror" and
+left alone. When the corpus repo was **renamed** on GitHub, the URL changed, the
+old one kept redirecting, every comparison passed, and the push failed silently
+for two days behind a green tick. A location is not an identity.
 
 **Nothing pushes outside a run.** The push is the last step of `distill_run_end`,
 after the secret sweep, and it is the same commit that carries the run record —
