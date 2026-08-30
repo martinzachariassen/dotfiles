@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Manifest for the converge feature — data only, no side effects. Sourced in a
+# subshell by core/features.sh; see features/README.md for the contract.
+# shellcheck disable=SC2034  # every variable here is read by the registry
+
+FEATURE_NAME="converge"
+FEATURE_TITLE="Converge this Mac to the repo"
+FEATURE_MODULE=""
+FEATURE_DOCTOR_ORDER="20"

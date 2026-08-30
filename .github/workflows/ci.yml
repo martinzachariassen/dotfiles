@@ -37,7 +37,7 @@ jobs:
       # and tests/lint-coverage.bats holds the two together.
       - name: Resolve shell scripts
         run: |
-          git ls-files -z -- '*.sh' ':!:src/**' > "$RUNNER_TEMP/shell-files.z"
+          git ls-files -z -- '*.sh' '*.bash' ':!:src/**' > "$RUNNER_TEMP/shell-files.z"
           test -s "$RUNNER_TEMP/shell-files.z" || { echo 'no shell scripts matched — pathspec is wrong'; exit 1; }
           tr '\0' '\n' < "$RUNNER_TEMP/shell-files.z"
       - name: ShellCheck
