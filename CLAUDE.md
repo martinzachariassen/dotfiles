@@ -138,9 +138,12 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
 3. Run the quality gates below.
 4. Open a PR.
 
-Day-to-day apply/drift runs through the `chez*` shell verbs (`chezup`, `chezapply`,
-`chezstatus`, `chezdoctor`, …) — see [`docs/commands.md`](docs/commands.md). An apply
-never uninstalls packages.
+Day-to-day apply/drift runs through **`chez <verb>`** (`chez up`, `chez apply`,
+`chez status`, `chez doctor`, …) — see [`docs/commands.md`](docs/commands.md).
+Every verb is one row in [`core/verbs.sh`](core/verbs.sh), which
+[`core/chez.sh`](core/chez.sh) reads to dispatch, to render `chez help` and to
+feed the zsh completion; adding a verb means adding that row, nothing else. The
+old `chezup`-style names remain as aliases. An apply never uninstalls packages.
 
 ## Shell & runtimes
 

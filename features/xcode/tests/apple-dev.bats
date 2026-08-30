@@ -183,14 +183,26 @@ no_match_in() {
 # so it ships as a verb the setup points at. Three surfaces have to agree with the
 # module gate, or a machine either loses the verb it needs or grows one it can't use.
 
-@test "appleDev on: the zshrc defines chezxcode and lists it in chezhelp" {
+@test "appleDev on: the zshrc keeps the chezxcode alias and the table routes it" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+    # shellcheck source=../../../core/verbs.sh
+    . "$REPO_ROOT/core/verbs.sh"
+    [ "$(verbs_path xcode)" = "features/xcode/cli.sh" ]
+    [ "$(verbs_module xcode)" = "appleDev" ]
     _stub_config '["macApps","appleDev"]'
     run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
     [ "$status" -eq 0 ]
-    echo "$output" | grep -qF '_chez_run features/xcode/cli.sh'
-    echo "$output" | grep -qE '^chezxcode\(\) \{'
-    echo "$output" | grep -q 'chezxcode        Install Xcode'
+    echo "$output" | grep -qxF "alias chezxcode='chez xcode'"
+}
+
+@test "appleDev on: chez help lists the verb; off, it says which module is missing" {
+    run env CHEZ_MODULES="appleDev" bash "$REPO_ROOT/core/chez.sh" help
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qE '^    chez xcode +Install Xcode'
+    # Gated off, the verb must explain itself rather than read as a typo.
+    run env CHEZ_MODULES="" bash "$REPO_ROOT/core/chez.sh" xcode --check
+    [ "$status" -eq 1 ]
+    echo "$output" | grep -qF 'needs the `appleDev` module'
 }
 
 @test "appleDev off: the zshrc has no chezxcode at all" {
@@ -216,7 +228,7 @@ no_match_in() {
     run _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     [ "$status" -eq 0 ]
     echo "$output" | grep -qF 'features/xcode/probe.sh'
-    echo "$output" | grep -qF 'chezxcode'
+    echo "$output" | grep -qF 'chez xcode'
 }
 
 @test "appleDev off: the completion hook never mentions Xcode" {
@@ -224,14 +236,14 @@ no_match_in() {
     _stub_config '["macApps"]'
     run _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     [ "$status" -eq 0 ]
-    no_match_in "$output" 'chezxcode'
+    no_match_in "$output" 'chez xcode'
     no_match_in "$output" 'xcode\.sh'
 }
 
 # The hook counts step numbers rather than hardcoding them, so the two optional
 # steps must not collide when both apply — a duplicated "4." in the closing
 # summary is the visible symptom.
-@test "completion hook: chezsign and chezxcode get distinct step numbers" {
+@test "completion hook: chez sign and chez xcode get distinct step numbers" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _stub_config '["macApps","appleDev"]'
     _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl" \
@@ -251,13 +263,13 @@ EOF
 
     run bash "$BATS_TEST_TMPDIR/completion.sh"
     [ "$status" -eq 0 ]
-    echo "$output" | grep -qE '^ *4\. chezsign'
-    echo "$output" | grep -qE '^ *5\. chezxcode'
+    echo "$output" | grep -qE '^ *4\. chez sign'
+    echo "$output" | grep -qE '^ *5\. chez xcode'
 }
 
 # The completion step's wording is the only thing that tells you *which* piece is
 # missing, and the three states have three different fixes. A single "run
-# chezxcode" for all of them would be a regression the earlier tests can't see.
+# chez xcode" for all of them would be a regression the earlier tests can't see.
 
 # _completion_says MODULES DEVDIR HAS_APP HAS_RUNTIME — render the hook, stub the
 # probes to describe that machine, run it, leave output in $output.

@@ -1,6 +1,9 @@
 #!/usr/bin/env bats
-# Tests for the zsh dotfiles meta-commands not covered by chezmirror.bats:
-#   dotfiles    — the no-arg control panel
+# The zsh half of the command surface: `_chez_run` and the `chez` dispatcher.
+#
+# Everything else about dispatch is bash and lives in tests/chez.bats. What can
+# only be tested here is what has to be a shell function — `chez cd` changing
+# the caller's directory — and the hand-off into bash.
 #
 # These extract the real function bodies from the committed template and run
 # them (under zsh) against stubbed chezmoi/brew, repointing the apply-time
@@ -8,8 +11,7 @@
 # source fails here directly.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    load '../core/testing/helper'
     command -v zsh >/dev/null 2>&1 || skip "zsh not installed"
 
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
@@ -81,12 +83,17 @@ teardown() {
     [ -n "${STUBS:-}" ] && rm -rf "$STUBS"
 }
 
-# Extract one or more function bodies, repointing the baked src line at $FAKE.
+# Extract one or more function bodies, replacing the two lines chezmoi renders
+# at apply time — the repo path and the module set — with test values. Both
+# carry Go-template braces, which zsh cannot parse, so a missed one shows up as
+# a parse error rather than a wrong result.
 extract() {
     local fn
     for fn in "$@"; do
         sed -n "/^${fn}() {/,/^}/p" "$ZSHRC"
-    done | sed "s|^    local src={{.*}}|    local src=\"$FAKE\"|"
+    done |
+        sed -e "s|^    local src={{.*}}|    local src=\"$FAKE\"|" \
+            -e "s|^    local -x CHEZ_MODULES={{.*}}|    local -x CHEZ_MODULES=\"${MODULES_STUB-}\"|"
 }
 
 # Run a zsh snippet with the stub PATH and log paths exported.
@@ -131,22 +138,63 @@ EOF
     [ ! -s "$APPLY_LOG" ]  # never applied
 }
 
-# ─── dotfiles: the no-arg control panel ─────────────────────────────────────
+# ─── chez: the dispatcher, as zsh actually runs it ──────────────────────────
+# tests/chez.bats drives core/chez.sh directly. What can only be checked here is
+# the half that has to be a shell function: `chez cd` changing the caller's
+# directory, and the delegation carrying its arguments and the module set into
+# bash.
 
 # bats runs under bash 3.2 (no negative array indices), so the trailing `pwd`
 # is read via an explicit last index rather than ${lines[-1]}.
-@test "dotfiles with no args cds into the source repo" {
-    run_zsh "$(extract dotfiles); dotfiles; pwd"
+@test "chez cd changes the calling shell's directory" {
+    run_zsh "$(extract chez); cd '$STUBS'; chez cd; pwd"
     [ "$status" -eq 0 ]
     [ "${lines[$((${#lines[@]} - 1))]}" = "$FAKE" ]
 }
 
-@test "dotfiles with an argument prints chezsetup guidance without cd-ing" {
-    run_zsh "$(extract dotfiles); cd '$STUBS'; dotfiles help; pwd"
+@test "every other verb is delegated, with its arguments intact" {
+    mkdir -p "$FAKE/core"
+    cat >"$FAKE/core/chez.sh" <<'EOF'
+#!/usr/bin/env bash
+printf 'dispatched: %s
+' "$*"
+EOF
+    run_zsh "$(extract _chez_run chez); chez mirror --dry-run -v"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"chezsetup"* ]] || return 1
-    [[ "$output" == *"chezsetup --reset"* ]] || return 1
-    [ "${lines[$((${#lines[@]} - 1))]}" = "$STUBS" ]  # argument path must NOT cd
+    [[ "$output" == *"dispatched: mirror --dry-run -v"* ]] || return 1
+}
+
+@test "the delegation carries the rendered module set into bash" {
+    mkdir -p "$FAKE/core"
+    printf '%s\n' '#!/usr/bin/env bash' \
+        'printf "modules=[%s]\\n" "${CHEZ_MODULES-UNSET}"' >"$FAKE/core/chez.sh"
+    run_zsh "$(MODULES_STUB='appleDev claudeDistiller' extract _chez_run chez); chez help"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"modules=[appleDev claudeDistiller]"* ]] || return 1
+}
+
+@test "a Mac with no modules still exports the variable rather than leaving it unset" {
+    mkdir -p "$FAKE/core"
+    printf '%s\n' '#!/usr/bin/env bash' \
+        'printf "modules=[%s]\\n" "${CHEZ_MODULES-UNSET}"' >"$FAKE/core/chez.sh"
+    # Set-but-empty is the honest answer for a Mac with no modules. Unset sends
+    # the dispatcher down its ~200 ms `chezmoi data` fallback on every run, and
+    # nothing about that failure is visible except the latency.
+    run_zsh "$(extract _chez_run chez); chez help"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"modules=[]"* ]] || return 1
+}
+
+@test "chez cd never reaches the dispatcher, which cannot change a directory" {
+    mkdir -p "$FAKE/core"
+    cat >"$FAKE/core/chez.sh" <<'EOF'
+#!/usr/bin/env bash
+printf 'SHOULD-NOT-DISPATCH
+'
+EOF
+    run_zsh "$(extract _chez_run chez); chez cd"
+    [ "$status" -eq 0 ]
+    no_match 'SHOULD-NOT-DISPATCH' <<<"$output"
 }
 
 # ─── chezbump: routine dependency-bump previewer ────────────────────────────

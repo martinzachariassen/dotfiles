@@ -223,8 +223,8 @@ _render_template() {
         # decide which next-step line to print. A stale suggestion costs nothing,
         # and re-firing the whole completion summary on every probe edit is noise.
         #
-        # Naming a path in output. Hook 99 prints features/auth/cli.sh as an
-        # instruction for the user to run later.
+        # Naming a path in output. Hook 99 still prints install.sh as the way
+        # to walk the wizard again — an instruction, not a delegation.
         grep -oE '(exec +)?(bash|sh) +"[^"]*features/[a-z]+/[a-z-]+\.sh' "$tmpl" |
             grep -oE 'features/[a-z]+/[a-z-]+\.sh' | sort -u | while IFS= read -r rel; do
             grep -qF "include \"../$rel\"" "$tmpl" || printf '%s -> %s\n' "$(basename "$tmpl")" "$rel"

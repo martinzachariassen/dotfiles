@@ -45,11 +45,11 @@ ${1}"
 # has memorised on install day. Say so here, because the consequence (git
 # refusing to commit) otherwise turns up much later, in an unrelated repo.
 if [ -z "$EMAIL" ]; then
-    add_step "    ${M}${NEXT}.${R} ${C}chezsetup${R}
+    add_step "    ${M}${NEXT}.${R} ${C}chez setup${R}
        ${Y}No git email is set${R} — git will refuse to commit until there is one.
        Better than the alternative: an empty address authors every commit as
        \"<>\", which GitHub cannot attribute and only a rewrite undoes.
-       chezsetup re-asks just this question. Your noreply address is at
+       chez setup re-asks just this question. Your noreply address is at
        github.com → Settings → Emails."
 fi
 
@@ -57,7 +57,7 @@ fi
 # which Homebrew only just installed. Surface the one-shot fix rather than
 # letting the machine sit silently unsigned.
 if [ "$SIGNING" != "off" ] && [ -z "$SIGNKEY" ]; then
-    add_step "    ${M}${NEXT}.${R} ${C}chezsign${R}
+    add_step "    ${M}${NEXT}.${R} ${C}chez sign${R}
        ${Y}Signing is deferred${R} — no key is set yet, so commits are unsigned.
        Run this once 1Password is signed in and its SSH agent is on; it offers
        the agent's keys and changes nothing else about your setup."
@@ -72,7 +72,7 @@ fi
 if [ -r "{{ .chezmoi.workingTree }}/features/xcode/probe.sh" ]; then
     . "{{ .chezmoi.workingTree }}/features/xcode/probe.sh"
     # Cheap probes only — this runs at the end of every apply, so the slower
-    # xcodebuild round-trips are left to `chezxcode --check` and `chezdoctor`.
+    # xcodebuild round-trips are left to `chez xcode --check` and `chez doctor`.
     if ! xcode_app_path >/dev/null 2>&1; then
         XCODE_MSG="${Y}No Xcode is installed${R} — the Swift CLIs are in place, but"$'\n'"       nothing can build an iOS app yet."
     elif ! xcode_selected_is_full; then
@@ -83,10 +83,10 @@ if [ -r "{{ .chezmoi.workingTree }}/features/xcode/probe.sh" ]; then
         XCODE_MSG=""
     fi
     if [ -n "$XCODE_MSG" ]; then
-        add_step "    ${M}${NEXT}.${R} ${C}chezxcode${R}
+        add_step "    ${M}${NEXT}.${R} ${C}chez xcode${R}
        ${XCODE_MSG}
        Installs Xcode, selects it, accepts the licence and fetches a simulator
-       runtime. Needs your Apple ID; budget ~40 GB. Check state: chezxcode --check"
+       runtime. Needs your Apple ID; budget ~40 GB. Check state: chez xcode --check"
     fi
 fi
 {{ end -}}
@@ -107,16 +107,16 @@ ${C}╰────────────────────────�
     ${M}1.${R} ${C}exec zsh${R}
        Reload the managed shell.
 
-    ${M}2.${R} ${C}bash ${SOURCE}/features/auth/cli.sh${R}
+    ${M}2.${R} ${C}chez auth${R}
        Sign in to gh, optional cloud CLIs, and verify git signing.
 
-    ${M}3.${R} ${C}chezdoctor${R}
+    ${M}3.${R} ${C}chez doctor${R}
        Run a health check after auth is done.${STEPS}
 
   ${B}Daily commands${R}
-    ${C}chezup${R}      converge this Mac to the repo (pull, apply, install packages)
-    ${C}chezdoctor${R}  full-stack health check
-    ${D}advanced: chezapply · chezsetup · chezbump · chezstatus${R}
+    ${C}chez up${R}      converge this Mac to the repo (pull, apply, install packages)
+    ${C}chez doctor${R}  full-stack health check
+    ${D}everything else: ${C}chez help${D} — the old chezup/chezdoctor names still work${R}
 
 ${D}Walk the wizard again with ${C}bash ${SOURCE}/install.sh${D}.${R}
 EOF
