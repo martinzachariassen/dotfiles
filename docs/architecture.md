@@ -48,19 +48,24 @@ src/                    # ← chezmoi's source dir; everything here deploys to $
   dot_config/           #   → ~/.config; untracked entries reconciled on demand by chezclean (keep-list in cleanup.toml)
   dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
 packages/               # what to install: core Brewfile + profile/module layers + editor lists
-core/                   # shared helpers no single feature owns (see below)
-scripts/                # tooling, grouped by who runs it (see below)
+core/                   # shared helpers + the registry (see below)
+features/               # one directory per feature; _template/ is the skeleton
+scripts/                # tooling not yet moved into a feature
 install.sh              # tiny bootstrap; hands off to `chezmoi init --apply`
 tests/                  # bats suites
 docs/                   # these guides
 ```
 ## How the tooling is organized
 
-Two roots, split by ownership rather than by kind:
+Three roots, split by ownership rather than by kind:
 
+- **[`features/`](../features)** — one directory per feature, holding its code,
+  its tests and its documentation. The contract is in
+  [features/README.md](../features/README.md).
 - **[`core/`](../core)** — helpers that no single feature owns, so giving them
-  to one would be arbitrary. Sourced, never run directly.
-- **[`scripts/`](../scripts)** — everything else, grouped by *who invokes it*:
+  to one would be arbitrary, plus the registry. Sourced, never run directly.
+- **[`scripts/`](../scripts)** — what has not moved into a feature yet, grouped
+  by *who invokes it*:
   - **[`scripts/bin/`](../scripts/bin)** — user-facing verbs run by hand or via
     the zsh functions: `chezup`, `doctor`, `bootstrap-auth`, `wizard`,
     `macos-defaults`, `clean`, `signing`, `xcode`, `distill`. Documented in
@@ -74,7 +79,32 @@ Two roots, split by ownership rather than by kind:
     `vscode.sh`, `xcode.sh`, `xcodes.sh`, `git-signing.sh`, `distill.sh`.
 
 The rule for which root a file belongs in is one sentence: *if exactly one
-feature cares about it, it belongs to that feature.*
+feature cares about it, it belongs to that feature.* `scripts/` shrinks to
+nothing as the features are moved across, one PR each; every file still in it
+has a named destination in its feature's README.
+
+### The registry
+
+Two files describe the whole surface, and four things read them, which is what
+stops the descriptions drifting apart again.
+
+| File | Declares |
+|---|---|
+| [`core/verbs.sh`](../core/verbs.sh) | Every verb: its owning feature, its group in `chez help`, its module gate, its one-line summary. The single source of truth for the command surface. |
+| `features/<name>/feature.sh` | What a feature *is*: name, title, the module that gates it, where its checks belong in `chezdoctor`'s order. Data only — sourced in a subshell, no side effects. |
+
+Verbs are declared in exactly one of those, never both. The list used to live in
+five hand-written places — the `chezhelp` heredoc, `README.md`,
+`docs/commands.md`, the `99-completion` hook and `CLAUDE.md` — with only one of
+them checked, in one direction. `tests/registry.bats` now holds the two
+exhaustive ones to the table in *both* directions, and checks that every module
+gate names a real module, that doctor orders are unique, and that every
+`.chezmoidata` file has an owner.
+
+Ordering in `chezdoctor` comes from `FEATURE_DOCTOR_ORDER`, never from the
+directory name: the current section order is deliberate — repo, chezmoi,
+identity, packages, runtimes, optional modules, informational — and
+alphabetical would scramble it.
 
 `bin/` and `ci/` scripts reach `core/` as `"$_DIR/../../core/…"` and their own
 engines as `"$_DIR/../lib/…"`; the chezmoi hooks reach both across the

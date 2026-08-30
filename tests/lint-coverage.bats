@@ -15,9 +15,10 @@ setup() {
     command -v git >/dev/null 2>&1 || skip "git not installed"
 }
 
-# The set CI resolves: every tracked *.sh outside chezmoi's source tree.
+# The set CI resolves: every tracked shell file outside chezmoi's source tree.
+# .bash is in scope because bats' `load` convention names helpers that way.
 tracked_shell_scripts() {
-    git -C "$REPO_ROOT" ls-files -- '*.sh' ':!:src/**'
+    git -C "$REPO_ROOT" ls-files -- '*.sh' '*.bash' ':!:src/**'
 }
 
 # The one `files:` pattern the three shell hooks share.
@@ -61,7 +62,7 @@ precommit_pattern() {
 }
 
 @test "CI resolves its shell file list from git, not from directory globs" {
-    grep -q "git ls-files -z -- '\*\.sh' ':!:src/\*\*'" "$CI"
+    grep -q "git ls-files -z -- '\*\.sh' '\*\.bash' ':!:src/\*\*'" "$CI"
     # The old hardcoded form must not creep back in.
     ! grep -q 'scripts/bin/\*\.sh' "$CI"
 }
