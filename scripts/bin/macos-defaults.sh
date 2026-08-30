@@ -4,19 +4,19 @@
 
 set -euo pipefail
 
-# log.sh and sudo.sh are committed siblings; fail loudly if a checkout is missing either.
+# ui.sh and sudo.sh are committed in core/; fail loudly if a checkout lacks either.
 _MD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-for _md_lib in log.sh sudo.sh; do
-    if [ ! -r "$_MD_DIR/../lib/$_md_lib" ]; then
-        printf 'macos-defaults: missing %s\n' "$_MD_DIR/../lib/$_md_lib" >&2
+for _md_lib in ui.sh sudo.sh; do
+    if [ ! -r "$_MD_DIR/../../core/$_md_lib" ]; then
+        printf 'macos-defaults: missing %s\n' "$_MD_DIR/../../core/$_md_lib" >&2
         exit 1
     fi
 done
 unset _md_lib
-# shellcheck source=../lib/log.sh
-. "$_MD_DIR/../lib/log.sh"
-# shellcheck source=../lib/sudo.sh
-. "$_MD_DIR/../lib/sudo.sh"
+# shellcheck source=../../core/ui.sh
+. "$_MD_DIR/../../core/ui.sh"
+# shellcheck source=../../core/sudo.sh
+. "$_MD_DIR/../../core/sudo.sh"
 ui_init_status
 
 printf '%s macOS defaults\n' "$NODE"

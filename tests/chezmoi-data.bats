@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/lib/chezmoi-data.sh. CI runs without jq, so these
+# Unit tests for core/chezmoi-data.sh. CI runs without jq, so these
 # exercise the sed fallback; jq-guarded tests below cover the jq path when
 # present. Both paths must return identical values.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    # shellcheck source=../scripts/lib/chezmoi-data.sh
-    . "$REPO_ROOT/scripts/lib/chezmoi-data.sh"
+    # shellcheck source=../core/chezmoi-data.sh
+    . "$REPO_ROOT/core/chezmoi-data.sh"
     JSON='{"name":"Ada","signingKey":"ssh-ed25519 AAAAkey","profile":"work","useOnePassword":true,"features":{"macApps":false}}'
 }
 
@@ -47,7 +47,7 @@ setup() {
 }
 
 @test "cm_data_bool sed fallback (no jq on PATH) still reads false" {
-    run bash -c 'PATH=/usr/bin:/bin; . "$1/scripts/lib/chezmoi-data.sh"; cm_data_bool "$2" macApps' _ "$REPO_ROOT" "$JSON"
+    run bash -c 'PATH=/usr/bin:/bin; . "$1/core/chezmoi-data.sh"; cm_data_bool "$2" macApps' _ "$REPO_ROOT" "$JSON"
     [ "$output" = "false" ]
 }
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Tests for scripts/lib/tty.sh, which reattaches a chezmoi hook's stdin to the
+# Tests for core/tty.sh, which reattaches a chezmoi hook's stdin to the
 # controlling terminal (chezmoi runs run_* scripts with stdin closed). The
 # reattach itself is environment-dependent, so this only pins what's stable:
 # the source guard and that tty_reattach exists and is callable.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    TTY="$REPO_ROOT/scripts/lib/tty.sh"
+    TTY="$REPO_ROOT/core/tty.sh"
     [ -r "$TTY" ] || skip "tty.sh not found at $TTY"
 }
 

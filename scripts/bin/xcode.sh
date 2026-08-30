@@ -22,16 +22,16 @@ XCODE_VERSION="${XCODE_VERSION:-}"
 SKIP_RUNTIME="${SKIP_RUNTIME:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_DIR/../lib/log.sh" ]; then
-    printf 'chezxcode: missing %s\n' "$_DIR/../lib/log.sh" >&2
+if [ ! -r "$_DIR/../../core/ui.sh" ]; then
+    printf 'chezxcode: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_DIR/../lib/log.sh"
-# shellcheck source=../lib/dry-run.sh
-. "$_DIR/../lib/dry-run.sh"
-# shellcheck source=../lib/sudo.sh
-. "$_DIR/../lib/sudo.sh"
+# shellcheck source=../../core/ui.sh
+. "$_DIR/../../core/ui.sh"
+# shellcheck source=../../core/dry-run.sh
+. "$_DIR/../../core/dry-run.sh"
+# shellcheck source=../../core/sudo.sh
+. "$_DIR/../../core/sudo.sh"
 # shellcheck source=../lib/xcode.sh
 . "$_DIR/../lib/xcode.sh"
 # shellcheck source=../lib/xcodes.sh

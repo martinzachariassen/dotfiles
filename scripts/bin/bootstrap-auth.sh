@@ -10,21 +10,21 @@ ASSUME_YES="${YES:-0}"
 
 # log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _UI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_UI_DIR/../lib/log.sh" ]; then
-    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/../lib/log.sh" >&2
+if [ ! -r "$_UI_DIR/../../core/ui.sh" ]; then
+    printf 'bootstrap-auth: missing %s\n' "$_UI_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_UI_DIR/../lib/log.sh"
+# shellcheck source=../../core/ui.sh
+. "$_UI_DIR/../../core/ui.sh"
 ui_init_logging
 
 # shellcheck source=../lib/git-signing.sh
 if [ -r "$_UI_DIR/../lib/git-signing.sh" ]; then
     . "$_UI_DIR/../lib/git-signing.sh"
 fi
-# shellcheck source=../lib/chezmoi-data.sh
-if [ -r "$_UI_DIR/../lib/chezmoi-data.sh" ]; then
-    . "$_UI_DIR/../lib/chezmoi-data.sh"
+# shellcheck source=../../core/chezmoi-data.sh
+if [ -r "$_UI_DIR/../../core/chezmoi-data.sh" ]; then
+    . "$_UI_DIR/../../core/chezmoi-data.sh"
 fi
 
 # has_module NAME — true when NAME is in the selected .modules list.

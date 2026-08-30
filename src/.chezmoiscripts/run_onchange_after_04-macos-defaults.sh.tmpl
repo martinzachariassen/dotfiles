@@ -21,8 +21,8 @@ echo "  System preferences pass (re-runs when the defaults script changes)."
 echo "  Some changes need a reboot."
 
 # chezmoi runs scripts with stdin closed; sudo inside macos-defaults.sh would hang without this.
-# shellcheck source=../../scripts/lib/tty.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
+# shellcheck source=../../core/tty.sh
+. "{{ .chezmoi.workingTree }}/core/tty.sh"
 if ! tty_reattach; then
     echo "! no terminal available; skipping macOS defaults"
     echo "  Run later with: macos-defaults"

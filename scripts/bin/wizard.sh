@@ -17,16 +17,16 @@ TMPL="$ROOT/src/.chezmoi.toml.tmpl"
 MODULES_TOML="$ROOT/src/.chezmoidata/modules.toml"
 
 # log.sh is a committed sibling; fail loudly if a checkout is missing it.
-if [ ! -r "$_DIR/../lib/log.sh" ]; then
-    printf 'wizard: missing %s\n' "$_DIR/../lib/log.sh" >&2
+if [ ! -r "$_DIR/../../core/ui.sh" ]; then
+    printf 'wizard: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_DIR/../lib/log.sh"
-# shellcheck source=../lib/chezmoi-data.sh
-. "$_DIR/../lib/chezmoi-data.sh"
-# shellcheck source=../lib/prompt-meta.sh
-. "$_DIR/../lib/prompt-meta.sh"
+# shellcheck source=../../core/ui.sh
+. "$_DIR/../../core/ui.sh"
+# shellcheck source=../../core/chezmoi-data.sh
+. "$_DIR/../../core/chezmoi-data.sh"
+# shellcheck source=../../core/prompt-meta.sh
+. "$_DIR/../../core/prompt-meta.sh"
 ui_init_logging
 
 # `read … || fallback` swallows an interrupted read and marches on, so trap

@@ -8,7 +8,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LOG="$REPO_ROOT/scripts/lib/log.sh"
+    LOG="$REPO_ROOT/core/ui.sh"
     BP="$REPO_ROOT/scripts/lib/brew-progress.sh"
     FIX="$(mktemp -d)"
     # The consumer asks `sudo -n true` whether a password prompt is possible.

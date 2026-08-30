@@ -11,18 +11,18 @@ DRY_RUN="${DRY_RUN:-0}"
 ASSUME_YES="${YES:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-# shellcheck source=../lib/log.sh
-if [ ! -r "$_DIR/../lib/log.sh" ]; then
-    printf 'chezup: missing %s\n' "$_DIR/../lib/log.sh" >&2
+# shellcheck source=../../core/ui.sh
+if [ ! -r "$_DIR/../../core/ui.sh" ]; then
+    printf 'chezup: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_DIR/../lib/log.sh"
+# shellcheck source=../../core/ui.sh
+. "$_DIR/../../core/ui.sh"
 ui_init_logging
-# shellcheck source=../lib/dry-run.sh
-. "$_DIR/../lib/dry-run.sh"
-# shellcheck source=../lib/modules.sh
-. "$_DIR/../lib/modules.sh"
+# shellcheck source=../../core/dry-run.sh
+. "$_DIR/../../core/dry-run.sh"
+# shellcheck source=../../core/modules.sh
+. "$_DIR/../../core/modules.sh"
 
 # offer_new_modules — offer every catalog module this Mac has never been asked
 # about, exactly once.

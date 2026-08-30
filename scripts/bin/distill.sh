@@ -10,22 +10,22 @@ DRY_RUN="${DRY_RUN:-0}"
 ASSUME_YES="${YES:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_DIR/../lib/log.sh" ]; then
-    printf 'chezdistill: missing %s\n' "$_DIR/../lib/log.sh" >&2
+if [ ! -r "$_DIR/../../core/ui.sh" ]; then
+    printf 'chezdistill: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_DIR/../lib/log.sh"
+# shellcheck source=../../core/ui.sh
+. "$_DIR/../../core/ui.sh"
 ui_init_logging
 ui_init_status
-# shellcheck source=../lib/dry-run.sh
-. "$_DIR/../lib/dry-run.sh"
+# shellcheck source=../../core/dry-run.sh
+. "$_DIR/../../core/dry-run.sh"
 # shellcheck source=../lib/distill.sh
 . "$_DIR/../lib/distill.sh"
-# shellcheck source=../lib/chezmoi-data.sh
-. "$_DIR/../lib/chezmoi-data.sh"
-# shellcheck source=../lib/modules.sh
-. "$_DIR/../lib/modules.sh"
+# shellcheck source=../../core/chezmoi-data.sh
+. "$_DIR/../../core/chezmoi-data.sh"
+# shellcheck source=../../core/modules.sh
+. "$_DIR/../../core/modules.sh"
 
 _distill_help() {
     cat <<'EOF'
@@ -143,7 +143,7 @@ _distill_confirm() {
 # _distill_setup_module — put claudeDistiller into the chezmoi module list.
 # Edits the single `modules = [...]` line rather than re-running `chezmoi init`:
 # init re-derives every other saved answer, and this has to change exactly one.
-# The edit itself lives in scripts/lib/modules.sh, shared with chezup's
+# The edit itself lives in core/modules.sh, shared with chezup's
 # new-module gate so the two cannot write the list differently.
 # 0 = already on · 3 = turned on now (an apply is needed) · 1 = could not.
 _distill_setup_module() {

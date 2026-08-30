@@ -10,7 +10,7 @@ REPO="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-# Deliberately duplicated from scripts/lib/log.sh: this file runs via
+# Deliberately duplicated from core/ui.sh: this file runs via
 # `curl | bash` before the repo exists on disk, so there is nothing to source.
 # Keep the vocabulary identical so the handoff to the wizard is seamless.
 if [ -t 1 ]; then

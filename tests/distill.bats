@@ -52,8 +52,8 @@ teardown() {
 
 # Source the engine with the logging vocabulary it expects.
 load_lib() {
-    # shellcheck source=../scripts/lib/log.sh
-    . "$REPO_ROOT/scripts/lib/log.sh"
+    # shellcheck source=../core/ui.sh
+    . "$REPO_ROOT/core/ui.sh"
     ui_init_logging
     ui_init_status
     # shellcheck source=../scripts/lib/distill.sh
@@ -90,14 +90,14 @@ item() {
 
 # ─── Script guards ────────────────────────────────────────────────────────────
 
-@test "hard-fails when log.sh is missing" {
+@test "hard-fails when core/ui.sh is missing" {
     tmp="$(mktemp -d)"
     cp "$BIN" "$tmp/distill.sh"
     run bash "$tmp/distill.sh"
     rm -rf "$tmp"
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }
 
 @test "--help prints usage and exits 0" {

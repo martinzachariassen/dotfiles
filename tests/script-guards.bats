@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Pins the "fail loudly if sibling log.sh is missing" guard shared by
+# Pins the "fail loudly if core/ui.sh is missing" guard shared by
 # doctor.sh/bootstrap-auth.sh (chezup.sh's copy is covered in chezup.bats),
 # so a refactor can't quietly turn the hard failure into a silent `|| true`.
 
@@ -7,7 +7,7 @@ setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
     ISO="$(mktemp -d)"
-    mkdir -p "$ISO/scripts/bin"  # note: no scripts/lib ⇒ log.sh is unreachable
+    mkdir -p "$ISO/scripts/bin"  # note: no core/ ⇒ ui.sh is unreachable
 }
 
 teardown() { [ -n "${ISO:-}" ] && rm -rf "$ISO"; }
@@ -21,30 +21,30 @@ run_isolated() {
     run env DOTFILES_DIR="$ISO" bash "$ISO/scripts/bin/$name"
 }
 
-@test "doctor.sh fails loudly when log.sh is missing" {
+@test "doctor.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/doctor.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }
 
-@test "bootstrap-auth.sh fails loudly when log.sh is missing" {
+@test "bootstrap-auth.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/bootstrap-auth.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }
 
-@test "wizard.sh fails loudly when log.sh is missing" {
+@test "wizard.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/wizard.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }
 
-@test "xcode.sh fails loudly when log.sh is missing" {
+@test "xcode.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/xcode.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }

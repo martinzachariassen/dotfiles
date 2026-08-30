@@ -155,14 +155,14 @@ run_chezup() {
     [[ "$output" != *"up to date"* ]]
 }
 
-@test "chezup fails loudly (exit 1) when its log.sh helper is missing" {
+@test "chezup fails loudly (exit 1) when its core/ui.sh helper is missing" {
     ISO="$(mktemp -d)"
-    mkdir -p "$ISO/scripts/bin"  # note: no scripts/lib ⇒ log.sh is absent
+    mkdir -p "$ISO/scripts/bin"  # note: no core/ ⇒ ui.sh is absent
     cp "$CHEZUP" "$ISO/scripts/bin/chezup.sh"
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" bash "$ISO/scripts/bin/chezup.sh"
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"log.sh"* ]]
+    [[ "$output" == *"ui.sh"* ]]
 }
 
 # ─── Drift → apply ──────────────────────────────────────────────────────────

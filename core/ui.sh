@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# log.sh — dependency-free terminal logging helpers shared across scripts.
+# ui.sh — dependency-free terminal logging helpers shared across scripts.
 # shellcheck disable=SC2034,SC2329
 
-[ -n "${__DOTFILES_LOG_SH:-}" ] && return 0
-__DOTFILES_LOG_SH=1
+[ -n "${__DOTFILES_UI_SH:-}" ] && return 0
+__DOTFILES_UI_SH=1
 
 # Colors emitted only on a TTY; always defined (empty otherwise) for `set -u`.
 ui_init_colors() {
@@ -111,6 +111,28 @@ explain() {
     local line
     for line in "$@"; do
         if [ -z "$line" ]; then hr; else dim "$line"; fi
+    done
+    return 0
+}
+
+# explain_titled TITLE LINE… — the same preamble with a heading: a blank line,
+# a cyan node glyph and a bold title, then each line behind a cyan bar.
+#
+# Kept byte-identical to the zsh-native `_chez_explain` in dot_zshrc.tmpl (see
+# tests/ui.bats), which is what the `chez*` verbs still living in that template
+# print. The verbs move to bash one feature at a time; each one that lands here
+# must keep the output it had, and `explain` is not it — that prints dim lines
+# with no heading at all.
+explain_titled() {
+    ui_quiet && return 0
+    ui_init_colors
+    ui_init_glyphs
+    local title="$1" line
+    shift
+    printf '\n'
+    printf '%s%s%s  %s%s%s\n' "$CYAN" "$NODE" "$RESET" "$BOLD" "$title" "$RESET"
+    for line in "$@"; do
+        printf '%s%s%s  %s%s%s\n' "$CYAN" "$BAR" "$RESET" "$DIM" "$line" "$RESET"
     done
     return 0
 }

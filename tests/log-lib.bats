@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for scripts/lib/log.sh — the dependency-free terminal UI helpers shared
+# Tests for core/ui.sh — the dependency-free terminal UI helpers shared
 # by doctor.sh, chezup.sh, bootstrap-auth.sh, and macos-defaults.sh.
 #
 # log.sh runs on a fresh machine before any package is installed, so two
@@ -11,7 +11,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LOG="$REPO_ROOT/scripts/lib/log.sh"
+    LOG="$REPO_ROOT/core/ui.sh"
     [ -r "$LOG" ] || skip "log.sh not found at $LOG"
 }
 
@@ -28,9 +28,9 @@ src() { bash -c "source '$LOG'; $1"; }
 }
 
 @test "log.sh sets its source guard and is safe to re-source" {
-    # __DOTFILES_LOG_SH makes a second source a cheap no-op; load-bearing for
+    # __DOTFILES_UI_SH makes a second source a cheap no-op; load-bearing for
     # the tty.sh sibling that early-returns the same way.
-    run src 'source "'"$LOG"'"; echo "${__DOTFILES_LOG_SH:-unset}"'
+    run src 'source "'"$LOG"'"; echo "${__DOTFILES_UI_SH:-unset}"'
     [ "$status" -eq 0 ]
     [ "$output" = "1" ]
 }

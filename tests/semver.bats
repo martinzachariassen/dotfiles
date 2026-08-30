@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/lib/semver.sh
+# Unit tests for core/semver.sh
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    # shellcheck source=../scripts/lib/semver.sh
-    . "$REPO_ROOT/scripts/lib/semver.sh"
+    # shellcheck source=../core/semver.sh
+    . "$REPO_ROOT/core/semver.sh"
 }
 
 # ─── semver_extract ────────────────────────────────────────────────────────────
