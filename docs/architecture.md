@@ -20,7 +20,7 @@ Two rules follow:
    `chezmoi re-add ~/.X`.
 2. **Inside a hook, `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`.** So
    reaching root-level tooling (`core/*`, the `scripts/lib/*` engines,
-   `packages/Brewfile*`) uses `{{ .chezmoi.workingTree }}` — the git working
+   `features/brew/Brewfile*`) uses `{{ .chezmoi.workingTree }}` — the git working
    tree, i.e. the repo root. That's the one path idiom the hooks rely on.
 
 ## chezmoi naming conventions

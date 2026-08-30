@@ -15,8 +15,8 @@ if command -v brew >/dev/null 2>&1; then
 fi
 
 echo "→ Installing Homebrew. This is usually about a minute on a fresh Mac."
-# shellcheck source=../../scripts/lib/homebrew.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/homebrew.sh"
+# shellcheck source=../../features/brew/lib/homebrew.sh
+. "{{ .chezmoi.workingTree }}/features/brew/lib/homebrew.sh"
 homebrew_install
 
 echo "✓ Homebrew installed and ready"

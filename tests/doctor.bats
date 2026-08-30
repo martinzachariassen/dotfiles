@@ -238,7 +238,7 @@ run_doctor_xcode() {
 }
 
 # ─── Brewfile resolution ────────────────────────────────────────────────────
-# The resolver itself lives in scripts/lib/brewfiles.sh and is exercised in
+# The resolver itself lives in features/brew/lib/tiers.sh and is exercised in
 # tests/brewfiles-lib.bats. What matters here is that doctor.sh keeps using it
 # for BOTH directions — "is my active set installed?" and "what's installed
 # that no active tier declares?". They used to disagree: the first was
@@ -254,9 +254,9 @@ run_doctor_xcode() {
 }
 
 @test "doctor.sh's untracked check reads only the active tiers (glob regression)" {
-    # The old code grepped "$SOURCE_DIR"/packages/Brewfile.* here, which counts
+    # The old code grepped "$SOURCE_DIR"/features/brew/Brewfile.* here, which counts
     # every tier that exists — including the other profile's.
-    no_match 'packages/Brewfile\.\*' "$DOCTOR"
+    no_match 'features/brew/Brewfile\.\*' "$DOCTOR"
     # It must build its file list from active_files instead.
     grep -qF 'tracked_files+=("$SOURCE_DIR/$rel")' "$DOCTOR"
 }

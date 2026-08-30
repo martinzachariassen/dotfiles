@@ -638,7 +638,7 @@ chezbump() {
 
 # "<kind>\t<name>" (cask | formula | tap) for every Homebrew item no ACTIVE
 # Brewfile tier declares — the removal set chezmirror acts on. $1 is the repo
-# root; pure/testable. The tier set comes from scripts/lib/brewfiles.sh, the
+# root; pure/testable. The tier set comes from features/brew/lib/tiers.sh, the
 # same resolver chezdoctor uses and the mirror of what the brew-bundle hook
 # installs from, so "tracked" means the same thing in both directions: a
 # work-profile cask on a personal machine is untracked here, not silently kept.
@@ -647,11 +647,11 @@ chezbump() {
 _chez_brew_removals() {
     local src=$1
 
-    if [ ! -r "$src/scripts/lib/brewfiles.sh" ]; then
-        echo "  ! cannot resolve the active Brewfiles: no $src/scripts/lib/brewfiles.sh — nothing offered for removal" >&2
+    if [ ! -r "$src/features/brew/lib/tiers.sh" ]; then
+        echo "  ! cannot resolve the active Brewfiles: no $src/features/brew/lib/tiers.sh — nothing offered for removal" >&2
         return 1
     fi
-    . "$src/scripts/lib/brewfiles.sh"
+    . "$src/features/brew/lib/tiers.sh"
 
     # Fail closed: an unresolvable tier set means an empty removal set, never a
     # broader one. Comparing against too FEW tiers would offer the whole
@@ -944,7 +944,7 @@ chezhelp() {
     dotfiles         cd into the source repo.
 
   Add something new to the repo
-    new brew pkg     add the line to packages/Brewfile* → chezapply  (apply installs it)
+    new brew pkg     add the line to features/brew/Brewfile* → chezapply  (apply installs it)
     new dotfile      chezmoi add ~/.foo   ·   update tracked: chezmoi re-add ~/.foo
 
   Under the hood

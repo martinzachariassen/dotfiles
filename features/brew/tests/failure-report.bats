@@ -11,9 +11,9 @@
 # back into an answer.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     LOG="$REPO_ROOT/core/ui.sh"
-    BP="$REPO_ROOT/scripts/lib/brew-progress.sh"
+    BP="$REPO_ROOT/features/brew/lib/progress.sh"
     HOOK="$REPO_ROOT/src/.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl"
     FIX="$(mktemp -d)"
 }

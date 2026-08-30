@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# Tests for scripts/lib/homebrew.sh, the shared Homebrew installer used by
+# Tests for features/brew/lib/homebrew.sh, the shared Homebrew installer used by
 # run_once_before_01-install-homebrew.sh.tmpl. install.sh keeps its own inline
 # copy (it runs before the repo is cloned) — not covered here, see install.bats.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    HOMEBREW_LIB="$REPO_ROOT/scripts/lib/homebrew.sh"
+    load '../../../core/testing/helper'
+    HOMEBREW_LIB="$REPO_ROOT/features/brew/lib/homebrew.sh"
     [ -r "$HOMEBREW_LIB" ] || skip "homebrew.sh not found at $HOMEBREW_LIB"
 
     STUBS="$(mktemp -d)"

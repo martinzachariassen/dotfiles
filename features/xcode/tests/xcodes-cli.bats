@@ -122,10 +122,10 @@ EOF
 }
 
 @test "the appleDev Brewfile no longer declares the unbuildable formula" {
-    run grep -c "xcodesorg" "$REPO_ROOT/packages/Brewfile.apple-dev"
+    run grep -c "xcodesorg" "$REPO_ROOT/features/brew/Brewfile.apple-dev"
     [ "$output" = "0" ]
 }
 
 @test "aria2 is kept — xcodes install still uses it" {
-    grep -qE '^brew "aria2"' "$REPO_ROOT/packages/Brewfile.apple-dev"
+    grep -qE '^brew "aria2"' "$REPO_ROOT/features/brew/Brewfile.apple-dev"
 }

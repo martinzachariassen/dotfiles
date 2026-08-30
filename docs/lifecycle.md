@@ -7,7 +7,7 @@ a configured machine, and the rules the hook scripts follow. The
 For the repo split, naming conventions, and `scripts/` layout, see
 [architecture.md](architecture.md). The one path idiom worth repeating: inside a
 hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level tooling
-(`scripts/lib/*`, `packages/Brewfile*`) is reached via
+(`scripts/lib/*`, `features/brew/Brewfile*`) is reached via
 `{{ .chezmoi.workingTree }}` (the git working tree = repo root).
 
 ## The stages
@@ -60,7 +60,7 @@ apply count, so these re-fire only when their embedded content hash changes.
 
 Package convergence uses Homebrew's native `brew bundle`: the
 `02-brew-bundle` hook reads the active file set from
-[`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml), then
+[`src/.chezmoidata/brew.toml`](../src/.chezmoidata/brew.toml), then
 runs `brew bundle --no-upgrade` to converge *presence*, not freshness. Casks
 that ship an Apple installer package need admin access, so the hook confirms
 the sudo ticket (asking on a clean screen, before the progress bar) and keeps
@@ -102,7 +102,7 @@ Brewfile, then `brew autoremove` to prune orphaned dependencies, while
 `chezstatus`/`chezdoctor` report the drift read-only. "No longer in a Brewfile"
 means no Brewfile **active on this machine** — core, the enabled modules and
 this profile's tier. Both directions resolve that set through
-[`scripts/lib/brewfiles.sh`](../scripts/lib/brewfiles.sh), so install and
+[`features/brew/lib/tiers.sh`](../features/brew/lib/tiers.sh), so install and
 removal can't disagree: moving a package to the other profile's tier makes it
 removable here, exactly as deleting it would. The removal side fails closed —
 an unresolvable tier set offers nothing, never more. Nothing about removal is
@@ -119,11 +119,11 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Concern | Source |
 |---|---|
 | Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `core/sudo.sh`); `run_after_02-brew-bundle` re-checks and asks again before its progress bar starts, if the ticket lapsed |
-| Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `scripts/lib/homebrew.sh`) |
-| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
+| Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `features/brew/lib/homebrew.sh`) |
+| Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `brew.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezstatus` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
-| Active Brewfile tier set (shared by install check, cleanup, doctor) | `scripts/lib/brewfiles.sh` (`brew_active_files`, reads `packages.toml` via `chezmoi data`) |
+| Active Brewfile tier set (shared by install check, cleanup, doctor) | `features/brew/lib/tiers.sh` (`brew_active_files`, reads `brew.toml` via `chezmoi data`) |
 | Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
 | chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
@@ -132,7 +132,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `features/macos/cli.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
-| Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work,apple-dev}` |
+| Package tiers | `features/brew/Brewfile` (core) + `features/brew/Brewfile.{mac-apps,personal,work,apple-dev}` |
 | Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |
 | Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` |
 
@@ -145,7 +145,7 @@ separate, plain scripts — see [install.md](install.md) and
 `install.sh` is a small hand-written script fetched via `curl | bash`
 **before this repo exists on disk**, so it can't source anything — its
 Homebrew-install step is necessarily its own inline copy of what
-`scripts/lib/homebrew.sh` does for `run_once_before_01` below. It installs
+`features/brew/lib/homebrew.sh` does for `run_once_before_01` below. It installs
 only the prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands
 off to `scripts/bin/wizard.sh` (repo now on disk, so it *can* source
 `scripts/lib/*`). The wizard asks the setup questions and feeds them to

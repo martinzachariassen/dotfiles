@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for the tap-trust helpers in scripts/lib/homebrew.sh.
+# Tests for the tap-trust helpers in features/brew/lib/homebrew.sh.
 #
 # Why these exist: Homebrew 6.0 will not load formulae or casks from a
 # non-official tap until the tap is trusted, and `brew bundle` skips the
@@ -8,8 +8,8 @@
 # about detecting that state, not about brew's own exit status.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    HOMEBREW_LIB="$REPO_ROOT/scripts/lib/homebrew.sh"
+    load '../../../core/testing/helper'
+    HOMEBREW_LIB="$REPO_ROOT/features/brew/lib/homebrew.sh"
     [ -r "$HOMEBREW_LIB" ] || skip "homebrew.sh not found at $HOMEBREW_LIB"
 
     STUBS="$(mktemp -d)"

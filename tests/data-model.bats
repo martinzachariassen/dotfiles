@@ -6,7 +6,7 @@ setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
     MODULES_DATA="$REPO_ROOT/src/.chezmoidata/modules.toml"
-    PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/packages.toml"
+    PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/brew.toml"
     WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
 }
 
@@ -98,7 +98,7 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in profileDefaults:$bad"; false; }
 }
 
-@test "packages.toml Brewfile paths all exist" {
+@test "brew.toml Brewfile paths all exist" {
     local path
     grep -oE '"[^"]+"' "$PACKAGES_DATA" | tr -d '"' | while IFS= read -r path; do
         [ -f "$REPO_ROOT/$path" ] || { echo "missing Brewfile: $path"; false; }

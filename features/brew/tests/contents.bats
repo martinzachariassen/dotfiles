@@ -11,11 +11,11 @@
 # reordering/comments without false-matching "1password" on "1password-cli".
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    CORE="$REPO_ROOT/packages/Brewfile"
-    MAC_APPS="$REPO_ROOT/packages/Brewfile.mac-apps"
-    WORK="$REPO_ROOT/packages/Brewfile.work"
-    PERSONAL="$REPO_ROOT/packages/Brewfile.personal"
+    load '../../../core/testing/helper'
+    CORE="$REPO_ROOT/features/brew/Brewfile"
+    MAC_APPS="$REPO_ROOT/features/brew/Brewfile.mac-apps"
+    WORK="$REPO_ROOT/features/brew/Brewfile.work"
+    PERSONAL="$REPO_ROOT/features/brew/Brewfile.personal"
 }
 
 # 0 if FILE has a line declaring `KIND "NAME"`, ignoring trailing comments.

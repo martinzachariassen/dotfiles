@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Coverage for scripts/lib/brewfiles.sh — the single answer to "which Brewfile
+# Coverage for features/brew/lib/tiers.sh — the single answer to "which Brewfile
 # tiers apply to THIS machine?", shared by chezdoctor and by chezmirror's
 # removal set so the install and removal directions can't disagree.
 #
@@ -9,17 +9,17 @@
 # personal machine and was never offered for uninstall.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LIB="$REPO_ROOT/scripts/lib/brewfiles.sh"
+    load '../../../core/testing/helper'
+    LIB="$REPO_ROOT/features/brew/lib/tiers.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
 
-    # Mirrors src/.chezmoidata/packages.toml's shape; both tiers of both
+    # Mirrors src/.chezmoidata/brew.toml's shape; both tiers of both
     # profiles and both optional modules exist, so every test below is really
     # about selection, not about which files happen to be defined.
     DATA='{"profile":"personal","modules":["macApps","theme"],"brewfiles":{
-        "core":"packages/Brewfile",
-        "byModule":{"macApps":"packages/Brewfile.mac-apps","appleDev":"packages/Brewfile.apple-dev"},
-        "byProfile":{"personal":"packages/Brewfile.personal","work":"packages/Brewfile.work"}}}'
+        "core":"features/brew/Brewfile",
+        "byModule":{"macApps":"features/brew/Brewfile.mac-apps","appleDev":"features/brew/Brewfile.apple-dev"},
+        "byProfile":{"personal":"features/brew/Brewfile.personal","work":"features/brew/Brewfile.work"}}}'
 }
 
 resolve() { # resolve JSON — run brew_active_files against fixture data
@@ -41,9 +41,9 @@ no_match_in() {
 @test "brew_active_files emits core + enabled modules + this profile" {
     resolve "$DATA"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "packages/Brewfile" ]
-    [ "${lines[1]}" = "packages/Brewfile.mac-apps" ]
-    [ "${lines[2]}" = "packages/Brewfile.personal" ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
+    [ "${lines[1]}" = "features/brew/Brewfile.mac-apps" ]
+    [ "${lines[2]}" = "features/brew/Brewfile.personal" ]
     [ "${#lines[@]}" -eq 3 ]
 }
 
@@ -61,21 +61,21 @@ no_match_in() {
 @test "brew_active_files picks up a module once it's enabled" {
     resolve "$(jq -c '.modules += ["appleDev"]' <<<"$DATA")"
     [ "$status" -eq 0 ]
-    grep -qF 'packages/Brewfile.apple-dev' <<<"$output"
+    grep -qF 'features/brew/Brewfile.apple-dev' <<<"$output"
 }
 
 @test "brew_active_files follows the profile switch" {
     resolve "$(jq -c '.profile = "work"' <<<"$DATA")"
     [ "$status" -eq 0 ]
-    grep -qF 'packages/Brewfile.work' <<<"$output"
+    grep -qF 'features/brew/Brewfile.work' <<<"$output"
     no_match_in "$output" 'Brewfile\.personal'
 }
 
 @test "brew_active_files orders core first, profile last (install order)" {
     # Same order run_after_02-brew-bundle installs in: core, modules, profile.
     resolve "$(jq -c '.modules += ["appleDev"]' <<<"$DATA")"
-    [ "${lines[0]}" = "packages/Brewfile" ]
-    [ "${lines[$((${#lines[@]} - 1))]}" = "packages/Brewfile.personal" ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
+    [ "${lines[$((${#lines[@]} - 1))]}" = "features/brew/Brewfile.personal" ]
 }
 
 @test "brew_active_files survives a profile with no Brewfile of its own" {
@@ -84,13 +84,13 @@ no_match_in() {
     resolve "$(jq -c '.profile = "minimal"' <<<"$DATA")"
     [ "$status" -eq 0 ]
     no_match_in "$output" '^null$'
-    grep -qF 'packages/Brewfile' <<<"$output"
+    grep -qF 'features/brew/Brewfile' <<<"$output"
 }
 
 @test "brew_active_files survives absent modules/byModule keys" {
-    resolve '{"profile":"personal","brewfiles":{"core":"packages/Brewfile","byProfile":{"personal":"p"}}}'
+    resolve '{"profile":"personal","brewfiles":{"core":"features/brew/Brewfile","byProfile":{"personal":"p"}}}'
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "packages/Brewfile" ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
     [ "${lines[1]}" = "p" ]
     [ "${#lines[@]}" -eq 2 ]
 }
@@ -112,7 +112,7 @@ EOF
     run env PATH="$stub:$PATH" FAKE_DATA="$DATA" bash -c ". '$LIB'; brew_active_files"
     rm -rf "$stub"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "packages/Brewfile" ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
 }
 
 @test "brew_active_files fails when chezmoi data yields nothing" {
@@ -132,5 +132,5 @@ EOF
     # not turn the second source into a failure.
     run bash -c ". '$LIB'; . '$LIB'; brew_active_files '$DATA'"
     [ "$status" -eq 0 ]
-    [ "${lines[0]}" = "packages/Brewfile" ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
 }
