@@ -163,7 +163,7 @@ setup() {
     command -v chezmoi >/dev/null || skip "chezmoi not installed"
     run chezmoi execute-template --init <"$TMPL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *'corpusRemote = ""'* ]]
+    [[ "$output" == *'corpusRemote = ""'* ]] || return 1
 }
 
 # The public repo must not carry anyone's private corpus URLs.

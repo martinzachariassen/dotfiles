@@ -103,14 +103,14 @@ assert_no_download() {
     run bash "$SCRIPT" --check </dev/null
     assert_no_download
     [ "$status" -eq 1 ]
-    [[ "$output" == *"no Xcode.app"* ]]
+    [[ "$output" == *"no Xcode.app"* ]] || return 1
 }
 
 @test "--help never downloads" {
     run bash "$SCRIPT" --help </dev/null
     assert_no_download
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezxcode"* ]]
+    [[ "$output" == *"usage: chezxcode"* ]] || return 1
 }
 
 @test "an unknown flag is rejected and downloads nothing" {
@@ -125,10 +125,10 @@ assert_no_download() {
     run env DRY_RUN=1 bash "$SCRIPT" </dev/null
     assert_no_download
     [ "$status" -eq 0 ]
-    [[ "$output" == *"dry-run \$ xcodes install --latest"* ]]
+    [[ "$output" == *"dry-run \$ xcodes install --latest"* ]] || return 1
     # A preview must never claim the work happened.
-    [[ "$output" == *"would install Xcode"* ]]
-    [[ "$output" == *"nothing was changed"* ]]
+    [[ "$output" == *"would install Xcode"* ]] || return 1
+    [[ "$output" == *"nothing was changed"* ]] || return 1
 }
 
 @test "DRY_RUN never reaches sudo -v" {
@@ -148,10 +148,10 @@ assert_no_download() {
     export STUB_RUNTIMES=""
     run env SKIP_RUNTIME=1 YES=1 DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"SKIP_RUNTIME=1"* ]]
-    [[ "$output" == *"xcodebuild -downloadPlatform iOS"* ]]
+    [[ "$output" == *"SKIP_RUNTIME=1"* ]] || return 1
+    [[ "$output" == *"xcodebuild -downloadPlatform iOS"* ]] || return 1
     # Step 5 skipped must not be reported as a completed download.
-    [[ "$output" != *"[5/5]"*"✓ installed"* ]]
+    [[ "$output" != *"[5/5]"*"✓ installed"* ]] || return 1
 }
 
 # ─── Already-ready short circuit ───────────────────────────────────────────────
@@ -175,7 +175,7 @@ EOF
     run bash "$SCRIPT" </dev/null
     assert_no_download
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already ready"* ]]
+    [[ "$output" == *"already ready"* ]] || return 1
 }
 
 # ─── Platform guard ────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ EOF
     run env UNAME_S=Linux bash "$SCRIPT" </dev/null
     assert_no_download
     [ "$status" -eq 1 ]
-    [[ "$output" == *"only exists on macOS"* ]]
+    [[ "$output" == *"only exists on macOS"* ]] || return 1
 }
 
 # ─── The real run: a stateful fake of the whole Xcode layer ─────────────────────
@@ -265,15 +265,15 @@ EOF
     _stateful_stubs
     run env YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ready to build and run iOS apps"* ]]
+    [[ "$output" == *"ready to build and run iOS apps"* ]] || return 1
 
     # Order matters: selecting before installing, or downloading a runtime
     # before first-launch, both fail on a real machine.
     run cat "$CALLS"
-    [[ "${lines[0]}" == "xcodes install --latest --select --experimental-unxip" ]]
-    [[ "${lines[1]}" == "xcodebuild -license accept" ]]
-    [[ "${lines[2]}" == "xcodebuild -runFirstLaunch" ]]
-    [[ "${lines[3]}" == "xcodebuild -downloadPlatform iOS" ]]
+    [[ "${lines[0]}" == "xcodes install --latest --select --experimental-unxip" ]] || return 1
+    [[ "${lines[1]}" == "xcodebuild -license accept" ]] || return 1
+    [[ "${lines[2]}" == "xcodebuild -runFirstLaunch" ]] || return 1
+    [[ "${lines[3]}" == "xcodebuild -downloadPlatform iOS" ]] || return 1
     [ "${#lines[@]}" -eq 4 ]
 }
 
@@ -286,7 +286,7 @@ EOF
 
     run env YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already ready"* ]]
+    [[ "$output" == *"already ready"* ]] || return 1
     [ ! -s "$CALLS" ]
 }
 
@@ -299,8 +299,8 @@ EOF
     run env YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
     run cat "$CALLS"
-    [[ "$output" != *"xcodes install"* ]]
-    [[ "${lines[0]}" == "xcode-select -s $APPS/Xcode.app/Contents/Developer" ]]
+    [[ "$output" != *"xcodes install"* ]] || return 1
+    [[ "${lines[0]}" == "xcode-select -s $APPS/Xcode.app/Contents/Developer" ]] || return 1
 }
 
 @test "XCODE_VERSION pins the version instead of --latest" {
@@ -319,7 +319,7 @@ EOF
     ! grep -qF "downloadPlatform" "$CALLS"
     # Still not "ready" — and it must say so rather than claim success.
     [ "$status" -eq 1 ]
-    [[ "$output" == *"not ready yet"* ]]
+    [[ "$output" == *"not ready yet"* ]] || return 1
 }
 
 # The licence step is skipped when xcodebuild already runs clean; accepting it

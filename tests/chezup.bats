@@ -90,14 +90,14 @@ run_chezup() {
     rm -rf "$REPO/.git"
     run_chezup ""
     [ "$status" -eq 1 ]
-    [[ "$output" == *"no git repo"* ]]
+    [[ "$output" == *"no git repo"* ]] || return 1
     [ ! -s "$APPLY_LOG" ]  # never reached apply
 }
 
 @test "chezup aborts when git pull --ff-only fails" {
     run_chezup "GIT_PULL_RC=1"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"git pull --ff-only failed"* ]]
+    [[ "$output" == *"git pull --ff-only failed"* ]] || return 1
     [ ! -s "$APPLY_LOG" ]
 }
 
@@ -110,7 +110,7 @@ run_chezup() {
     ln -s "$STUBS/git" "$nochez/git"
     run env PATH="$nochez:/usr/bin:/bin" DOTFILES_DIR="$REPO" GIT_PULL_RC=0 bash "$CHEZUP"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"chezmoi is not on PATH"* ]]
+    [[ "$output" == *"chezmoi is not on PATH"* ]] || return 1
 }
 
 # ─── Clean tree ─────────────────────────────────────────────────────────────
@@ -118,8 +118,8 @@ run_chezup() {
 @test "chezup reports in-sync and exits 0 when nothing drifted" {
     run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
-    [[ "$output" == *"up to date"* ]]
-    [[ "$output" == *"already in sync"* ]]
+    [[ "$output" == *"up to date"* ]] || return 1
+    [[ "$output" == *"already in sync"* ]] || return 1
     [ ! -s "$APPLY_LOG" ]  # in sync ⇒ no apply
 }
 
@@ -133,17 +133,17 @@ run_chezup() {
 @test "chezup applies when only hooks are pending (no file drift)" {
     run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no managed files drifted"* ]]
-    [[ "$output" == *"hook(s) pending"* ]]
-    [[ "$output" != *"already in sync"* ]]
+    [[ "$output" == *"no managed files drifted"* ]] || return 1
+    [[ "$output" == *"hook(s) pending"* ]] || return 1
+    [[ "$output" != *"already in sync"* ]] || return 1
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
 @test "chezup counts file drift and pending hooks separately" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"1 managed file(s) drifted"* ]]
-    [[ "$output" == *"1 apply hook(s) pending"* ]]
+    [[ "$output" == *"1 managed file(s) drifted"* ]] || return 1
+    [[ "$output" == *"1 apply hook(s) pending"* ]] || return 1
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
@@ -151,8 +151,8 @@ run_chezup() {
     # before != after ⇒ the 'pulled N commit(s)' branch instead of 'up to date'.
     run_chezup "GIT_ADVANCE=1 GIT_PULLED_COUNT=3 CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
-    [[ "$output" == *"pulled 3 commit"* ]]
-    [[ "$output" != *"up to date"* ]]
+    [[ "$output" == *"pulled 3 commit"* ]] || return 1
+    [[ "$output" != *"up to date"* ]] || return 1
 }
 
 @test "chezup fails loudly (exit 1) when its core/ui.sh helper is missing" {
@@ -161,8 +161,8 @@ run_chezup() {
     cp "$CHEZUP" "$ISO/scripts/bin/chezup.sh"
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" bash "$ISO/scripts/bin/chezup.sh"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 # ─── Drift → apply ──────────────────────────────────────────────────────────
@@ -170,15 +170,15 @@ run_chezup() {
 @test "chezup applies drifted files when confirmation is bypassed with YES=1" {
     run_chezup "CHEZMOI_STATUS=MM_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"drifted"* ]]
-    [[ "$output" == *"chezup complete"* ]]
+    [[ "$output" == *"drifted"* ]] || return 1
+    [[ "$output" == *"chezup complete"* ]] || return 1
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
 @test "chezup surfaces a failing apply as exit 1" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc YES=1 CHEZMOI_APPLY_RC=1"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"apply failed"* ]]
+    [[ "$output" == *"apply failed"* ]] || return 1
 }
 
 # ─── DRY_RUN: preview only, never mutate ────────────────────────────────────
@@ -186,7 +186,7 @@ run_chezup() {
 @test "chezup with DRY_RUN=1 previews the apply without running it" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc YES=1 DRY_RUN=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"dry-run"* ]]
+    [[ "$output" == *"dry-run"* ]] || return 1
     # The apply command is printed, not executed — so the stub logged nothing.
     [ ! -s "$APPLY_LOG" ]
 }
@@ -229,10 +229,10 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"1 new module since this Mac was set up"* ]]
-    [[ "$output" == *"claudeDistiller"* ]]
+    [[ "$output" == *"1 new module since this Mac was set up"* ]] || return 1
+    [[ "$output" == *"claudeDistiller"* ]] || return 1
     # The catalog description, so the choice can be made without reading docs.
-    [[ "$output" == *"Nightly distillation of Claude sessions"* ]]
+    [[ "$output" == *"Nightly distillation of Claude sessions"* ]] || return 1
 }
 
 @test "chezup says nothing about modules when the catalog holds nothing new" {
@@ -241,7 +241,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
         sed 's/"modulesSeen":\["macApps","theme"\]/"modulesSeen":["macApps","theme","claudeDistiller"]/')" \
         "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"new module"* ]]
+    [[ "$output" != *"new module"* ]] || return 1
 }
 
 @test "chezup does not re-offer a module that was already declined" {
@@ -252,7 +252,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
         "moduleCatalog":{"macApps":"GUI","claudeDistiller":"Nightly distillation"}}' \
         "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"new module"* ]]
+    [[ "$output" != *"new module"* ]] || return 1
 }
 
 @test "chezup never enables a module unattended under YES=1" {
@@ -260,7 +260,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Not enabling anything unattended"* ]]
+    [[ "$output" == *"Not enabling anything unattended"* ]] || return 1
     grep -qF 'modules     = ["macApps", "theme"]' "$CFG"
     grep -qF 'modulesSeen = ["macApps", "theme"]' "$CFG"
     # …and the run still converges; the gate is never a reason to stop.
@@ -271,8 +271,8 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1 DRY_RUN=1"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"claudeDistiller"* ]]
-    [[ "$output" == *"not touching the module list"* ]]
+    [[ "$output" == *"claudeDistiller"* ]] || return 1
+    [[ "$output" == *"not touching the module list"* ]] || return 1
     grep -qF 'modulesSeen = ["macApps", "theme"]' "$CFG"
 }
 
@@ -294,6 +294,6 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     setup_catalog
     run_chezup_data "" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"new module"* ]]
+    [[ "$output" != *"new module"* ]] || return 1
     grep -q 'apply --force' "$APPLY_LOG"
 }

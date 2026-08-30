@@ -46,36 +46,36 @@ no_match() {
 @test "doctor.sh fails when a legacy .zshrc is present" {
     touch "$ISO_HOME/.zshrc"
     run_doctor
-    [[ "$output" == *"legacy $ISO_HOME/.zshrc present"* ]]
+    [[ "$output" == *"legacy $ISO_HOME/.zshrc present"* ]] || return 1
 }
 
 @test "doctor.sh passes XDG layout when only the managed files exist" {
     mkdir -p "$ISO_HOME/.config/zsh"
     touch "$ISO_HOME/.config/zsh/.zshrc" "$ISO_HOME/.zshenv"
     run_doctor
-    [[ "$output" == *"~/.config/zsh/.zshrc present"* ]]
-    [[ "$output" == *"~/.zshenv present"* ]]
-    [[ "$output" == *"no legacy .zshrc"* ]]
-    [[ "$output" != *"legacy $ISO_HOME"* ]]
+    [[ "$output" == *"~/.config/zsh/.zshrc present"* ]] || return 1
+    [[ "$output" == *"~/.zshenv present"* ]] || return 1
+    [[ "$output" == *"no legacy .zshrc"* ]] || return 1
+    [[ "$output" != *"legacy $ISO_HOME"* ]] || return 1
 }
 
 @test "doctor.sh fails when ~/.config/zsh/.zshrc is missing" {
     run_doctor
-    [[ "$output" == *"~/.config/zsh/.zshrc missing"* ]]
+    [[ "$output" == *"~/.config/zsh/.zshrc missing"* ]] || return 1
 }
 
 # ─── Source repo ────────────────────────────────────────────────────────────
 
 @test "doctor.sh fails when DOTFILES_DIR has no .git" {
     run_doctor
-    [[ "$output" == *"repo missing at $ISO_REPO"* ]]
+    [[ "$output" == *"repo missing at $ISO_REPO"* ]] || return 1
 }
 
 @test "doctor.sh passes repo presence and clean-tree checks for a real git repo" {
     (cd "$ISO_REPO" && git init -q -b main)
     run_doctor
-    [[ "$output" == *"repo at $ISO_REPO"* ]]
-    [[ "$output" == *"repo working tree clean"* ]]
+    [[ "$output" == *"repo at $ISO_REPO"* ]] || return 1
+    [[ "$output" == *"repo working tree clean"* ]] || return 1
 }
 
 # ─── chezmoi version comparison ─────────────────────────────────────────────
@@ -100,7 +100,7 @@ EOF
     echo "2.50.0" >"$ISO_REPO/src/.chezmoiversion"
     stub_chezmoi "v2.40.0"
     run_doctor
-    [[ "$output" == *"chezmoi 2.40.0 is older than the repo minimum 2.50.0"* ]]
+    [[ "$output" == *"chezmoi 2.40.0 is older than the repo minimum 2.50.0"* ]] || return 1
 }
 
 @test "doctor.sh passes when the installed chezmoi meets the repo floor" {
@@ -109,7 +109,7 @@ EOF
     echo "2.50.0" >"$ISO_REPO/src/.chezmoiversion"
     stub_chezmoi "v2.72.0"
     run_doctor
-    [[ "$output" == *"chezmoi 2.72.0 meets repo minimum 2.50.0"* ]]
+    [[ "$output" == *"chezmoi 2.72.0 meets repo minimum 2.50.0"* ]] || return 1
 }
 
 # ─── Xcode / iOS (appleDev) ─────────────────────────────────────────────────
@@ -183,22 +183,22 @@ run_doctor_xcode() {
 @test "doctor: no Xcode collapses to a single failure, not six" {
     stub_xcode_machine '["appleDev"]' "/Library/Developer/CommandLineTools" 0 0 0
     run_doctor_xcode
-    [[ "$output" == *"Xcode / iOS (appleDev)"* ]]
-    [[ "$output" == *"no Xcode.app — install.sh only installs the Command Line Tools"* ]]
+    [[ "$output" == *"Xcode / iOS (appleDev)"* ]] || return 1
+    [[ "$output" == *"no Xcode.app — install.sh only installs the Command Line Tools"* ]] || return 1
     # The five downstream checks must stay quiet; they all fail for this one reason.
-    [[ "$output" != *"no iOS Simulator SDK"* ]]
-    [[ "$output" != *"first-launch components pending"* ]]
+    [[ "$output" != *"no iOS Simulator SDK"* ]] || return 1
+    [[ "$output" != *"first-launch components pending"* ]] || return 1
 }
 
 @test "doctor: a fully ready machine passes every Xcode check" {
     mkdir -p "$ISO_HOME/Applications"
     stub_xcode_machine '["appleDev"]' "/Applications/Xcode.app/Contents/Developer"
     run_doctor_xcode
-    [[ "$output" == *"Xcode installed: /Applications/Xcode.app"* ]]
-    [[ "$output" == *"xcodebuild runs: Xcode 26.6"* ]]
-    [[ "$output" == *"first-launch components installed"* ]]
-    [[ "$output" == *"iOS Simulator SDK present"* ]]
-    [[ "$output" == *"iOS simulator runtime: iOS 26.5"* ]]
+    [[ "$output" == *"Xcode installed: /Applications/Xcode.app"* ]] || return 1
+    [[ "$output" == *"xcodebuild runs: Xcode 26.6"* ]] || return 1
+    [[ "$output" == *"first-launch components installed"* ]] || return 1
+    [[ "$output" == *"iOS Simulator SDK present"* ]] || return 1
+    [[ "$output" == *"iOS simulator runtime: iOS 26.5"* ]] || return 1
 }
 
 # The trap this whole feature exists for: Xcode is installed, but the Command
@@ -207,8 +207,8 @@ run_doctor_xcode() {
     mkdir -p "$ISO_HOME/Applications/Xcode.app"
     stub_xcode_machine '["appleDev"]' "/Library/Developer/CommandLineTools"
     run_doctor_xcode
-    [[ "$output" == *"Xcode installed:"* ]]
-    [[ "$output" == *"xcode-select points at /Library/Developer/CommandLineTools, not Xcode.app"* ]]
+    [[ "$output" == *"Xcode installed:"* ]] || return 1
+    [[ "$output" == *"xcode-select points at /Library/Developer/CommandLineTools, not Xcode.app"* ]] || return 1
 }
 
 # A pending licence and a broken xcodebuild have different fixes; doctor must
@@ -217,8 +217,8 @@ run_doctor_xcode() {
     mkdir -p "$ISO_HOME/Applications"
     stub_xcode_machine '["appleDev"]' "/Applications/Xcode.app/Contents/Developer" 0
     run_doctor_xcode
-    [[ "$output" == *"Xcode licence not accepted"* ]]
-    [[ "$output" != *"xcodebuild fails — run"* ]]
+    [[ "$output" == *"Xcode licence not accepted"* ]] || return 1
+    [[ "$output" != *"xcodebuild fails — run"* ]] || return 1
 }
 
 # The state this Mac was actually in: everything green except the runtime.
@@ -226,15 +226,15 @@ run_doctor_xcode() {
     mkdir -p "$ISO_HOME/Applications"
     stub_xcode_machine '["appleDev"]' "/Applications/Xcode.app/Contents/Developer" 1 1 0
     run_doctor_xcode
-    [[ "$output" == *"no iOS simulator runtime — nothing to run an app on"* ]]
-    [[ "$output" == *"iOS Simulator SDK present"* ]]
+    [[ "$output" == *"no iOS simulator runtime — nothing to run an app on"* ]] || return 1
+    [[ "$output" == *"iOS Simulator SDK present"* ]] || return 1
 }
 
 @test "doctor: the Xcode section is absent without the appleDev module" {
     stub_xcode_machine '["macApps"]' "/Library/Developer/CommandLineTools" 0 0 0
     run_doctor_xcode
-    [[ "$output" != *"Xcode / iOS"* ]]
-    [[ "$output" != *"chezxcode"* ]]
+    [[ "$output" != *"Xcode / iOS"* ]] || return 1
+    [[ "$output" != *"chezxcode"* ]] || return 1
 }
 
 # ─── Brewfile resolution ────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ run_doctor_xcode() {
     printf 'chezmoi\n' >"$ISO_REPO/words.txt"
     ln -s "$ISO_REPO/words.txt" "$ISO_HOME/.config/cspell/personal.txt"
     run_doctor
-    [[ "$output" == *"cSpell personal dictionary resolves"* ]]
+    [[ "$output" == *"cSpell personal dictionary resolves"* ]] || return 1
 }
 
 @test "doctor.sh fails on a dangling cSpell dictionary symlink" {
@@ -287,11 +287,11 @@ run_doctor_xcode() {
     ln -s "$ISO_REPO/gone.txt" "$ISO_HOME/.config/cspell/personal.txt"
     run_doctor
     [ "$status" -eq 1 ]
-    [[ "$output" == *"dangling symlink"* ]]
+    [[ "$output" == *"dangling symlink"* ]] || return 1
 }
 
 @test "doctor.sh only notes a cSpell dictionary that was never deployed" {
     run_doctor
-    [[ "$output" == *"cSpell personal dictionary not deployed yet"* ]]
-    [[ "$output" != *"dangling symlink"* ]]
+    [[ "$output" == *"cSpell personal dictionary not deployed yet"* ]] || return 1
+    [[ "$output" != *"dangling symlink"* ]] || return 1
 }

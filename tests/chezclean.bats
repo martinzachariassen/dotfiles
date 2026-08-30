@@ -208,7 +208,7 @@ no_match_in() {
     mkdir -p "$FAKEHOME/.keepme"
     run bash -c 'source "$1"; DRY_RUN=1; _clean_remove_one "$2/.keepme"' _ "$SCRIPT" "$FAKEHOME"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"dry-run"* ]]
+    [[ "$output" == *"dry-run"* ]] || return 1
     [ -d "$FAKEHOME/.keepme" ]  # untouched
 }
 
@@ -237,8 +237,8 @@ no_match_in() {
     done
     no_match_in "$output" '(^| )\.storecode '
     no_match_in "$output" 'Documents'
-    [[ "$output" == *"dry-run"* ]]
-    [[ "$output" == *"removed 4 · kept 0"* ]]
+    [[ "$output" == *"dry-run"* ]] || return 1
+    [[ "$output" == *"removed 4 · kept 0"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]
     [ -L "$FAKEHOME/.deadlink" ]
     [ -f "$FAKEHOME/.junkfile" ]
@@ -249,7 +249,7 @@ no_match_in() {
     mkdir -p "$clean/.config" "$clean/.storecode"  # all managed or kept
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$clean" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"clean"* ]]
+    [[ "$output" == *"clean"* ]] || return 1
 }
 
 # ─── safety guards ───────────────────────────────────────────────────────────
@@ -258,8 +258,8 @@ no_match_in() {
     have_tty && skip "has a controlling tty; see the confirm/remove tests instead"
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no TTY"* ]]
-    [[ "$output" == *".hawtjni"* ]]
+    [[ "$output" == *"no TTY"* ]] || return 1
+    [[ "$output" == *".hawtjni"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]
     [ -f "$FAKEHOME/.junkfile" ]
     [ -L "$FAKEHOME/.deadlink" ]
@@ -269,22 +269,22 @@ no_match_in() {
     : >"$KEEP_OUT"  # chezmoi execute-template yields nothing
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 1 ]
-    [[ "$output" == *"empty keep-list"* ]]
+    [[ "$output" == *"empty keep-list"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]  # nothing removed
 }
 
 @test "--help prints usage and removes nothing" {
     run_clean --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezclean"* ]]
-    [[ "$output" == *"--all"* ]]
+    [[ "$output" == *"usage: chezclean"* ]] || return 1
+    [[ "$output" == *"--all"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]
 }
 
 @test "rejects an unknown option (exit 2, removes nothing)" {
     run_clean --bogus
     [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown option"* ]]
+    [[ "$output" == *"unknown option"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]
 }
 
@@ -295,7 +295,7 @@ no_match_in() {
     # YES=1 must never read stdin — a stray read would hang; </dev/null proves it.
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 4 · kept 0"* ]]
+    [[ "$output" == *"removed 4 · kept 0"* ]] || return 1
     for j in .deadlink .hawtjni .junkfile .lemminx; do
         [ ! -e "$FAKEHOME/$j" ] && [ ! -L "$FAKEHOME/$j" ]
     done
@@ -308,7 +308,7 @@ no_match_in() {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" --all <<<$'yes'
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 4 · kept 0"* ]]
+    [[ "$output" == *"removed 4 · kept 0"* ]] || return 1
     [ ! -e "$FAKEHOME/.hawtjni" ]
     [ ! -L "$FAKEHOME/.deadlink" ]
 }
@@ -317,7 +317,7 @@ no_match_in() {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" --all <<<$'no'
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aborted"* ]]
+    [[ "$output" == *"aborted"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]  # nothing removed
 }
 
@@ -327,7 +327,7 @@ no_match_in() {
     # removes the first and third.
     run env PATH="$STUBS:$PATH" CHEZCLEAN_TARGET="$FAKEHOME" bash "$SCRIPT" <<<$'yes\nno\nyes\nno'
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 2 · kept 2"* ]]
+    [[ "$output" == *"removed 2 · kept 2"* ]] || return 1
     [ ! -L "$FAKEHOME/.deadlink" ]  # removed
     [ ! -e "$FAKEHOME/.junkfile" ]  # removed
     [ -d "$FAKEHOME/.hawtjni" ]     # kept (declined)
@@ -391,7 +391,7 @@ no_match_in() {
     run bash -c 'source "$1"; printf "%s\n" ".hawtjni" | _clean_classify "" "" "" ""' \
         _ "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == $'.hawtjni\tunknown'* ]]
+    [[ "$output" == $'.hawtjni\tunknown'* ]] || return 1
 }
 
 @test "_clean_installed_vscode lists extensions lowercased + sorted, empty when code absent" {
@@ -448,15 +448,15 @@ EOF
     mkdir -p "$t/.kube" "$t/.hawtjni"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"kept 1 untracked entr"* ]]
-    [[ "$output" == *"owned by installed tooling"* ]]
+    [[ "$output" == *"kept 1 untracked entr"* ]] || return 1
+    [[ "$output" == *"owned by installed tooling"* ]] || return 1
     [[ "$output" != *".kube"* ]]            # never surfaced without -v
     [[ "$output" == *".hawtjni"* ]]         # the orphan-less junk still offered
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
     # -v names it and its owning package.
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".kube (kept — kubernetes-cli installed)"* ]]
+    [[ "$output" == *".kube (kept — kubernetes-cli installed)"* ]] || return 1
 }
 
 @test "keeps config owned by a PATH binary from mise even when brew lacks it (.m2 via mvn)" {
@@ -465,9 +465,9 @@ EOF
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
     # brew canned files omit maven, so this can only be the binary check.
-    [[ "$output" == *".m2 (kept — mvn installed)"* ]]
+    [[ "$output" == *".m2 (kept — mvn installed)"* ]] || return 1
     [[ "$output" != *"rm -rf $t/.m2"* ]]    # never scheduled for removal
-    [[ "$output" == *".hawtjni"* ]]
+    [[ "$output" == *".hawtjni"* ]] || return 1
 }
 
 @test "offers an orphan whose tool is gone, annotated with the package (.azure)" {
@@ -475,8 +475,8 @@ EOF
     mkdir -p "$t/.azure"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".azure (dir) — orphan · config for azure-cli, not installed"* ]]
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *".azure (dir) — orphan · config for azure-cli, not installed"* ]] || return 1
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
 }
 
 @test "keeps a tool matched only by the stem heuristic (.gradle → gradle on PATH)" {
@@ -484,8 +484,8 @@ EOF
     mkdir -p "$t/.gradle" "$t/.hawtjni"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".gradle (kept — gradle installed)"* ]]
-    [[ "$output" != *"rm -rf $t/.gradle"* ]]
+    [[ "$output" == *".gradle (kept — gradle installed)"* ]] || return 1
+    [[ "$output" != *"rm -rf $t/.gradle"* ]] || return 1
 }
 
 @test "degrades gracefully when brew is absent — still classifies via binaries" {
@@ -499,7 +499,7 @@ EOF
     run env PATH="$nb:$COREBIN" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *".m2 (kept — mvn installed)"* ]]           # binary check survives
-    [[ "$output" == *".kube (dir) — orphan · config for kubernetes-cli, not installed"* ]]
+    [[ "$output" == *".kube (dir) — orphan · config for kubernetes-cli, not installed"* ]] || return 1
 }
 
 # ─── VS Code extension ownership (DRY_RUN, hermetic PATH) ─────────────────────
@@ -511,15 +511,15 @@ EOF
     mkdir -p "$t/.sonarlint" "$t/.hawtjni"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"kept 1 untracked entr"* ]]
-    [[ "$output" == *"owned by installed tooling"* ]]
+    [[ "$output" == *"kept 1 untracked entr"* ]] || return 1
+    [[ "$output" == *"owned by installed tooling"* ]] || return 1
     [[ "$output" != *".sonarlint (dir)"* ]]   # never surfaced without -v
     [[ "$output" == *".hawtjni"* ]]           # the ownerless junk still offered
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
     # -v names it and its owning extension.
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" -v </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".sonarlint (kept — sonarsource.sonarlint-vscode installed)"* ]]
+    [[ "$output" == *".sonarlint (kept — sonarsource.sonarlint-vscode installed)"* ]] || return 1
 }
 
 @test "offers an extension-owned dir as an orphan when its extension is gone (.codetogether)" {
@@ -527,8 +527,8 @@ EOF
     mkdir -p "$t/.codetogether"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".codetogether (dir) — orphan · config for genuitecllc.codetogether, not installed"* ]]
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *".codetogether (dir) — orphan · config for genuitecllc.codetogether, not installed"* ]] || return 1
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
 }
 
 # ─── scope 2: ~/.config reconciliation (DRY_RUN, hermetic PATH) ───────────────
@@ -541,11 +541,11 @@ EOF
     ln -s "$t/.config/nowhere" "$t/.config/deadcfg"  # dangling — cruft, must be offered
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *".config/randomcfg (dir) — untracked"* ]]
-    [[ "$output" == *".config/deadcfg (symlink) — untracked"* ]]
+    [[ "$output" == *".config/randomcfg (dir) — untracked"* ]] || return 1
+    [[ "$output" == *".config/deadcfg (symlink) — untracked"* ]] || return 1
     [[ "$output" != *".config/gh"* ]]    # keepConfig-spared, never surfaced
     [[ "$output" != *".config/nvim"* ]]  # chezmoi-managed, never surfaced
-    [[ "$output" == *"removed 2 · kept 0"* ]]
+    [[ "$output" == *"removed 2 · kept 0"* ]] || return 1
 }
 
 @test "scope 2: keeps a ~/.config child whose tool is on PATH (stem heuristic)" {
@@ -556,7 +556,7 @@ EOF
     [[ "$output" == *".config/gradle (kept — gradle installed)"* ]]  # stem "gradle" on PATH
     [[ "$output" != *".config/gradle (dir) —"* ]]                    # never offered
     [[ "$output" == *".config/randomcfg"* ]]                         # the ownerless junk offered
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
 }
 
 @test "scope 2: empty keepConfig skips ~/.config (refusal) but still reconciles \$HOME" {
@@ -565,11 +565,11 @@ EOF
     mkdir -p "$t/.config/junkcfg" "$t/.junktop"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" DRY_RUN=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"skipping ~/.config"* ]]
-    [[ "$output" == *"empty keep-list"* ]]
+    [[ "$output" == *"skipping ~/.config"* ]] || return 1
+    [[ "$output" == *"empty keep-list"* ]] || return 1
     [[ "$output" != *".config/junkcfg"* ]]  # ~/.config never reconciled
     [[ "$output" == *".junktop"* ]]          # scope 1 (keepHome) still runs
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
     [ -d "$t/.config/junkcfg" ]              # untouched
 }
 
@@ -579,7 +579,7 @@ EOF
     mkdir -p "$t/.config/junkcfg" "$t/.config/gh"
     run env PATH="$SYSPATH" CHEZCLEAN_TARGET="$t" YES=1 bash "$SCRIPT" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
     [ ! -e "$t/.config/junkcfg" ]  # removed
     [ -d "$t/.config/gh" ]         # keepConfig-spared, untouched
 }

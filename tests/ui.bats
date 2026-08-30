@@ -46,8 +46,8 @@ _chez_explain \"\$@\"" _ "$@"
     run env LC_ALL=en_US.UTF-8 bash -c '. "$1"; explain_titled "Title" "body"' _ "$UI"
     [ "$status" -eq 0 ]
     [ -z "${lines[0]:-}" ] || [ "${#lines[@]}" -eq 2 ] # bats strips a leading blank
-    [[ "$output" == *"◆  Title"* ]]
-    [[ "$output" == *"│  body"* ]]
+    [[ "$output" == *"◆  Title"* ]] || return 1
+    [[ "$output" == *"│  body"* ]] || return 1
 }
 
 @test "explain_titled is silent under QUIET=1" {
@@ -62,9 +62,9 @@ _chez_explain \"\$@\"" _ "$@"
 @test "explain_titled falls back to ASCII glyphs outside UTF-8" {
     run env LC_ALL=C LANG=C LC_CTYPE=C bash -c '. "$1"; explain_titled "Title" "body"' _ "$UI"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"*  Title"* ]]
-    [[ "$output" == *"|  body"* ]]
-    [[ "$output" != *"◆"* ]]
+    [[ "$output" == *"*  Title"* ]] || return 1
+    [[ "$output" == *"|  body"* ]] || return 1
+    [[ "$output" != *"◆"* ]] || return 1
 }
 
 @test "explain and explain_titled are different functions" {
@@ -72,5 +72,5 @@ _chez_explain \"\$@\"" _ "$@"
     # that reaches for it silently loses its title.
     run env LC_ALL=en_US.UTF-8 bash -c '. "$1"; ui_init_logging; explain "Title" "body"' _ "$UI"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"◆"* ]]
+    [[ "$output" != *"◆"* ]] || return 1
 }

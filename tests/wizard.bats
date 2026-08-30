@@ -43,7 +43,7 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/signing.sh"
     # Inside the init_flags array literal, not behind an `if`.
     run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/scripts/bin/wizard.sh"
-    [[ "$output" == *"prompt_msg corpusRemote"* ]]
+    [[ "$output" == *"prompt_msg corpusRemote"* ]] || return 1
 }
 
 # The prompt message doubles as a chezmoi --prompt* flag KEY, and a comma in a
@@ -54,7 +54,7 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
         run wiz "prompt_msg $k"
         [ "$status" -eq 0 ]
         [ -n "$output" ]
-        [[ "$output" != *,* ]]
+        [[ "$output" != *,* ]] || return 1
     done
 }
 
@@ -132,9 +132,9 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     run wiz 'declare -F on_interrupt >/dev/null && echo ok'
     [ "$output" = "ok" ]
     run wiz 'trap -p INT'
-    [[ "$output" == *on_interrupt* ]]
+    [[ "$output" == *on_interrupt* ]] || return 1
     run wiz 'trap -p TERM'
-    [[ "$output" == *on_interrupt* ]]
+    [[ "$output" == *on_interrupt* ]] || return 1
 }
 
 # Regression: chezmoi has no `apply.force` config key (verified v2.72.0 — it was

@@ -60,15 +60,15 @@ run_sign() { # extra env is set by the caller
 @test "--help explains the verb without touching chezmoi" {
     FAKE_DATA="$DATA_FULL" run_sign --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezsign"* ]]
+    [[ "$output" == *"usage: chezsign"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 
 @test "signing off is reported, not silently 'fixed'" {
     FAKE_DATA='{"signingMode":"off"}' run_sign
     [ "$status" -eq 0 ]
-    [[ "$output" == *"off"* ]]
-    [[ "$output" == *"chezsetup --reset"* ]]
+    [[ "$output" == *"off"* ]] || return 1
+    [[ "$output" == *"chezsetup --reset"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 
@@ -78,39 +78,39 @@ run_sign() { # extra env is set by the caller
     # DRY_RUN prints the command it would run, through printf %q — so spaces
     # arrive backslash-escaped ("Ada\ L"). Strip the escaping before matching.
     local plain="${output//\\/}"
-    [[ "$plain" == *"Ada L"* ]]
-    [[ "$plain" == *"ada@example.com"* ]]
-    [[ "$plain" == *"Profile=personal"* ]]
-    [[ "$plain" == *"theme/jvmStack"* ]]
-    [[ "$plain" == *"BBBBKEYBBB"* ]]
+    [[ "$plain" == *"Ada L"* ]] || return 1
+    [[ "$plain" == *"ada@example.com"* ]] || return 1
+    [[ "$plain" == *"Profile=personal"* ]] || return 1
+    [[ "$plain" == *"theme/jvmStack"* ]] || return 1
+    [[ "$plain" == *"BBBBKEYBBB"* ]] || return 1
 }
 
 @test "the replayed init passes --force so it cannot stall on a drift prompt" {
     FAKE_DATA="$DATA_FULL" run_sign "$KEY_B"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"--force"* ]]
+    [[ "$output" == *"--force"* ]] || return 1
 }
 
 @test "the signing mode is replayed unchanged, never reset to a default" {
     FAKE_DATA='{"name":"A","email":"a@b.c","profile":"work","signingMode":"ssh-key","signingKey":"","modules":[]}'
     run_sign "$KEY_B"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ssh-key"* ]]
-    [[ "$output" != *"1password"* ]]
+    [[ "$output" == *"ssh-key"* ]] || return 1
+    [[ "$output" != *"1password"* ]] || return 1
 }
 
 @test "a trailing agent comment is stripped from the key" {
     FAKE_DATA="$DATA_FULL" run_sign "$KEY_B some trailing comment"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"BBBBKEYBBB"* ]]
-    [[ "$output" != *"trailing comment"* ]]
+    [[ "$output" == *"BBBBKEYBBB"* ]] || return 1
+    [[ "$output" != *"trailing comment"* ]] || return 1
 }
 
 @test "setting the key that is already configured changes nothing" {
     FAKE_DATA='{"name":"A","email":"a@b.c","profile":"personal","signingMode":"1password","signingKey":"'"$KEY_A"'","modules":[]}'
     run_sign "$KEY_A"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already configured"* ]]
+    [[ "$output" == *"already configured"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 
@@ -120,9 +120,9 @@ run_sign() { # extra env is set by the caller
     run env PATH="$STUBS:$PATH" DRY_RUN=1 YES=1 CHEZSIGN_AGENT_SOCK="$AGENT_SOCK" \
         FAKE_DATA="$DATA_FULL" FAKE_AGENT_KEYS="$KEY_A SSH Key" bash "$SCRIPT"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"AAAAKEYAAA"* ]]
+    [[ "$output" == *"AAAAKEYAAA"* ]] || return 1
     # The agent's comment must not reach allowed_signers, which is "<email> <key>".
-    [[ "$output" != *"SSH Key"* ]]
+    [[ "$output" != *"SSH Key"* ]] || return 1
 }
 
 @test "no agent and no key fails with actionable guidance" {
@@ -130,8 +130,8 @@ run_sign() { # extra env is set by the caller
     run env PATH="$STUBS:$PATH" DRY_RUN=1 YES=1 CHEZSIGN_AGENT_SOCK=/nonexistent \
         SSH_AUTH_SOCK= FAKE_DATA="$DATA_FULL" bash "$SCRIPT"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"no SSH agent keys found"* ]]
-    [[ "$output" == *"SSH agent"* ]]
+    [[ "$output" == *"no SSH agent keys found"* ]] || return 1
+    [[ "$output" == *"SSH agent"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 

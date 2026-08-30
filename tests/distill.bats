@@ -96,20 +96,20 @@ item() {
     run bash "$tmp/distill.sh"
     rm -rf "$tmp"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 @test "--help prints usage and exits 0" {
     run bash "$BIN" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezdistill"* ]]
+    [[ "$output" == *"usage: chezdistill"* ]] || return 1
 }
 
 @test "unknown option exits 2" {
     run bash "$BIN" --nope
     [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown option"* ]]
+    [[ "$output" == *"unknown option"* ]] || return 1
 }
 
 @test "--since rejects a missing value" {
@@ -125,13 +125,13 @@ item() {
 @test "an optional count never swallows the flag behind it" {
     run bash "$BIN" --logs --nope
     [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown option: --nope"* ]]
+    [[ "$output" == *"unknown option: --nope"* ]] || return 1
 }
 
 @test "a non-numeric count is refused rather than read as a flag" {
     run bash "$BIN" --runs 7d
     [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown option: 7d"* ]]
+    [[ "$output" == *"unknown option: 7d"* ]] || return 1
 
     run bash "$BIN" --runs=abc
     [ "$status" -eq 2 ]
@@ -140,7 +140,7 @@ item() {
 @test "-f outside --logs is refused, not ignored" {
     run bash "$BIN" --status -f
     [ "$status" -eq 2 ]
-    [[ "$output" == *"only applies to --logs"* ]]
+    [[ "$output" == *"only applies to --logs"* ]] || return 1
 }
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ item() {
     run distill_preflight
     chmod u+w "$ro"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"cannot write"* ]]
+    [[ "$output" == *"cannot write"* ]] || return 1
 }
 
 @test "the memory tier is written where Claude reads it" {
@@ -213,7 +213,7 @@ item() {
     load_lib
     extract 2026-08-22 "[$(item 'same rule' s1),$(item 'same rule' s1)]"
     run distill_derive
-    [[ "$output" == *'"hits":1'* ]]
+    [[ "$output" == *'"hits":1'* ]] || return 1
 }
 
 @test "a single sighting stays out of MAIN and lands in Candidates" {
@@ -265,7 +265,7 @@ item() {
     load_lib
     f="$(distill_extract_file 2026-08-22)"
     [ "$(dirname "$f")" = "$STATE/extracts" ]
-    [[ "$(basename "$f")" == "2026-08-22."*".json" ]]
+    [[ "$(basename "$f")" == "2026-08-22."*".json" ]] || return 1
     [ "$(basename "$f")" != "2026-08-22.json" ]
 }
 
@@ -278,10 +278,10 @@ item() {
         >"$STATE/extracts/2026-08-22.mac-two.json"
 
     run distill_derive
-    [[ "$output" == *'"hits":2'* ]]
+    [[ "$output" == *'"hits":2'* ]] || return 1
     # The host suffix must not leak into the date the renderer sorts and ages by.
-    [[ "$output" == *'"first_seen":"2026-08-22"'* ]]
-    [[ "$output" == *'"last_seen":"2026-08-22"'* ]]
+    [[ "$output" == *'"first_seen":"2026-08-22"'* ]] || return 1
+    [[ "$output" == *'"last_seen":"2026-08-22"'* ]] || return 1
 }
 
 @test "retention ages a host-scoped extract by its date, not its filename" {
@@ -309,11 +309,11 @@ item() {
     distill_commit_local "chore(distill): test"
 
     run git -C "$STATE" ls-files
-    [[ "$output" != *"runs.jsonl"* ]]
-    [[ "$output" != *"spend.jsonl"* ]]
-    [[ "$output" != *"cursor.json"* ]]
+    [[ "$output" != *"runs.jsonl"* ]] || return 1
+    [[ "$output" != *"spend.jsonl"* ]] || return 1
+    [[ "$output" != *"cursor.json"* ]] || return 1
     # ...and the one thing that cannot be regenerated still is.
-    [[ "$output" == *"extracts/"* ]]
+    [[ "$output" == *"extracts/"* ]] || return 1
 }
 
 # ─── Determinism and the cap ──────────────────────────────────────────────────
@@ -404,7 +404,7 @@ item() {
     printf '{"t":"%s","usd":99}\n' "$(distill_iso_now)" >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -ne 0 ]
-    [[ "$output" == *"ceiling"* ]]
+    [[ "$output" == *"ceiling"* ]] || return 1
 }
 
 @test "spend under the ceiling allows a run" {
@@ -433,7 +433,7 @@ item() {
     } >"$STATE/spend.jsonl"
     run distill_spend_ok
     [ "$status" -ne 0 ]
-    [[ "$output" == *"ceiling"* ]]
+    [[ "$output" == *"ceiling"* ]] || return 1
 }
 
 @test "a spend total that cannot be evaluated stops the run rather than waving it through" {
@@ -485,12 +485,12 @@ a_conversation() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ceiling reached"* ]]
+    [[ "$output" == *"ceiling reached"* ]] || return 1
     # Exactly one session was paid for; the other was never read...
-    [[ "$output" == *"1 of 2 session(s)"* ]]
+    [[ "$output" == *"1 of 2 session(s)"* ]] || return 1
     # ...so the cursor must not claim the window was read to the end.
     [ ! -f "$STATE/cursor.json" ]
-    [[ "$output" == *"cursor held"* ]]
+    [[ "$output" == *"cursor held"* ]] || return 1
     # What was already paid for is still saved.
     grep -rq 'a rule' "$STATE/extracts"
 }
@@ -538,7 +538,7 @@ a_conversation() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -eq 0 ]
-    [[ "$output" == *"1 of 2 model call(s) failed"* ]]
+    [[ "$output" == *"1 of 2 model call(s) failed"* ]] || return 1
     [ -f "$STATE/cursor.json" ]
 }
 
@@ -559,9 +559,9 @@ a_conversation() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -ne 0 ]
-    [[ "$output" == *"outage"* ]]
+    [[ "$output" == *"outage"* ]] || return 1
     [ ! -f "$STATE/cursor.json" ]
-    [[ "$output" == *"cursor held"* ]]
+    [[ "$output" == *"cursor held"* ]] || return 1
 }
 
 # ─── Run log ──────────────────────────────────────────────────────────────────
@@ -592,8 +592,8 @@ a_conversation() {
     distill_run_record failed
 
     run jq -r '.status, (.notes[] | .text)' "$STATE/runs.jsonl"
-    [[ "$output" == *"failed"* ]]
-    [[ "$output" == *"claude invocation failed for model sonnet"* ]]
+    [[ "$output" == *"failed"* ]] || return 1
+    [[ "$output" == *"claude invocation failed for model sonnet"* ]] || return 1
 }
 
 # "7 seen, 0 kept" reads as a broken job until you can see that six were under
@@ -607,8 +607,8 @@ a_conversation() {
 
     run distill_run_last_detail
     [ "$status" -eq 0 ]
-    [[ "$output" == *"too short, no model call"* ]]
-    [[ "$output" == *"2 turn(s)"* ]]
+    [[ "$output" == *"too short, no model call"* ]] || return 1
+    [[ "$output" == *"2 turn(s)"* ]] || return 1
 }
 
 @test "records older than the retention window are pruned" {
@@ -666,7 +666,7 @@ a_conversation() {
     distill_fail "could not write MAIN.md" >/dev/null
     distill_run_end 0 >/dev/null 2>&1 || true
     run distill_last_run
-    [[ "$output" == *'"status":"failed"'* ]]
+    [[ "$output" == *'"status":"failed"'* ]] || return 1
 }
 
 @test "a failed MAIN.md write is recorded, not swallowed" {
@@ -718,7 +718,7 @@ a_conversation() {
     run distill_persist_extracts "$tmp"
     chmod u+w "$STATE/extracts"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"not saved"* ]]
+    [[ "$output" == *"not saved"* ]] || return 1
 }
 
 # ─── Retention ────────────────────────────────────────────────────────────────
@@ -740,7 +740,7 @@ a_conversation() {
 
     run jq -r '.items[0] | has("evidence"), has("cwd"), has("origin"), has("host")' \
         "$STATE/extracts/$old_date.json"
-    [[ "$output" != *"true"* ]]
+    [[ "$output" != *"true"* ]] || return 1
     run jq -r '.items[0].text' "$STATE/extracts/$old_date.json"
     [ "$output" = "a rule" ]
 }
@@ -759,7 +759,7 @@ a_conversation() {
     _DISTILL_CFG=""
     distill_prune_extracts
     run distill_derive
-    [[ "$output" == *'"hits":2'* ]]
+    [[ "$output" == *'"hits":2'* ]] || return 1
 }
 
 @test "recent extracts keep their evidence" {
@@ -782,7 +782,7 @@ a_conversation() {
 
     distill_commit_local "chore(distill): test"
     run git -C "$STATE" ls-files
-    [[ "$output" == *"Pinned.md"* ]]
+    [[ "$output" == *"Pinned.md"* ]] || return 1
 }
 
 # A rule added to .gitignore after a repo already exists must both reach that
@@ -800,7 +800,7 @@ a_conversation() {
     distill_state_repo_init
     grep -qxF 'cursor.json' "$STATE/.gitignore"
     run git -C "$STATE" ls-files
-    [[ "$output" != *"cursor.json"* ]]
+    [[ "$output" != *"cursor.json"* ]] || return 1
 }
 
 @test "the cursor is never committed — it is meaningless on another machine" {
@@ -809,7 +809,7 @@ a_conversation() {
     printf 'x\n' >"$STATE/extracts-marker"
     distill_commit_local "chore(distill): test"
     run git -C "$STATE" ls-files
-    [[ "$output" != *"cursor.json"* ]]
+    [[ "$output" != *"cursor.json"* ]] || return 1
 }
 
 # A global url.<ssh>.pushInsteadOf rewrites HTTPS pushes to SSH, and this
@@ -870,7 +870,7 @@ a_conversation() {
     extract 2026-08-22 "[$(item 'committed' s1)]"
     distill_commit_local "chore(distill): test"
     run git -C "$STATE" ls-files
-    [[ "$output" != *"logs/nightly.log"* ]]
+    [[ "$output" != *"logs/nightly.log"* ]] || return 1
 }
 
 # The generated notes all say "fix a wrong rule by editing Pinned.md". Until
@@ -1091,8 +1091,8 @@ window_setup() {
     a_transcript 6 >/dev/null
     run distill_session_files "$(distill_iso_ago 1)"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"session-0.jsonl"* ]]
-    [[ "$output" != *"session-6.jsonl"* ]]
+    [[ "$output" == *"session-0.jsonl"* ]] || return 1
+    [[ "$output" != *"session-6.jsonl"* ]] || return 1
 }
 
 @test "a week-old cursor reaches the week-old transcripts" {
@@ -1101,8 +1101,8 @@ window_setup() {
     a_transcript 6 >/dev/null
     run distill_session_files "$(distill_iso_ago 7)"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"session-0.jsonl"* ]]
-    [[ "$output" == *"session-6.jsonl"* ]]
+    [[ "$output" == *"session-0.jsonl"* ]] || return 1
+    [[ "$output" == *"session-6.jsonl"* ]] || return 1
 }
 
 @test "an unparseable cursor falls back to a narrow window, not to everything" {
@@ -1111,8 +1111,8 @@ window_setup() {
     a_transcript 6 >/dev/null
     run distill_session_files "not-a-timestamp"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"session-0.jsonl"* ]]
-    [[ "$output" != *"session-6.jsonl"* ]]
+    [[ "$output" == *"session-0.jsonl"* ]] || return 1
+    [[ "$output" != *"session-6.jsonl"* ]] || return 1
 }
 
 @test "subagent transcripts stay out however wide the window" {
@@ -1121,7 +1121,7 @@ window_setup() {
     : >"$ROOTS/proj/subagents/sub.jsonl"
     run distill_session_files "$(distill_iso_ago 30)"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"sub.jsonl"* ]]
+    [[ "$output" != *"sub.jsonl"* ]] || return 1
 }
 
 # ─── Somewhere to read from ───────────────────────────────────────────────────
@@ -1140,8 +1140,8 @@ window_setup() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -ne 0 ]
-    [[ "$output" == *"do not exist"* ]]
-    [[ "$output" == *"nowhere"* ]]
+    [[ "$output" == *"do not exist"* ]] || return 1
+    [[ "$output" == *"nowhere"* ]] || return 1
 }
 
 @test "a root that exists but holds no transcripts fails the run" {
@@ -1149,7 +1149,7 @@ window_setup() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -ne 0 ]
-    [[ "$output" == *"no transcripts"* ]]
+    [[ "$output" == *"no transcripts"* ]] || return 1
 }
 
 # The counterweight, and the more important half: a quiet night must stay quiet.
@@ -1159,7 +1159,7 @@ window_setup() {
     distill_run_begin
     run _distill_daily_body
     [ "$status" -eq 0 ]
-    [[ "$output" != *"no transcripts"* ]]
+    [[ "$output" != *"no transcripts"* ]] || return 1
 }
 
 # The bats suite configures no roots at all, and so does anyone reading the
@@ -1187,7 +1187,7 @@ window_setup() {
     distill_run_begin
     run distill_sources_ok
     [ "$status" -eq 0 ]
-    [[ "$output" != *"/nope/not/here"* ]]
+    [[ "$output" != *"/nope/not/here"* ]] || return 1
 }
 
 # An unreadable config is `{}`, and `{}` makes transcriptRoots come back empty —
@@ -1201,7 +1201,7 @@ window_setup() {
     distill_run_begin
     run distill_sources_ok
     [ "$status" -eq 1 ]
-    [[ "$output" == *"config"* ]]
+    [[ "$output" == *"config"* ]] || return 1
 }
 
 @test "the reason a run had nothing to read survives into the record" {
@@ -1214,8 +1214,8 @@ window_setup() {
     distill_run_record failed
 
     run jq -r '.status, (.notes[] | .text)' "$STATE/runs.jsonl"
-    [[ "$output" == *"failed"* ]]
-    [[ "$output" == *"do not exist"* ]]
+    [[ "$output" == *"failed"* ]] || return 1
+    [[ "$output" == *"do not exist"* ]] || return 1
 }
 
 # The check belongs in the run path, never in preflight: --render rebuilds the
@@ -1231,8 +1231,8 @@ window_setup() {
     window_setup
     a_transcript 0 >/dev/null
     run distill_status
-    [[ "$output" == *"sources"* ]]
-    [[ "$output" == *"1 transcript"* ]]
+    [[ "$output" == *"sources"* ]] || return 1
+    [[ "$output" == *"1 transcript"* ]] || return 1
 }
 
 # chezdoctor is the only passive liveness signal this job has, so the input side
@@ -1265,8 +1265,8 @@ a_run() {
     a_run "$(distill_iso_ago 1)" failed 0 0
     run distill_runs 10
     [ "$status" -eq 0 ]
-    [[ "$output" == *"5"* ]]
-    [[ "$output" == *"failed"* ]]
+    [[ "$output" == *"5"* ]] || return 1
+    [[ "$output" == *"failed"* ]] || return 1
 }
 
 @test "--runs N shows at most N" {
@@ -1276,8 +1276,8 @@ a_run() {
     a_run "$(distill_iso_ago 1)" ok 3 3
     run distill_runs 1
     [ "$status" -eq 0 ]
-    [[ "$output" == *"3/3"* ]]
-    [[ "$output" != *"1/1"* ]]
+    [[ "$output" == *"3/3"* ]] || return 1
+    [[ "$output" != *"1/1"* ]] || return 1
 }
 
 # The exact shape of this bug: every run succeeded, not one of them read a thing.
@@ -1285,7 +1285,7 @@ a_run() {
     load_lib
     a_run "$(distill_iso_ago 1)" ok 0 0
     run distill_runs 10
-    [[ "$output" == *"not one of these runs"* ]]
+    [[ "$output" == *"not one of these runs"* ]] || return 1
 }
 
 @test "--runs on an empty log says so and exits 0" {
@@ -1300,15 +1300,15 @@ a_run() {
     printf 'first\nsecond\nthird\n' >"$STATE/logs/nightly.log"
     run distill_logs 2 0
     [ "$status" -eq 0 ]
-    [[ "$output" == *"third"* ]]
-    [[ "$output" != *"first"* ]]
+    [[ "$output" == *"third"* ]] || return 1
+    [[ "$output" != *"first"* ]] || return 1
 }
 
 @test "--logs before the first run says so and exits 0" {
     load_lib
     run distill_logs 50 0
     [ "$status" -eq 0 ]
-    [[ "$output" == *"nightly.log"* ]]
+    [[ "$output" == *"nightly.log"* ]] || return 1
 }
 
 # Runtime-tested this would hang CI forever on a regression, and macOS ships no
@@ -1342,7 +1342,7 @@ a_run() {
 
     run distill_stats
     [ "$status" -eq 0 ]
-    [[ "$output" == *"evicted"* ]]
+    [[ "$output" == *"evicted"* ]] || return 1
 }
 
 @test "--stats survives an empty corpus" {
@@ -1423,7 +1423,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     [ "$output" = "$WORK_URL" ]
 
     run distill_status
-    [[ "$output" == *"chezdistill --remote"* ]]
+    [[ "$output" == *"chezdistill --remote"* ]] || return 1
 }
 
 @test "one repo spelled two ways is not drift" {
@@ -1442,7 +1442,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
 
     run distill_corpus_check_local
     [ "$status" -eq 1 ]
-    [[ "$output" == *"personal"* ]]
+    [[ "$output" == *"personal"* ]] || return 1
 }
 
 @test "nothing is committed while the corpus is stamped for another profile" {
@@ -1465,7 +1465,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
         >"$(distill_corpus_file)"
     run distill_preflight
     [ "$status" -eq 1 ]
-    [[ "$output" == *"personal"* ]]
+    [[ "$output" == *"personal"* ]] || return 1
 }
 
 @test "--status still reports when the corpus is what is wrong" {
@@ -1475,7 +1475,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
         >"$(distill_corpus_file)"
     run distill_status
     [ "$status" -eq 0 ]
-    [[ "$output" != *"paths    unusable"* ]]
+    [[ "$output" != *"paths    unusable"* ]] || return 1
 }
 
 # Kept because the normaliser is still load-bearing — for the tracked README and
@@ -1581,7 +1581,7 @@ attach_state() {
     distill_state_repo_init
 
     run distill_derive
-    [[ "$output" == *"a remembered rule"* ]]
+    [[ "$output" == *"a remembered rule"* ]] || return 1
 }
 
 @test "a remote on master is followed, not overwritten with main" {
@@ -1612,8 +1612,8 @@ attach_state() {
     [ ! -d "$STATE/.git/rebase-apply" ]
     # Both Macs' work is on the remote.
     run git -C "$bare" ls-tree -r --name-only main
-    [[ "$output" == *"2026-08-23.mac-b.json"* ]]
-    [[ "$output" == *"2026-08-24."* ]]
+    [[ "$output" == *"2026-08-23.mac-b.json"* ]] || return 1
+    [[ "$output" == *"2026-08-24."* ]] || return 1
 }
 
 @test "an unreachable remote defers instead of wedging the repo" {
@@ -1642,7 +1642,7 @@ attach_state() {
     run distill_commit_local "chore(distill): second"
 
     [ "$status" -eq 0 ]
-    [[ "$output" == *"detached"* ]]
+    [[ "$output" == *"detached"* ]] || return 1
     [ "$(git -C "$STATE" rev-list --count HEAD)" -eq "$before" ]
 }
 
@@ -1658,10 +1658,10 @@ attach_state() {
     git -C "$STATE" commit -q --allow-empty -m "chore(distill): later"
 
     run distill_backup_state
-    [[ "$output" == ahead* ]]
+    [[ "$output" == ahead* ]] || return 1
 
     run distill_status
-    [[ "$output" != *"commit(s), pushed to"* ]]
+    [[ "$output" != *"commit(s), pushed to"* ]] || return 1
 }
 
 @test "a corpus in step with its remote reads as backed up" {
@@ -1729,7 +1729,7 @@ local_shard() {
     extract 2026-08-22 "[$(item 'a rule' s1)]"
     distill_commit_local "chore(distill): test"
     run git -C "$STATE" ls-files
-    [[ "$output" == *"corpus.json"* ]]
+    [[ "$output" == *"corpus.json"* ]] || return 1
 }
 
 @test "attaching to an empty remote makes this Mac's corpus the corpus" {
@@ -1741,8 +1741,8 @@ local_shard() {
     run distill_remote_attach "$bare"
     [ "$status" -eq 0 ]
     run git -C "$bare" ls-tree -r --name-only main
-    [[ "$output" == *"extracts/2026-08-20.mac-one.json"* ]]
-    [[ "$output" == *"corpus.json"* ]]
+    [[ "$output" == *"extracts/2026-08-20.mac-one.json"* ]] || return 1
+    [[ "$output" == *"corpus.json"* ]] || return 1
 }
 
 @test "attaching a machine with nothing restores the corpus whole" {
@@ -1785,8 +1785,8 @@ local_shard() {
     [ "$status" -eq 0 ]
 
     run git -C "$bare" ls-tree -r --name-only main
-    [[ "$output" == *"2026-07-01.other-mac.json"* ]]
-    [[ "$output" == *"2026-08-20.this-mac.json"* ]]
+    [[ "$output" == *"2026-07-01.other-mac.json"* ]] || return 1
+    [[ "$output" == *"2026-08-20.this-mac.json"* ]] || return 1
 
     # Both sessions survived the collision — 1 would mean one side was dropped.
     hits="$(distill_derive | jq -r 'select(.text == "a shared rule") | .hits')"
@@ -1822,7 +1822,7 @@ local_shard() {
     run distill_remote_attach "$bare"
 
     [ "$status" -eq 1 ]
-    [[ "$output" == *"personal"* ]]
+    [[ "$output" == *"personal"* ]] || return 1
     [ "$(git -C "$bare" rev-parse main)" = "$before" ]
 }
 
@@ -1841,7 +1841,7 @@ local_shard() {
 
     run distill_remote_attach "$moved"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"same corpus"* ]]
+    [[ "$output" == *"same corpus"* ]] || return 1
     [ "$(git -C "$STATE" remote get-url origin)" = "$moved" ]
 }
 
@@ -1887,7 +1887,7 @@ local_shard() {
 
     run distill_corpus_check_local
     [ "$status" -eq 1 ]
-    [[ "$output" == *"work"* ]]
+    [[ "$output" == *"work"* ]] || return 1
 
     run distill_preflight
     [ "$status" -eq 1 ]

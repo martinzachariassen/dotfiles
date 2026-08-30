@@ -40,8 +40,8 @@ setup() {
     run bash "$iso/scripts/bin/macos-defaults.sh"
     rm -rf "$iso"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 @test "macos-defaults.sh fails loudly when sudo.sh is missing but core/ui.sh is present" {
@@ -52,8 +52,8 @@ setup() {
     run bash "$iso/scripts/bin/macos-defaults.sh"
     rm -rf "$iso"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"sudo.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"sudo.sh"* ]] || return 1
 }
 
 # run_before_00-sudo-cache is explicitly allowed to give up on caching sudo, so

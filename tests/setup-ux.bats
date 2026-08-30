@@ -19,26 +19,26 @@ setup() {
 @test "explain prints its lines by default" {
     run bash -c ". '$LOG'; ui_init_logging; explain 'hello there'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"hello there"* ]]
+    [[ "$output" == *"hello there"* ]] || return 1
 }
 
 @test "QUIET=1 suppresses explain but leaves results" {
     run bash -c ". '$LOG'; ui_init_logging; QUIET=1 explain 'noise'; ok 'result'"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"noise"* ]]
-    [[ "$output" == *"result"* ]]
+    [[ "$output" != *"noise"* ]] || return 1
+    [[ "$output" == *"result"* ]] || return 1
 }
 
 @test "a suppressed explain cannot trip set -e" {
     run bash -c "set -e; . '$LOG'; ui_init_logging; QUIET=1; f() { explain 'x'; }; f; echo REACHED"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"REACHED"* ]]
+    [[ "$output" == *"REACHED"* ]] || return 1
 }
 
 @test "explain works under ui_init_status as well as ui_init_logging" {
     run bash -c ". '$LOG'; ui_init_status; explain 'flat line'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"flat line"* ]]
+    [[ "$output" == *"flat line"* ]] || return 1
 }
 
 @test "ui_elapsed stays silent for fast steps and formats slow ones" {
@@ -53,8 +53,8 @@ setup() {
 
 @test "step_begin numbers each step out of the declared total" {
     run bash -c ". '$LOG'; ui_init_steps 3; step_begin One; step_begin Two"
-    [[ "$output" == *"[1/3]"* ]]
-    [[ "$output" == *"[2/3]"* ]]
+    [[ "$output" == *"[1/3]"* ]] || return 1
+    [[ "$output" == *"[2/3]"* ]] || return 1
 }
 
 # ─── bash 3.2 compatibility ───────────────────────────────────────────────────
@@ -77,7 +77,7 @@ setup() {
     run bash -c ". '$LOG'; LC_ALL=C LANG=C LC_CTYPE=C ui_init_glyphs; printf '%s' \"\$SUB_MARK\""
     [ -n "$output" ]
     # Must be pure ASCII, or a dumb terminal shows mojibake.
-    [[ "$output" =~ ^[[:print:]]+$ ]]
+    [[ "$output" =~ ^[[:print:]]+$ ]] || return 1
     run bash -c ". '$LOG'; LC_ALL=en_US.UTF-8 ui_init_glyphs; printf '%s' \"\$SUB_MARK\""
     [ "$output" = "↳" ]
 }

@@ -63,7 +63,56 @@ so a rename or drifted default fails fast:
 | `mise-config.bats` | The rendered mise config. |
 | `wizard.bats` | The wizard's prompt tiers and flag mapping. |
 | `shell-functions.bats` / `zshrc-wiring.bats` | The zsh verbs and their wiring. |
-| `check-commit-msg.bats` / `semver.bats` | The corresponding `scripts/` helpers. |
+| `check-commit-msg.bats` / `semver.bats` | The corresponding helpers. |
+| `lint-coverage.bats` | Every tracked `*.sh` outside `src/` is linted by both pre-commit and CI. |
+| `bats-assertions.bats` | Every bare `[[ ]]` in the suite actually gates its test — see below. |
+
+### Writing assertions
+
+**On a Mac, a bare `[[ ]]` does not fail a bats test unless it is the last
+statement in the body.** bats runs test bodies with errexit *off* and detects
+failures with an **ERR trap**. The trap fires for `[ ]`, `false`, `grep -q` and
+any helper function on every bash — but for `[[ ]]` the behaviour is
+version-dependent:
+
+| bash | ERR trap fires for `[[ ]]`? | Where you meet it |
+|---|---|---|
+| 3.2.57 | **no** | Apple's `/bin/bash` — what bats uses for test bodies on macOS |
+| 4.4+ | yes | CI's ubuntu runner (bash 5) |
+
+So 226 of this suite's 385 `[[ ]]` assertions were decorative **locally** while
+gating correctly **on CI** — local green did not mean CI green, which is the
+worst way for a pre-push check to be wrong. The explicit `|| return 1` makes the
+two agree. `bats-assertions.bats` proves the mechanism in a few lines of bash,
+asserting the version-appropriate answer rather than asking you to take it on
+trust.
+
+So every bare `[[ ]]` carries an explicit `|| return 1`:
+
+```sh
+[ "$status" -eq 1 ]                          # gates: [ ] is a builtin
+[[ "$output" == *"missing"* ]] || return 1   # gates: explicitly
+grep -q 'pattern' "$file"                    # gates: a command
+```
+
+The same reasoning is why `doctor.bats` and `chezmirror.bats` route negative
+checks through a `no_match` helper: `! grep …` is exempt from failure detection,
+but a function call is not.
+
+**Local and CI differ in two ways that bite.** bats is 1.14 locally (brew) and
+1.10 on CI (apt); bash is 3.2 locally (`/bin/bash`) and 5.x on CI. Consequences:
+
+- 1.10 cannot run a bats file from inside another bats test — the child inherits
+  the parent's state, its tests become `unknown test name`, and the run ends
+  `Executed N instead of expected M`. Scrubbing `BATS_*` to isolate it breaks
+  bats' own bootstrap, so just don't nest.
+- bash 3.2 vs 5 changes ERR-trap behaviour, per the table above.
+
+Check bats' **exit status** directly: `bats -r tests/ | grep 'not ok'` discards
+it, and a run can fail with every individual test printing green. For anything
+test-infrastructure-shaped, verify on Linux too —
+`docker run --rm -v "$PWD:/w:ro" -w /w bats/bats:1.10.0 tests/<file>.bats`
+covers the bash-5 side without installing anything.
 
 ## Conventions
 
