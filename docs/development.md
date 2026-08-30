@@ -33,11 +33,13 @@ hook (see [lifecycle.md](lifecycle.md)).
 
 ```sh
 # Lint + parse shell
-shellcheck --severity=error --shell=bash install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
-shfmt -d -i 4 -ci install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
+# The file list comes from git, exactly as CI resolves it, so a script that
+# moves between scripts/, core/ and features/ cannot drop out of linting.
+git ls-files -z -- '*.sh' '*.bash' ':!:src/**' | xargs -0 shellcheck --severity=error --shell=bash
+git ls-files -z -- '*.sh' '*.bash' ':!:src/**' | xargs -0 shfmt -d -i 4 -ci
 
-# Run every bats suite
-bats tests/
+# Run every bats suite — cross-cutting ones and each feature's own
+bats -r tests/ features/
 
 # Render every template across one profile × module set (dry-run)
 PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"
@@ -51,8 +53,10 @@ pre-commit run --all-files
 
 ## Tests
 
-The [`tests/`](../tests) bats suites cover the data model and shell surface
-so a rename or drifted default fails fast:
+A suite lives with what it tests: [`features/<name>/tests/`](../features) for
+anything one feature owns, [`tests/`](../tests) for what spans them. Together
+they cover the data model and shell surface so a rename or drifted default fails
+fast:
 
 | Suite | Guards |
 |---|---|
