@@ -40,7 +40,7 @@ run_isolated() {
 }
 
 @test "wizard.sh fails loudly when core/ui.sh is missing" {
-    run_isolated scripts/bin/wizard.sh
+    run_isolated features/setup/cli.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1
     [[ "$output" == *"ui.sh"* ]] || return 1

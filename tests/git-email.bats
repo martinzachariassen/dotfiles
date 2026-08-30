@@ -19,7 +19,7 @@ setup() {
     TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
     GITCFG="$REPO_ROOT/src/dot_config/git/config.tmpl"
     SIGNERS="$REPO_ROOT/src/dot_config/git/allowed_signers.tmpl"
-    WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
+    WIZ="$REPO_ROOT/features/setup/cli.sh"
     DOCTOR="$REPO_ROOT/scripts/bin/doctor.sh"
     COMPLETION="$REPO_ROOT/src/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     FIX="$(mktemp -d)"

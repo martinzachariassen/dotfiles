@@ -4,7 +4,7 @@ One installer covers every machine. [`install.sh`](../install.sh) is a tiny
 hand-written bootstrap fetched via `curl | bash` **before this repo exists on
 disk**, so it installs only the prerequisites — Xcode Command Line Tools,
 Homebrew, chezmoi, and the repo clone — then hands off to the setup wizard
-([`scripts/bin/wizard.sh`](../scripts/bin/wizard.sh)), which asks the setup
+([`features/setup/cli.sh`](../features/setup/cli.sh)), which asks the setup
 questions and runs `chezmoi init --apply`. See [lifecycle.md](lifecycle.md) for
 what `apply` does. Every step is idempotent and safe to re-run.
 
