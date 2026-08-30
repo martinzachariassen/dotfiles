@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
 # Guards the one thing that makes every other suite in this repo meaningful.
 #
-# bats does not run test bodies under `set -e` — errexit is off, and failures
-# are caught by a DEBUG trap instead. That trap sees commands: `false`, `[ ]`,
-# `grep -q` and any helper function all fail their test correctly. It does not
-# see `[[ ]]`, which is a shell *keyword*. So a bare `[[ ... ]]` only decides
-# anything when it happens to be the last statement in the test — everywhere
-# else it is decorative, and 226 of this suite's 385 were exactly that.
+# bats runs test bodies with errexit *off* and detects failures with an ERR
+# trap instead. bash's ERR trap fires for `[ ]`, `false`, `grep -q` and any
+# helper function — but **not** for `[[ ]]`, which is a compound command the
+# trap does not observe. So a bare `[[ ... ]]` is invisible to bats unless it is
+# the last command in the body, whose exit status becomes the test's result.
+# 226 of this suite's 385 were not last, and gated nothing.
 #
 # Every bare `[[ ]]` therefore carries an explicit `|| return 1`. This test
 # fails if one loses it.
@@ -39,23 +39,34 @@ setup() {
 
 # The premise above, asserted directly, so this file explains itself to anyone
 # who doubts it rather than just asserting a style rule.
-@test "bats really does ignore a non-final [[ ]] but honour [ ]" {
-    local t="$BATS_TEST_TMPDIR/premise.bats"
-    # Built from a variable rather than written literally, so the fixture's
-    # deliberately-ungated assertion is not itself an offender above.
+@test "bash's ERR trap ignores [[ ]] but sees [ ], false and commands" {
+    # The mechanism behind the rule above, proved directly rather than asserted.
+    # Deliberately not done by running bats inside bats: bats 1.10 (what CI
+    # installs from apt; brew ships 1.14 locally) hands the child its own state
+    # and the child's tests become "unknown test name", and scrubbing BATS_* to
+    # avoid that breaks bats' own bootstrap. A few lines of bash say it better.
+    #
+    # The probe is written from a variable so its deliberately-ungated assertion
+    # is not itself an offender in the test above.
+    local probe="$BATS_TEST_TMPDIR/errtrap.sh"
     local dbl='[[ "hello" == *"NOPE"* ]]'
-    cat >"$t" <<INNER
-@test "non-final double-bracket is ignored" {
-    $dbl
-    true
-}
-@test "non-final single-bracket is honoured" {
-    [ 1 -eq 2 ]
-    true
-}
-INNER
-    run bats "$t"
-    # The [[ ]] case passes despite a false assertion; the [ ] case fails.
-    printf '%s\n' "$output" | grep -qE '^ok 1 ' || return 1
-    printf '%s\n' "$output" | grep -qE '^not ok 2 '
+    cat >"$probe" <<PROBE
+fired=0
+set -E
+trap 'fired=\$((fired + 1))' ERR
+$dbl
+printf 'after double bracket: %s\\n' "\$fired"
+[ 1 -eq 2 ]
+printf 'after single bracket: %s\\n' "\$fired"
+false
+printf 'after false: %s\\n' "\$fired"
+grep -q NOPE <<< "hello"
+printf 'after grep: %s\\n' "\$fired"
+PROBE
+    run bash "$probe"
+    [ "$status" -eq 0 ] || return 1
+    printf '%s\n' "$output" | grep -qx 'after double bracket: 0' || return 1
+    printf '%s\n' "$output" | grep -qx 'after single bracket: 1' || return 1
+    printf '%s\n' "$output" | grep -qx 'after false: 2' || return 1
+    printf '%s\n' "$output" | grep -qx 'after grep: 3'
 }

@@ -70,10 +70,14 @@ so a rename or drifted default fails fast:
 ### Writing assertions
 
 **A bare `[[ ]]` does not fail a bats test unless it is the last statement in
-the body.** bats runs test bodies with errexit *off* and catches failures with
-a DEBUG trap instead. That trap sees commands — `false`, `[ ]`, `grep -q`, any
-helper function — but not `[[ ]]`, which is a shell keyword. Before this was
-found, 226 of the suite's 385 `[[ ]]` assertions were decorative.
+the body.** bats runs test bodies with errexit *off* and detects failures with
+an **ERR trap**. bash's ERR trap fires for `[ ]`, `false`, `grep -q` and any
+helper function — but not for `[[ ]]`, which is a compound command the trap does
+not observe. So a failing `[[ ]]` is invisible unless it happens to be the last
+command, whose exit status becomes the test's result. Before this was found, 226
+of the suite's 385 `[[ ]]` assertions were decorative.
+`bats-assertions.bats` proves the mechanism in a few lines of bash rather than
+asking you to take it on trust.
 
 So every bare `[[ ]]` carries an explicit `|| return 1`:
 
@@ -83,11 +87,17 @@ So every bare `[[ ]]` carries an explicit `|| return 1`:
 grep -q 'pattern' "$file"                    # gates: a command
 ```
 
-`bats-assertions.bats` fails if one loses its gate, and demonstrates the
-underlying behaviour rather than just asserting the rule. The same reasoning is
-why `doctor.bats` and `chezmirror.bats` route negative checks through a
-`no_match` helper: `! grep …` is exempt from failure detection, but a function
-call is not.
+The same reasoning is why `doctor.bats` and `chezmirror.bats` route negative
+checks through a `no_match` helper: `! grep …` is exempt from failure detection,
+but a function call is not.
+
+**Two bats versions are in play.** CI installs 1.10 from apt; Homebrew ships
+1.14 locally. They differ in ways that bite: 1.10 cannot run a bats file from
+inside another bats test (the child inherits the parent's state and reports
+`unknown test name`, then the run ends with `Executed N instead of expected M`).
+Verify anything test-infrastructure-shaped against both. Also check bats' exit
+status directly — `bats -r tests/ | grep 'not ok'` discards it, and a run can
+fail with every individual test green.
 
 ## Conventions
 
