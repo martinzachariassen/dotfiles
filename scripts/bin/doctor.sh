@@ -354,6 +354,23 @@ else
     note "VS Code CLI not on PATH — extension check skipped"
 fi
 
+# ~/.config/cspell/personal.txt is a symlink *into this repo*, so it is the one
+# managed path a repo-side file move can break. cSpell fails silently when the
+# dictionary is unreadable — it just stops knowing the words — so nothing else
+# would ever report it.
+cspell_link="$HOME/.config/cspell/personal.txt"
+if [ -L "$cspell_link" ]; then
+    if [ -r "$cspell_link" ]; then
+        pass "cSpell personal dictionary resolves"
+    else
+        fail "cSpell dictionary is a dangling symlink: $(readlink "$cspell_link") — run: chezmoi apply"
+    fi
+elif [ -e "$cspell_link" ]; then
+    warn "$cspell_link is not a symlink — chezmoi expects to manage it; run: chezmoi apply"
+else
+    note "cSpell personal dictionary not deployed yet — run: chezmoi apply"
+fi
+
 section "mise (runtimes)"
 if command -v mise >/dev/null 2>&1; then
     pass "mise installed: $(mise version 2>/dev/null | head -1)"
