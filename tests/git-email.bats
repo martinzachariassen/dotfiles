@@ -63,7 +63,7 @@ EOF
     git init -q repo && cd repo && echo x >a && git add a
     run env GIT_CONFIG_GLOBAL="$FIX/gitconfig" git commit -m "should not happen"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"Please tell me who you are"* ]]
+    [[ "$output" == *"Please tell me who you are"* ]] || return 1
 }
 
 # ─── the config template ──────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ render_gitconfig() {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     run render_gitconfig "$(stub_config noemail)"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"useConfigOnly = true"* ]]
+    [[ "$output" == *"useConfigOnly = true"* ]] || return 1
     # No *active* email line — the bytes that produced "Ada L <>". Comments are
     # stripped first: the explanatory comment quotes "email =" itself.
     local active
@@ -125,8 +125,8 @@ render_gitconfig() {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     run render_gitconfig "$(stub_config withemail ada@example.com)"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"email = ada@example.com"* ]]
-    [[ "$output" != *"useConfigOnly"* ]]
+    [[ "$output" == *"email = ada@example.com"* ]] || return 1
+    [[ "$output" != *"useConfigOnly"* ]] || return 1
 }
 
 # ─── the wizard ───────────────────────────────────────────────────────────────

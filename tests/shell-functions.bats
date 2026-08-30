@@ -136,7 +136,7 @@ run_session_name() {
 @test "_zj_session_name definition exists in the template" {
     run extract_fn_block _zj_session_name
     [ "$status" -eq 0 ]
-    [[ "$output" == *"_zj_session_name() {"* ]]
+    [[ "$output" == *"_zj_session_name() {"* ]] || return 1
 }
 
 @test "_zj_session_name uses the git repo root name from any subdir" {
@@ -174,9 +174,9 @@ run_cwd_fn() {
 @test "_zj_record_cwd / _zj_inherit_cwd definitions exist in the template" {
     run extract_fn_block _zj_record_cwd
     [ "$status" -eq 0 ]
-    [[ "$output" == *"_zj_record_cwd() {"* ]]
+    [[ "$output" == *"_zj_record_cwd() {"* ]] || return 1
     run extract_fn_block _zj_inherit_cwd
-    [[ "$output" == *"_zj_inherit_cwd() {"* ]]
+    [[ "$output" == *"_zj_inherit_cwd() {"* ]] || return 1
 }
 
 @test "_zj_record_cwd writes \$PWD and creates the state dir" {

@@ -25,10 +25,10 @@ chezmirror() { echo "CHEZMIRROR $*"; }
 $(extract chezreconcile)
 chezreconcile"
     [ "$status" -eq 0 ]
-    [[ "$output" == *CHEZUP* ]]
-    [[ "$output" == *CHEZMIRROR* ]]
+    [[ "$output" == *CHEZUP* ]] || return 1
+    [[ "$output" == *CHEZMIRROR* ]] || return 1
     # Install before prune: everything before the first CHEZMIRROR must include CHEZUP.
-    [[ "${output%%CHEZMIRROR*}" == *CHEZUP* ]]
+    [[ "${output%%CHEZMIRROR*}" == *CHEZUP* ]] || return 1
 }
 
 @test "chezreconcile forwards trailing args to chezup (→ chezmoi apply)" {
@@ -36,7 +36,7 @@ chezreconcile"
 $(extract chezreconcile)
 chezreconcile -v"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"CHEZUP -v"* ]]
+    [[ "$output" == *"CHEZUP -v"* ]] || return 1
 }
 
 @test "chezreconcile under DRY_RUN previews via chezmirror -n and never removes" {
@@ -44,8 +44,8 @@ chezreconcile -v"
 $(extract chezreconcile)
 DRY_RUN=1 chezreconcile"
     [ "$status" -eq 0 ]
-    [[ "$output" == *CHEZUP* ]]
-    [[ "$output" == *"CHEZMIRROR -n"* ]]
+    [[ "$output" == *CHEZUP* ]] || return 1
+    [[ "$output" == *"CHEZMIRROR -n"* ]] || return 1
 }
 
 @test "chezreconcile aborts before chezmirror when chezup fails" {
@@ -53,6 +53,6 @@ DRY_RUN=1 chezreconcile"
 $(extract chezreconcile)
 CHEZUP_RC=4 chezreconcile"
     [ "$status" -eq 4 ]
-    [[ "$output" == *CHEZUP* ]]
-    [[ "$output" != *CHEZMIRROR* ]]
+    [[ "$output" == *CHEZUP* ]] || return 1
+    [[ "$output" != *CHEZMIRROR* ]] || return 1
 }

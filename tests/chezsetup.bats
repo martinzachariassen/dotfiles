@@ -95,8 +95,8 @@ $1"
     grep -q '^chezapply ' "$APPLY_LOG"
     [ ! -s "$RESET_LOG" ]  # never resets state in default mode
     [ ! -s "$WIZARD_LOG" ] # never touches the wizard in default mode
-    [[ "$output" == *"filling in any new/unanswered setup keys only"* ]]
-    [[ "$output" == *"chezsetup --reset"* ]]
+    [[ "$output" == *"filling in any new/unanswered setup keys only"* ]] || return 1
+    [[ "$output" == *"chezsetup --reset"* ]] || return 1
 }
 
 @test "chezsetup (default) aborts before chezmoi init if git pull fails" {
@@ -158,8 +158,8 @@ $1"
 @test "chezsetup --help prints usage and touches nothing" {
     run_zsh "$(extract chezsetup); chezsetup --help"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezsetup"* ]]
-    [[ "$output" == *"--reset"* ]]
+    [[ "$output" == *"usage: chezsetup"* ]] || return 1
+    [[ "$output" == *"--reset"* ]] || return 1
     [ ! -s "$GIT_LOG" ]
     [ ! -s "$INIT_LOG" ]
     [ ! -s "$RESET_LOG" ]

@@ -76,9 +76,9 @@ src() { bash -c "source '$LOG'; $1"; }
 @test "ok/warn/fail print their message with the expected glyph" {
     run bash -c "export LC_ALL=C; source '$LOG'; ui_init_logging; ok hello; warn careful; fail broke"
     [ "$status" -eq 0 ]
-    [[ "${lines[0]}" == *"OK hello"* ]]
-    [[ "${lines[1]}" == *"! careful"* ]]
-    [[ "${lines[2]}" == *"X broke"* ]]
+    [[ "${lines[0]}" == *"OK hello"* ]] || return 1
+    [[ "${lines[1]}" == *"! careful"* ]] || return 1
+    [[ "${lines[2]}" == *"X broke"* ]] || return 1
 }
 
 # ─── ui_init_status: the flat report-style helpers ──────────────────────────
@@ -92,6 +92,6 @@ src() { bash -c "source '$LOG'; $1"; }
 @test "s_pass/s_fail render an indented glyph + message" {
     run bash -c "export LC_ALL=C; source '$LOG'; ui_init_status; s_pass good; s_fail bad"
     [ "$status" -eq 0 ]
-    [[ "${lines[0]}" == *"OK  good"* ]]
-    [[ "${lines[1]}" == *"X  bad"* ]]
+    [[ "${lines[0]}" == *"OK  good"* ]] || return 1
+    [[ "${lines[1]}" == *"X  bad"* ]] || return 1
 }

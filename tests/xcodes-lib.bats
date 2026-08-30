@@ -83,7 +83,7 @@ load_lib() {
     load_lib
     run xcodes_bootstrap
     [ "$status" -ne 0 ]
-    [[ "$output" == *"checksum mismatch"* ]]
+    [[ "$output" == *"checksum mismatch"* ]] || return 1
     [ ! -e "$BIN_DIR/xcodes" ]
 }
 
@@ -107,7 +107,7 @@ EOF
     load_lib
     run xcodes_bootstrap
     [ "$status" -ne 0 ]
-    [[ "$output" == *"pin"* ]]
+    [[ "$output" == *"pin"* ]] || return 1
     [ ! -e "$BIN_DIR/xcodes" ]
 }
 

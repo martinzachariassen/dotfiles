@@ -182,7 +182,7 @@ _render_storecode_body() { # $1 = fake HOME
     # PATH has no real `storecode`, so the skip is driven by the dir, not the host.
     run env PATH="/usr/bin:/bin" bash -c "$body"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already installed"* ]]
+    [[ "$output" == *"already installed"* ]] || return 1
 }
 
 @test "05-storecode with no installer configured prints guidance and exits 0 (never fails an apply)" {
@@ -195,6 +195,6 @@ _render_storecode_body() { # $1 = fake HOME
     body="$(_render_storecode_body "$fakehome")"
     run env PATH="/usr/bin:/bin" bash -c "$body"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no installer is configured yet"* ]]
-    [[ "$output" != *"already installed"* ]]
+    [[ "$output" == *"no installer is configured yet"* ]] || return 1
+    [[ "$output" != *"already installed"* ]] || return 1
 }

@@ -139,7 +139,7 @@ EOF
         case "$f" in *cspell* | *vscode*) continue ;; esac
         run bash -c ". '$BP'; brew_pkg_count '$f'"
         [ "$status" -eq 0 ]
-        [[ "$output" =~ ^[0-9]+$ ]]
+        [[ "$output" =~ ^[0-9]+$ ]] || return 1
     done
 }
 
@@ -389,7 +389,7 @@ EOF
         { printf 'Using jq\n'; printf 'SENT\n'; sleep 5; } | brew_progress_consume SENT >/dev/null
         echo RETURNED"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"RETURNED"* ]]
+    [[ "$output" == *"RETURNED"* ]] || return 1
 }
 
 @test "a producer killed mid-stream cannot hang the consumer forever" {
@@ -398,7 +398,7 @@ EOF
         export BREW_PROGRESS_MAX_IDLE
         { printf 'Using jq\n'; sleep 4; } | brew_progress_consume SENT >/dev/null
         echo RETURNED"
-    [[ "$output" == *"RETURNED"* ]]
+    [[ "$output" == *"RETURNED"* ]] || return 1
 }
 
 # ─── honesty ──────────────────────────────────────────────────────────────────

@@ -107,7 +107,7 @@ echo "ran with: $*"
 EOF
     run_zsh "$(extract _chez_run); _chez_run scripts/bin/echo.sh alpha beta"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"ran with: alpha beta"* ]]
+    [[ "$output" == *"ran with: alpha beta"* ]] || return 1
 }
 
 @test "_chez_run on a missing script with no chezmoi tells you how to fix by hand" {
@@ -117,8 +117,8 @@ EOF
     run env PATH="/usr/bin:/bin" APPLY_LOG="$APPLY_LOG" \
         zsh -c "$(extract _chez_run); _chez_run scripts/bin/gone.sh"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"is missing"* ]]
-    [[ "$output" == *"fix by hand"* ]]
+    [[ "$output" == *"is missing"* ]] || return 1
+    [[ "$output" == *"fix by hand"* ]] || return 1
     [ ! -s "$APPLY_LOG" ]  # never applied
 }
 
@@ -145,8 +145,8 @@ OUT
     CHEZMOI_STATUS="" BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_zsh "$(extract chezapply _chez_brew_removals); chezapply"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"no active Brewfile"* ]]
-    [[ "$output" == *"chezmirror"* ]]
+    [[ "$output" == *"no active Brewfile"* ]] || return 1
+    [[ "$output" == *"chezmirror"* ]] || return 1
 }
 
 @test "chezapply propagates a failing apply's exit code" {
@@ -164,8 +164,8 @@ OUT
     CHEZMOI_STATUS="" \
         run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"in sync"* ]]
-    [[ "$output" != *"Untracked Homebrew"* ]]
+    [[ "$output" == *"in sync"* ]] || return 1
+    [[ "$output" != *"Untracked Homebrew"* ]] || return 1
 }
 
 @test "chezstatus flags untracked casks, not just formulae, and points at chezmirror" {
@@ -179,10 +179,10 @@ OUT
     CHEZMOI_STATUS="" BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Untracked Homebrew"* ]]
-    [[ "$output" == *"cask"* ]]
-    [[ "$output" == *"obs"* ]]
-    [[ "$output" == *"chezmirror"* ]]
+    [[ "$output" == *"Untracked Homebrew"* ]] || return 1
+    [[ "$output" == *"cask"* ]] || return 1
+    [[ "$output" == *"obs"* ]] || return 1
+    [[ "$output" == *"chezmirror"* ]] || return 1
 }
 
 @test "chezstatus groups repo → \$HOME changes under the apply section with plain verbs" {
@@ -191,11 +191,11 @@ OUT
     CHEZMOI_STATUS=$' M .config/zsh/.zshrc\n A .config/foo/bar' \
         run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Repo → \$HOME"* ]]
-    [[ "$output" == *"modify"* ]]
-    [[ "$output" == *".config/zsh/.zshrc"* ]]
-    [[ "$output" == *"add"* ]]
-    [[ "$output" == *".config/foo/bar"* ]]
+    [[ "$output" == *"Repo → \$HOME"* ]] || return 1
+    [[ "$output" == *"modify"* ]] || return 1
+    [[ "$output" == *".config/zsh/.zshrc"* ]] || return 1
+    [[ "$output" == *"add"* ]] || return 1
+    [[ "$output" == *".config/foo/bar"* ]] || return 1
     [[ "$output" != *"Local drift"* ]]  # nothing edited locally
 }
 
@@ -205,10 +205,10 @@ OUT
     CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
         run_zsh "$(extract chezstatus _chez_brew_removals); chezstatus"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Repo → \$HOME"* ]]
-    [[ "$output" == *"Local drift"* ]]
-    [[ "$output" == *"edited"* ]]
-    [[ "$output" == *"re-add"* ]]
+    [[ "$output" == *"Repo → \$HOME"* ]] || return 1
+    [[ "$output" == *"Local drift"* ]] || return 1
+    [[ "$output" == *"edited"* ]] || return 1
+    [[ "$output" == *"re-add"* ]] || return 1
 }
 
 @test "chezstatus -v hands off to the raw \`chezmoi diff\`" {
@@ -230,7 +230,7 @@ OUT
 @test "chezstatus --help prints usage without touching chezmoi" {
     run_zsh "$(extract chezstatus); chezstatus --help"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezstatus"* ]]
+    [[ "$output" == *"usage: chezstatus"* ]] || return 1
     [ ! -s "$DIFF_LOG" ]  # help path shells out to nothing
 }
 
@@ -247,8 +247,8 @@ OUT
 @test "dotfiles with an argument prints chezsetup guidance without cd-ing" {
     run_zsh "$(extract dotfiles); cd '$STUBS'; dotfiles help; pwd"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"chezsetup"* ]]
-    [[ "$output" == *"chezsetup --reset"* ]]
+    [[ "$output" == *"chezsetup"* ]] || return 1
+    [[ "$output" == *"chezsetup --reset"* ]] || return 1
     [ "${lines[$((${#lines[@]} - 1))]}" = "$STUBS" ]  # argument path must NOT cd
 }
 
@@ -265,8 +265,8 @@ OUT
     BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_zsh "$(extract chezbump _chez_brew_removals); chezbump"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"formula"* ]]
-    [[ "$output" == *"orphan-cli"* ]]
+    [[ "$output" == *"formula"* ]] || return 1
+    [[ "$output" == *"orphan-cli"* ]] || return 1
     [[ "$output" == *"chezmirror"* ]]  # reconcile hint
 }
 
@@ -275,5 +275,5 @@ OUT
     BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_zsh "$(extract chezbump _chez_brew_removals); chezbump"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"every installed package is tracked"* ]]
+    [[ "$output" == *"every installed package is tracked"* ]] || return 1
 }

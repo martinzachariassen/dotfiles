@@ -100,8 +100,8 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Setup wizard"* ]]
-    [[ "$output" == *"WIZARD RAN"* ]]
+    [[ "$output" == *"Setup wizard"* ]] || return 1
+    [[ "$output" == *"WIZARD RAN"* ]] || return 1
     # No args ⇒ it must NOT go straight to chezmoi init.
     [ ! -s "$CHEZMOI_LOG" ]
 }
@@ -112,9 +112,9 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL" --promptDefaults
     [ "$status" -eq 0 ]
-    [[ "$output" == *"handing off to chezmoi init"* ]]
-    [[ "$output" == *"CHEZMOI INIT"* ]]
-    [[ "$output" != *"WIZARD RAN"* ]]
+    [[ "$output" == *"handing off to chezmoi init"* ]] || return 1
+    [[ "$output" == *"CHEZMOI INIT"* ]] || return 1
+    [[ "$output" != *"WIZARD RAN"* ]] || return 1
     grep -q -- '--apply' "$CHEZMOI_LOG"
     grep -q -- '--promptDefaults' "$CHEZMOI_LOG"
     # Without --force chezmoi stops on every drifted target and asks
@@ -127,20 +127,20 @@ teardown() {
 @test "install refuses to run on a non-macOS host" {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" UNAME_S=Linux bash "$INSTALL"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"only supports macOS"* ]]
+    [[ "$output" == *"only supports macOS"* ]] || return 1
 }
 
 @test "install refuses to run as root" {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" FAKE_UID=0 bash "$INSTALL"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"normal user"* ]]
+    [[ "$output" == *"normal user"* ]] || return 1
 }
 
 @test "install warns but continues on non-Apple-Silicon" {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" UNAME_M=x86_64 bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Apple Silicon"* ]]
+    [[ "$output" == *"Apple Silicon"* ]] || return 1
     [[ "$output" == *"WIZARD RAN"* ]]  # warned, then proceeded
 }
 
@@ -150,7 +150,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"already cloned"* ]]
+    [[ "$output" == *"already cloned"* ]] || return 1
     [ ! -f "$GIT_LOG" ] || ! grep -q 'clone' "$GIT_LOG"
 }
 
@@ -159,7 +159,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$fresh" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"cloning into"* ]]
+    [[ "$output" == *"cloning into"* ]] || return 1
     grep -q 'clone' "$GIT_LOG"
 }
 
@@ -169,7 +169,7 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$empty" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"cloning into"* ]]
+    [[ "$output" == *"cloning into"* ]] || return 1
 }
 
 # Without this guard `git clone` dies into the non-empty dir and `set -e` kills
@@ -179,8 +179,8 @@ teardown() {
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -ne 0 ]
-    [[ "$output" == *"not a git checkout"* ]]
-    [[ "$output" == *"DOTFILES_DIR"* ]]
+    [[ "$output" == *"not a git checkout"* ]] || return 1
+    [[ "$output" == *"DOTFILES_DIR"* ]] || return 1
     [ ! -f "$GIT_LOG" ] || ! grep -q 'clone' "$GIT_LOG"
 }
 
@@ -201,8 +201,8 @@ EOF
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"opening Apple's installer"* ]]
-    [[ "$output" == *"Xcode Command Line Tools"* ]]
-    [[ "$output" == *"WIZARD RAN"* ]]
+    [[ "$output" == *"opening Apple's installer"* ]] || return 1
+    [[ "$output" == *"Xcode Command Line Tools"* ]] || return 1
+    [[ "$output" == *"WIZARD RAN"* ]] || return 1
     [ -f "$STUBS/xcode.installed" ]  # --install was actually invoked
 }

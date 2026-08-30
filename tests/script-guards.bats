@@ -24,27 +24,27 @@ run_isolated() {
 @test "doctor.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/doctor.sh
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 @test "bootstrap-auth.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/bootstrap-auth.sh
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 @test "wizard.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/wizard.sh
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }
 
 @test "xcode.sh fails loudly when core/ui.sh is missing" {
     run_isolated scripts/bin/xcode.sh
     [ "$status" -eq 1 ]
-    [[ "$output" == *"missing"* ]]
-    [[ "$output" == *"ui.sh"* ]]
+    [[ "$output" == *"missing"* ]] || return 1
+    [[ "$output" == *"ui.sh"* ]] || return 1
 }

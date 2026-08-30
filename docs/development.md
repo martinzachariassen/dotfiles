@@ -63,7 +63,31 @@ so a rename or drifted default fails fast:
 | `mise-config.bats` | The rendered mise config. |
 | `wizard.bats` | The wizard's prompt tiers and flag mapping. |
 | `shell-functions.bats` / `zshrc-wiring.bats` | The zsh verbs and their wiring. |
-| `check-commit-msg.bats` / `semver.bats` | The corresponding `scripts/` helpers. |
+| `check-commit-msg.bats` / `semver.bats` | The corresponding helpers. |
+| `lint-coverage.bats` | Every tracked `*.sh` outside `src/` is linted by both pre-commit and CI. |
+| `bats-assertions.bats` | Every bare `[[ ]]` in the suite actually gates its test — see below. |
+
+### Writing assertions
+
+**A bare `[[ ]]` does not fail a bats test unless it is the last statement in
+the body.** bats runs test bodies with errexit *off* and catches failures with
+a DEBUG trap instead. That trap sees commands — `false`, `[ ]`, `grep -q`, any
+helper function — but not `[[ ]]`, which is a shell keyword. Before this was
+found, 226 of the suite's 385 `[[ ]]` assertions were decorative.
+
+So every bare `[[ ]]` carries an explicit `|| return 1`:
+
+```sh
+[ "$status" -eq 1 ]                          # gates: [ ] is a builtin
+[[ "$output" == *"missing"* ]] || return 1   # gates: explicitly
+grep -q 'pattern' "$file"                    # gates: a command
+```
+
+`bats-assertions.bats` fails if one loses its gate, and demonstrates the
+underlying behaviour rather than just asserting the rule. The same reasoning is
+why `doctor.bats` and `chezmirror.bats` route negative checks through a
+`no_match` helper: `! grep …` is exempt from failure detection, but a function
+call is not.
 
 ## Conventions
 

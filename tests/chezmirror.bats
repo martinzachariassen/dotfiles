@@ -303,8 +303,8 @@ EOF
     BREW_CLEANUP_STDERR='Error: Refusing to load formula acme/tap/thing from untrusted tap acme/tap.' \
         run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"reported errors"* ]]
-    [[ "$output" == *"Error: Refusing to load formula"* ]]
+    [[ "$output" == *"reported errors"* ]] || return 1
+    [[ "$output" == *"Error: Refusing to load formula"* ]] || return 1
 }
 
 @test "_chez_brew_removals stays silent on benign brew stderr noise (cache refresh, warnings)" {
@@ -313,7 +313,7 @@ EOF
     BREW_CLEANUP_STDERR='==> Downloading Homebrew API data' \
         run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"reported errors"* ]]
+    [[ "$output" != *"reported errors"* ]] || return 1
 }
 
 # ─── _chez_brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
@@ -352,7 +352,7 @@ EOF
     : >"$CANNED" # nothing untracked
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"nothing to remove"* ]]
+    [[ "$output" == *"nothing to remove"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ] # never uninstalled anything
 }
 
@@ -360,8 +360,8 @@ EOF
     have_tty && skip "has a controlling tty; see the confirm-loop test instead"
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"No TTY"* ]]
-    [[ "$output" == *"orphan-app"* ]]
+    [[ "$output" == *"No TTY"* ]] || return 1
+    [[ "$output" == *"orphan-app"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
@@ -380,7 +380,7 @@ EOF
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 2 ]
     no_match '^bats-core$' "$UNINSTALL_LOG"
-    [[ "$output" == *"removed 2 · kept 1"* ]]
+    [[ "$output" == *"removed 2 · kept 1"* ]] || return 1
 }
 
 # ─── chezmirror accept-all mode (--all / --yes / YES=1) ─────────────────────
@@ -388,16 +388,16 @@ EOF
 @test "chezmirror --help prints usage and removes nothing" {
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --help"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezmirror"* ]]
-    [[ "$output" == *"--all"* ]]
+    [[ "$output" == *"usage: chezmirror"* ]] || return 1
+    [[ "$output" == *"--all"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ] # help path never touches brew
 }
 
 @test "chezmirror --dry-run previews the untracked set and removes nothing" {
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --dry-run"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"orphan-app"* ]]
-    [[ "$output" == *"DRY_RUN"* ]]
+    [[ "$output" == *"orphan-app"* ]] || return 1
+    [[ "$output" == *"DRY_RUN"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ] # dry-run never touches brew
 }
 
@@ -408,15 +408,15 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" DRY_RUN=1 \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"orphan-app"* ]]
-    [[ "$output" == *"DRY_RUN"* ]]
+    [[ "$output" == *"orphan-app"* ]] || return 1
+    [[ "$output" == *"DRY_RUN"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
 @test "chezmirror rejects an unknown option (exit 2, no uninstall)" {
     run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --bogus"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"unknown option"* ]]
+    [[ "$output" == *"unknown option"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
@@ -433,7 +433,7 @@ EOF
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "bats-core" ]
     [ "$(sed -n 3p "$UNINSTALL_LOG")" = "orphan-cli" ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
-    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
 }
 
 @test "chezmirror --all aborts cleanly when the bulk confirm is declined" {
@@ -444,7 +444,7 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --all" <<<$'no'
     [ "$status" -eq 0 ]
-    [[ "$output" == *"aborted"* ]]
+    [[ "$output" == *"aborted"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
@@ -458,7 +458,7 @@ EOF
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
-    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
 }
 
 @test "chezmirror removes an interdependent set despite deps-first order (retry passes)" {
@@ -589,9 +589,9 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
     [[ "$output" == *"leftover-dep"* ]]                  # the orphan was previewed
-    [[ "$output" == *"pruned orphaned dependencies"* ]]
+    [[ "$output" == *"pruned orphaned dependencies"* ]] || return 1
     [ -f "$AUTOREMOVE_LOG" ]                             # `brew autoremove` actually ran
     grep -qx "ran" "$AUTOREMOVE_LOG"
 }
@@ -607,8 +607,8 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nyes\nyes\nno'
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 3 · kept 0"* ]]
-    [[ "$output" == *"kept orphaned dependencies"* ]]
+    [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
+    [[ "$output" == *"kept orphaned dependencies"* ]] || return 1
     [ ! -f "$AUTOREMOVE_LOG" ]                           # prune declined ⇒ never ran
 }
 
@@ -633,7 +633,7 @@ EOF
         UNINSTALL_LOG="$UNINSTALL_LOG" \
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
-    [[ "$output" == *"removed 3 · kept 0"* ]]
+    [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
     [[ "$output" != *"Orphaned dependencies"* ]]         # nothing surfaced
     [ ! -f "$AUTOREMOVE_LOG" ]                           # prune never ran
 }
@@ -652,5 +652,5 @@ EOF
         bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
     [ "$status" -eq 0 ]
     [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
-    [[ "$output" == *"removed 1 · kept 0"* ]]
+    [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
 }

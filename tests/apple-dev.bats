@@ -279,21 +279,21 @@ EOF
 @test "completion step: no Xcode at all says so" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _completion_says '["appleDev"]' /Library/Developer/CommandLineTools 0 0
-    [[ "$output" == *"No Xcode is installed"* ]]
+    [[ "$output" == *"No Xcode is installed"* ]] || return 1
 }
 
 @test "completion step: Xcode present but CLT selected names the toolchain" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _completion_says '["appleDev"]' /Library/Developer/CommandLineTools 1 0
-    [[ "$output" == *"Command Line Tools are still the active toolchain"* ]]
-    [[ "$output" != *"No Xcode is installed"* ]]
+    [[ "$output" == *"Command Line Tools are still the active toolchain"* ]] || return 1
+    [[ "$output" != *"No Xcode is installed"* ]] || return 1
 }
 
 @test "completion step: only the runtime missing names the runtime" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _completion_says '["appleDev"]' /Applications/Xcode.app/Contents/Developer 1 0
-    [[ "$output" == *"No iOS simulator runtime is downloaded"* ]]
-    [[ "$output" != *"active toolchain"* ]]
+    [[ "$output" == *"No iOS simulator runtime is downloaded"* ]] || return 1
+    [[ "$output" != *"active toolchain"* ]] || return 1
 }
 
 # A ready machine must not be nagged — the step disappears entirely.

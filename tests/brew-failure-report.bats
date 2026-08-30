@@ -35,22 +35,22 @@ Installing mas
 EOF
     run bash -c "$(lib) brew_error_lines '$FIX/brew.log'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"xcbuild executable"* ]]
+    [[ "$output" == *"xcbuild executable"* ]] || return 1
     # The old `tail -15` showed these instead of the error.
-    [[ "$output" != *"brew bundle\` complete"* ]]
+    [[ "$output" != *"brew bundle\` complete"* ]] || return 1
 }
 
 @test "Error: lines are matched regardless of case" {
     printf 'Using jq\nError: docker-desktop: Failed to link binary\n' >"$FIX/brew.log"
     run bash -c "$(lib) brew_error_lines '$FIX/brew.log'"
-    [[ "$output" == *"Failed to link binary"* ]]
+    [[ "$output" == *"Failed to link binary"* ]] || return 1
 }
 
 @test "a log with no error line still shows something to read" {
     printf 'Using jq\nUsing fd\nUsing ripgrep\n' >"$FIX/brew.log"
     run bash -c "$(lib) brew_error_lines '$FIX/brew.log' 2"
     [ -n "$output" ]
-    [[ "$output" == *"ripgrep"* ]]
+    [[ "$output" == *"ripgrep"* ]] || return 1
 }
 
 @test "the number of surfaced error lines is capped" {
@@ -58,7 +58,7 @@ EOF
     run bash -c "$(lib) brew_error_lines '$FIX/brew.log' 5"
     [ "${#lines[@]}" -eq 5 ]
     # Newest last — the most recent failure must be visible.
-    [[ "${lines[4]}" == *"failure 40"* ]]
+    [[ "${lines[4]}" == *"failure 40"* ]] || return 1
 }
 
 @test "a missing log file is not fatal" {
