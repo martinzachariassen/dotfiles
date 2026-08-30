@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  colima at login. `colima start --foreground` IS the service: it boots the VM
+  and stays attached, so launchd supervises one process rather than a detached
+  daemon it cannot see.
+
+  EnvironmentVariables is not optional. launchd does not read .zshenv, so
+  XDG_CONFIG_HOME would be absent — and colima falls back to ~/.colima when it
+  is, which both ignores the managed template and permanently shadows
+  ~/.config/colima for every later shell invocation too.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>no.mlz.colima</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/colima</string>
+        <string>start</string>
+        <string>--foreground</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{{ .chezmoi.homeDir }}</string>
+        <key>XDG_CONFIG_HOME</key>
+        <string>{{ .chezmoi.homeDir }}/.config</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!--
+      SuccessfulExit=false, not plain true: a deliberate `colima stop` exits 0
+      and must stay stopped. Only a crash brings it back.
+    -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/colima/logs/startup.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{ .chezmoi.homeDir }}/.local/state/colima/logs/startup.log</string>
+</dict>
+</plist>

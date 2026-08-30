@@ -300,6 +300,20 @@ command -v kubectl >/dev/null && {
     alias klf='kubectl logs -f'
 }
 
+# ─── Containers (colima) ──────────────────────────────────────────────────────
+# There is no Docker Desktop here: dockerd lives in colima's Lima VM and the
+# `colima` docker context points at its socket.
+command -v colima >/dev/null && {
+    alias cstart='colima start'
+    alias cstop='colima stop'
+    alias cstat='colima status'
+
+    # Testcontainers' Ryuk bind-mounts the docker socket by the path it has
+    # INSIDE the VM, not the ~/.config/colima/... path the host client uses.
+    # Without this every container it starts dies on an unreachable socket.
+    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+}
+
 {{ if has "appleDev" (dig "modules" (list) .) -}}
 # ─── Swift / iOS ──────────────────────────────────────────────────────────────
 alias xcderived='rm -rf ~/Library/Developer/Xcode/DerivedData'  # nuke stale build cache

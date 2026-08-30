@@ -32,6 +32,16 @@ brew "zoxide"                  # smarter cd
 # ─── Runtimes ─────────────────────────────────────────────────────────────────
 brew "mise"                    # language runtime manager
 
+# ─── Containers ───────────────────────────────────────────────────────────────
+# colima replaces Docker Desktop: a Lima VM running dockerd, driven by the plain
+# docker CLI. No GUI, no licence, no privileged helper. The VM shape lives in
+# dot_config/colima/_templates/default.yaml; a LaunchAgent starts it at login.
+brew "colima"                  # the VM + docker daemon
+brew "docker"                  # CLI only — the daemon is inside the VM
+brew "docker-buildx"           # plugin; linked from dot_docker/cli-plugins
+brew "docker-compose"          # plugin; linked from dot_docker/cli-plugins
+brew "docker-credential-helper" # `docker login` → macOS keychain
+
 # ─── Editor (terminal) ────────────────────────────────────────────────────────
 brew "neovim"                  # LazyVim config in dot_config/nvim
 
@@ -45,7 +55,6 @@ brew "zsh-syntax-highlighting" # source this last
 # ─── GUI essentials (terminal + 1Password are foundational here) ──────────────
 cask "1password"               # SSH agent + git signing
 cask "1password-cli"           # op CLI; chezmoi secrets
-cask "docker-desktop"          # or colima/podman
 cask "ghostty"                 # Catppuccin Mocha
 cask "visual-studio-code"      # chezmoi manages settings
 

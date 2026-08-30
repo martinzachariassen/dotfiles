@@ -1,0 +1,63 @@
+# colima's template for NEW instances — `colima template --print` resolves here.
+# It is read only when a VM is created, so editing it does nothing to a VM that
+# already exists: `colima delete && colima start` is what adopts a change.
+#
+# colima picks its home from $XDG_CONFIG_HOME, but ONLY while ~/.colima does not
+# exist — a bare ~/.colima silently wins and strands this file. Anything that
+# starts colima outside the shell (launchd) must therefore export
+# XDG_CONFIG_HOME itself; see Library/LaunchAgents/no.mlz.colima.plist.
+#
+# Full key reference: EDITOR=cat colima template
+
+# Host is 10 cores / 24 GiB. Leaving four cores and two thirds of RAM to macOS
+# keeps an IDE plus a JVM comfortable while containers build.
+cpu: 6
+memory: 8
+
+# Sparse — it costs only what is written. Can be grown later, never shrunk.
+disk: 100
+
+arch: host
+runtime: docker
+hostname: colima
+
+# vz is Apple's Virtualization.framework: faster to boot and far lighter than
+# qemu. It also gates the two settings below. Cannot be changed after create.
+vmType: vz
+
+# amd64 images run under Rosetta instead of qemu's user-mode emulation — the
+# difference between "usable" and "unusable" for x86-only base images.
+rosetta: true
+
+# The fastest mount driver, and vz-only. Cannot be changed after create.
+mountType: virtiofs
+
+# $HOME is mounted writable by default; nothing else needs mounting.
+mounts: []
+
+# A reachable IP for the VM, so a container port can be hit directly and not
+# only through the forwarder.
+network:
+  address: true
+  dnsHosts:
+    host.docker.internal: host.lima.internal
+
+# Sets the `colima` docker context as current on start.
+autoActivate: true
+
+# ~/.ssh is 1Password's and chezmoi's; colima keeps its own ssh_config under
+# $COLIMA_HOME either way, so there is nothing to gain by letting it write here.
+sshConfig: false
+
+# Maps straight to the VM's /etc/docker/daemon.json. The GC ceiling is what the
+# old ~/.docker/daemon.json carried over from Docker Desktop.
+docker:
+  features:
+    buildkit: true
+  builder:
+    gc:
+      enabled: true
+      defaultKeepStorage: 20GB
+
+kubernetes:
+  enabled: false
