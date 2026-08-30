@@ -39,15 +39,15 @@ setup() {
 
 # The premise above, asserted directly, so this file explains itself to anyone
 # who doubts it rather than just asserting a style rule.
-@test "bash's ERR trap ignores [[ ]] but sees [ ], false and commands" {
-    # The mechanism behind the rule above, proved directly rather than asserted.
-    # Deliberately not done by running bats inside bats: bats 1.10 (what CI
-    # installs from apt; brew ships 1.14 locally) hands the child its own state
-    # and the child's tests become "unknown test name", and scrubbing BATS_* to
-    # avoid that breaks bats' own bootstrap. A few lines of bash say it better.
+@test "the ERR trap sees [ ], false and commands on every bash" {
+    # The mechanism, proved directly rather than asserted. Not done by running
+    # bats inside bats: bats 1.10 (what CI installs from apt; brew ships 1.14
+    # locally) hands the child its own state and the child's tests become
+    # "unknown test name", and scrubbing BATS_* to avoid that breaks bats' own
+    # bootstrap.
     #
-    # The probe is written from a variable so its deliberately-ungated assertion
-    # is not itself an offender in the test above.
+    # The probe is written from a variable so its deliberately-ungated
+    # assertion is not itself an offender in the test above.
     local probe="$BATS_TEST_TMPDIR/errtrap.sh"
     local dbl='[[ "hello" == *"NOPE"* ]]'
     cat >"$probe" <<PROBE
@@ -55,18 +55,37 @@ fired=0
 set -E
 trap 'fired=\$((fired + 1))' ERR
 $dbl
-printf 'after double bracket: %s\\n' "\$fired"
+printf 'double %s\\n' "\$fired"
 [ 1 -eq 2 ]
-printf 'after single bracket: %s\\n' "\$fired"
+printf 'single %s\\n' "\$fired"
 false
-printf 'after false: %s\\n' "\$fired"
+printf 'false %s\\n' "\$fired"
 grep -q NOPE <<< "hello"
-printf 'after grep: %s\\n' "\$fired"
+printf 'grep %s\\n' "\$fired"
 PROBE
     run bash "$probe"
     [ "$status" -eq 0 ] || return 1
-    printf '%s\n' "$output" | grep -qx 'after double bracket: 0' || return 1
-    printf '%s\n' "$output" | grep -qx 'after single bracket: 1' || return 1
-    printf '%s\n' "$output" | grep -qx 'after false: 2' || return 1
-    printf '%s\n' "$output" | grep -qx 'after grep: 3'
+
+    # `[ ]`, `false` and a command always fire the trap. This is the half that
+    # holds everywhere, and it is why those forms need no `|| return 1`.
+    local d s2 f g
+    d="$(printf '%s\n' "$output" | sed -n 's/^double //p')"
+    s2="$(printf '%s\n' "$output" | sed -n 's/^single //p')"
+    f="$(printf '%s\n' "$output" | sed -n 's/^false //p')"
+    g="$(printf '%s\n' "$output" | sed -n 's/^grep //p')"
+    [ "$((s2 - d))" -eq 1 ] || return 1
+    [ "$((f - s2))" -eq 1 ] || return 1
+    [ "$((g - f))" -eq 1 ] || return 1
+
+    # `[[ ]]` is the version-dependent half, and the whole reason for the rule:
+    # bash 3.2 (Apple's /bin/bash, which is what bats runs test bodies under on
+    # macOS) does not fire the trap for it. bash 4.4+ does. So on a Mac a
+    # non-final `[[ ]]` gates nothing while the same test gates correctly on
+    # CI's Linux bash 5 — local green would not mean CI green.
+    if [ "${BASH_VERSINFO[0]}" -lt 4 ] ||
+        { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -lt 4 ]; }; then
+        [ "$d" -eq 0 ]
+    else
+        [ "$d" -eq 1 ]
+    fi
 }
