@@ -128,12 +128,28 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 
 # Every prompt reads with `read … || fallback`, which also swallows an
 # interrupted read — only the SIGINT/SIGTERM trap can quit cleanly (exit 130).
+#
+# SIGINT is checked only when it is trappable at all. A shell that inherits
+# SIGINT already *ignored* cannot trap it — POSIX: a signal ignored on entry
+# stays ignored — so `trap … INT` becomes a silent no-op and `trap -p INT`
+# prints nothing. bats reaches that state when the suite runs as a set rather
+# than a single file, which is how this assertion passed alone and failed in a
+# full run. SIGTERM is never inherited-ignored here, so it is checked
+# unconditionally and is what actually proves the line ran.
 @test "a SIGINT trap is armed to quit cleanly" {
     run wiz 'declare -F on_interrupt >/dev/null && echo ok'
     [ "$output" = "ok" ]
-    run wiz 'trap -p INT'
-    [[ "$output" == *on_interrupt* ]] || return 1
     run wiz 'trap -p TERM'
+    [[ "$output" == *on_interrupt* ]] || return 1
+    run wiz 'trap -p INT'
+    if [ -z "$output" ]; then
+        run bash -c 'trap "" INT; bash -c "trap - INT; trap x INT; trap -p INT"'
+        [ -z "$output" ] || {
+            echo "SIGINT is trappable here, so the wizard should have armed it"
+            return 1
+        }
+        skip "SIGINT is inherited-ignored in this runner; a trap for it cannot be set"
+    fi
     [[ "$output" == *on_interrupt* ]] || return 1
 }
 

@@ -1238,8 +1238,9 @@ window_setup() {
 # chezdoctor is the only passive liveness signal this job has, so the input side
 # has to reach it too — otherwise the next silent outage passes it green again.
 @test "chezdoctor checks that there is anything to read" {
-    sect="$BATS_TEST_TMPDIR/sect.sh"
-    awk '/claudeDistiller/,/^fi$/' "$REPO_ROOT/scripts/bin/doctor.sh" >"$sect"
+    # The section is its own file now, so this reads it directly rather than
+    # awk-ing a range out of a 680-line script and hoping the range still holds.
+    sect="$REPO_ROOT/features/distill/doctor.sh"
     grep -q 'distill_source_count' "$sect"
     grep -q 'distill_source_roots' "$sect"
 }

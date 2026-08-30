@@ -6,4 +6,7 @@
 FEATURE_NAME="converge"
 FEATURE_TITLE="Converge this Mac to the repo"
 FEATURE_MODULE=""
-FEATURE_DOCTOR_ORDER="20"
+# No section of its own: what a converge check would look at — chezmoi, its
+# config, the source path — is not this feature's, it is chezmoi's, and lives
+# in features/doctor/checks/15-chezmoi.sh.
+FEATURE_DOCTOR_ORDER=""

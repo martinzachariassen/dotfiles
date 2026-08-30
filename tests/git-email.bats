@@ -20,7 +20,7 @@ setup() {
     GITCFG="$REPO_ROOT/src/dot_config/git/config.tmpl"
     SIGNERS="$REPO_ROOT/src/dot_config/git/allowed_signers.tmpl"
     WIZ="$REPO_ROOT/features/setup/cli.sh"
-    DOCTOR="$REPO_ROOT/scripts/bin/doctor.sh"
+    DOCTOR="$REPO_ROOT/features/sign/doctor.sh"
     COMPLETION="$REPO_ROOT/src/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     FIX="$(mktemp -d)"
     command -v chezmoi >/dev/null 2>&1 && HAS_CHEZMOI=1 || HAS_CHEZMOI=0
