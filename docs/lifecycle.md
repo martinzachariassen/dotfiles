@@ -87,36 +87,14 @@ Presence-convergence keeps installed *state* matching the repo; a parallel,
 **manual** step keeps the dotfiles matching it *structurally*. An apply never
 deletes — it only renders what the repo tracks — so untracked cruft (a dir some
 tool dropped, config for a package you've since removed) accumulates until you
-reconcile it. That's [`chezclean`](commands.md)'s job: the confirm-gated file
-analogue of `chezmirror`.
+reconcile it. That's `chezclean`'s job: the confirm-gated file analogue of
+`chezmirror`.
 
-`chezclean` reconciles two scopes against the repo, both reading their keep-list
-from [`src/.chezmoidata/cleanup.toml`](../src/.chezmoidata/cleanup.toml):
-
-- the **top level of `$HOME`** — untracked `~/.*` entries, spared by
-  `cleanup.keepHome` (it can't be `exact_`: it holds `~/Library`,
-  `~/Documents`, and other user data);
-- **`~/.config`** — untracked `~/.config/X`, spared by `cleanup.keepConfig`:
-  auth/state dirs like `op`, `gh`, `gcloud`, and chezmoi's own
-  `~/.config/chezmoi`.
-
-Neither scope descends past its immediate children, so a managed subdir
-(`nvim`, `zsh`, …) keeps its own untracked contents (caches, `.zcompdump`,
-local overrides). Nothing is removed without a confirmation (or an explicit
-`--all`/`YES=1`), and never at all without a controlling terminal.
-
-`chezclean` is **tool-aware**: config whose owning tool is still present is
-kept automatically and never offered, where "present" is the union of three
-signals — its brew package is installed, its command is on PATH (so tools
-from mise/gcloud/npm count too), **or** its owning VS Code extension is in
-`code --list-extensions`; uninstall the tool (or drop the extension) and its
-leftovers re-surface as removable. Most tools are matched by a stem
-heuristic (`command -v <name-minus-dot>`, e.g. `.gradle`→`gradle`); the
-`cleanup.owners` map supplies only the aliases where the dir name and the
-tool's command/package/extension diverge (`.kube`→`kubectl`, `.m2`→`mvn`
-from mise, `.lemminx`→the `redhat.vscode-xml` extension).
-`cleanup.toml` is the single source of truth for all three lists
-(`keepConfig`, `keepHome`, `owners`), so the two scopes can't drift apart.
+It reconciles two scopes — the top level of `$HOME` and `~/.config` — against
+what chezmoi manages, keeps anything whose owning tool is still installed, and
+removes only what you confirm. The full model, including the three
+tool-presence signals and the keep-lists, is in
+[features/clean](../features/clean/README.md).
 
 Dropped **Homebrew packages** are reconciled the same way, by hand:
 `chezmirror` runs `brew bundle cleanup` to uninstall anything no longer in a
@@ -146,8 +124,8 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezstatus` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
 | Active Brewfile tier set (shared by install check, cleanup, doctor) | `scripts/lib/brewfiles.sh` (`brew_active_files`, reads `packages.toml` via `chezmoi data`) |
-| Untracked dotfile cleanup (confirm-gated) | `scripts/bin/clean.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
-| chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/cleanup.toml` (`cleanup.owners`) |
+| Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
+| chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |

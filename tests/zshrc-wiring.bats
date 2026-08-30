@@ -222,10 +222,10 @@ _zprofile_path() {
     no_match 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
 }
 
-# Wiring only — behaviour is exercised end-to-end in tests/chezclean.bats.
+# Wiring only — behaviour is exercised end-to-end in features/clean/tests/.
 @test "zshrc defines the chezclean function routed through _chez_run" {
     grep -qE '^chezclean\(\) \{' "$ZSHRC"
-    sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/clean.sh'
+    sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/clean/cli.sh'
 }
 
 # chezreconcile must compose chezup (install) + chezmirror (removal), never

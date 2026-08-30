@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for clean.sh (chezclean): reconciles untracked dotfiles across $HOME's
+# Tests for the clean feature (chezclean): reconciles untracked dotfiles across $HOME's
 # top level and ~/.config to what chezmoi manages, removing only what's
 # confirmed. Candidates = entries minus managed minus keep-list; a drift there
 # could offer auth/state dirs for deletion, so these tests pin that computation
@@ -7,13 +7,13 @@
 #
 # Interactive/removing tests need a controlling terminal and are inverse-gated
 # from the headless safety/dry-run tests. Run the full set locally with:
-#     script -q /dev/null bats tests/chezclean.bats
+#     script -q /dev/null bats features/clean/tests/clean.bats
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SCRIPT="$REPO_ROOT/scripts/bin/clean.sh"
-    command -v bash >/dev/null 2>&1 || skip "bash not installed"
-    [ -x "$SCRIPT" ] || skip "clean.sh missing or not executable"
+    load '../../../core/testing/helper'
+    SCRIPT="$REPO_ROOT/features/clean/cli.sh"
+    skip_unless bash
+    [ -x "$SCRIPT" ] || skip "features/clean/cli.sh missing or not executable"
 
     # Fake $HOME mixing managed dirs, keep-listed dirs, and junk; candidates
     # must be exactly the junk.
