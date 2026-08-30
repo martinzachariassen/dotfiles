@@ -11,7 +11,7 @@
 # `vim.timeout` ms on every press.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     SRC_DIR="$REPO_ROOT/src"
     SETTINGS="$SRC_DIR/Library/Application Support/Code/User/settings.json.tmpl"
 

@@ -86,7 +86,7 @@ Every check names the fix. It changes nothing — the two `!` lines and the one 
 | --- | --- |
 | Terminal | [Ghostty](https://ghostty.org), [Zellij](https://zellij.dev), [Starship](https://starship.rs), Catppuccin Mocha, JetBrainsMono Nerd Font |
 | Shell | zsh with XDG layout, fzf, zoxide, Carapace completions, syntax highlighting, modern CLI aliases |
-| Editors | VS Code via Homebrew (extensions in [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt)), Neovim with LazyVim |
+| Editors | VS Code via Homebrew (extensions in [`features/vscode/extensions.txt`](features/vscode/extensions.txt)), Neovim with LazyVim |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
 | Runtimes | [mise](https://mise.jdx.dev) for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml` |
 | iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols. Xcode itself comes from `chezxcode` (Apple ID, ~40 GB), not from an apply |
@@ -104,7 +104,7 @@ This is tuned to one person's Apple Silicon Mac — the profiles and modules exi
 | Change | Where |
 | --- | --- |
 | Packages and apps | [`packages/Brewfile*`](packages/) — core, per-profile, per-module |
-| VS Code extensions | [`packages/vscode-extensions.txt`](packages/vscode-extensions.txt) |
+| VS Code extensions | [`features/vscode/extensions.txt`](features/vscode/extensions.txt) |
 | Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and per-profile defaults |
 | macOS defaults | [`scripts/bin/macos-defaults.sh`](scripts/bin/macos-defaults.sh) ([what it sets](docs/macos.md)) |
 | Repo URL in the installer | `REPO` in [`install.sh`](install.sh), or point at your fork without editing: `DOTFILES_REPO=<url> bash install.sh` |

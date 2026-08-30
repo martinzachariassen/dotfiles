@@ -19,21 +19,14 @@ extensions are managed by chezmoi.
   language server never breaks on a runtime bump. See
   [shell.md](shell.md#runtimes-mise).
 - **Extensions** — the single source of truth is
-  [`packages/vscode-extensions.txt`](../packages/vscode-extensions.txt). The
-  `run_onchange_after_03-vscode` hook **mirrors** it onto the machine:
-  installs every ID the manifest lists, uninstalls any extension not in it
-  (re-fires only when the list changes — see [lifecycle.md](lifecycle.md)).
-  `chezdoctor` reports drift in both directions read-only; the set logic
-  lives in [`scripts/lib/vscode.sh`](../scripts/lib/vscode.sh) (unit-tested
-  by `tests/vscode.bats`). The set covers the language toolchain: the
-  Java/Spring pack, Kotlin, Gradle/Maven, plus Docker, Postgres, and
-  shell/YAML/TOML tooling. The IaC/Kubernetes and Python extensions were
-  dropped 2026-08 as unused — their CLIs stay in the Brewfile, only the
-  editor integrations went. Several extensions are backed by CLIs from the
-  Brewfile (hadolint, shellcheck, shfmt) so they use the pinned binary
-  instead of downloading their own. A few entries are **module-gated** in the hook —
-  excluded from install *and* prune when the module is off: the Norwegian
-  dictionary (`locale`), and the Swift/iOS extensions (`appleDev`, below).
+  [`features/vscode/extensions.txt`](../features/vscode/extensions.txt), which
+  the `run_onchange_after_03-vscode` hook **mirrors** onto the machine: it
+  installs every ID listed and uninstalls anything not in it. A few entries are
+  module-gated. The set covers the language toolchain — the Java/Spring pack,
+  Kotlin, Gradle/Maven — plus Docker, Postgres and shell/YAML/TOML tooling. The
+  IaC/Kubernetes and Python extensions were dropped 2026-08 as unused; their
+  CLIs stay in the Brewfile, only the editor integrations went. How the mirror
+  works, and why it prunes: [features/vscode](../features/vscode/README.md).
 
 #### Appearance
 

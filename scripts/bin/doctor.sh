@@ -64,9 +64,9 @@ if [ -r "$_DOCTOR_DIR/../lib/brewfiles.sh" ]; then
     . "$_DOCTOR_DIR/../lib/brewfiles.sh"
 fi
 
-# shellcheck source=../lib/vscode.sh
-if [ -r "$_DOCTOR_DIR/../lib/vscode.sh" ]; then
-    . "$_DOCTOR_DIR/../lib/vscode.sh"
+# shellcheck source=../../features/vscode/lib.sh
+if [ -r "$_DOCTOR_DIR/../../features/vscode/lib.sh" ]; then
+    . "$_DOCTOR_DIR/../../features/vscode/lib.sh"
 fi
 
 # shellcheck source=../lib/git-signing.sh
@@ -324,9 +324,9 @@ fi
 # next apply's 03-vscode hook would reconcile.
 section "VS Code extensions"
 if command -v code >/dev/null 2>&1; then
-    vsc_manifest_file="$SOURCE_DIR/packages/vscode-extensions.txt"
+    vsc_manifest_file="$SOURCE_DIR/features/vscode/extensions.txt"
     if [ ! -f "$vsc_manifest_file" ]; then
-        warn "extension manifest missing: packages/vscode-extensions.txt"
+        warn "extension manifest missing: features/vscode/extensions.txt"
     else
         # Mirrors the 03-vscode hook's locale guard.
         vsc_exclude=()
@@ -346,7 +346,7 @@ if command -v code >/dev/null 2>&1; then
             fi
             if [ -n "$vsc_untracked" ]; then
                 n=$(printf '%s\n' "$vsc_untracked" | wc -l | tr -d ' ')
-                warn "$n installed extension(s) not in the manifest — \`chezmoi apply\` will prune them (add to packages/vscode-extensions.txt to keep)"
+                warn "$n installed extension(s) not in the manifest — \`chezmoi apply\` will prune them (add to features/vscode/extensions.txt to keep)"
             fi
         fi
     fi

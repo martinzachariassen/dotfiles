@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# Mirror VS Code extensions to packages/vscode-extensions.txt (installs listed,
-# uninstalls untracked). Re-runs when this script or the manifest changes.
+# Mirror VS Code extensions to features/vscode/extensions.txt (installs listed,
+# uninstalls untracked). The engine is features/vscode/hook.sh; this template
+# holds only what must be decided at render time.
 #
-# Marketplace extension manifest hash: {{ include "../packages/vscode-extensions.txt" | sha256sum }}
+# Both halves are hashed, so an edit to either re-fires the hook. Hashing only
+# this file would freeze the engine: chezmoi would keep matching the recorded
+# hash and the hook would simply never run again, with no error and no output.
+#
+# Engine hash:   {{ include "../features/vscode/hook.sh" | sha256sum }}
+# Manifest hash: {{ include "../features/vscode/extensions.txt" | sha256sum }}
 #
 # The presence marker below is part of the hash on purpose — see the same note in
 # run_onchange_after_02e. Skipping on a missing `code` CLI still exits 0, which
@@ -22,29 +28,9 @@ if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
-ROOT="{{ .chezmoi.workingTree }}"
-EXTENSIONS_FILE="$ROOT/packages/vscode-extensions.txt"
-EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
+export VSCODE_EXTENSIONS_DIR="{{ .chezmoi.homeDir }}/.vscode/extensions"
 
-# shellcheck source=../../scripts/lib/vscode.sh
-. "$ROOT/scripts/lib/vscode.sh"
-
-if ! command -v code >/dev/null 2>&1; then
-    echo "! VS Code CLI not found; extension sync skipped — re-runs automatically"
-    echo "  on the next \`chezup\`/\`chezapply\` once brew bundle has installed it"
-    exit 0
-fi
-
-if [ ! -f "$EXTENSIONS_FILE" ]; then
-    echo "! VS Code extension manifest missing: $EXTENSIONS_FILE"
-    exit 0
-fi
-
-installed_extensions() {
-    code --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true
-}
-
-# One manifest drives both install and prune; excluding off-module entries keeps them consistent.
+# Module gates are render-time decisions, so they are resolved here and passed in.
 EXCLUDES=()
 {{ if not (has "locale" (dig "modules" (list) .)) -}}
 EXCLUDES+=("streetsidesoftware.code-spell-checker-norwegian-bokmal") # locale module
@@ -52,84 +38,5 @@ EXCLUDES+=("streetsidesoftware.code-spell-checker-norwegian-bokmal") # locale mo
 {{ if not (has "appleDev" (dig "modules" (list) .)) -}}
 EXCLUDES+=("swiftlang.swift-vscode" "sweetpad.sweetpad" "vadimcn.vscode-lldb" "llvm-vs-code-extensions.lldb-dap") # appleDev module
 {{ end -}}
-MANIFEST="$(vscode_read_manifest "$EXTENSIONS_FILE" ${EXCLUDES[@]+"${EXCLUDES[@]}"})"
 
-install_marketplace_extensions() {
-    local installed ext
-    installed="$(installed_extensions)"
-    while IFS= read -r ext || [ -n "$ext" ]; do
-        [ -n "$ext" ] || continue
-        if printf '%s\n' "$installed" | grep -qxF "$ext"; then
-            echo "✓ extension already installed: $ext"
-        else
-            echo "→ installing extension: $ext"
-            # Continue-on-error: one bad ID mustn't abort the rest.
-            code --install-extension "$ext" || echo "  ! failed to install: $ext (continuing)"
-        fi
-    done <<EOF
-$MANIFEST
-EOF
-}
-
-# Fallback for extension packs the CLI refuses to uninstall (external dependents).
-remove_extension_on_disk() {
-    local ext="$1" changed=false dir cache
-
-    shopt -s nullglob nocaseglob
-    for dir in "$EXTENSIONS_DIR/$ext"-*; do
-        [ -d "$dir" ] || continue
-        rm -rf "$dir" && changed=true
-    done
-    shopt -u nullglob nocaseglob
-
-    cache="$EXTENSIONS_DIR/extensions.json"
-    if [ -f "$cache" ] && command -v python3 >/dev/null 2>&1; then
-        if python3 - "$cache" "$ext" <<'PY'
-import json, sys
-cache, ext = sys.argv[1], sys.argv[2].lower()
-try:
-    data = json.load(open(cache))
-except Exception:
-    sys.exit(1)
-kept = [e for e in data if e.get("identifier", {}).get("id", "").lower() != ext]
-if len(kept) == len(data):
-    sys.exit(1)  # nothing pruned
-json.dump(kept, open(cache, "w"))
-PY
-        then
-            changed=true
-        fi
-    fi
-
-    [ "$changed" = true ]
-}
-
-prune_untracked_extensions() {
-    local installed untracked ext
-    installed="$(installed_extensions)"
-    untracked="$(vscode_untracked "$installed" "$MANIFEST")"
-    [ -n "$untracked" ] || return 0
-
-    while IFS= read -r ext || [ -n "$ext" ]; do
-        [ -n "$ext" ] || continue
-        echo "→ uninstalling untracked extension: $ext"
-        if code --uninstall-extension "$ext" >/dev/null 2>&1; then
-            continue
-        fi
-        if remove_extension_on_disk "$ext"; then
-            echo "  ↳ CLI declined; removed on disk instead"
-        else
-            echo "  ! failed to uninstall: $ext (continuing)"
-        fi
-    done <<EOF
-$untracked
-EOF
-}
-
-echo "▶ VS Code extensions"
-echo "  Manifest: $EXTENSIONS_FILE"
-
-install_marketplace_extensions
-prune_untracked_extensions
-
-echo "✓ VS Code extensions mirror the manifest"
+exec bash "{{ .chezmoi.workingTree }}/features/vscode/hook.sh" ${EXCLUDES[@]+"${EXCLUDES[@]}"}

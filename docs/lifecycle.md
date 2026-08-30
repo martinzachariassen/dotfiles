@@ -54,7 +54,7 @@ short-circuit, so a clean machine is a quick no-op — keeps "make this Mac
 match the repo" always true, with no separate fix step.
 
 `run_onchange_after_02e/03/04/05` mutate state from a fixed manifest
-(`.pre-commit-config.yaml`, `packages/vscode-extensions.txt`, macOS defaults,
+(`.pre-commit-config.yaml`, `features/vscode/extensions.txt`, macOS defaults,
 the storecode installer). The action performed is identical regardless of
 apply count, so these re-fire only when their embedded content hash changes.
 
@@ -72,7 +72,7 @@ silently uninstall, so `chezapply` flags untracked packages and `chezmirror`
 reconciles them behind a confirm. VS Code extensions are the deliberate
 exception: they carry no data and are trivial to reinstall, so
 `run_onchange_after_03-vscode` mirrors them outright — installing what
-`packages/vscode-extensions.txt` lists and pruning what it doesn't — with
+`features/vscode/extensions.txt` lists and pruning what it doesn't — with
 `chezdoctor` surfacing the drift read-only. Some extensions also drop a
 top-level dir in `$HOME` (`.sts4`, `.lemminx`, …); those are **not**
 touched by an apply — `chezclean` removes them on demand once their owning
@@ -128,7 +128,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
-| VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
+| VS Code extension mirror | `run_onchange_after_03-vscode` (a thin template) + `features/vscode/{hook,lib}.sh` + `features/vscode/extensions.txt` (drift check in `scripts/bin/doctor.sh`) |
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
