@@ -71,8 +71,29 @@ precommit_pattern() {
     grep -q 'pathspec is wrong' "$CI"
 }
 
-@test "CI runs bats recursively so feature-owned suites are discovered" {
-    grep -qE '^ *- run: bats -r tests/$' "$CI"
+@test "CI runs bats over both test roots, recursively" {
+    grep -qE '^ *- run: bats -r tests/ features/$' "$CI"
+}
+
+@test "every .bats file in the repo is under a root CI actually runs" {
+    # Adding a suite somewhere CI does not look loses its coverage silently:
+    # the run stays green because the tests never execute. 50 feature-owned
+    # tests were in exactly that state for the length of one commit.
+    local roots stray=() f
+    roots="$(sed -n 's/^ *- run: bats -r \(.*\)$/\1/p' "$CI")"
+    [ -n "$roots" ] || return 1
+    while IFS= read -r f; do
+        local covered=1 r
+        for r in $roots; do
+            case "$f" in "${r%/}"/*) covered=0 ;; esac
+        done
+        [ "$covered" -eq 0 ] || stray+=("$f")
+    done < <(git -C "$REPO_ROOT" ls-files -- '*.bats')
+    if [ "${#stray[@]}" -gt 0 ]; then
+        printf 'not run by CI (roots: %s):\n' "$roots" >&2
+        printf '  %s\n' "${stray[@]}" >&2
+    fi
+    [ "${#stray[@]}" -eq 0 ]
 }
 
 @test "shellcheck follows source directives relative to the script" {

@@ -9,7 +9,8 @@ This feature has not been moved yet. Until it is, these are its parts:
 
 - `src/.chezmoidata/storecode.toml`
 - `src/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl`
-- `tests/cleanup-mirror.bats (storecode half)`
+- `features/storecode/tests/storecode.bats` — moved here already, along
+  with the `~/.storecode` keepHome exemption it shares with `clean`
 
 Moving them here — code, tests and this document — is what turns this stub into
 the dossier. See [docs/architecture.md](../../docs/architecture.md).

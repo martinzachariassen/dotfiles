@@ -4,7 +4,7 @@
 # only what you confirm. Config whose owning tool is still installed is kept
 # automatically (brew package, PATH command, or VS Code extension present).
 #
-# Keep-lists and the tool-ownership map live in src/.chezmoidata/cleanup.toml.
+# Keep-lists and the tool-ownership map live in src/.chezmoidata/clean.toml.
 # Env: DRY_RUN=1 preview only; YES=1 accept-all. CHEZCLEAN_TARGET overrides $HOME (tests).
 
 set -uo pipefail
@@ -232,7 +232,7 @@ usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
 
   YES=1 chezclean   accept-all with no prompt (still needs a terminal).
   Keep an entry for good: add it to keepHome / keepConfig in
-  src/.chezmoidata/cleanup.toml; map a tool's config dir to its command in
+  src/.chezmoidata/clean.toml; map a tool's config dir to its command in
   cleanup.owners (e.g. .kube -> kubectl).
 EOF
 }

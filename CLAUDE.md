@@ -38,24 +38,17 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   *adds/updates* (renders managed files, `brew bundle`, `mise install`). Reconciling a
   machine back to the repo — removing what the repo no longer tracks — is done by two
   confirm-gated verbs you run by hand: `chezmirror` for Homebrew packages, and
-  `chezclean` (`scripts/bin/clean.sh`) for untracked dotfiles. There are no
+  `chezclean` (`features/clean/cli.sh`) for untracked dotfiles. There are no
   hand-maintained deprecation lists and no auto-prune hooks. If a machine drifts, it's
   up to that machine's owner to run the verbs.
-- **`chezclean` reconciles both the top level of `$HOME` and `~/.config`.** `~/.config`
-  is a normal `dot_config` dir (not `exact_`), so an apply won't prune it; instead
-  `chezclean` surfaces untracked `~/.*` (vs `cleanup.keepHome`) and untracked
-  `~/.config/X` (vs `cleanup.keepConfig`) and removes only what you confirm. It's
-  **tool-aware**: config whose owning tool is still present is kept automatically — the
-  union of three signals: the tool's brew package is installed, its command is on PATH
-  (so mise/gcloud tools count), *or* its owning VS Code extension is in
-  `code --list-extensions` — matching most tools by a stem heuristic
-  (`command -v <name-minus-dot>`) and the `cleanup.owners` map for
-  name↔command/package/extension aliases (`.kube`→`kubectl`, `.m2`→`mvn` from mise,
-  `.lemminx`→`redhat.vscode-xml`). Adding a tool = track it
-  (`chezmoi add`), add it to a keep-list, or (if its dir name diverges from its
-  command) add an `owners` alias; `keepConfig`/`keepHome`/`owners` all live in
-  `cleanup.toml` so they can't drift. Full model in
-  [docs/lifecycle.md](docs/lifecycle.md).
+- **`chezclean` reconciles both the top level of `$HOME` and `~/.config`.**
+  `~/.config` is a normal `dot_config` dir (not `exact_`), so an apply won't prune
+  it. `chezclean` is **tool-aware** — config whose owning tool is still installed
+  is kept automatically — and `clean.toml` holds all three lists
+  (`keepHome`, `keepConfig`, `owners`) so the two scopes can't drift apart.
+  Adding a tool means tracking it (`chezmoi add`), adding it to a keep-list, or —
+  if its dir name diverges from its command — adding an `owners` alias. Full
+  model in [features/clean](features/clean/README.md).
 - **Xcode is out-of-band, by design.** `install.sh` installs only the Xcode
   *Command Line Tools* (Homebrew's prerequisite), and the `appleDev` module's
   Brewfile installs only the Swift *tooling*. Xcode.app itself, the selected

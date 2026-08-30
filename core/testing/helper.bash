@@ -54,3 +54,41 @@ stub_bin() {
     } >"$dir/$name"
     chmod +x "$dir/$name"
 }
+
+# ── chezmoi rendering ────────────────────────────────────────────────────────
+# Several suites need to render a template against the repo's real .chezmoidata.
+# Doing it by hand takes twenty lines of stub config, and three suites had their
+# own copy.
+
+# chezmoi_stub_config [DATA…] — write a minimal chezmoi config into
+# $BATS_TEST_TMPDIR and set STUB_DIR/SRC_DIR. Extra args are appended verbatim
+# inside [data], one per line.
+chezmoi_stub_config() {
+    SRC_DIR="$REPO_ROOT/src"
+    STUB_DIR="$BATS_TEST_TMPDIR/chezmoi-stub"
+    mkdir -p "$STUB_DIR/home/.config/chezmoi" "$STUB_DIR/dst"
+    {
+        printf 'sourceDir = "%s"\n\n[data]\n' "$SRC_DIR"
+        printf '    profile = "personal"\n'
+        local extra
+        for extra in "$@"; do printf '    %s\n' "$extra"; done
+    } >"$STUB_DIR/home/.config/chezmoi/chezmoi.toml"
+}
+
+# chezmoi_render_str TEMPLATE — render one template string against .chezmoidata.
+chezmoi_render_str() {
+    HOME="$STUB_DIR/home" XDG_CONFIG_HOME="$STUB_DIR/home/.config" \
+        chezmoi execute-template \
+        --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
+        --source="$SRC_DIR" "$1"
+}
+
+# chezmoi_render_file FILE [HOME] — render a template file, optionally against a
+# fake HOME so {{ .chezmoi.homeDir }} points into it.
+chezmoi_render_file() {
+    local home="${2:-$STUB_DIR/home}"
+    HOME="$home" XDG_CONFIG_HOME="$home/.config" \
+        chezmoi execute-template \
+        --config="$STUB_DIR/home/.config/chezmoi/chezmoi.toml" \
+        --source="$SRC_DIR" <"$1"
+}

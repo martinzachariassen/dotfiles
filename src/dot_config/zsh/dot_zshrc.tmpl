@@ -895,7 +895,7 @@ chezreconcile() {
 # Reconcile untracked dotfiles to what chezmoi manages (both $HOME's top level
 # and ~/.config, per cleanup.toml). The file analogue of chezmirror.
 chezclean() {
-    _chez_run scripts/bin/clean.sh "$@"
+    _chez_run features/clean/cli.sh "$@"
 }
 
 # Print every dotfiles verb, grouped by frequency. Mirrors README.md /
