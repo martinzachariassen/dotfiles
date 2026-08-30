@@ -394,142 +394,23 @@ dotfiles() {
     fi
 }
 
-# `chezmoi apply --force`, with one upfront confirm when managed files in $HOME
-# have drifted (avoids colliding with later sudo prompts). -v for per-file diffs.
+# Apply without pulling — the building block chezup calls. Flags Brewfile drift
+# (packages installed but untracked); never uninstalls.
 chezapply() {
-    local src={{ .chezmoi.workingTree | quote }}
-    local status_output response
-    _chez_explain "Applying config" \
-        "Writes this repo's files into your home folder and installs anything" \
-        "your profile declares that is missing. Never uninstalls." \
-        "Local edits to managed files are overwritten — you get one confirm first."
-    status_output=$(chezmoi status --exclude scripts 2>&1)
-    if [ -n "$status_output" ]; then
-        echo
-        echo "── Pending changes ───────────────────────────────────────────"
-        echo "$status_output"
-        echo "──────────────────────────────────────────────────────────────"
-        echo "  What this means:"
-        echo "    chezmoi has file changes to apply and/or managed files in \$HOME drifted."
-        echo
-        echo "  Status codes:"
-        echo "    A add   M modify   D remove"
-        echo "    left column = your \$HOME edits (drift), right column = repo → \$HOME (apply)"
-        echo "    plain-language breakdown: \`chezstatus\`"
-        echo
-        echo "  Choices:"
-        echo "    y + Enter      apply now with \`chezmoi apply --force\`"
-        echo "                   this overwrites drift in managed \$HOME files"
-        echo "    n or Enter     abort; inspect first with \`chezstatus\` (plain) or \`chezmoi diff\` (raw)"
-        echo
-        printf "Apply these managed dotfile changes now? [y/N] "
-        read -r response < /dev/tty
-        case "$response" in
-            [yY]|[yY][eE][sS]) ;;
-            *) echo "Aborted."; return 1 ;;
-        esac
-    fi
-    chezmoi apply --force "$@"
-    local rc=$?
-    # Flag untracked packages so `chezapply` never silently uninstalls.
-    if command -v brew >/dev/null 2>&1; then
-        local untracked
-        untracked=$(_chez_brew_removals "$src")
-        if [ -n "$untracked" ]; then
-            echo
-            echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but declared by no active Brewfile."
-            echo "    review: chezstatus   ·   reconcile (uninstall): chezmirror"
-        fi
-    fi
-    return $rc
+    _chez_run features/converge/apply.sh "$@"
 }
 
-# Read-only drift explainer: plain-language file drift (repo ↔ $HOME) AND
+# Read-only drift explainer: plain-language file drift (repo <-> $HOME) AND
 # untracked-package drift, in one report. Never applies, pulls, or removes.
 chezstatus() {
-    case "${1:-}" in
-        -h | --help)
-            echo "usage: chezstatus [-v|--verbose] [PATH …]"
-            echo "  (no args)   plain-language summary: pending changes, local drift, untracked packages"
-            echo "  PATH        raw \`chezmoi diff\` for a file (e.g. chezstatus ~/.zshrc)"
-            echo "  -v          raw \`chezmoi diff\` for everything"
-            return 0
-            ;;
-        -v | --verbose)
-            shift
-            chezmoi diff "$@"
-            return
-            ;;
-        ?*)
-            chezmoi diff "$@"
-            return
-            ;;
-    esac
-
-    local src={{ .chezmoi.workingTree | quote }}
-    local status_output
-    status_output=$(chezmoi status --exclude scripts 2>&1) || {
-        print -ru2 -- "chezstatus: \`chezmoi status\` failed:"
-        print -ru2 -- "$status_output"
-        return 1
-    }
-    if [ -z "$status_output" ]; then
-        echo "  ✓ in sync — no pending changes, nothing edited locally"
-    else
-        # right column → "apply would write", left column → "you edited locally".
-        local pending drift line col1 col2 path
-        pending=""
-        drift=""
-        while IFS= read -r line; do
-            [ -n "$line" ] || continue
-            col1=${line:0:1}
-            col2=${line:1:1}
-            path=${line:3}
-            case "$col2" in
-                A) pending+="    add      ~/$path"$'\n' ;;
-                M) pending+="    modify   ~/$path"$'\n' ;;
-                D) pending+="    remove   ~/$path"$'\n' ;;
-            esac
-            case "$col1" in
-                A) drift+="    added    ~/$path"$'\n' ;;
-                M) drift+="    edited   ~/$path"$'\n' ;;
-                D) drift+="    deleted  ~/$path"$'\n' ;;
-            esac
-        done <<<"$status_output"
-
-        if [ -n "$pending" ]; then
-            echo "── Repo → \$HOME · what \`chezapply\` would write ───────────────"
-            printf '%s' "$pending"
-            echo
-        fi
-        if [ -n "$drift" ]; then
-            echo "── Local drift · managed files you edited in \$HOME ───────────"
-            printf '%s' "$drift"
-            echo "  ⚠ \`chezapply\` overwrites these. Keep an edit instead: chezmoi re-add ~/…"
-            echo
-        fi
-    fi
-
-    if command -v brew >/dev/null 2>&1; then
-        local removals
-        removals=$(_chez_brew_removals "$src")
-        if [ -n "$removals" ]; then
-            echo "── Untracked Homebrew packages (in no active Brewfile tier) ───"
-            printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
-            echo "  reconcile (uninstall): chezmirror"
-            echo
-        fi
-    fi
-
-    echo "  See a file's exact lines:  chezstatus ~/path   ·   all:  chezstatus -v"
-    echo "  Apply now:                 chezapply"
+    _chez_run features/converge/status.sh "$@"
 }
 
 # ─── Everyday: the two commands that keep a machine in sync ───────────────────
 # Converge this Mac to the repo: pull + preview + apply.
 # Knobs: YES=1 skip confirm · DRY_RUN=1 print without running. Extra args → apply.
 chezup() {
-    _chez_run scripts/bin/chezup.sh "$@"
+    _chez_run features/converge/up.sh "$@"
 }
 
 # Read-only full-stack health check.
@@ -618,20 +499,6 @@ chezbump() {
     _chez_run features/brew/bump.sh "$@"
 }
 
-# "<kind>\t<name>" for every Homebrew item no ACTIVE Brewfile tier declares.
-# The implementation is features/brew/lib/removals.sh — shared with mirror.sh
-# and bump.sh so "untracked" cannot mean two different things. This wrapper
-# exists only because chezapply and chezstatus still live in this file.
-_chez_brew_removals() {
-    local src=$1
-    if [ ! -r "$src/features/brew/lib/removals.sh" ]; then
-        echo "  ! cannot resolve the removal set: no $src/features/brew/lib/removals.sh" >&2
-        return 1
-    fi
-    . "$src/features/brew/lib/removals.sh"
-    brew_removals "$src"
-}
-
 # Removal direction of the Brewfile: uninstall untracked packages, then prune
 # orphaned dependencies. Not wired into `chezapply` — a routine apply must never
 # silently uninstall. `chezreconcile` chains chezup (install) + this (remove).
@@ -643,19 +510,7 @@ chezmirror() {
 # (remove what it no longer tracks). Untracked *files* are a separate step
 # (`chezclean`). Honours DRY_RUN=1 and YES=1. Trailing args pass to chezup.
 chezreconcile() {
-    _chez_explain "Full package reconcile" \
-        "Two passes: chezup installs what the Brewfiles declare, then chezmirror" \
-        "offers to remove what they don't. Together they make this Mac match the repo."
-    chezup "$@" || return $?
-    echo
-    if [ "${DRY_RUN:-}" = 1 ]; then
-        echo "── Package removals chezmirror would reconcile (preview) ──────"
-        chezmirror -n
-        echo "  (DRY_RUN=1 — re-run without it to prune, or run \`chezmirror\`.)"
-        return 0
-    fi
-    echo "── Reconciling package removals (chezmirror) ─────────────────"
-    chezmirror
+    _chez_run features/converge/reconcile.sh "$@"
 }
 
 # Reconcile untracked dotfiles to what chezmoi manages (both $HOME's top level

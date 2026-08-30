@@ -142,9 +142,14 @@ setup() {
 @test "the destructive verbs explain themselves before acting" {
     # chezmirror is a bash script now and uses core/ui.sh's explain_titled,
     # which is kept byte-identical to the zsh _chez_explain by tests/ui.bats.
-    grep -q 'explain_titled' "$REPO_ROOT/features/brew/mirror.sh"
-    sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -q '_chez_explain'
-    sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC" | grep -q '_chez_explain'
+    # All three are bash scripts now and use core/ui.sh's explain_titled, which
+    # tests/ui.bats keeps byte-identical to the zsh _chez_explain they used.
+    for s in features/brew/mirror.sh features/converge/apply.sh features/converge/reconcile.sh; do
+        grep -q 'explain_titled' "$REPO_ROOT/$s" || {
+            echo "$s no longer explains itself before acting"
+            return 1
+        }
+    done
 }
 
 @test "chezhelp documents the QUIET knob" {

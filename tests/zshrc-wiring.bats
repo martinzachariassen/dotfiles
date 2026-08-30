@@ -179,7 +179,7 @@ _zprofile_path() {
 }
 
 @test "chezup and chezdoctor route through _chez_run (no stale bare-path calls)" {
-    sed -n '/^chezup() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/chezup.sh'
+    sed -n '/^chezup() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/up.sh'
     sed -n '/^chezdoctor() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/doctor.sh'
 }
 
@@ -219,14 +219,11 @@ _zprofile_path() {
     sed -n '/^chezbump() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/brew/bump.sh'
 }
 
-# chezapply and chezstatus still live in this file and still need the removal
-# set, so the wrapper that reaches the shared lib must stay until they move.
-@test "the removal-set wrapper delegates to the shared lib, never a second copy" {
-    helper="$(sed -n '/^_chez_brew_removals() {/,/^}/p' "$ZSHRC")"
-    grep -qF 'features/brew/lib/removals.sh' <<<"$helper"
-    grep -qF 'brew_removals "$src"' <<<"$helper"
-    # The implementation must not have been copied back into the template.
+# Every verb that touches Homebrew is a script now, so no copy of the removal
+# logic may remain in the template.
+@test "the template keeps no copy of the package-removal logic" {
     no_match 'brew bundle cleanup' "$ZSHRC"
+    no_match '_chez_brew_removals\(\)' "$ZSHRC"
 }
 
 # Wiring only — behaviour is exercised end-to-end in features/clean/tests/.
@@ -237,17 +234,25 @@ _zprofile_path() {
 
 # chezreconcile must compose chezup (install) + chezmirror (removal), never
 # re-implement either. Behaviour is exercised in tests/chezreconcile.bats.
-@test "zshrc defines chezreconcile composing chezup then chezmirror" {
+# Composition is asserted against the script in
+# features/converge/tests/reconcile.bats; this only pins the wiring.
+@test "zshrc defines chezreconcile routed through _chez_run" {
     grep -qE '^chezreconcile\(\) \{' "$ZSHRC"
-    body="$(sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC")"
-    grep -qF 'chezup' <<<"$body"
-    grep -qF 'chezmirror' <<<"$body"
+    sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/reconcile.sh'
 }
 
+@test "zshrc defines chezapply and chezstatus routed through _chez_run" {
+    sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/apply.sh'
+    sed -n '/^chezstatus() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/status.sh'
+}
+
+# chezapply reports package drift and points at chezmirror; it must never
+# uninstall. Asserted against the script now — the template only wraps it.
 @test "chezapply surfaces Brewfile drift but never auto-uninstalls" {
-    grep -qE '^_chez_brew_removals\(\) \{' "$ZSHRC"
-    grep -qF 'reconcile (uninstall): chezmirror' "$ZSHRC"
-    ! sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -qF 'brew bundle cleanup'
+    APPLY="$REPO_ROOT/features/converge/apply.sh"
+    grep -qF 'brew_removals' "$APPLY"
+    grep -qF 'reconcile (uninstall): chezmirror' "$APPLY"
+    no_match 'brew (bundle cleanup|uninstall|untap)' "$APPLY"
 }
 
 # ─── Startup cost ──────────────────────────────────────────────────────────
