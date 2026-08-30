@@ -4,8 +4,8 @@
 # against a stubbed chezmoi.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    BOOT="$REPO_ROOT/scripts/bin/bootstrap-auth.sh"
+    load '../../../core/testing/helper'
+    BOOT="$REPO_ROOT/features/auth/cli.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed"
 
     STUBS="$(mktemp -d)"

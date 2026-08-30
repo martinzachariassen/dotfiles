@@ -69,9 +69,9 @@ if [ -r "$_DOCTOR_DIR/../../features/vscode/lib.sh" ]; then
     . "$_DOCTOR_DIR/../../features/vscode/lib.sh"
 fi
 
-# shellcheck source=../lib/git-signing.sh
-if [ -r "$_DOCTOR_DIR/../lib/git-signing.sh" ]; then
-    . "$_DOCTOR_DIR/../lib/git-signing.sh"
+# shellcheck source=../../features/sign/lib.sh
+if [ -r "$_DOCTOR_DIR/../../features/sign/lib.sh" ]; then
+    . "$_DOCTOR_DIR/../../features/sign/lib.sh"
 fi
 
 # shellcheck source=../lib/xcode.sh
@@ -203,7 +203,7 @@ if [ "$SIGNING_MODE" = "off" ]; then
 elif [ "$SIGNING_MODE" = "ssh-key" ]; then
     note "signing uses a plain SSH key (signingMode = ssh-key), not the 1Password agent"
 elif [ -z "$SSH_SIGN" ]; then
-    warn "scripts/lib/git-signing.sh not readable — skipping the signing checks"
+    warn "features/sign/lib.sh not readable — skipping the signing checks"
 elif [ -x "$SSH_SIGN" ]; then
     pass "op-ssh-sign present"
 else

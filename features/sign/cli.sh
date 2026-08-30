@@ -28,8 +28,8 @@ fi
 . "$_DIR/../../core/chezmoi-data.sh"
 # shellcheck source=../../core/prompt-meta.sh
 . "$_DIR/../../core/prompt-meta.sh"
-# shellcheck source=../lib/git-signing.sh
-. "$_DIR/../lib/git-signing.sh"
+# shellcheck source=lib.sh
+. "$_DIR/lib.sh"
 ui_init_logging
 
 on_interrupt() {

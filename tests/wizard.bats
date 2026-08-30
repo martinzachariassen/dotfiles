@@ -40,7 +40,7 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 # reset the answer.
 @test "corpusRemote is replayed by both wizard and signing, unconditionally" {
     grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/wizard.sh"
-    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/signing.sh"
+    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/features/sign/cli.sh"
     # Inside the init_flags array literal, not behind an `if`.
     run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/scripts/bin/wizard.sh"
     [[ "$output" == *"prompt_msg corpusRemote"* ]] || return 1
