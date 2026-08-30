@@ -22,6 +22,9 @@ setup() {
     # The real resolver, so these zsh-side tests exercise the committed lib —
     # _chez_brew_removals sources it out of the repo root it's handed.
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
+    # chezapply/chezstatus reach the resolver through the same lib the
+    # extracted verbs do, so the fake repo has to carry it too.
+    cp "$REPO_ROOT/features/brew/lib/removals.sh" "$FAKE/features/brew/lib/removals.sh"
     printf 'brew "git"\n' >"$FAKE/features/brew/Brewfile"
     : >"$FAKE/features/brew/Brewfile.mac-apps"
     : >"$FAKE/features/brew/Brewfile.personal"
@@ -96,6 +99,15 @@ run_zsh() {
         BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
         CHEZMOI_STATUS="${CHEZMOI_STATUS:-}" CHEZMOI_APPLY_RC="${CHEZMOI_APPLY_RC:-0}" \
         zsh -c "$1"
+}
+
+# The verbs that have moved out of the template are run as the scripts they are,
+# against the fake repo. Only the ones still inline need run_zsh.
+run_bash() {
+    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$FAKE" \
+        DATA_JSON_FILE="$DATA_JSON_FILE" \
+        BREW_CLEANUP_OUT="${BREW_CLEANUP_OUT:-}" \
+        bash "$@"
 }
 
 # ─── _chez_run: the self-heal wrapper ───────────────────────────────────────
@@ -263,7 +275,7 @@ orphan-cli
 Run `brew bundle cleanup --force` to make these changes.
 OUT
     BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
-        run_zsh "$(extract chezbump _chez_brew_removals); chezbump"
+        run_bash "$REPO_ROOT/features/brew/bump.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"formula"* ]] || return 1
     [[ "$output" == *"orphan-cli"* ]] || return 1
@@ -273,7 +285,7 @@ OUT
 @test "chezbump reports a fully-tracked machine when nothing is untracked" {
     : >"$STUBS/cleanup.out"  # brew bundle cleanup finds nothing to remove
     BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
-        run_zsh "$(extract chezbump _chez_brew_removals); chezbump"
+        run_bash "$REPO_ROOT/features/brew/bump.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"every installed package is tracked"* ]] || return 1
 }
