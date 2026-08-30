@@ -23,7 +23,7 @@ teardown() { [ -n "${STUBS:-}" ] && rm -rf "$STUBS"; }
 # Pull the multi-line has_module body out of the script (no template directives).
 # has_module calls cm_has_module/cm_data_json, so chezmoi-data.sh must be sourced too.
 extract() {
-    printf '. "%s/scripts/lib/chezmoi-data.sh"; ' "$REPO_ROOT"
+    printf '. "%s/core/chezmoi-data.sh"; ' "$REPO_ROOT"
     sed -n '/^has_module() {/,/^}/p' "$BOOT"
 }
 

@@ -41,7 +41,7 @@ setup() {
     grep -qF '$seenDefault := $modules' "$TMPL"
 }
 
-# scripts/lib/modules.sh rewrites these two lines in the *generated* config, so
+# core/modules.sh rewrites these two lines in the *generated* config, so
 # its rendering must be byte-identical to the template's or an edit and a later
 # init would fight over formatting. Same range expression = same output.
 @test "modules and modulesSeen render through the same array expression" {
@@ -51,7 +51,7 @@ setup() {
         | sort -u)"
     [ "$(printf '%s\n' "$shape" | grep -c .)" -eq 1 ]
     # …and that shape is what modules_toml_array emits.
-    run bash -c ". '$REPO_ROOT/scripts/lib/modules.sh'; modules_toml_array a b"
+    run bash -c ". '$REPO_ROOT/core/modules.sh'; modules_toml_array a b"
     [ "$output" = '["a", "b"]' ]
 }
 

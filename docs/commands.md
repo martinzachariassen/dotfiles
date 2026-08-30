@@ -73,7 +73,7 @@ offers the difference:
 Both lists live in `~/.config/chezmoi/chezmoi.toml`, are emitted by
 [`src/.chezmoi.toml.tmpl`](../src/.chezmoi.toml.tmpl) (so `chezmoi init`
 round-trips them rather than wiping them), and are read and rewritten through
-[`scripts/lib/modules.sh`](../scripts/lib/modules.sh), shared with
+[`core/modules.sh`](../core/modules.sh), shared with
 `chezdistill --setup` so the two can't write the list differently.
 
 ## When a command says its script is missing
@@ -207,7 +207,7 @@ keep only results:
 QUIET=1 chezup
 ```
 
-The vocabulary lives in [`scripts/lib/log.sh`](../scripts/lib/log.sh)
+The vocabulary lives in [`core/ui.sh`](../core/ui.sh)
 (`explain`, `ui_init_steps`, `step_begin`, `ui_elapsed`). `install.sh` mirrors it
 by hand rather than sourcing it: it runs via `curl | bash` **before the repo
 exists on disk**, so there is nothing to source yet — `tests/setup-ux.bats`

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Coverage for scripts/lib/modules.sh — the single answer to "which modules has
+# Coverage for core/modules.sh — the single answer to "which modules has
 # THIS Mac been offered, and how is that list written back?", shared by chezup's
 # new-module gate, and by `chezdistill --setup` when it enables claudeDistiller.
 #
@@ -9,7 +9,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LIB="$REPO_ROOT/scripts/lib/modules.sh"
+    LIB="$REPO_ROOT/core/modules.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed (modules.sh needs it)"
 
     # Mirrors the shape of `chezmoi data`: a catalog of four, two enabled, one

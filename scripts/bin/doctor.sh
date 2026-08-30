@@ -9,12 +9,12 @@ set -uo pipefail
 
 # log.sh is a committed sibling; fail loudly if a checkout is missing it.
 _DOCTOR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-if [ ! -r "$_DOCTOR_DIR/../lib/log.sh" ]; then
-    printf 'doctor: missing %s\n' "$_DOCTOR_DIR/../lib/log.sh" >&2
+if [ ! -r "$_DOCTOR_DIR/../../core/ui.sh" ]; then
+    printf 'doctor: missing %s\n' "$_DOCTOR_DIR/../../core/ui.sh" >&2
     exit 1
 fi
-# shellcheck source=../lib/log.sh
-. "$_DOCTOR_DIR/../lib/log.sh"
+# shellcheck source=../../core/ui.sh
+. "$_DOCTOR_DIR/../../core/ui.sh"
 ui_init_status
 
 echo
@@ -49,14 +49,14 @@ section() { s_section "$1"; }
 
 SOURCE_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-# shellcheck source=../lib/semver.sh
-if [ -r "$_DOCTOR_DIR/../lib/semver.sh" ]; then
-    . "$_DOCTOR_DIR/../lib/semver.sh"
+# shellcheck source=../../core/semver.sh
+if [ -r "$_DOCTOR_DIR/../../core/semver.sh" ]; then
+    . "$_DOCTOR_DIR/../../core/semver.sh"
 fi
 
-# shellcheck source=../lib/chezmoi-data.sh
-if [ -r "$_DOCTOR_DIR/../lib/chezmoi-data.sh" ]; then
-    . "$_DOCTOR_DIR/../lib/chezmoi-data.sh"
+# shellcheck source=../../core/chezmoi-data.sh
+if [ -r "$_DOCTOR_DIR/../../core/chezmoi-data.sh" ]; then
+    . "$_DOCTOR_DIR/../../core/chezmoi-data.sh"
 fi
 
 # shellcheck source=../lib/brewfiles.sh

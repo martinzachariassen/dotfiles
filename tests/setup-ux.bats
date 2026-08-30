@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Guards for the setup UX layer: the step/explain vocabulary in scripts/lib/log.sh,
+# Guards for the setup UX layer: the step/explain vocabulary in core/ui.sh,
 # install.sh's hand-mirrored copy of it (it runs before the repo exists, so it
 # cannot source the lib), and the wizard's question headers.
 #
@@ -7,7 +7,7 @@
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LOG="$REPO_ROOT/scripts/lib/log.sh"
+    LOG="$REPO_ROOT/core/ui.sh"
     INSTALL="$REPO_ROOT/install.sh"
     WIZARD="$REPO_ROOT/scripts/bin/wizard.sh"
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"

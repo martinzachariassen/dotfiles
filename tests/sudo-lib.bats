@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Tests for scripts/lib/sudo.sh, the background sudo-timestamp keeper shared by
+# Tests for core/sudo.sh, the background sudo-timestamp keeper shared by
 # run_before_00-sudo-cache and macos-defaults.sh.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SUDO_LIB="$REPO_ROOT/scripts/lib/sudo.sh"
+    SUDO_LIB="$REPO_ROOT/core/sudo.sh"
     [ -r "$SUDO_LIB" ] || skip "sudo.sh not found at $SUDO_LIB"
 }
 

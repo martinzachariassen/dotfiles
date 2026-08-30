@@ -140,7 +140,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 
 | Concern | Source |
 |---|---|
-| Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `scripts/lib/sudo.sh`); `run_after_02-brew-bundle` re-checks and asks again before its progress bar starts, if the ticket lapsed |
+| Sudo pre-auth | `run_before_00-sudo-cache.sh.tmpl` (keeper: `core/sudo.sh`); `run_after_02-brew-bundle` re-checks and asks again before its progress bar starts, if the ticket lapsed |
 | Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `scripts/lib/homebrew.sh`) |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `packages.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
@@ -152,7 +152,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` + `packages/vscode-extensions.txt` + `scripts/lib/vscode.sh` (drift check in `scripts/bin/doctor.sh`) |
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
-| macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` (shares `scripts/lib/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
+| macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work,apple-dev}` |
 | Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |

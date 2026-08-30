@@ -11,10 +11,10 @@ exit 0
 {{ end -}}
 
 # Reattach stdin so casks needing sudo can prompt (belt-and-braces to run_before_00-sudo-cache).
-# shellcheck source=../../scripts/lib/tty.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/tty.sh"
-# shellcheck source=../../scripts/lib/log.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/log.sh"
+# shellcheck source=../../core/tty.sh
+. "{{ .chezmoi.workingTree }}/core/tty.sh"
+# shellcheck source=../../core/ui.sh
+. "{{ .chezmoi.workingTree }}/core/ui.sh"
 # shellcheck source=../../scripts/lib/brew-progress.sh
 . "{{ .chezmoi.workingTree }}/scripts/lib/brew-progress.sh"
 # shellcheck source=../../scripts/lib/homebrew.sh
@@ -101,8 +101,8 @@ if ! sudo -n true </dev/null 2>/dev/null; then
         # Keep the ticket alive for the whole bundle: a 65-package run is well
         # past sudo's 5-minute cache, and a cask installing at minute 12 would
         # otherwise prompt again from behind the progress bar.
-        # shellcheck source=../../scripts/lib/sudo.sh
-        . "{{ .chezmoi.workingTree }}/scripts/lib/sudo.sh"
+        # shellcheck source=../../core/sudo.sh
+        . "{{ .chezmoi.workingTree }}/core/sudo.sh"
         sudo_keep_warm "$$"
     else
         warn "no admin access — apps that need an installer package will be skipped"
