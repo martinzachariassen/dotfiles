@@ -599,7 +599,7 @@ chezsign() {
 # developer dir, the licence, first-launch components, and a simulator runtime.
 # Interactive by necessity (Apple ID + 2FA), which is why it isn't an apply hook.
 chezxcode() {
-    _chez_run scripts/bin/xcode.sh "$@"
+    _chez_run features/xcode/cli.sh "$@"
 }
 {{- end }}
 {{- if has "claudeDistiller" (dig "modules" (list) .) }}

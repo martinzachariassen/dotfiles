@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# scripts/lib/xcode.sh — the probes both `chezxcode` and `chezdoctor` read.
+# features/xcode/probe.sh — the probes both `chezxcode` and `chezdoctor` read.
 #
 # These pin the two states that look healthy but aren't, because both are
 # reachable straight out of install.sh and neither shows up in `brew bundle
@@ -18,9 +18,9 @@
 # tests describe a machine's state rather than this machine's state.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    LIB="$REPO_ROOT/scripts/lib/xcode.sh"
-    [ -r "$LIB" ] || skip "scripts/lib/xcode.sh missing"
+    load '../../../core/testing/helper'
+    LIB="$REPO_ROOT/features/xcode/probe.sh"
+    [ -r "$LIB" ] || skip "features/xcode/probe.sh missing"
 
     STUBS="$BATS_TEST_TMPDIR/bin"
     APPS="$BATS_TEST_TMPDIR/Applications"
@@ -63,7 +63,7 @@ EOF
     PATH="$STUBS:$PATH"
     export PATH XCODE_APPS_DIR="$APPS"
 
-    # shellcheck source=../scripts/lib/xcode.sh
+    # shellcheck source=../probe.sh
     . "$LIB"
 }
 

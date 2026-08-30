@@ -3,7 +3,7 @@
 #
 # Shared by chezup (the "new modules since this Mac was set up" gate), wizard.sh
 # and chezdistill --setup, so the three can't disagree about what the module
-# list is or how it is written — the same reason scripts/lib/xcode.sh is shared
+# list is or how it is written — the same reason features/xcode/probe.sh is shared
 # between chezxcode and chezdoctor.
 #
 # Why the config file is edited line-by-line rather than re-running

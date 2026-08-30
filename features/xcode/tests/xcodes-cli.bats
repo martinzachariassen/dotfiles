@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# xcodes-lib.bats — scripts/lib/xcodes.sh, the prebuilt-binary bootstrap that
+# xcodes-cli.bats — features/xcode/xcodes-cli.sh, the prebuilt-binary bootstrap that
 # replaced `brew "xcodesorg/made/xcodes"`.
 #
 # The property under test: the binary is never installed unless it came from the
@@ -8,7 +8,7 @@
 # failure path below asserts the target file does not exist afterwards.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     STUBS="$BATS_TEST_TMPDIR/stubs"
     BIN_DIR="$BATS_TEST_TMPDIR/localbin"
     SERVE="$BATS_TEST_TMPDIR/serve"
@@ -61,7 +61,7 @@ load_lib() {
     # Ensure the guard doesn't carry over between tests in one shell.
     unset __DOTFILES_XCODES_SH
     # shellcheck source=/dev/null
-    . "$REPO_ROOT/scripts/lib/xcodes.sh"
+    . "$REPO_ROOT/features/xcode/xcodes-cli.sh"
 }
 
 @test "pin values are read from chezmoi data" {

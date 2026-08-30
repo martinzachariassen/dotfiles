@@ -32,10 +32,10 @@ fi
 . "$_DIR/../../core/dry-run.sh"
 # shellcheck source=../../core/sudo.sh
 . "$_DIR/../../core/sudo.sh"
-# shellcheck source=../lib/xcode.sh
-. "$_DIR/../lib/xcode.sh"
-# shellcheck source=../lib/xcodes.sh
-. "$_DIR/../lib/xcodes.sh"
+# shellcheck source=probe.sh
+. "$_DIR/probe.sh"
+# shellcheck source=xcodes-cli.sh
+. "$_DIR/xcodes-cli.sh"
 
 usage() {
     echo "usage: chezxcode [--check]"

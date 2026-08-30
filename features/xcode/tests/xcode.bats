@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# scripts/bin/xcode.sh (`chezxcode`) — the consent gates around a ~40 GB download.
+# features/xcode/cli.sh (`chezxcode`) — the consent gates around a ~40 GB download.
 #
 # The safety property under test is one sentence: **`xcodes install` never runs
 # without a person saying yes.** Two bugs violated it during development, both
@@ -17,9 +17,9 @@
 # invoked, rather than on wording: the wording may change, the invariant may not.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SCRIPT="$REPO_ROOT/scripts/bin/xcode.sh"
-    [ -r "$SCRIPT" ] || skip "scripts/bin/xcode.sh missing"
+    load '../../../core/testing/helper'
+    SCRIPT="$REPO_ROOT/features/xcode/cli.sh"
+    [ -r "$SCRIPT" ] || skip "features/xcode/cli.sh missing"
 
     STUBS="$BATS_TEST_TMPDIR/bin"
     APPS="$BATS_TEST_TMPDIR/Applications"

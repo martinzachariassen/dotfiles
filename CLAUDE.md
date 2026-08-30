@@ -54,9 +54,9 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   Brewfile installs only the Swift *tooling*. Xcode.app itself, the selected
   developer dir, the licence, first-launch components and the iOS simulator
   runtime come from the confirm-gated `chezxcode` verb
-  (`scripts/bin/xcode.sh`), because `xcodes install` needs an Apple ID with 2FA
+  (`features/xcode/cli.sh`), because `xcodes install` needs an Apple ID with 2FA
   and ~40 GB — don't move it into an apply hook or a Brewfile. Its read-only
-  probes live in `scripts/lib/xcode.sh` and are shared with `chezdoctor` so the
+  probes live in `features/xcode/probe.sh` and are shared with `chezdoctor` so the
   two can't disagree; add checks there, not in either caller.
 - **`chezdistill` writes to two places, neither of them this repo.** The memory tier
   (`MAIN.md`, `Topics/`, `Candidates.md`) goes to `~/.config/claude/memory`, beside

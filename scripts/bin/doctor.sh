@@ -74,9 +74,9 @@ if [ -r "$_DOCTOR_DIR/../../features/sign/lib.sh" ]; then
     . "$_DOCTOR_DIR/../../features/sign/lib.sh"
 fi
 
-# shellcheck source=../lib/xcode.sh
-if [ -r "$_DOCTOR_DIR/../lib/xcode.sh" ]; then
-    . "$_DOCTOR_DIR/../lib/xcode.sh"
+# shellcheck source=../../features/xcode/probe.sh
+if [ -r "$_DOCTOR_DIR/../../features/xcode/probe.sh" ]; then
+    . "$_DOCTOR_DIR/../../features/xcode/probe.sh"
 fi
 
 # shellcheck source=../lib/distill.sh
@@ -410,7 +410,7 @@ fi
 if command -v cm_has_module >/dev/null 2>&1 && cm_has_module "$DATA_JSON" appleDev; then
     section "Xcode / iOS (appleDev)"
     if ! command -v xcode_ready >/dev/null 2>&1; then
-        warn "scripts/lib/xcode.sh missing — Xcode checks skipped"
+        warn "features/xcode/probe.sh missing — Xcode checks skipped"
     elif [ -z "$(xcode_app_path || true)" ]; then
         # One fail, not six: without Xcode.app every check below fails for the
         # same reason, and six red lines read as six problems.

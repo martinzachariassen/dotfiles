@@ -39,7 +39,7 @@ SourceKit-LSP. Selecting the `appleDev` module gets you the Swift *tooling*
 install` needs an Apple ID with 2FA, so it can't run unattended from an apply.
 The `xcodes` CLI isn't a Brewfile entry either: its formula builds from source
 and that build needs a full Xcode.app, so `chezxcode` fetches the upstream
-prebuilt binary (pinned by sha256 in `src/.chezmoidata/xcodes.toml`) itself. Run **`chezxcode`** once afterwards to close that gap; the apply's
+prebuilt binary (pinned by sha256 in `src/.chezmoidata/xcode.toml`) itself. Run **`chezxcode`** once afterwards to close that gap; the apply's
 closing summary prompts you when it's outstanding, and `chezdoctor` stays red
 until it's done. See [commands.md](commands.md#advanced--occasional-helpers).
 

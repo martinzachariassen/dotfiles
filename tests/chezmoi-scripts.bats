@@ -214,11 +214,18 @@ _render_template() {
 @test "every hook that delegates to a feature also hashes that file" {
     local tmpl rel
     for tmpl in "$SCRIPTS_DIR"/run_*.sh.tmpl; do
-        # Only *executing* or *sourcing* a feature file is delegation. Hook 99
-        # prints features/auth/cli.sh as an instruction for the user to run
-        # later; that is not something whose content the hook depends on, so it
-        # must not demand a hash.
-        grep -oE '(exec +)?(bash|sh) +"[^"]*features/[a-z]+/[a-z-]+\.sh|(\.|source) +"[^"]*features/[a-z]+/[a-z-]+\.sh' "$tmpl" |
+        # Delegation means *executing* a file: the hook has handed its work to
+        # that engine, so the engine's content must be part of the hash or the
+        # hook silently freezes. Two things deliberately do not count.
+        #
+        # Sourcing a helper. Hooks 00 and 02 source core/tty.sh and core/sudo.sh
+        # and hash neither, and hook 99 sources features/xcode/probe.sh only to
+        # decide which next-step line to print. A stale suggestion costs nothing,
+        # and re-firing the whole completion summary on every probe edit is noise.
+        #
+        # Naming a path in output. Hook 99 prints features/auth/cli.sh as an
+        # instruction for the user to run later.
+        grep -oE '(exec +)?(bash|sh) +"[^"]*features/[a-z]+/[a-z-]+\.sh' "$tmpl" |
             grep -oE 'features/[a-z]+/[a-z-]+\.sh' | sort -u | while IFS= read -r rel; do
             grep -qF "include \"../$rel\"" "$tmpl" || printf '%s -> %s\n' "$(basename "$tmpl")" "$rel"
         done
