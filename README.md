@@ -103,7 +103,7 @@ This is tuned to one person's Apple Silicon Mac — the profiles and modules exi
 
 | Change | Where |
 | --- | --- |
-| Packages and apps | [`features/brew/Brewfile*`](packages/) — core, per-profile, per-module |
+| Packages and apps | [`features/brew/Brewfile*`](features/brew/) — core, per-profile, per-module |
 | VS Code extensions | [`features/vscode/extensions.txt`](features/vscode/extensions.txt) |
 | Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and per-profile defaults |
 | macOS defaults | [`features/macos/cli.sh`](features/macos/cli.sh) ([what it sets](docs/macos.md)) |

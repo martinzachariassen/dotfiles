@@ -102,7 +102,7 @@ Line 2 is **budget**, and the two clocks are the part worth explaining:
 
 `💰 $1.24 $1.59/h` is cumulative cost plus burn rate, the latter suppressed for
 the first two minutes where it's pure noise. Behavior is covered by
-[`tests/statusline.bats`](../tests/statusline.bats).
+[`features/claude/tests/statusline.bats`](../features/claude/tests/statusline.bats).
 
 ## One rulebook, two assistants
 

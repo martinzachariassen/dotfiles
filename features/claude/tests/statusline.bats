@@ -5,7 +5,7 @@
 # branch names or dirty counts would make these tests depend on the worktree.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     STATUSLINE="$REPO_ROOT/src/dot_config/claude/executable_statusline.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed"
 
