@@ -79,7 +79,7 @@ multi-select) are chezmoi's own `init` prompt data, defined in
 re-running is idempotent. But chezmoi renders those prompts as an interactive
 TUI picker that is unreliable under `curl | bash` and some terminals (it can
 fail to register navigation and just confirm the default). So
-[`scripts/bin/wizard.sh`](../scripts/bin/wizard.sh) is the front-end: it asks
+[`features/setup/cli.sh`](../features/setup/cli.sh) is the front-end: it asks
 each question with plain `read` from `/dev/tty` and passes the answers to
 `chezmoi init --apply` via its `--promptString/-Choice/-Multichoice` flags —
 no TUI.
@@ -95,7 +95,7 @@ The prompts degrade across three tiers to fit the terminal:
 
 `WIZARD_NO_GUM=1` skips the first tier, `WIZARD_NO_TUI=1` the first two.
 
-`bash scripts/bin/wizard.sh` (or `chezsetup`) is the "change the setup" path;
+`bash features/setup/cli.sh` (or `chezsetup`) is the "change the setup" path;
 `chezsetup --reset` also replays first-time setup. See
 [commands.md](commands.md#changing-your-setup) for how the two modes differ.
 

@@ -9,7 +9,7 @@ setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     LOG="$REPO_ROOT/core/ui.sh"
     INSTALL="$REPO_ROOT/install.sh"
-    WIZARD="$REPO_ROOT/scripts/bin/wizard.sh"
+    WIZARD="$REPO_ROOT/features/setup/cli.sh"
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
     BASH32=/bin/bash
 }

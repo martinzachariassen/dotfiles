@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/bin/wizard.sh pure helpers.
+# Unit tests for features/setup/cli.sh pure helpers.
 #
 # WIZARD_LIB_ONLY=1 sources the wizard's functions and module catalog, then
 # returns before any /dev/tty prompting or apply — so these run headless in
@@ -7,8 +7,8 @@
 # lock down the drift-prone bits: prompt messages/choices and module readers.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
+    load '../../../core/testing/helper'
+    WIZ="$REPO_ROOT/features/setup/cli.sh"
 }
 
 # wiz EXPR — source the helpers in a clean bash and evaluate EXPR; echoes result.
@@ -39,10 +39,10 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 # which cannot run under `curl | bash` — and on the signing path it would silently
 # reset the answer.
 @test "corpusRemote is replayed by both wizard and signing, unconditionally" {
-    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/scripts/bin/wizard.sh"
+    grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/features/setup/cli.sh"
     grep -q 'prompt_msg corpusRemote' "$REPO_ROOT/features/sign/cli.sh"
     # Inside the init_flags array literal, not behind an `if`.
-    run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/scripts/bin/wizard.sh"
+    run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/features/setup/cli.sh"
     [[ "$output" == *"prompt_msg corpusRemote"* ]] || return 1
 }
 

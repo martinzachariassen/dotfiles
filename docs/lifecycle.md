@@ -133,7 +133,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `features/macos/cli.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `features/brew/Brewfile` (core) + `features/brew/Brewfile.{mac-apps,personal,work,apple-dev}` |
-| Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |
+| Data model + wizard | `src/.chezmoi.toml.tmpl` + `features/setup/cli.sh` |
 | Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` |
 
 ## Bootstrap
@@ -147,7 +147,7 @@ separate, plain scripts — see [install.md](install.md) and
 Homebrew-install step is necessarily its own inline copy of what
 `features/brew/lib/homebrew.sh` does for `run_once_before_01` below. It installs
 only the prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands
-off to `scripts/bin/wizard.sh` (repo now on disk, so it *can* source
+off to `features/setup/cli.sh` (repo now on disk, so it *can* source
 `scripts/lib/*`). The wizard asks the setup questions and feeds them to
 `chezmoi init --apply`, whose `--apply` runs the hooks above. See
 [packages.md](packages.md#the-wizard) for the wizard's three prompt tiers.

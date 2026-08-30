@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wizard.sh — plain-text first-run setup wizard. Sidesteps chezmoi's flaky TUI
+# cli.sh — plain-text first-run setup wizard (`chez setup`). Sidesteps chezmoi's flaky TUI
 # picker: asks each question with plain `read` (bash-3.2 safe, works in any
 # terminal), upgrades to gum when installed, then hands answers to chezmoi's
 # non-interactive init flags. Prompt messages are read from .chezmoi.toml.tmpl

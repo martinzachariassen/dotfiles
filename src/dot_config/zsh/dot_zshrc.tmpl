@@ -418,54 +418,10 @@ chezdoctor() {
     _chez_run scripts/bin/doctor.sh
 }
 
-# ─── Advanced / occasional chezmoi helpers ────────────────────────────────────
-# Configure this machine's profile/modules/signing. Default: fill in any
-# newly-added setup keys, keeping existing answers. --reset/-r: replay
-# first-time setup instead — reset chezmoi's persistent state so run_once_*/
-# run_onchange_* hooks re-fire, then re-ask everything, overriding saved
-# answers. Neither mode uninstalls anything; --reset is confirm-gated.
+# Configure profile/modules/signing. Default fills in newly added setup keys
+# only, keeping existing answers; --reset/-r sets this Mac up as new.
 chezsetup() {
-    local src={{ .chezmoi.workingTree | quote }}
-    local reset=0 reply arg
-    local -a rest
-    for arg in "$@"; do
-        case "$arg" in
-            -r | --reset) reset=1 ;;
-            -h | --help)
-                echo "usage: chezsetup [--reset|-r]"
-                echo "  (no flag)      fill in newly-added setup keys only; keeps existing answers"
-                echo "  --reset, -r    replay first-time setup: reset run-once state, re-ask everything"
-                return 0
-                ;;
-            *) rest+=("$arg") ;;
-        esac
-    done
-
-    if [ "$reset" -eq 1 ]; then
-        # Self-heal a stale wizard path before the destructive state reset below.
-        [[ -f $src/scripts/bin/wizard.sh ]] || { _chez_run scripts/bin/wizard.sh "${rest[@]}"; return; }
-        (cd "$src" && git pull --ff-only) || return $?
-        # `[ -r /dev/tty ]` is unreliable, so actually try to open it.
-        if { : </dev/tty; } 2>/dev/null; then
-            printf 'chezsetup --reset: replay first-time setup (reset run-once state, re-ask the wizard)? [y/N] '
-            IFS= read -r reply </dev/tty || reply=""
-            case "$reply" in
-                y | Y | yes | YES) ;;
-                *)
-                    echo "aborted — nothing changed"
-                    return 0
-                    ;;
-            esac
-        fi
-        chezmoi state reset --force || return $?
-        bash "$src/scripts/bin/wizard.sh" "${rest[@]}"
-        return
-    fi
-
-    (cd "$src" && git pull --ff-only) || return $?
-    echo "chezsetup: filling in any new/unanswered setup keys only."
-    echo "           to re-choose profile/modules/signing, run: chezsetup --reset"
-    chezmoi init && chezapply "${rest[@]}"
+    _chez_run features/setup/setup.sh "$@"
 }
 
 # Set the git signing key on a machine that deferred it during setup (the key

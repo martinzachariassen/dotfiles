@@ -7,7 +7,7 @@ setup() {
     TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
     MODULES_DATA="$REPO_ROOT/src/.chezmoidata/modules.toml"
     PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/brew.toml"
-    WIZ="$REPO_ROOT/scripts/bin/wizard.sh"
+    WIZ="$REPO_ROOT/features/setup/cli.sh"
 }
 
 # Rendered before .chezmoidata loads, so the template lists module names

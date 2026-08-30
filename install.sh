@@ -244,7 +244,7 @@ if [ "$#" -eq 0 ]; then
     explain \
         "A few questions about how you want this Mac set up." \
         "Every answer is changeable later with \`chezsetup\`."
-    exec bash "$SOURCE_DIR/scripts/bin/wizard.sh"
+    exec bash "$SOURCE_DIR/features/setup/cli.sh"
 fi
 info "extra args given — skipping the wizard, handing off to chezmoi init"
 exec chezmoi init --apply --force --source="$SOURCE_DIR" "$@"

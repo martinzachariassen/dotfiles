@@ -16,12 +16,12 @@ setup() {
 
     # Fake, already-present source repo so the clone step is a no-op.
     REPO="$(mktemp -d)"
-    mkdir -p "$REPO/.git" "$REPO/scripts/bin"
-    cat >"$REPO/scripts/bin/wizard.sh" <<'EOF'
+    mkdir -p "$REPO/.git" "$REPO/features/setup"
+    cat >"$REPO/features/setup/cli.sh" <<'EOF'
 #!/usr/bin/env bash
 echo "WIZARD RAN args=[$*]"
 EOF
-    chmod +x "$REPO/scripts/bin/wizard.sh"
+    chmod +x "$REPO/features/setup/cli.sh"
 
     STUBS="$(mktemp -d)"
     GIT_LOG="$STUBS/git.log"
@@ -75,9 +75,9 @@ printf '%s\n' "\$*" >>"$GIT_LOG"
 if [ "\$1" = clone ]; then
     dest="\${3:-}"
     if [ -n "\$dest" ]; then
-        mkdir -p "\$dest/.git" "\$dest/scripts/bin"
-        printf '#!/usr/bin/env bash\necho "WIZARD RAN args=[\$*]"\n' >"\$dest/scripts/bin/wizard.sh"
-        chmod +x "\$dest/scripts/bin/wizard.sh"
+        mkdir -p "\$dest/.git" "\$dest/features/setup"
+        printf '#!/usr/bin/env bash\necho "WIZARD RAN args=[\$*]"\n' >"\$dest/features/setup/cli.sh"
+        chmod +x "\$dest/features/setup/cli.sh"
     fi
 fi
 exit 0
@@ -175,7 +175,7 @@ teardown() {
 # Without this guard `git clone` dies into the non-empty dir and `set -e` kills
 # the installer with a raw git error and no hint about what to do.
 @test "install refuses a target dir that has content but is not a checkout" {
-    rm -rf "$REPO/.git"   # leaves scripts/bin/wizard.sh behind
+    rm -rf "$REPO/.git"   # leaves features/setup/cli.sh behind
     run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" \
         GIT_LOG="$GIT_LOG" CHEZMOI_LOG="$CHEZMOI_LOG" bash "$INSTALL"
     [ "$status" -ne 0 ]
