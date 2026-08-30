@@ -1,0 +1,6 @@
+# Follow `# shellcheck source=` directives, and resolve them relative to the
+# script that declares them rather than the working directory — so a lib can be
+# moved between scripts/, core/ and features/ without every directive going
+# stale in a way that only silently stops cross-file checking.
+external-sources=true
+source-path=SCRIPTDIR
