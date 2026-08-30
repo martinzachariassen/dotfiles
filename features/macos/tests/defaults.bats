@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for scripts/bin/macos-defaults.sh's sudo-keeper dedup: under a chezmoi
+# Tests for features/macos/cli.sh's sudo-keeper dedup: under a chezmoi
 # apply, run_before_00-sudo-cache already keeps sudo warm for the whole run
 # (core/sudo.sh), so macos-defaults.sh must skip spawning a second
 # keeper when told the caller already has one running.
@@ -10,8 +10,8 @@
 # Linux.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    MD="$REPO_ROOT/scripts/bin/macos-defaults.sh"
+    load '../../../core/testing/helper'
+    MD="$REPO_ROOT/features/macos/cli.sh"
     HOOK="$REPO_ROOT/src/.chezmoiscripts/run_onchange_after_04-macos-defaults.sh.tmpl"
 }
 
@@ -35,9 +35,9 @@ setup() {
 # The guard block runs before any macOS-only command, so it's exercisable on Linux.
 @test "macos-defaults.sh fails loudly when core/ui.sh is missing" {
     iso="$(mktemp -d)"
-    mkdir -p "$iso/scripts/bin" # no core/ ⇒ both helpers unreachable
-    cp "$MD" "$iso/scripts/bin/macos-defaults.sh"
-    run bash "$iso/scripts/bin/macos-defaults.sh"
+    mkdir -p "$iso/features/macos" # no core/ ⇒ both helpers unreachable
+    cp "$MD" "$iso/features/macos/cli.sh"
+    run bash "$iso/features/macos/cli.sh"
     rm -rf "$iso"
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1
@@ -46,10 +46,10 @@ setup() {
 
 @test "macos-defaults.sh fails loudly when sudo.sh is missing but core/ui.sh is present" {
     iso="$(mktemp -d)"
-    mkdir -p "$iso/scripts/bin" "$iso/core"
-    cp "$MD" "$iso/scripts/bin/macos-defaults.sh"
+    mkdir -p "$iso/features/macos" "$iso/core"
+    cp "$MD" "$iso/features/macos/cli.sh"
     cp "$REPO_ROOT/core/ui.sh" "$iso/core/ui.sh"
-    run bash "$iso/scripts/bin/macos-defaults.sh"
+    run bash "$iso/features/macos/cli.sh"
     rm -rf "$iso"
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Applies scripts/bin/macos-defaults.sh when its contents change (run_once would
+# Applies features/macos/cli.sh when its contents change (run_once would
 # silently ignore later edits). Re-apply without editing via the `macos-defaults` alias.
 #
-# scripts/bin/macos-defaults.sh  hash: {{ include "../scripts/bin/macos-defaults.sh" | sha256sum }}
+# features/macos/cli.sh  hash: {{ include "../features/macos/cli.sh" | sha256sum }}
 
 set -euo pipefail
 
@@ -20,22 +20,22 @@ echo "▶ macOS defaults"
 echo "  System preferences pass (re-runs when the defaults script changes)."
 echo "  Some changes need a reboot."
 
-# chezmoi runs scripts with stdin closed; sudo inside macos-defaults.sh would hang without this.
+# chezmoi runs scripts with stdin closed; sudo inside cli.sh would hang without this.
 # shellcheck source=../../core/tty.sh
 . "{{ .chezmoi.workingTree }}/core/tty.sh"
 if ! tty_reattach; then
     echo "! no terminal available; skipping macOS defaults"
     echo "  Run later with: macos-defaults"
-    echo "  Or: bash {{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"
+    echo "  Or: bash {{ .chezmoi.workingTree }}/features/macos/cli.sh"
     exit 0
 fi
 
 # run_before_00-sudo-cache already keeps sudo warm for this whole apply; tell
-# macos-defaults.sh so it doesn't spawn a second, redundant keeper.
+# cli.sh so it doesn't spawn a second, redundant keeper.
 # `|| :` on purpose: hooks 05 and 99 run after this one, and 99 prints the
 # "Next moves" block (chezsign, bootstrap-auth, chezdoctor) a fresh Mac depends
 # on. A defaults pass that fails must never cost the user those instructions.
-if DOTFILES_SUDO_KEPT_WARM=1 bash "{{ .chezmoi.workingTree }}/scripts/bin/macos-defaults.sh"; then
+if DOTFILES_SUDO_KEPT_WARM=1 bash "{{ .chezmoi.workingTree }}/features/macos/cli.sh"; then
     echo "✓ macOS defaults applied"
 else
     echo "! macOS defaults did not complete — re-run with: macos-defaults"

@@ -194,9 +194,11 @@ _render_template() {
 @test "the macOS-defaults hook cannot abort the apply" {
     tmpl="$SCRIPTS_DIR/run_onchange_after_04-macos-defaults.sh.tmpl"
     # set -e is on, so the invocation must be inside a condition, not bare.
-    grep -qE 'if .*macos-defaults\.sh"?; then' "$tmpl" || {
-        echo "macos-defaults.sh is invoked bare under set -e — a failed defaults"
-        echo "pass would abort the apply and skip 05-storecode and 99-completion."
+    # Matched on the invocation's shape rather than the script's name, so moving
+    # the script between directories cannot quietly disarm this.
+    grep -qE 'if .*(macos-defaults\.sh|features/macos/cli\.sh)"?; then' "$tmpl" || {
+        echo "the defaults script is invoked bare under set -e — a failed pass"
+        echo "would abort the apply and skip 05-storecode and 99-completion."
         return 1
     }
     grep -qF 'did not complete' "$tmpl"
