@@ -10,10 +10,13 @@
 # Go-template directives, so plain grep is safe without rendering.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    load '../core/testing/helper'
     ZSHENV="$REPO_ROOT/src/dot_zshenv"
     ZPROFILE="$REPO_ROOT/src/dot_config/zsh/dot_zprofile"
+    # The alias assertions below are driven by the verb table rather than by a
+    # list repeated here, which is the whole point of having the table.
+    # shellcheck source=../core/verbs.sh
+    . "$REPO_ROOT/core/verbs.sh"
 }
 
 # Negative assertions must go through these. A bare `! grep …` in the middle of
@@ -160,63 +163,86 @@ _zprofile_path() {
     return 0
 }
 
-# ─── Dotfiles meta-commands that the README documents as "daily commands" ──
+# ─── The chez dispatcher ────────────────────────────────────────────────────
+# Every verb used to be its own zsh function, each asserted here by name. They
+# are one dispatcher now, so what this file pins is the wiring: that `chez`
+# exists, that it self-heals, that `cd` stays in the shell, and that the aliases
+# and the verb table agree. Behaviour lives in tests/chez.bats.
 
-@test "zshrc defines the chezup function" {
-    grep -qE '^chezup\(\) \{' "$ZSHRC"
+@test "zshrc defines the chez dispatcher" {
+    grep -qE '^chez\(\) \{' "$ZSHRC"
 }
 
-@test "zshrc defines the chezdoctor function" {
-    grep -qE '^chezdoctor\(\) \{' "$ZSHRC"
-}
-
-# Wrappers must route through _chez_run so a moved/renamed helper self-heals
-# instead of stranding the very command you'd fix it with.
+# The dispatcher must route through _chez_run so a moved or renamed helper
+# self-heals instead of stranding the very command you would fix it with.
 @test "zshrc defines the _chez_run self-heal wrapper" {
     grep -qE '^_chez_run\(\) \{' "$ZSHRC"
     # It must fall back to re-applying when the baked script path is missing.
     sed -n '/^_chez_run() {/,/^}/p' "$ZSHRC" | grep -qF 'chezmoi apply'
 }
 
-@test "chezup and chezdoctor route through _chez_run (no stale bare-path calls)" {
-    sed -n '/^chezup() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/up.sh'
-    sed -n '/^chezdoctor() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/doctor.sh'
+@test "chez routes through _chez_run, not a bare path into the repo" {
+    body="$(sed -n '/^chez() {/,/^}/p' "$ZSHRC")"
+    grep -qF '_chez_run core/chez.sh "$@"' <<<"$body"
+    # A bare `bash "$src/..."` would skip the self-heal entirely.
+    no_match 'bash "\$src/' <<<"$body"
 }
 
-@test "zshrc defines the dotfiles function (control panel)" {
-    grep -qE '^dotfiles\(\) \{' "$ZSHRC"
+# `chez cd` has to change THIS shell's directory, so it cannot be delegated to
+# a subprocess — which is the whole reason chez is a function and not a script.
+@test "chez handles cd itself, before anything is delegated" {
+    body="$(sed -n '/^chez() {/,/^}/p' "$ZSHRC")"
+    grep -qE '\bcd "\$src"' <<<"$body"
+    # The cd branch must come first; delegating it would silently no-op.
+    [ "$(grep -n 'cd "$src"' <<<"$body" | head -1 | cut -d: -f1)" \
+        -lt "$(grep -n '_chez_run' <<<"$body" | head -1 | cut -d: -f1)" ]
 }
 
-@test "zshrc defines the chezapply wrapper around chezmoi apply" {
-    grep -qE '^chezapply\(\) \{' "$ZSHRC"
+# Module gating is a render-time decision passed in, not a `chezmoi data` call
+# on every help. If this stops being exported, help and dispatch fall back to a
+# ~200 ms subprocess per invocation and nothing fails loudly enough to notice.
+@test "chez exports the module set it was rendered with" {
+    sed -n '/^chez() {/,/^}/p' "$ZSHRC" | grep -qF 'local -x CHEZ_MODULES='
 }
 
-# chezhelp's listing must stay in sync with the actual verbs.
-@test "zshrc defines chezhelp and it lists every verb" {
-    grep -qE '^chezhelp\(\) \{' "$ZSHRC"
-    body="$(sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC")"
-    for verb in chezup chezdoctor chezsetup chezapply chezstatus chezbump chezmirror chezreconcile chezclean chezdistill dotfiles; do
-        grep -qE "^ +${verb} " <<<"$body" || {
-            echo "chezhelp is missing an entry for: ${verb}"
-            return 1
-        }
-    done
+@test "zshrc offers completion for chez, fed by the dispatcher itself" {
+    grep -qE '^_chez\(\) \{' "$ZSHRC"
+    grep -qF 'compdef _chez chez' "$ZSHRC"
+    # Fed from `chez --verbs` rather than a hand-written list, so a new verb
+    # completes without touching this file.
+    sed -n '/^_chez() {/,/^}/p' "$ZSHRC" | grep -qF -- '--verbs'
 }
 
-# Wiring only — the behaviour (union, parser, cask/formula dispatch, no-TTY
-# safety) is exercised end-to-end in tests/chezmirror.bats against a stubbed brew.
-# Wiring only — chezmirror's behaviour is exercised end-to-end against the real
-# script in features/brew/tests/mirror.bats, including the --file=- invariant
-# and the per-package confirm loop. What is checked here is that the verb still
-# reaches that script.
-@test "zshrc defines the chezmirror function routed through _chez_run" {
-    grep -qE '^chezmirror\(\) \{' "$ZSHRC"
-    sed -n '/^chezmirror() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/brew/mirror.sh'
+# compdef is a compinit builtin: registering before compinit runs is a silent
+# no-op, and completion for chez simply never appears.
+@test "compdef for chez comes after compinit" {
+    [ "$(grep -n 'compinit -' "$ZSHRC" | head -1 | cut -d: -f1)" \
+        -lt "$(grep -n 'compdef _chez chez' "$ZSHRC" | cut -d: -f1)" ]
 }
 
-@test "zshrc defines the chezbump function routed through _chez_run" {
-    grep -qE '^chezbump\(\) \{' "$ZSHRC"
-    sed -n '/^chezbump() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/brew/bump.sh'
+# Every verb answered to `chez<verb>` before the dispatcher. Both directions are
+# checked: an alias that names a verb the table does not have would break on
+# use, and a verb with no alias silently breaks muscle memory.
+@test "every table verb keeps its old name as an alias" {
+    local missing=() v legacy
+    while IFS= read -r v; do
+        legacy="$(verbs_legacy_name "$v")"
+        [ -n "$legacy" ] || continue # auth never had one
+        grep -qE "^alias ${legacy}='chez ${v}'\$" "$ZSHRC" || missing+=("$legacy -> chez $v")
+    done < <(verbs_all)
+    [ "${#missing[@]}" -eq 0 ] || printf 'no alias: %s\n' "${missing[@]}" >&2
+    [ "${#missing[@]}" -eq 0 ]
+}
+
+@test "every alias in the zshrc names a verb the table has" {
+    local extra=() line verb
+    while IFS= read -r line; do
+        verb="${line##*chez }"
+        verb="${verb%\'}"
+        verbs_all | grep -qx "$verb" || extra+=("$line")
+    done < <(grep -E "^alias [a-z-]+='chez [a-z]+'\$" "$ZSHRC")
+    [ "${#extra[@]}" -eq 0 ] || printf 'alias for an unknown verb: %s\n' "${extra[@]}" >&2
+    [ "${#extra[@]}" -eq 0 ]
 }
 
 # Every verb that touches Homebrew is a script now, so no copy of the removal
@@ -226,24 +252,15 @@ _zprofile_path() {
     no_match '_chez_brew_removals\(\)' "$ZSHRC"
 }
 
-# Wiring only — behaviour is exercised end-to-end in features/clean/tests/.
-@test "zshrc defines the chezclean function routed through _chez_run" {
-    grep -qE '^chezclean\(\) \{' "$ZSHRC"
-    sed -n '/^chezclean() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/clean/cli.sh'
-}
-
-# chezreconcile must compose chezup (install) + chezmirror (removal), never
-# re-implement either. Behaviour is exercised in tests/chezreconcile.bats.
-# Composition is asserted against the script in
-# features/converge/tests/reconcile.bats; this only pins the wiring.
-@test "zshrc defines chezreconcile routed through _chez_run" {
-    grep -qE '^chezreconcile\(\) \{' "$ZSHRC"
-    sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/reconcile.sh'
-}
-
-@test "zshrc defines chezapply and chezstatus routed through _chez_run" {
-    sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/apply.sh'
-    sed -n '/^chezstatus() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/converge/status.sh'
+# The per-verb wrappers are gone; nothing may quietly grow one back, because a
+# hand-written wrapper bypasses the table that help and completion read.
+@test "no per-verb wrapper survives in the template" {
+    local strays
+    strays="$(grep -oE '^chez[a-z]+\(\) \{' "$ZSHRC" || true)"
+    [ -z "$strays" ] || {
+        printf 'per-verb wrapper still in the zshrc: %s\n' "$strays" >&2
+        return 1
+    }
 }
 
 # chezapply reports package drift and points at chezmirror; it must never

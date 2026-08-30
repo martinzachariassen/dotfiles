@@ -49,14 +49,17 @@ Three rules, each enforced by `tests/registry.bats`:
   then informational. Alphabetical would scramble it. Leave gaps.
 
 Verbs are **not** declared here — they live in [`core/verbs.sh`](../core/verbs.sh),
-the single source of truth for the command surface, which names the owning
-feature per verb. Declaring them twice is how the two drift apart.
+the single source of truth for the command surface. Each row names the owning
+feature *and the script to run*, which is what lets `core/chez.sh` dispatch,
+render `chez help` and feed the completion from one place. Declaring a verb
+twice is how the two drift apart.
 
 ## Adding a feature
 
 1. `cp -r features/_template features/<name>` — or copy the nearest sibling.
 2. Fill in the manifest and the README.
-3. If it has a verb, add a row to `core/verbs.sh`.
+3. If it has a verb, add a row to `core/verbs.sh` — that is the whole wiring:
+   `chez <verb>` runs it, `chez help` lists it, completion offers it.
 4. If it has checks, write `doctor.sh` and give it an order.
 
 `tests/registry.bats` will tell you what you missed.

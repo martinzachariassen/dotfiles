@@ -65,14 +65,19 @@ When the wizard finishes, sign in and reload:
 ```sh
 open -a 1Password                                                 # skip if disabled
                                                                   # → Settings → Developer → enable the SSH agent
-chezsign                                                          # set the signing key deferred above
-bash ~/Developer/personal/dotfiles/features/auth/cli.sh          # sign in to gh / cloud CLIs
 exec zsh                                                          # reload the managed shell
-chezdoctor                                                        # verify everything is healthy
+chez sign                                                         # set the signing key deferred above
+chez auth                                                         # sign in to gh / cloud CLIs
+chez doctor                                                       # verify everything is healthy
 sudo shutdown -r now                                              # reboot to finish macOS defaults
 ```
 
-`chezsign` reads the keys the 1Password agent is already holding, so there's
+**Reload first.** `chez` is a shell function the managed `.zshrc` defines, so
+until `exec zsh` has run it does not exist — the shell you ran the installer
+from is the one you had before. The apply's closing summary puts `exec zsh` at
+step 1 for the same reason.
+
+`chez sign` reads the keys the 1Password agent is already holding, so there's
 nothing to copy-paste — pick one and it replays every other setup answer
 untouched, then proves it worked with a real signed commit. It re-asks nothing
 else, so you never have to walk the whole wizard again just to supply a key.

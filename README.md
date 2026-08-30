@@ -51,11 +51,11 @@ The apply prints these for you, in order:
 
 ```sh
 exec zsh                                                          # 1. reload the managed shell
-bash ~/Developer/personal/dotfiles/features/auth/cli.sh          # 2. sign in to gh / cloud CLIs
-chezdoctor                                                        # 3. health-check everything
+chez auth                                                         # 2. sign in to gh / cloud CLIs
+chez doctor                                                       # 3. health-check everything
 ```
 
-If you deferred the signing key, open 1Password, enable its SSH agent (**Settings → Developer**), then run `chezsign` — it offers the keys the agent already holds, so there's nothing to paste. Reboot when you're done; some macOS defaults only take effect on login.
+If you deferred the signing key, open 1Password, enable its SSH agent (**Settings → Developer**), then run `chez sign` — it offers the keys the agent already holds, so there's nothing to paste. Reboot when you're done; some macOS defaults only take effect on login.
 
 ## Day to day
 

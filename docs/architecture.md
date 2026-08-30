@@ -85,21 +85,33 @@ has a named destination in its feature's README.
 
 ### The registry
 
-Two files describe the whole surface, and four things read them, which is what
-stops the descriptions drifting apart again.
+Two files describe the whole surface, and everything else reads them, which is
+what stops the descriptions drifting apart again.
 
 | File | Declares |
 |---|---|
-| [`core/verbs.sh`](../core/verbs.sh) | Every verb: its owning feature, its group in `chez help`, its module gate, its one-line summary. The single source of truth for the command surface. |
+| [`core/verbs.sh`](../core/verbs.sh) | Every verb: its owning feature, the script it runs, its group in `chez help`, its module gate, its one-line summary. The single source of truth for the command surface. |
 | `features/<name>/feature.sh` | What a feature *is*: name, title, the module that gates it, where its checks belong in `chezdoctor`'s order. Data only — sourced in a subshell, no side effects. |
 
-Verbs are declared in exactly one of those, never both. The list used to live in
-five hand-written places — the `chezhelp` heredoc, `README.md`,
+[`core/chez.sh`](../core/chez.sh) is the only consumer that matters day to day.
+It reads the table three ways from the one row: to resolve `chez <verb>` to a
+script, to render `chez help`, and to answer `chez --verbs` for the zsh
+completion. A verb added to the table therefore dispatches, documents itself and
+completes without a second edit anywhere.
+
+`chez` is a zsh *function*, not a script, for one reason: `chez cd` changes the
+calling shell's directory. Everything else it hands to `core/chez.sh` through
+`_chez_run`, which self-heals a shell config that predates a repo change. Module
+gating is passed in as `CHEZ_MODULES` at render time rather than read back from
+`chezmoi data`, so neither help nor dispatch pays a ~200 ms subprocess.
+
+Verbs are declared in exactly one of those files, never both. The list used to
+live in five hand-written places — the `chezhelp` heredoc, `README.md`,
 `docs/commands.md`, the `99-completion` hook and `CLAUDE.md` — with only one of
-them checked, in one direction. `tests/registry.bats` now holds the two
-exhaustive ones to the table in *both* directions, and checks that every module
-gate names a real module, that doctor orders are unique, and that every
-`.chezmoidata` file has an owner.
+them checked, in one direction. Three of the five are generated now.
+`tests/registry.bats` holds the prose that is left to the table in *both*
+directions, and checks that every module gate names a real module, that doctor
+orders are unique, and that every `.chezmoidata` file has an owner.
 
 Ordering in `chezdoctor` comes from `FEATURE_DOCTOR_ORDER`, never from the
 directory name: the current section order is deliberate — repo, chezmoi,

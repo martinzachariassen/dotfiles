@@ -127,45 +127,38 @@ feature_list() { feature_names "$REPO_ROOT"; }
 
 # ─── the hand-written lists ─────────────────────────────────────────────────
 #
-# Two of the five places the verb list lived claim to be exhaustive: the
-# chezhelp heredoc and docs/commands.md. Those are checked here, in both
-# directions. README.md carries only the everyday verbs and the completion hook
-# mentions verbs in context, so neither is a list and neither is enforced.
-
-help_text() { sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC"; }
-
-@test "chezhelp lists every verb in the table" {
-    local missing=() v legacy help
-    help="$(help_text)"
-    while IFS= read -r v; do
-        legacy="$(verbs_legacy_name "$v")"
-        [ -n "$legacy" ] || continue # a verb that does not exist yet
-        printf '%s\n' "$help" | grep -qw -- "$legacy" || missing+=("$v ($legacy)")
-    done < <(verbs_all)
-    [ "${#missing[@]}" -eq 0 ] || printf 'absent from chezhelp: %s\n' "${missing[@]}" >&2
-    [ "${#missing[@]}" -eq 0 ]
-}
-
-@test "chezhelp lists nothing that is not in the table" {
-    local known extra=() word
-    known="$(while IFS= read -r v; do verbs_legacy_name "$v"; done < <(verbs_all))"
-    while IFS= read -r word; do
-        printf '%s\n' "$known" | grep -qx "$word" || extra+=("$word")
-        # `chezmoi` is the tool this repo drives, not one of its verbs.
-    done < <(help_text | grep -oE '\bchez[a-z]+\b' | grep -vx chezmoi | sort -u)
-    [ "${#extra[@]}" -eq 0 ] || printf 'in chezhelp but not the table: %s\n' "${extra[@]}" >&2
-    [ "${#extra[@]}" -eq 0 ]
-}
+# The verb list lived in five hand-synced places, and nothing checked four of
+# them. Three are generated now — `chez help`, the completion feed and dispatch
+# all read the table — so what is left to police is the prose. docs/commands.md
+# claims to be exhaustive, so it is checked in both directions; README.md
+# carries only the everyday verbs and the completion hook mentions verbs in
+# context, so neither is a list and neither is enforced.
 
 @test "docs/commands.md documents every verb in the table" {
     local missing=() v legacy
     while IFS= read -r v; do
         legacy="$(verbs_legacy_name "$v")"
         [ -n "$legacy" ] || continue
-        grep -qw -- "$legacy" "$REPO_ROOT/docs/commands.md" || missing+=("$v ($legacy)")
+        # Either spelling counts: the docs are being rewritten from `chezup` to
+        # `chez up` a page at a time, and both name the same verb.
+        grep -qE "\b(${legacy}|chez ${v})\b" "$REPO_ROOT/docs/commands.md" ||
+            missing+=("$v ($legacy)")
     done < <(verbs_all)
     [ "${#missing[@]}" -eq 0 ] || printf 'absent from docs/commands.md: %s\n' "${missing[@]}" >&2
     [ "${#missing[@]}" -eq 0 ]
+}
+
+@test "docs/commands.md documents nothing that is not a verb" {
+    local known extra=() word v
+    known="$(while IFS= read -r v; do verbs_legacy_name "$v"; done < <(verbs_all))"
+    # Anything starting `chezmoi` belongs to the tool this repo drives, not to
+    # its verbs — the command itself, and .chezmoidata/.chezmoiroot besides.
+    while IFS= read -r word; do
+        printf '%s\n' "$known" | grep -qx "$word" || extra+=("$word")
+    done < <(grep -oE '\bchez[a-z]+\b' "$REPO_ROOT/docs/commands.md" |
+        grep -vE '^chezmoi' | sort -u)
+    [ "${#extra[@]}" -eq 0 ] || printf 'in docs/commands.md but not the table: %s\n' "${extra[@]}" >&2
+    [ "${#extra[@]}" -eq 0 ]
 }
 
 # ─── data files ─────────────────────────────────────────────────────────────

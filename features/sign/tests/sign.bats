@@ -135,13 +135,19 @@ run_sign() { # extra env is set by the caller
     [ ! -s "$INIT_LOG" ]
 }
 
-@test "zshrc defines chezsign, routed through _chez_run" {
-    grep -qE '^chezsign\(\) \{' "$ZSHRC"
-    sed -n '/^chezsign() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/sign/cli.sh'
+# The verb reaches this feature through core/verbs.sh, and both `chez help` and
+# the completion read the same row — so pinning the row is what keeps all three
+# honest. The dispatcher's own behaviour is tests/chez.bats.
+@test "the verb table routes chez sign at this feature" {
+    # shellcheck source=../../../core/verbs.sh
+    . "$REPO_ROOT/core/verbs.sh"
+    [ "$(verbs_path sign)" = "features/sign/cli.sh" ]
+    [ "$(verbs_feature sign)" = "sign" ]
+    [ -n "$(verbs_summary sign)" ]
 }
 
-@test "chezhelp lists chezsign" {
-    sed -n '/^chezhelp() {/,/^}/p' "$ZSHRC" | grep -qF 'chezsign'
+@test "chezsign still works as the old name" {
+    grep -qxF "alias chezsign='chez sign'" "$ZSHRC"
 }
 
 @test "the completion script offers chezsign only when the key is deferred" {

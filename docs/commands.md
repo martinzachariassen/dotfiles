@@ -1,25 +1,45 @@
 # Commands
 
+Everything is one command with subcommands: **`chez <verb>`**. Run `chez help`
+for the list this Mac actually has — it is generated, so it cannot fall behind
+the code, and it hides the verbs whose module is off.
+
+Every verb also answers to the name it had before the dispatcher existed:
+`chezup` is `chez up`, `chezdoctor` is `chez doctor`, `dotfiles` is `chez cd`,
+`macos-defaults` is `chez macos`. The old names are aliases and are not going
+away in this release; the pages below still use them in places.
+
 The everyday surface is **two verbs plus a health check**. Both verbs end in the
 same `chezmoi apply`, which reconciles *real installed state* on every run, so it
-always installs what the Brewfile declares. It never *uninstalls*: `chezapply` only
-flags packages you have but the Brewfile doesn't, and `chezmirror` reconciles
-that removal direction on demand. `chezmirror` is **removal-only** — the install
-direction is what every `chezapply`/`chezup` already does; `chezreconcile` chains
-the two (`chezup` then `chezmirror`) when you want a full both-directions package
+always installs what the Brewfile declares. It never *uninstalls*: `chez apply`
+only flags packages you have but the Brewfile doesn't, and `chez mirror`
+reconciles that removal direction on demand. `chez mirror` is **removal-only** —
+the install direction is what every `chez apply`/`chez up` already does;
+`chez reconcile` chains the two when you want a full both-directions package
 reconcile in one step.
 
-The verbs are defined in
-[`src/dot_config/zsh/dot_zshrc.tmpl`](../src/dot_config/zsh/dot_zshrc.tmpl) and
-delegate to the scripts in [`scripts/bin/`](../scripts/bin).
+## Where a verb lives
+
+[`core/verbs.sh`](../core/verbs.sh) is the table: one row per verb, naming its
+owning feature, the script it runs, the group it appears under, and the module
+that gates it. [`core/chez.sh`](../core/chez.sh) reads that table to dispatch, to
+render `chez help`, and to feed the zsh completion — so those three cannot
+disagree with each other or with the code.
+
+`chez` itself is a shell function rather than a script, because `chez cd` has to
+change *your* shell's directory. It also means the verb surface does not exist
+until the managed `.zshrc` is loaded: on a fresh Mac, `exec zsh` comes first.
+
+Adding a verb is a row in the table plus a script in its feature. Nothing else
+needs editing — not this page's list, not the completion, not the help.
 
 ## Everyday
 
 | Command | What it does |
 |---|---|
-| `chezup` | **Converge this Mac to the repo:** pull the latest changes, offer any module added since this Mac was set up, preview file drift and pending hooks, then apply. The everyday command, and the way to retry a partial install. |
+| `chez up` | **Converge this Mac to the repo:** pull the latest changes, offer any module added since this Mac was set up, preview file drift and pending hooks, then apply. The everyday command, and the way to retry a partial install. |
 | `install.sh` | **Bootstrap a new Mac** from scratch (the same apply path under the hood — see [install.md](install.md)). |
-| `chezdoctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, shell layout, and — when the module is on — the nightly distiller. |
+| `chez doctor` | Read-only **health check** for repo, chezmoi, brew, auth, signing, mise, shell layout, and — when the module is on — the nightly distiller. |
 
 **`chezup` runs in four phases**, honouring `DRY_RUN=1` (print, don't run) and
 `YES=1` (skip the confirm gate), and passing any trailing arguments through to

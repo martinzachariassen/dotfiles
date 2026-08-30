@@ -3,12 +3,15 @@
 #
 # The verb list used to exist in five hand-synced places: the `chezhelp`
 # heredoc, README.md, docs/commands.md, the 99-completion hook, and CLAUDE.md.
-# Nothing checked four of them. This table is now the one that counts, and
-# tests/registry.bats holds the others to it in both directions.
+# Nothing checked four of them. This table is now the one that counts:
+# core/chez.sh dispatches and renders `chez help` straight from it, and
+# tests/registry.bats holds the remaining prose to it in both directions.
 #
 # Columns, tab-separated:
 #   verb     the subcommand, as in `chez <verb>`
 #   feature  owning directory under features/, or "-" for a registry verb
+#   path     the script to run, relative to the working tree, or "-" when the
+#            verb is handled by the dispatcher itself
 #   group    heading it appears under in `chez help`
 #   module   module that must be enabled for the verb to exist, or "-"
 #   summary  one line, present tense, no trailing period beyond the first
@@ -23,22 +26,22 @@ __DOTFILES_VERBS_SH=1
 # callers can read it without filtering.
 verbs_table() {
     sed -e 's/#.*$//' -e '/^[[:space:]]*$/d' <<'TABLE'
-up	converge	everyday	-	Pull → preview → apply. The command you run most.
-doctor	doctor	everyday	-	Read-only health check (repo, brew, auth, mise, shell).
-setup	setup	setup	-	Fill in newly-added setup keys; keeps existing answers.
-sign	sign	setup	-	Set the git signing key on its own; keeps every other answer.
-auth	auth	setup	-	Sign in to gh and the cloud CLIs after a fresh install.
-xcode	xcode	setup	appleDev	Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
-distill	distill	setup	claudeDistiller	Distil Claude conversations into the MAIN.md Claude loads.
-apply	converge	maintenance	-	Apply without pulling. Flags drift; never uninstalls.
-status	converge	maintenance	-	Explain pending file + package drift in plain words (read-only).
-bump	brew	maintenance	-	Upgrade deps: brew upgrade + mise upgrade.
-mirror	brew	maintenance	-	Uninstall untracked packages (removal only), confirming each.
-reconcile	converge	maintenance	-	Full package reconcile: install then remove.
-clean	clean	maintenance	-	Remove untracked top-level ~/.* entries, confirming each.
-macos	macos	hood	-	(Re-)apply macOS system defaults on their own.
-cd	-	maintenance	-	cd into the source repo.
-help	-	hood	-	Show this list.
+up	converge	features/converge/up.sh	everyday	-	Pull → preview → apply. The command you run most.
+doctor	doctor	scripts/bin/doctor.sh	everyday	-	Read-only health check (repo, brew, auth, mise, shell).
+setup	setup	features/setup/setup.sh	setup	-	Fill in newly-added setup keys; keeps existing answers.
+sign	sign	features/sign/cli.sh	setup	-	Set the git signing key on its own; keeps every other answer.
+auth	auth	features/auth/cli.sh	setup	-	Sign in to gh and the cloud CLIs after a fresh install.
+xcode	xcode	features/xcode/cli.sh	setup	appleDev	Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
+distill	distill	scripts/bin/distill.sh	setup	claudeDistiller	Distil Claude conversations into the MAIN.md Claude loads.
+apply	converge	features/converge/apply.sh	maintenance	-	Apply without pulling. Flags drift; never uninstalls.
+status	converge	features/converge/status.sh	maintenance	-	Explain pending file + package drift in plain words (read-only).
+bump	brew	features/brew/bump.sh	maintenance	-	Upgrade deps: brew upgrade + mise upgrade.
+mirror	brew	features/brew/mirror.sh	maintenance	-	Uninstall untracked packages (removal only), confirming each.
+reconcile	converge	features/converge/reconcile.sh	maintenance	-	Full package reconcile: install then remove.
+clean	clean	features/clean/cli.sh	maintenance	-	Remove untracked top-level ~/.* entries, confirming each.
+macos	macos	features/macos/cli.sh	hood	-	(Re-)apply macOS system defaults on their own.
+cd	-	-	maintenance	-	cd into the source repo.
+help	-	-	hood	-	Show this list.
 TABLE
 }
 
@@ -50,14 +53,24 @@ verbs_field() {
     verbs_table | awk -F'\t' -v v="$1" -v n="$2" '$1 == v { print $n; exit }'
 }
 
-# verbs_feature VERB / verbs_group VERB / verbs_module VERB / verbs_summary VERB
+# verbs_feature VERB / verbs_path VERB / verbs_group VERB / verbs_module VERB /
+# verbs_summary VERB
 verbs_feature() { verbs_field "$1" 2; }
-verbs_group() { verbs_field "$1" 3; }
-verbs_module() { verbs_field "$1" 4; }
-verbs_summary() { verbs_field "$1" 5; }
+verbs_path() { verbs_field "$1" 3; }
+verbs_group() { verbs_field "$1" 4; }
+verbs_module() { verbs_field "$1" 5; }
+verbs_summary() { verbs_field "$1" 6; }
 
-# verbs_legacy_name VERB — the pre-dispatcher name, for the transition aliases
-# and for checking the docs that still use it.
+# verbs_groups — group keys in table order, deduplicated. The order a group
+# first appears is the order `chez help` prints it, so the table is also the
+# running order and there is no second list to keep in step.
+verbs_groups() { verbs_table | cut -f4 | awk '!seen[$0]++'; }
+
+# verbs_in_group GROUP — the verbs in one group, in table order.
+verbs_in_group() { verbs_table | awk -F'\t' -v g="$1" '$4 == g { print $1 }'; }
+
+# verbs_legacy_name VERB — the pre-dispatcher name, kept as an alias through the
+# transition and still used by the docs that have not been rewritten.
 verbs_legacy_name() {
     case "$1" in
         cd) printf 'dotfiles\n' ;;

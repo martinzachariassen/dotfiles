@@ -358,8 +358,11 @@ _chez_run() {
     print -ru2 -- "  synced — open a new shell (or run: exec zsh)."
 }
 
-# Plain-language preamble for the zsh-native verbs; the bash scripts get the same
-# from core/ui.sh's `explain`. QUIET=1 drops back to results only.
+# The plain-language preamble every verb prints. Nothing in this file calls it
+# any more — the verbs are bash scripts and use core/ui.sh's `explain_titled` —
+# but it stays as the parity oracle: tests/ui.bats runs both and asserts the
+# output is byte-identical, so the extraction cannot quietly change how a verb
+# looks. QUIET=1 drops back to results only.
 _chez_explain() {
     [[ ${QUIET:-0} == 1 ]] && return 0
     local bar='│' dim=$'\e[2m' cyan=$'\e[36m' bold=$'\e[1m' reset=$'\e[0m' line
@@ -371,171 +374,63 @@ _chez_explain() {
     return 0
 }
 
-# Not auto-run by `chezmoi apply` — invoke on a fresh Mac or after resetting a pref pane.
-alias macos-defaults='_chez_run features/macos/cli.sh'
-
-# No args: cd into the source repo. With args: point at the setup verbs.
-dotfiles() {
+# ─── chez: one verb, many subcommands ─────────────────────────────────────────
+# `chez <verb>` resolves through core/verbs.sh, the single table that also
+# renders `chez help` and feeds the completion below — so the surface, the help
+# and the completion cannot drift apart.
+#
+# It has to be a function, not a script: `chez cd` changes THIS shell's
+# directory, which a subprocess cannot do. Everything else is handed to
+# core/chez.sh through _chez_run, so a stale shell config still self-heals.
+chez() {
     local src={{ .chezmoi.workingTree | quote }}
-    if [ "$#" -eq 0 ]; then
+    if [[ ${1:-} == cd ]]; then
         cd "$src" || return
-    else
-        echo "Re-choose your setup (profile, modules, signing):"
-        echo "    chezsetup --reset          # plain-text wizard, then applies"
-        echo
-        echo "Or just fill in newly-added setup keys (keeps current answers):"
-        echo "    chezsetup"
-        echo
-        echo "Just set the git signing key (once 1Password is running):"
-        echo "    chezsign"
-        echo
-        echo "List every dotfiles command:"
-        echo "    chezhelp"
+        return 0
     fi
+    # Exported from render-time data rather than read back out of `chezmoi
+    # data`: gating help and dispatch on the module set costs nothing this way,
+    # and is exactly as accurate as the shell config it came from.
+    local -x CHEZ_MODULES={{ (dig "modules" (list) .) | join " " | quote }}
+    _chez_run core/chez.sh "$@"
 }
 
-# Apply without pulling — the building block chezup calls. Flags Brewfile drift
-# (packages installed but untracked); never uninstalls.
-chezapply() {
-    _chez_run features/converge/apply.sh "$@"
+# The verb list comes from the dispatcher itself, so a verb added to the table
+# completes without touching this file. Module-gated verbs the Mac does not have
+# are already filtered out by `--verbs`.
+_chez() {
+    local -a verbs
+    verbs=(${(f)"$(chez --verbs 2>/dev/null)"})
+    _describe -t verbs 'chez verb' verbs
 }
+compdef _chez chez
 
-# Read-only drift explainer: plain-language file drift (repo <-> $HOME) AND
-# untracked-package drift, in one report. Never applies, pulls, or removes.
-chezstatus() {
-    _chez_run features/converge/status.sh "$@"
-}
-
-# ─── Everyday: the two commands that keep a machine in sync ───────────────────
-# Converge this Mac to the repo: pull + preview + apply.
-# Knobs: YES=1 skip confirm · DRY_RUN=1 print without running. Extra args → apply.
-chezup() {
-    _chez_run features/converge/up.sh "$@"
-}
-
-# Read-only full-stack health check.
-chezdoctor() {
-    _chez_run scripts/bin/doctor.sh
-}
-
-# Configure profile/modules/signing. Default fills in newly added setup keys
-# only, keeping existing answers; --reset/-r sets this Mac up as new.
-chezsetup() {
-    _chez_run features/setup/setup.sh "$@"
-}
-
-# Set the git signing key on a machine that deferred it during setup (the key
-# lives in 1Password, which isn't installed until after the wizard runs). Offers
-# the SSH agent's keys, changes nothing else, then proves it with a signed commit.
-chezsign() {
-    _chez_run features/sign/cli.sh "$@"
-}
+# ─── The old names, kept as aliases ───────────────────────────────────────────
+# Every verb answered to `chez<verb>` before the dispatcher existed, and muscle
+# memory outlives a refactor. These are one line each and forward verbatim;
+# `chez help` is what documents the surface.
+#
+# Two do not follow the pattern: `dotfiles` predates the `chez` prefix, and
+# `macos-defaults` is the name the macOS docs and the 04 hook already use.
+alias chezup='chez up'
+alias chezdoctor='chez doctor'
+alias chezsetup='chez setup'
+alias chezsign='chez sign'
+alias chezapply='chez apply'
+alias chezstatus='chez status'
+alias chezbump='chez bump'
+alias chezmirror='chez mirror'
+alias chezreconcile='chez reconcile'
+alias chezclean='chez clean'
+alias chezhelp='chez help'
+alias dotfiles='chez cd'
+alias macos-defaults='chez macos'
 {{- if has "appleDev" (dig "modules" (list) .) }}
-
-# Install/repair the Xcode layer an apply can't: Xcode.app itself, the selected
-# developer dir, the licence, first-launch components, and a simulator runtime.
-# Interactive by necessity (Apple ID + 2FA), which is why it isn't an apply hook.
-chezxcode() {
-    _chez_run features/xcode/cli.sh "$@"
-}
+alias chezxcode='chez xcode'
 {{- end }}
 {{- if has "claudeDistiller" (dig "modules" (list) .) }}
-
-# Distil Claude Code conversations into the MAIN.md every future session loads.
-# Knobs: --setup · --since 7d · --render · --undo · --remote [URL|none] · -n.
-# Read-only, free: --status · --stats · --runs [N] · --logs [N] [-f] · --remote.
-chezdistill() {
-    _chez_run scripts/bin/distill.sh "$@"
-}
+alias chezdistill='chez distill'
 {{- end }}
-
-# Routine dependency upgrade: brew update + upgrade, then mise upgrade, with a
-# read-only report of anything no Brewfile tier declares.
-chezbump() {
-    _chez_run features/brew/bump.sh "$@"
-}
-
-# Removal direction of the Brewfile: uninstall untracked packages, then prune
-# orphaned dependencies. Not wired into `chezapply` — a routine apply must never
-# silently uninstall. `chezreconcile` chains chezup (install) + this (remove).
-chezmirror() {
-    _chez_run features/brew/mirror.sh "$@"
-}
-
-# Full reconcile: chezup (install what the repo declares) then chezmirror
-# (remove what it no longer tracks). Untracked *files* are a separate step
-# (`chezclean`). Honours DRY_RUN=1 and YES=1. Trailing args pass to chezup.
-chezreconcile() {
-    _chez_run features/converge/reconcile.sh "$@"
-}
-
-# Reconcile untracked dotfiles to what chezmoi manages (both $HOME's top level
-# and ~/.config, per cleanup.toml). The file analogue of chezmirror.
-chezclean() {
-    _chez_run features/clean/cli.sh "$@"
-}
-
-# Print every dotfiles verb, grouped by frequency. Mirrors README.md /
-# docs/commands.md — keep the three in sync.
-chezhelp() {
-    cat <<'EOF'
-
-  ── dotfiles commands ─────────────────────────────────────────────
-  Converge this Mac to the repo. Two verbs day to day; the rest are
-  for setup changes and package drift.
-
-  Everyday
-    chezup           Pull → preview → apply. The command you run most.
-    chezdoctor       Read-only health check (repo, brew, auth, mise, shell).
-
-  Change your setup (re-run the wizard)
-    chezsetup        Fill in newly-added setup keys; keeps existing answers.
-                       --reset/-r  set up as new: reset run-once state, re-ask everything.
-    chezsign         Set the git signing key on its own; keeps every other answer.
-                       Run this after 1Password is up if setup deferred the key.
-{{- if has "appleDev" (dig "modules" (list) .) }}
-    chezxcode        Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
-                       --check  report the five readiness checks; changes nothing.
-{{- end }}
-{{- if has "claudeDistiller" (dig "modules" (list) .) }}
-    chezdistill      Distil Claude conversations into the MAIN.md Claude loads.
-                       --setup   turn it on here: module, apply, nightly timer.
-                       --status  where things live, MAIN size vs cap, spend, runs.
-                       --render  rebuild from the corpus, no API calls.
-                       --stats   the corpus: funnel, topics, spend, runs.
-                       --runs [N]  a row per night ·  --logs [N] [-f]  the log.
-                       --since 7d  backfill     ·  --undo  revert + re-render.
-                       --remote [URL|none]  back the corpus up, or stop.
-{{- end }}
-
-  Maintenance (packages & drift)
-    chezapply        Apply without pulling. Flags drift; never uninstalls.
-    chezstatus       Explain pending file + package drift in plain words (read-only).
-    chezbump         Upgrade deps: brew upgrade + mise upgrade.
-    chezmirror       Uninstall untracked packages (removal only), confirming each.
-                       --all/-a      uninstall the whole set after one confirmation.
-                       --dry-run/-n  preview only, remove nothing.
-    chezreconcile    Full package reconcile: chezup (install) + chezmirror (remove).
-    chezclean        Remove untracked top-level ~/.* entries, confirming each.
-                       --all/-a  remove the whole set after one confirmation.
-    dotfiles         cd into the source repo.
-
-  Add something new to the repo
-    new brew pkg     add the line to features/brew/Brewfile* → chezapply  (apply installs it)
-    new dotfile      chezmoi add ~/.foo   ·   update tracked: chezmoi re-add ~/.foo
-
-  Under the hood
-    install.sh       Bootstrap a fresh Mac (curl | bash entry point).
-    macos-defaults   (Re-)apply macOS system defaults on their own.
-    chezhelp         Show this list.
-
-  Knobs (chezup / chezapply / chezreconcile / chezclean):  DRY_RUN=1 print only  ·  YES=1 skip confirm
-  QUIET=1 on any verb (and install.sh) drops the explanations, leaving just results
-  chezmirror also honors DRY_RUN=1 / -n (preview only) and YES=1 (accept-all, no prompts)
-  YES=1 chezclean:  accept-all — remove everything untracked, no prompts
-  Deeper docs:  run `dotfiles`, then see docs/commands.md
-EOF
-}
 
 # ─── Zellij, in-session ───────────────────────────────────────────────────────
 # The auto-attach and the helpers it needs live at the top of this file, because
