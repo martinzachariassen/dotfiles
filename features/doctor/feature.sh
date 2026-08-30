@@ -6,4 +6,7 @@
 FEATURE_NAME="doctor"
 FEATURE_TITLE="Health check"
 FEATURE_MODULE=""
-FEATURE_DOCTOR_ORDER="10"
+# Empty on purpose: this feature has no single section. Its checks live in
+# checks/NN-*.sh and each carries its own order in its filename, on the same
+# numeric scale as every FEATURE_DOCTOR_ORDER.
+FEATURE_DOCTOR_ORDER=""

@@ -27,7 +27,7 @@ __DOTFILES_VERBS_SH=1
 verbs_table() {
     sed -e 's/#.*$//' -e '/^[[:space:]]*$/d' <<'TABLE'
 up	converge	features/converge/up.sh	everyday	-	Pull → preview → apply. The command you run most.
-doctor	doctor	scripts/bin/doctor.sh	everyday	-	Read-only health check (repo, brew, auth, mise, shell).
+doctor	doctor	features/doctor/cli.sh	everyday	-	Read-only health check (repo, brew, auth, mise, shell).
 setup	setup	features/setup/setup.sh	setup	-	Fill in newly-added setup keys; keeps existing answers.
 sign	sign	features/sign/cli.sh	setup	-	Set the git signing key on its own; keeps every other answer.
 auth	auth	features/auth/cli.sh	setup	-	Sign in to gh and the cloud CLIs after a fresh install.

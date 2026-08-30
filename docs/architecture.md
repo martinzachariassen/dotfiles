@@ -113,10 +113,19 @@ them checked, in one direction. Three of the five are generated now.
 directions, and checks that every module gate names a real module, that doctor
 orders are unique, and that every `.chezmoidata` file has an owner.
 
-Ordering in `chezdoctor` comes from `FEATURE_DOCTOR_ORDER`, never from the
+Ordering in `chez doctor` comes from `FEATURE_DOCTOR_ORDER`, never from the
 directory name: the current section order is deliberate — repo, chezmoi,
 identity, packages, runtimes, optional modules, informational — and
 alphabetical would scramble it.
+
+The report is the registry's second consumer. `features/doctor/cli.sh` owns only
+the tallies, the order and the summary; each section is a **sourced fragment**
+at `features/<name>/doctor.sh` defining one `doctor_<name>()`. Sourced rather
+than executed so the fragments share one set of counters — running them as
+subprocesses would mean rebuilding the same four numbers out of fifteen exit
+codes. The checks belonging to no feature live in `features/doctor/checks/`,
+carrying their order in the filename on the same numeric scale. Full model in
+[features/doctor](../features/doctor/README.md).
 
 `bin/` and `ci/` scripts reach `core/` as `"$_DIR/../../core/…"` and their own
 engines as `"$_DIR/../lib/…"`; the chezmoi hooks reach both across the

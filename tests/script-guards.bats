@@ -25,8 +25,8 @@ run_isolated() {
     run env DOTFILES_DIR="$ISO" bash "$ISO/$rel"
 }
 
-@test "doctor.sh fails loudly when core/ui.sh is missing" {
-    run_isolated scripts/bin/doctor.sh
+@test "doctor/cli.sh fails loudly when core/ui.sh is missing" {
+    run_isolated features/doctor/cli.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1
     [[ "$output" == *"ui.sh"* ]] || return 1
