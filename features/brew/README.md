@@ -62,6 +62,13 @@ rather than `~/.homebrew`.
 deliberate and commented at both ends: `install.sh` runs via `curl | bash` before
 the repo exists, so it cannot source anything.
 
-`chezmirror` and `chezbump` still live in `src/dot_config/zsh/dot_zshrc.tmpl` as
-inline zsh. They move here next; the zshrc sources `lib/tiers.sh` directly in the
-meantime, which is why that file must stay POSIX-safe for both bash and zsh.
+`chezmirror` and `chezbump` are `mirror.sh` and `bump.sh` here now. They were
+~240 lines of zsh inside `dot_zshrc.tmpl`, where the shellcheck and shfmt globs
+could not reach them and eight test files got at them by `sed`-ing function
+bodies out of a Go template. The zshrc keeps one-line wrappers.
+
+One wrapper survives in the template: `_chez_brew_removals`. `chezapply` and
+`chezstatus` still live there and still need the removal set, so it sources
+`lib/removals.sh` and calls into it rather than keeping a second copy. It goes
+when those two verbs move. That is also why `lib/removals.sh` and `lib/tiers.sh`
+must stay POSIX-safe for both bash and zsh.

@@ -140,7 +140,9 @@ setup() {
 }
 
 @test "the destructive verbs explain themselves before acting" {
-    sed -n '/^chezmirror() {/,/^}/p' "$ZSHRC" | grep -q '_chez_explain'
+    # chezmirror is a bash script now and uses core/ui.sh's explain_titled,
+    # which is kept byte-identical to the zsh _chez_explain by tests/ui.bats.
+    grep -q 'explain_titled' "$REPO_ROOT/features/brew/mirror.sh"
     sed -n '/^chezapply() {/,/^}/p' "$ZSHRC" | grep -q '_chez_explain'
     sed -n '/^chezreconcile() {/,/^}/p' "$ZSHRC" | grep -q '_chez_explain'
 }

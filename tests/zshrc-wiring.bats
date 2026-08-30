@@ -205,21 +205,28 @@ _zprofile_path() {
 
 # Wiring only — the behaviour (union, parser, cask/formula dispatch, no-TTY
 # safety) is exercised end-to-end in tests/chezmirror.bats against a stubbed brew.
-@test "zshrc defines the chezmirror function (Brewfile removal reconcile)" {
+# Wiring only — chezmirror's behaviour is exercised end-to-end against the real
+# script in features/brew/tests/mirror.bats, including the --file=- invariant
+# and the per-package confirm loop. What is checked here is that the verb still
+# reaches that script.
+@test "zshrc defines the chezmirror function routed through _chez_run" {
     grep -qE '^chezmirror\(\) \{' "$ZSHRC"
-    body="$(sed -n '/^chezmirror() {/,/^}/p' "$ZSHRC")"
-    # Confirms per package (individually gated) — never a bulk cleanup --force.
-    grep -qF '_chez_brew_removals' <<<"$body"
-    grep -qF '_chez_brew_uninstall_one' <<<"$body"
-    grep -qF 'gum confirm' <<<"$body"
-    no_match_in "$body" 'brew bundle cleanup --force'
+    sed -n '/^chezmirror() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/brew/mirror.sh'
+}
 
-    # `brew bundle cleanup` honours only ONE --file; tiers must arrive on
-    # stdin (--file=-) or only the last tier would be read.
-    grep -qE '^_chez_brew_removals\(\) \{' "$ZSHRC"
+@test "zshrc defines the chezbump function routed through _chez_run" {
+    grep -qE '^chezbump\(\) \{' "$ZSHRC"
+    sed -n '/^chezbump() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/brew/bump.sh'
+}
+
+# chezapply and chezstatus still live in this file and still need the removal
+# set, so the wrapper that reaches the shared lib must stay until they move.
+@test "the removal-set wrapper delegates to the shared lib, never a second copy" {
     helper="$(sed -n '/^_chez_brew_removals() {/,/^}/p' "$ZSHRC")"
-    grep -qF 'brew bundle cleanup --file=-' <<<"$helper"
-    no_match 'brew bundle cleanup[^|]*--file=[^-]' "$ZSHRC"
+    grep -qF 'features/brew/lib/removals.sh' <<<"$helper"
+    grep -qF 'brew_removals "$src"' <<<"$helper"
+    # The implementation must not have been copied back into the template.
+    no_match 'brew bundle cleanup' "$ZSHRC"
 }
 
 # Wiring only — behaviour is exercised end-to-end in features/clean/tests/.

@@ -612,265 +612,31 @@ chezdistill() {
 }
 {{- end }}
 
-# Routine dependency bump: brew + mise global runtimes. Doesn't auto-commit.
+# Routine dependency upgrade: brew update + upgrade, then mise upgrade, with a
+# read-only report of anything no Brewfile tier declares.
 chezbump() {
-    local src={{ .chezmoi.workingTree | quote }}
-    echo "── brew update + upgrade ─────────────────────────────────────"
-    brew update && brew upgrade
-    echo
-    echo "── Untracked Homebrew packages (in no Brewfile tier) ──────────"
-    local removals
-    removals=$(_chez_brew_removals "$src")
-    if [ -n "$removals" ]; then
-        printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
-        echo "  (reconcile with \`chezmirror\` to uninstall — it prompts per package)"
-    else
-        echo "  ✓ none — every installed package is tracked"
-    fi
-    if command -v mise >/dev/null 2>&1; then
-        echo
-        echo "── mise upgrade (global runtimes) ─────────────────────────────"
-        mise upgrade || true
-    fi
-    echo
-    echo "Now: cd $src && git diff   to review, then commit."
+    _chez_run features/brew/bump.sh "$@"
 }
 
-# "<kind>\t<name>" (cask | formula | tap) for every Homebrew item no ACTIVE
-# Brewfile tier declares — the removal set chezmirror acts on. $1 is the repo
-# root; pure/testable. The tier set comes from features/brew/lib/tiers.sh, the
-# same resolver chezdoctor uses and the mirror of what the brew-bundle hook
-# installs from, so "tracked" means the same thing in both directions: a
-# work-profile cask on a personal machine is untracked here, not silently kept.
-# `brew bundle cleanup` only honours one --file, so the active tiers are
-# concatenated onto stdin (--file=-).
+# "<kind>\t<name>" for every Homebrew item no ACTIVE Brewfile tier declares.
+# The implementation is features/brew/lib/removals.sh — shared with mirror.sh
+# and bump.sh so "untracked" cannot mean two different things. This wrapper
+# exists only because chezapply and chezstatus still live in this file.
 _chez_brew_removals() {
     local src=$1
-
-    if [ ! -r "$src/features/brew/lib/tiers.sh" ]; then
-        echo "  ! cannot resolve the active Brewfiles: no $src/features/brew/lib/tiers.sh — nothing offered for removal" >&2
+    if [ ! -r "$src/features/brew/lib/removals.sh" ]; then
+        echo "  ! cannot resolve the removal set: no $src/features/brew/lib/removals.sh" >&2
         return 1
     fi
-    . "$src/features/brew/lib/tiers.sh"
-
-    # Fail closed: an unresolvable tier set means an empty removal set, never a
-    # broader one. Comparing against too FEW tiers would offer the whole
-    # toolchain for uninstall.
-    local rel
-    local -a files
-    files=()
-    while IFS= read -r rel; do
-        [ -n "$rel" ] || continue
-        [ -f "$src/$rel" ] && files+=("$src/$rel")
-    done < <(brew_active_files)
-    if [ "${#files[@]}" -eq 0 ]; then
-        echo "  ! could not resolve the active Brewfiles (is jq installed?) — nothing offered for removal" >&2
-        return 1
-    fi
-
-    # Homebrew 6.0 refuses to even load a Brewfile referencing an untrusted
-    # non-official tap — `brew bundle cleanup` then errors out with nothing on
-    # stdout, which used to look identical to "nothing to remove". Trust every
-    # declared tap first, same as run_after_02-brew-bundle.sh.tmpl does for installs.
-    local taprepo
-    while IFS= read -r taprepo; do
-        [ -n "$taprepo" ] || continue
-        brew trust --tap "$taprepo" >/dev/null 2>&1
-    done < <(sed -n 's/^[[:space:]]*tap[[:space:]]*"\([^"]*\)".*/\1/p' "${files[@]}" 2>/dev/null)
-
-    # brew's stderr routinely carries benign noise (API-cache refresh,
-    # deprecation notices) even on success, so only surface lines using
-    # brew's own convention for a fatal error (`Error: …`) — that's the
-    # untrusted-tap failure's exact signature, not a generic "any stderr" check.
-    local out err
-    err=$(mktemp)
-    out=$(cat "${files[@]}" 2>/dev/null |
-        brew bundle cleanup --file=- 2>"$err")
-    if grep -q '^Error:' "$err" 2>/dev/null; then
-        echo "  ! brew bundle cleanup reported errors — removal set may be incomplete:" >&2
-        grep '^Error:' "$err" | sed 's/^/      /' >&2
-    fi
-    rm -f "$err"
-
-    printf '%s\n' "$out" | awk '
-            /^Would uninstall casks:/    { kind = "cask";    next }
-            /^Would uninstall formulae:/ { kind = "formula"; next }
-            /^Would untap:/              { kind = "tap";     next }
-            /^Would .brew cleanup.:/     { kind = "";        next }
-            /^Run .brew bundle cleanup/  { kind = "";        next }
-            kind && NF                   { print kind "\t" $0 }
-        '
-}
-
-# Remove one package, routing casks/taps to the right subcommand.
-_chez_brew_uninstall_one() {
-    if [ "$1" = cask ]; then
-        brew uninstall --cask "$2"
-    elif [ "$1" = tap ]; then
-        brew untap "$2"
-    else
-        brew uninstall "$2"
-    fi
+    . "$src/features/brew/lib/removals.sh"
+    brew_removals "$src"
 }
 
 # Removal direction of the Brewfile: uninstall untracked packages, then prune
-# orphaned dependencies. Not wired into `chezapply` — a routine apply should
-# never silently uninstall. `chezreconcile` chains chezup (install) + this
-# (remove). `chezstatus` is the read-only preview for this same removal set.
+# orphaned dependencies. Not wired into `chezapply` — a routine apply must never
+# silently uninstall. `chezreconcile` chains chezup (install) + this (remove).
 chezmirror() {
-    local src={{ .chezmoi.workingTree | quote }}
-
-    local all=0 bulk_confirm=1 dry=0 arg
-    [ "${YES:-}" = 1 ] && { all=1; bulk_confirm=0; }
-    [ "${DRY_RUN:-}" = 1 ] && dry=1
-    for arg in "$@"; do
-        case "$arg" in
-            -a | --all | -y | --yes) all=1 ;;
-            -n | --dry-run) dry=1 ;;
-            -h | --help)
-                echo "usage: chezmirror [--all|-a | --yes|-y] [--dry-run|-n]"
-                echo "  removal only — installs happen via chezup/chezapply; chezreconcile does both."
-                echo "  (no flag)      confirm each untracked package individually"
-                echo "  --all, -a      uninstall the whole untracked set after ONE confirmation"
-                echo "  --yes, -y      alias of --all;  YES=1 chezmirror skips that confirmation"
-                echo "  --dry-run, -n  preview the untracked set only, remove nothing;  DRY_RUN=1 chezmirror does the same"
-                return 0
-                ;;
-            *)
-                echo "chezmirror: unknown option: $arg (try --help)" >&2
-                return 2
-                ;;
-        esac
-    done
-
-    _chez_explain "Untracked packages" \
-        "Finds Homebrew packages installed on this Mac that no Brewfile active for" \
-        "this profile and module set declares, then offers to uninstall them. This is" \
-        "the only verb that removes packages; apply and chezup never do. Each removal" \
-        "is confirmed separately."
-
-    # Distinguish "resolved, and nothing is untracked" from "could not resolve"
-    # — both yield an empty set, but only the first is a clean bill of health.
-    local parsed rc
-    parsed=$(_chez_brew_removals "$src")
-    rc=$?
-
-    if [ "$rc" -ne 0 ]; then
-        echo "  ! could not determine what this machine tracks — nothing removed"
-        echo "    fix the error above (usually: run \`chezup\`), then re-run chezmirror"
-        return 1
-    fi
-    if [ -z "$parsed" ]; then
-        echo "  ✓ nothing to remove — every installed package is tracked"
-        return 0
-    fi
-
-    echo "── Untracked (installed locally, in no active Brewfile tier) ──"
-    printf '%s\n' "$parsed" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
-    echo
-
-    if [ "$dry" -eq 1 ]; then
-        echo "  DRY_RUN — nothing removed. Re-run without --dry-run to uninstall."
-        return 0
-    fi
-
-    # `[ -r /dev/tty ]` is unreliable, so actually try to open it.
-    if ! { : </dev/tty; } 2>/dev/null; then
-        echo "No TTY — not removing. Re-run interactively to confirm each."
-        return 0
-    fi
-
-    if [ "$all" -eq 1 ] && [ "$bulk_confirm" -eq 1 ]; then
-        local count ok
-        count=$(printf '%s\n' "$parsed" | grep -c .)
-        if command -v gum >/dev/null 2>&1; then
-            gum confirm "Uninstall ALL $count untracked package(s)?" && ok=1 || ok=0
-        else
-            local reply
-            printf 'Uninstall ALL %s untracked package(s)? [y/N] ' "$count"
-            IFS= read -r reply </dev/tty || reply=""
-            case "$reply" in y | Y | yes | YES) ok=1 ;; *) ok=0 ;; esac
-        fi
-        [ "$ok" -eq 1 ] || { echo "aborted — nothing removed"; return 0; }
-    fi
-
-    # Phase 1 — decide, without uninstalling yet. List on fd 3, not stdin: `gum
-    # confirm` reads keypresses from stdin, so a here-string there would drain it.
-    local kind name reply ok kept=0 approved=""
-    while IFS=$'\t' read -r kind name <&3; do
-        [ -n "$name" ] || continue
-        if [ "$all" -eq 1 ]; then
-            ok=1
-        elif command -v gum >/dev/null 2>&1; then
-            gum confirm "Uninstall ${kind} ${name}?" && ok=1 || ok=0
-        else
-            printf 'Uninstall %s %s? [y/N] ' "$kind" "$name"
-            IFS= read -r reply </dev/tty || reply=""
-            case "$reply" in y | Y | yes | YES) ok=1 ;; *) ok=0 ;; esac
-        fi
-        if [ "$ok" -eq 1 ]; then
-            approved+="${kind}"$'\t'"${name}"$'\n'
-        else
-            kept=$((kept + 1))
-        fi
-    done 3<<<"$parsed"
-
-    # Phase 2 — remove, retrying in passes: `brew bundle cleanup` lists deps
-    # before dependents, so shared deps fail until the leaves above them are
-    # gone. Loop until a pass removes nothing. List on fd 3 again to keep
-    # brew's stdin on the terminal.
-    local removed=0 pending=$approved progressed leftover
-    while [ -n "$pending" ]; do
-        progressed=0 leftover=""
-        while IFS=$'\t' read -r kind name <&3; do
-            [ -n "$name" ] || continue
-            if _chez_brew_uninstall_one "$kind" "$name" 2>/dev/null; then
-                removed=$((removed + 1))
-                progressed=1
-            else
-                leftover+="${kind}"$'\t'"${name}"$'\n'
-            fi
-        done 3<<<"$pending"
-        pending=$leftover
-        [ "$progressed" -eq 1 ] || break
-    done
-
-    if [ -n "$pending" ]; then
-        echo
-        echo "  ! still installed — a package outside your Brewfiles still needs these:"
-        printf '%s' "$pending" | awk -F'\t' 'NF { printf "      %-8s %s\n", $1, $2 }'
-    fi
-
-    echo
-    echo "  removed $removed · kept $kept"
-
-    # `brew autoremove` only touches orphaned dependency-only formulae, never a
-    # Brewfile-tracked package, so it's safe to offer after a removal pass.
-    local orphans ocount oyes oreply
-    orphans="$(brew autoremove -n 2>/dev/null | grep -vE '^==>' | grep -E '^[^[:space:]]+$' || true)"
-    if [ -n "$orphans" ]; then
-        ocount=$(printf '%s\n' "$orphans" | grep -c .)
-        echo
-        echo "── Orphaned dependencies (needed by nothing in your Brewfiles) ────"
-        printf '%s\n' "$orphans" | awk 'NF { printf "  %s\n", $0 }'
-        echo
-        if [ "$all" -eq 1 ]; then
-            oyes=1
-        elif command -v gum >/dev/null 2>&1; then
-            gum confirm "Prune $ocount orphaned dependency(ies) with brew autoremove?" && oyes=1 || oyes=0
-        else
-            printf 'Prune %s orphaned dependency(ies) with brew autoremove? [y/N] ' "$ocount"
-            IFS= read -r oreply </dev/tty || oreply=""
-            case "$oreply" in y | Y | yes | YES) oyes=1 ;; *) oyes=0 ;; esac
-        fi
-        if [ "$oyes" -eq 1 ]; then
-            brew autoremove
-            echo "  ✓ pruned orphaned dependencies"
-        else
-            echo "  kept orphaned dependencies — run \`brew autoremove\` to prune later."
-        fi
-    fi
-    return 0
+    _chez_run features/brew/mirror.sh "$@"
 }
 
 # Full reconcile: chezup (install what the repo declares) then chezmirror

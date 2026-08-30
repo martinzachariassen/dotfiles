@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Tests for chezmirror and the helpers it shares with chezbump
-# (_chez_brew_removals, _chez_brew_uninstall_one) — the reconciler that
+# (brew_removals, brew_uninstall_one) — the reconciler that
 # uninstalls Homebrew packages tracked in NO Brewfile tier.
 #
 # The dangerous bit: `brew bundle cleanup` honours only ONE --file, so the
@@ -19,11 +19,10 @@
 # The interactive per-package loop needs a controlling terminal; the two
 # TTY-dependent tests are inverse-gated (safety runs headless in CI, the
 # confirm-loop test needs a real/pseudo tty). Run it locally with:
-#   script -q /dev/null bats tests/chezmirror.bats
+#   script -q /dev/null bats features/brew/tests/mirror.bats
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
+    load '../../../core/testing/helper'
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
@@ -128,25 +127,36 @@ teardown() {
     [ -n "${STUBS:-}" ] && rm -rf "$STUBS"
 }
 
-# Pull function bodies out of the template, repointing chezmirror's
-# `local src={{ .chezmoi.workingTree | quote }}` line at the fake repo.
-extract() {
-    local fn
-    for fn in "$@"; do
-        sed -n "/^${fn}() {/,/^}/p" "$ZSHRC"
-    done | sed "s|^    local src={{.*}}|    local src=\"$FAKE\"|"
-}
+# The committed scripts are run directly. DOTFILES_DIR points them at the fake
+# repo, so they read its Brewfiles and its stubbed `chezmoi data` while still
+# sourcing the real core/ui.sh and lib/removals.sh — the code under test is the
+# code that ships, not a copy of it.
+#
+# This used to sed the function bodies out of dot_zshrc.tmpl and eval them,
+# because that was the only way to reach 155 lines of zsh living inside a Go
+# template. Those lines are features/brew/mirror.sh now.
 
 # Mirrors chezmirror's own tty guard, for the TTY-gated tests below.
 have_tty() { { : </dev/tty; } >/dev/null 2>&1; }
 
-run_fn() { # run_fn 'shell snippet' — under stubbed PATH + exported log paths
+# _stubbed CMD… — run under the stubbed PATH and the log paths the stubs use.
+_stubbed() {
     run env \
         PATH="$STUBS:$PATH" \
+        DOTFILES_DIR="$FAKE" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" BREW_CLEANUP_STDERR="${BREW_CLEANUP_STDERR:-}" \
         DATA_JSON_FILE="$DATA_JSON_FILE" \
-        bash -c "$1"
+        "$@"
+}
+
+# run_mirror [args…] — the real chezmirror.
+run_mirror() { _stubbed bash "$REPO_ROOT/features/brew/mirror.sh" "$@"; }
+
+# run_removals [args…] — the shared resolver, called as the verbs call it.
+run_removals() {
+    _stubbed bash -c '. "$1/features/brew/lib/removals.sh"; shift; brew_removals "$@"' \
+        _ "$REPO_ROOT" "$@"
 }
 
 # Negative assertions must go through these. A bare `! grep …` in the middle of
@@ -170,10 +180,10 @@ no_match_in() {
     fi
 }
 
-# ─── _chez_brew_removals: the active tier set + parser (bugs lived here) ─────
+# ─── brew_removals: the active tier set + parser (bugs lived here) ─────
 
-@test "_chez_brew_removals parses cleanup output into <kind><TAB><name> rows" {
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+@test "brew_removals parses cleanup output into <kind><TAB><name> rows" {
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "$(printf 'cask\torphan-app')" ]
     [ "${lines[1]}" = "$(printf 'formula\tbats-core')" ]
@@ -181,8 +191,8 @@ no_match_in() {
     [ "${#lines[@]}" -eq 3 ]
 }
 
-@test "_chez_brew_removals stops at the cache-prune section (no leaked paths)" {
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+@test "brew_removals stops at the cache-prune section (no leaked paths)" {
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     # The cache-prune section must never surface as a removal (parser bug regression).
     no_match_in "$output" 'Would remove'
@@ -190,7 +200,7 @@ no_match_in() {
     no_match_in "$output" 'brew cleanup'
 }
 
-@test "_chez_brew_removals labels the untap section 'tap' without leaking its header" {
+@test "brew_removals labels the untap section 'tap' without leaking its header" {
     # "Would untap:" entries must not inherit the preceding "formula" kind — the
     # bug that made chezmirror `brew uninstall "Would untap:"` and a bare tap name.
     cat >"$CANNED" <<'EOF'
@@ -199,7 +209,7 @@ orphan-cli
 Would untap:
 acme/formulae
 EOF
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "$(printf 'formula\torphan-cli')" ]
     [ "${lines[1]}" = "$(printf 'tap\tacme/formulae')" ]
@@ -207,8 +217,8 @@ EOF
     no_match_in "$output" 'Would untap' # the header itself must never leak
 }
 
-@test "_chez_brew_removals feeds EVERY active tier to brew (multi-tier regression)" {
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+@test "brew_removals feeds EVERY active tier to brew (multi-tier regression)" {
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     # Each active tier's marker must reach brew's stdin — not just the last
     # file's. Missing one reports its packages as untracked and queues the
@@ -222,30 +232,30 @@ EOF
     done
 }
 
-@test "_chez_brew_removals excludes the other profile's tier (work-on-personal bug)" {
+@test "brew_removals excludes the other profile's tier (work-on-personal bug)" {
     # The bug: the tier set was the `Brewfile.*` glob, so Brewfile.work counted
     # as tracked on a personal machine — a cask moved from mac-apps to the work
     # profile was never offered for removal on the machine that just dropped it.
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     no_match 'marker-work' "$STDIN_LOG"
 }
 
-@test "_chez_brew_removals excludes a disabled module's tier" {
+@test "brew_removals excludes a disabled module's tier" {
     printf 'brew "marker-appledev"\n' >"$FAKE/features/brew/Brewfile.apple-dev"
     # appleDev is absent from .modules in the default stub data.
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     no_match 'marker-appledev' "$STDIN_LOG"
 }
 
-@test "_chez_brew_removals includes a module tier once its module is enabled" {
+@test "brew_removals includes a module tier once its module is enabled" {
     # The other half of the same rule, and the apple-dev regression from #72: a
     # tier the machine DOES have enabled must never read as untracked.
     printf 'brew "marker-appledev"\n' >"$FAKE/features/brew/Brewfile.apple-dev"
     jq '.modules += ["appleDev"]' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
     mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     grep -qF marker-appledev "$STDIN_LOG" || {
         echo "the enabled apple-dev tier never reached brew stdin:"
@@ -254,82 +264,82 @@ EOF
     }
 }
 
-@test "_chez_brew_removals follows the profile: work data feeds work, not personal" {
+@test "brew_removals follows the profile: work data feeds work, not personal" {
     jq '.profile = "work"' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
     mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     grep -qF marker-work "$STDIN_LOG"
     no_match 'marker-personal' "$STDIN_LOG"
 }
 
-@test "_chez_brew_removals fails closed when the tier set cannot be resolved" {
+@test "brew_removals fails closed when the tier set cannot be resolved" {
     # Fail-closed matters more than fail-loud here: an empty/garbage resolve
     # must yield NO removal set, never a bigger one. brew must not even run.
     : >"$DATA_JSON_FILE"
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 1 ]
     [ ! -s "$ARGS_LOG" ]
     grep -qF 'could not resolve the active Brewfiles' <<<"$output"
 }
 
-@test "_chez_brew_removals fails closed when the resolver lib is missing" {
+@test "brew_removals fails closed when the resolver lib is missing" {
     rm -f "$FAKE/features/brew/lib/tiers.sh"
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 1 ]
     [ ! -s "$ARGS_LOG" ]
     grep -qF 'cannot resolve the active Brewfiles' <<<"$output"
 }
 
-@test "_chez_brew_removals passes a single --file=- (never multiple --file)" {
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+@test "brew_removals passes a single --file=- (never multiple --file)" {
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     [ "$(cat "$ARGS_LOG")" = "cleanup --file=-" ]
     # Belt-and-braces: exactly one --file token — the whole point of the fix.
     [ "$(grep -o -- '--file' "$ARGS_LOG" | wc -l | tr -d ' ')" -eq 1 ]
 }
 
-@test "_chez_brew_removals yields nothing when brew reports no removals" {
+@test "brew_removals yields nothing when brew reports no removals" {
     : >"$CANNED" # brew bundle cleanup prints nothing
-    run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
+    run_removals "$FAKE"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
 
-@test "_chez_brew_removals warns on a genuine brew Error: but still returns the removal set" {
+@test "brew_removals warns on a genuine brew Error: but still returns the removal set" {
     # Regression: an untrusted-tap load failure (or any other real brew
     # failure) writes `Error: …` to stderr. Must surface as a loud warning,
     # not silently look identical to \"nothing to remove\".
     BREW_CLEANUP_STDERR='Error: Refusing to load formula acme/tap/thing from untrusted tap acme/tap.' \
-        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+        run_removals "$FAKE" 2>&1 1>/dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"reported errors"* ]] || return 1
     [[ "$output" == *"Error: Refusing to load formula"* ]] || return 1
 }
 
-@test "_chez_brew_removals stays silent on benign brew stderr noise (cache refresh, warnings)" {
+@test "brew_removals stays silent on benign brew stderr noise (cache refresh, warnings)" {
     # brew routinely writes non-fatal progress/deprecation notices to stderr
     # even on a fully successful run — these must never trigger the warning.
     BREW_CLEANUP_STDERR='==> Downloading Homebrew API data' \
-        run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE' 2>&1 1>/dev/null"
+        run_removals "$FAKE" 2>&1 1>/dev/null
     [ "$status" -eq 0 ]
     [[ "$output" != *"reported errors"* ]] || return 1
 }
 
-# ─── _chez_brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
+# ─── brew_uninstall_one: cask-vs-formula dispatch ─────────────────────
 
-@test "_chez_brew_uninstall_one routes casks through --cask, formulae plain" {
-    run_fn "$(extract _chez_brew_uninstall_one)
-        _chez_brew_uninstall_one cask my-app
-        _chez_brew_uninstall_one formula my-cli"
+@test "brew_uninstall_one routes casks through --cask, formulae plain" {
+    _stubbed bash -c '. "$1/features/brew/lib/removals.sh"
+        brew_uninstall_one cask my-app
+        brew_uninstall_one formula my-cli' _ "$REPO_ROOT"
     [ "$status" -eq 0 ]
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask my-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "my-cli" ]
 }
 
-@test "_chez_brew_uninstall_one routes taps through untap (never uninstall)" {
-    run_fn "$(extract _chez_brew_uninstall_one)
-        _chez_brew_uninstall_one tap acme/formulae"
+@test "brew_uninstall_one routes taps through untap (never uninstall)" {
+    _stubbed bash -c '. "$1/features/brew/lib/removals.sh"
+        brew_uninstall_one tap acme/formulae' _ "$REPO_ROOT"
     [ "$status" -eq 0 ]
     [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
 }
@@ -341,7 +351,7 @@ EOF
     # unresolvable one as "✓ every installed package is tracked" would be a
     # false all-clear on exactly the machine that needs looking at.
     : >"$DATA_JSON_FILE"
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    run_mirror
     [ "$status" -eq 1 ]
     no_match_in "$output" 'nothing to remove'
     grep -qF 'could not determine what this machine tracks' <<<"$output"
@@ -350,7 +360,7 @@ EOF
 
 @test "chezmirror reports nothing to remove when every package is tracked" {
     : >"$CANNED" # nothing untracked
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    run_mirror
     [ "$status" -eq 0 ]
     [[ "$output" == *"nothing to remove"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ] # never uninstalled anything
@@ -358,7 +368,7 @@ EOF
 
 @test "chezmirror refuses to uninstall without a controlling terminal (safety)" {
     have_tty && skip "has a controlling tty; see the confirm-loop test instead"
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+    run_mirror
     [ "$status" -eq 0 ]
     [[ "$output" == *"No TTY"* ]] || return 1
     [[ "$output" == *"orphan-app"* ]] || return 1
@@ -372,9 +382,10 @@ EOF
     # packages instead of these answers and the loop miscounts.
     run env \
         PATH="$STUBS:$PATH" \
+        DOTFILES_DIR="$FAKE" DATA_JSON_FILE="$DATA_JSON_FILE" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nno\nyes'
+        bash "$REPO_ROOT/features/brew/mirror.sh" <<<$'yes\nno\nyes'
     [ "$status" -eq 0 ]
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "orphan-cli" ]
@@ -386,7 +397,7 @@ EOF
 # ─── chezmirror accept-all mode (--all / --yes / YES=1) ─────────────────────
 
 @test "chezmirror --help prints usage and removes nothing" {
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --help"
+    run_mirror --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"usage: chezmirror"* ]] || return 1
     [[ "$output" == *"--all"* ]] || return 1
@@ -394,7 +405,7 @@ EOF
 }
 
 @test "chezmirror --dry-run previews the untracked set and removes nothing" {
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --dry-run"
+    run_mirror --dry-run
     [ "$status" -eq 0 ]
     [[ "$output" == *"orphan-app"* ]] || return 1
     [[ "$output" == *"DRY_RUN"* ]] || return 1
@@ -406,7 +417,7 @@ EOF
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" DRY_RUN=1 \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror"
+        bash "$REPO_ROOT/features/brew/mirror.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"orphan-app"* ]] || return 1
     [[ "$output" == *"DRY_RUN"* ]] || return 1
@@ -414,7 +425,7 @@ EOF
 }
 
 @test "chezmirror rejects an unknown option (exit 2, no uninstall)" {
-    run_fn "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --bogus"
+    run_mirror --bogus
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown option"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
@@ -425,9 +436,10 @@ EOF
     # One 'yes' gates the whole batch; the per-package loop then runs unattended.
     run env \
         PATH="$STUBS:$PATH" \
+        DOTFILES_DIR="$FAKE" DATA_JSON_FILE="$DATA_JSON_FILE" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --all" <<<$'yes'
+        bash "$REPO_ROOT/features/brew/mirror.sh" --all <<<$'yes'
     [ "$status" -eq 0 ]
     [ "$(sed -n 1p "$UNINSTALL_LOG")" = "--cask orphan-app" ]
     [ "$(sed -n 2p "$UNINSTALL_LOG")" = "bats-core" ]
@@ -440,9 +452,10 @@ EOF
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     run env \
         PATH="$STUBS:$PATH" \
+        DOTFILES_DIR="$FAKE" DATA_JSON_FILE="$DATA_JSON_FILE" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror --all" <<<$'no'
+        bash "$REPO_ROOT/features/brew/mirror.sh" --all <<<$'no'
     [ "$status" -eq 0 ]
     [[ "$output" == *"aborted"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
@@ -455,7 +468,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     [ "$(wc -l <"$UNINSTALL_LOG" | tr -d ' ')" -eq 3 ]
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
@@ -494,7 +507,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     # A non-final `[[ … ]]` never fails a bats test (set -e skips it), so every
     # assertion here uses `[ … ]`/`grep` instead — a no-op `[[ … ]]` would let
@@ -538,7 +551,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     [ "$(cat "$UNINSTALL_LOG")" = "zlib" ]     # only zlib actually left
     grep -qF "still installed" <<<"$output"
@@ -587,7 +600,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
     [[ "$output" == *"leftover-dep"* ]]                  # the orphan was previewed
@@ -603,9 +616,10 @@ EOF
     # Three package confirms, then the autoremove confirm — decline the last.
     run env \
         PATH="$STUBS:$PATH" \
+        DOTFILES_DIR="$FAKE" DATA_JSON_FILE="$DATA_JSON_FILE" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" <<<$'yes\nyes\nyes\nno'
+        bash "$REPO_ROOT/features/brew/mirror.sh" <<<$'yes\nyes\nyes\nno'
     [ "$status" -eq 0 ]
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
     [[ "$output" == *"kept orphaned dependencies"* ]] || return 1
@@ -631,7 +645,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
     [[ "$output" != *"Orphaned dependencies"* ]]         # nothing surfaced
@@ -649,7 +663,7 @@ EOF
         PATH="$STUBS:$PATH" YES=1 \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
         UNINSTALL_LOG="$UNINSTALL_LOG" \
-        bash -c "$(extract chezmirror _chez_brew_removals _chez_brew_uninstall_one); chezmirror" </dev/null
+        bash "$REPO_ROOT/features/brew/mirror.sh" </dev/null
     [ "$status" -eq 0 ]
     [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
     [[ "$output" == *"removed 1 · kept 0"* ]] || return 1
