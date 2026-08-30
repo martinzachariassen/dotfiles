@@ -6,7 +6,7 @@ assistant on the same page. Most of this rides on the `macApps` and
 
 ## Apps & local models (macApps module)
 
-Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
+Installed from [`Brewfile.mac-apps`](../features/brew/Brewfile.mac-apps):
 
 - **Claude** (`cask "claude"`) — the Anthropic desktop app.
 - **Claude Code** (`cask "claude-code"`) — the Anthropic CLI. The

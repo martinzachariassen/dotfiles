@@ -12,12 +12,12 @@ is the core file plus whatever your profile and modules add:
 
 | Tier | File | Installed when |
 |---|---|---|
-| **Core** | [`Brewfile`](../packages/Brewfile) | Always. The smallest set that makes the documented shell experience work. |
+| **Core** | [`Brewfile`](../features/brew/Brewfile) | Always. The smallest set that makes the documented shell experience work. |
 | **Profile** | `Brewfile.personal` / `Brewfile.work` | Your profile matches. `work` adds the cloud/Kubernetes/IaC CLIs (az, gcloud, kubectl, kubectx, kubelogin, terraform, helm, minikube) and work apps (IntelliJ IDEA, M365, Teams, Slack). |
 | **Module** | `Brewfile.mac-apps`, `Brewfile.apple-dev` | The matching module is selected (`macApps` → GUI + AI apps; `appleDev` → Swift/iOS toolchain). |
 
 The profile→file and module→file mappings live in
-[`src/.chezmoidata/packages.toml`](../src/.chezmoidata/packages.toml) — the
+[`src/.chezmoidata/brew.toml`](../src/.chezmoidata/brew.toml) — the
 single source of truth. The `run_after_02-brew-bundle` hook reads the active
 set and runs `brew bundle --no-upgrade`, converging *presence*, not freshness.
 See [lifecycle.md](lifecycle.md#where-each-piece-lives).
@@ -25,7 +25,7 @@ See [lifecycle.md](lifecycle.md#where-each-piece-lives).
 ### Mac App Store apps (mas)
 
 App Store apps are declared with [`mas`](https://github.com/mas-cli/mas) in the
-`macApps` tier ([`Brewfile.mac-apps`](../packages/Brewfile.mac-apps)) so
+`macApps` tier ([`Brewfile.mac-apps`](../features/brew/Brewfile.mac-apps)) so
 `brew bundle` reproduces them on a fresh Mac. Each line is `mas "Name", id:
 NNN`; you must be signed in to the App Store before an apply installs them.
 
@@ -101,14 +101,14 @@ The prompts degrade across three tiers to fit the terminal:
 
 ## Adding a package
 
-- **A tool everyone gets** → add it to the core [`Brewfile`](../packages/Brewfile),
+- **A tool everyone gets** → add it to the core [`Brewfile`](../features/brew/Brewfile),
   alphabetically within its section.
 - **Profile- or module-specific** → add it to the matching layer file. If it's
   a new module, add the catalog entry to `modules.toml`, its Brewfile mapping
-  to `packages.toml`, and mirror the default into `.chezmoi.toml.tmpl`.
+  to `brew.toml`, and mirror the default into `.chezmoi.toml.tmpl`.
 
 CI resolves every Homebrew name on macOS (`scripts/ci/brew-resolve.sh`), so a
 typo'd formula fails the build; `brew-check-modules.sh` runs alongside it as
-an advisory-only bundle check. Module wiring itself (every `packages.toml`
+an advisory-only bundle check. Module wiring itself (every `brew.toml`
 entry pointing at a real Brewfile) is enforced by `tests/data-model.bats`.
 See [development.md](development.md).

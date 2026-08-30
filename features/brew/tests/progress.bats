@@ -7,9 +7,9 @@
 # the two platform traps that made earlier versions wrong on a real Mac.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     LOG="$REPO_ROOT/core/ui.sh"
-    BP="$REPO_ROOT/scripts/lib/brew-progress.sh"
+    BP="$REPO_ROOT/features/brew/lib/progress.sh"
     FIX="$(mktemp -d)"
     # The consumer asks `sudo -n true` whether a password prompt is possible.
     # Left alone, the answer depends on whether the developer running the suite
@@ -119,7 +119,7 @@ EOF
 @test "a Brewfile with no entries counts 0 without breaking arithmetic" {
     # Regression: `grep -c` prints "0" AND exits 1, so a `|| echo 0` fallback
     # emitted the count twice, turning $((total + $(...))) into a syntax error.
-    # This is not hypothetical — packages/Brewfile.personal is comment-only.
+    # This is not hypothetical — features/brew/Brewfile.personal is comment-only.
     printf '# just a comment\n#\n' >"$FIX/Brewfile"
     run bash -c ". '$BP'; brew_pkg_count '$FIX/Brewfile'"
     [ "$output" = "0" ]
@@ -135,7 +135,7 @@ EOF
 }
 
 @test "the repo's own Brewfiles all count cleanly" {
-    for f in "$REPO_ROOT"/packages/Brewfile*; do
+    for f in "$REPO_ROOT"/features/brew/Brewfile*; do
         case "$f" in *cspell* | *vscode*) continue ;; esac
         run bash -c ". '$BP'; brew_pkg_count '$f'"
         [ "$status" -eq 0 ]

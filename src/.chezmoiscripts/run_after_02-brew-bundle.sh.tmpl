@@ -15,10 +15,10 @@ exit 0
 . "{{ .chezmoi.workingTree }}/core/tty.sh"
 # shellcheck source=../../core/ui.sh
 . "{{ .chezmoi.workingTree }}/core/ui.sh"
-# shellcheck source=../../scripts/lib/brew-progress.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/brew-progress.sh"
-# shellcheck source=../../scripts/lib/homebrew.sh
-. "{{ .chezmoi.workingTree }}/scripts/lib/homebrew.sh"
+# shellcheck source=../../features/brew/lib/progress.sh
+. "{{ .chezmoi.workingTree }}/features/brew/lib/progress.sh"
+# shellcheck source=../../features/brew/lib/homebrew.sh
+. "{{ .chezmoi.workingTree }}/features/brew/lib/homebrew.sh"
 ui_init_logging
 tty_reattach || warn "no terminal available; casks needing sudo may ask later"
 

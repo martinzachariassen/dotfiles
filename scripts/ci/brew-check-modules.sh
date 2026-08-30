@@ -5,7 +5,7 @@ set +e
 
 SOURCE_DIR="${1:-$(pwd)}"
 
-for f in "$SOURCE_DIR"/packages/Brewfile "$SOURCE_DIR"/packages/Brewfile.*; do
+for f in "$SOURCE_DIR"/features/brew/Brewfile "$SOURCE_DIR"/features/brew/Brewfile.*; do
     [ -f "$f" ] || continue
     case "$f" in *.lock.json) continue ;; esac
     echo "── $(basename "$f") ──"

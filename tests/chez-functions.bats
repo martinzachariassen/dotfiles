@@ -18,14 +18,14 @@ setup() {
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
 
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/packages" "$FAKE/scripts/bin" "$FAKE/scripts/lib"
+    mkdir -p "$FAKE/features/brew/lib" "$FAKE/scripts/bin"
     # The real resolver, so these zsh-side tests exercise the committed lib —
     # _chez_brew_removals sources it out of the repo root it's handed.
-    cp "$REPO_ROOT/scripts/lib/brewfiles.sh" "$FAKE/scripts/lib/brewfiles.sh"
-    printf 'brew "git"\n' >"$FAKE/packages/Brewfile"
-    : >"$FAKE/packages/Brewfile.mac-apps"
-    : >"$FAKE/packages/Brewfile.personal"
-    : >"$FAKE/packages/Brewfile.work"
+    cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
+    printf 'brew "git"\n' >"$FAKE/features/brew/Brewfile"
+    : >"$FAKE/features/brew/Brewfile.mac-apps"
+    : >"$FAKE/features/brew/Brewfile.personal"
+    : >"$FAKE/features/brew/Brewfile.work"
 
     STUBS="$(mktemp -d)"
     APPLY_LOG="$STUBS/apply.log"
@@ -39,11 +39,11 @@ setup() {
   "profile": "personal",
   "modules": ["macApps"],
   "brewfiles": {
-    "core": "packages/Brewfile",
-    "byModule": {"macApps": "packages/Brewfile.mac-apps"},
+    "core": "features/brew/Brewfile",
+    "byModule": {"macApps": "features/brew/Brewfile.mac-apps"},
     "byProfile": {
-      "personal": "packages/Brewfile.personal",
-      "work": "packages/Brewfile.work"
+      "personal": "features/brew/Brewfile.personal",
+      "work": "features/brew/Brewfile.work"
     }
   }
 }

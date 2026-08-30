@@ -125,7 +125,7 @@ Four pieces, all in the core tier:
 |---|---|
 | VM shape | [`src/dot_config/colima/_templates/default.yaml`](../src/dot_config/colima/_templates/default.yaml) |
 | Start at login | [`src/Library/LaunchAgents/no.mlz.colima.plist.tmpl`](../src/Library/LaunchAgents/no.mlz.colima.plist.tmpl), registered by `run_onchange_after_07-colima` |
-| CLI + plugins | `colima`, `docker`, `docker-compose`, `docker-buildx` in [`packages/Brewfile`](../packages/Brewfile) |
+| CLI + plugins | `colima`, `docker`, `docker-compose`, `docker-buildx` in [`features/brew/Brewfile`](../features/brew/Brewfile) |
 | Plugin wiring | `symlink_docker-{compose,buildx}` under [`src/dot_docker/cli-plugins`](../src/dot_docker/cli-plugins) |
 
 The VM is 6 CPU / 8 GiB / 100 GiB sparse disk on `vz` (Apple's

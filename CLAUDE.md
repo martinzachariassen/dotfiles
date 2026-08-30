@@ -32,7 +32,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src` — reach root-level tooling via
   `{{ .chezmoi.workingTree }}` (the git root).
 - Feature gating is data-driven: modules in `src/.chezmoidata/modules.toml`,
-  packages in `src/.chezmoidata/packages.toml`. Templates gate with
+  packages in `src/.chezmoidata/brew.toml`. Templates gate with
   `{{ if has "theme" .modules }}`.
 - **Removal is always manual — an apply never deletes.** `chezmoi apply` only
   *adds/updates* (renders managed files, `brew bundle`, `mise install`). Reconciling a
@@ -147,7 +147,7 @@ never uninstalls packages.
 - Shell config is plain zsh, XDG layout (`ZDOTDIR=~/.config/zsh`) — no
   oh-my-zsh/prezto/zinit, and no language-runtime managers in shell config.
 - **mise owns language runtimes** (`~/.config/mise/config.toml`); **Homebrew owns
-  global CLIs and apps** (`packages/Brewfile*`). Don't reach for `npm -g` /
+  global CLIs and apps** (`features/brew/Brewfile*`). Don't reach for `npm -g` /
   `pip --user` — add the tool to a Brewfile or mise instead.
 - Guard shell integrations so a fresh machine starts cleanly before every package
   is installed.

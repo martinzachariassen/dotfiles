@@ -3,12 +3,12 @@
 # {{ .chezmoi.workingTree }}.
 
 [brewfiles]
-core = "packages/Brewfile"
+core = "features/brew/Brewfile"
 
 [brewfiles.byModule]
-macApps = "packages/Brewfile.mac-apps"
-appleDev = "packages/Brewfile.apple-dev"
+macApps = "features/brew/Brewfile.mac-apps"
+appleDev = "features/brew/Brewfile.apple-dev"
 
 [brewfiles.byProfile]
-personal = "packages/Brewfile.personal"
-work = "packages/Brewfile.work"
+personal = "features/brew/Brewfile.personal"
+work = "features/brew/Brewfile.work"

@@ -172,7 +172,7 @@ else
 fi
 
 # --- 2. Homebrew ----------------------------------------------------------
-# Inlined rather than shared with scripts/lib/homebrew.sh: this runs before the
+# Inlined rather than shared with features/brew/lib/homebrew.sh: this runs before the
 # repo is cloned (step 4 below), so there's nothing local to source yet.
 step "Homebrew"
 if load_brew; then

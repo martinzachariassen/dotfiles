@@ -1,5 +1,5 @@
 # Brewfile — CORE tier, always installed. Optional add-ons layer on top from
-# packages/Brewfile.<feature>. Entries sorted alphabetically within each section.
+# features/brew/Brewfile.<feature>. Entries sorted alphabetically within each section.
 
 # ─── Core CLI ─────────────────────────────────────────────────────────────────
 brew "actionlint"              # pre-commit + CI
@@ -67,4 +67,4 @@ cask "visual-studio-code"      # chezmoi manages settings
 cask "font-jetbrains-mono"             # VS Code editor (unpatched)
 cask "font-jetbrains-mono-nerd-font"   # Ghostty + VS Code terminal (patched)
 
-# Mac App Store apps live in the macApps tier — see packages/Brewfile.mac-apps.
+# Mac App Store apps live in the macApps tier — see features/brew/Brewfile.mac-apps.

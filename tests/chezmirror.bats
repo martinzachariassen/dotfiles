@@ -11,7 +11,7 @@
 # brew/gum, so a regression in the committed source fails here.
 #
 # The tier set is the ACTIVE one (core + enabled modules + this profile),
-# resolved by the real scripts/lib/brewfiles.sh against a stubbed `chezmoi
+# resolved by the real features/brew/lib/tiers.sh against a stubbed `chezmoi
 # data` — not every `Brewfile.*` that exists. Too FEW tiers offers the
 # toolchain for uninstall; too MANY (the old glob) silently keeps packages
 # this machine's profile dropped.
@@ -32,12 +32,12 @@ setup() {
     # prove exactly which ones reach brew's stdin. It carries the REAL resolver
     # lib, so these tests exercise the committed brewfiles.sh, not a mock of it.
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/packages" "$FAKE/scripts/lib"
-    cp "$REPO_ROOT/scripts/lib/brewfiles.sh" "$FAKE/scripts/lib/brewfiles.sh"
-    printf 'brew "marker-core"\n' >"$FAKE/packages/Brewfile"
-    printf 'cask "marker-macapps"\n' >"$FAKE/packages/Brewfile.mac-apps"
-    printf 'brew "marker-personal"\n' >"$FAKE/packages/Brewfile.personal"
-    printf 'brew "marker-work"\n' >"$FAKE/packages/Brewfile.work"
+    mkdir -p "$FAKE/features/brew/lib"
+    cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
+    printf 'brew "marker-core"\n' >"$FAKE/features/brew/Brewfile"
+    printf 'cask "marker-macapps"\n' >"$FAKE/features/brew/Brewfile.mac-apps"
+    printf 'brew "marker-personal"\n' >"$FAKE/features/brew/Brewfile.personal"
+    printf 'brew "marker-work"\n' >"$FAKE/features/brew/Brewfile.work"
 
     # Stub bin dir (prepended to PATH) + log/queue files the stubs read/write.
     STUBS="$(mktemp -d)"
@@ -55,14 +55,14 @@ setup() {
   "profile": "personal",
   "modules": ["macApps"],
   "brewfiles": {
-    "core": "packages/Brewfile",
+    "core": "features/brew/Brewfile",
     "byModule": {
-      "macApps": "packages/Brewfile.mac-apps",
-      "appleDev": "packages/Brewfile.apple-dev"
+      "macApps": "features/brew/Brewfile.mac-apps",
+      "appleDev": "features/brew/Brewfile.apple-dev"
     },
     "byProfile": {
-      "personal": "packages/Brewfile.personal",
-      "work": "packages/Brewfile.work"
+      "personal": "features/brew/Brewfile.personal",
+      "work": "features/brew/Brewfile.work"
     }
   }
 }
@@ -232,7 +232,7 @@ EOF
 }
 
 @test "_chez_brew_removals excludes a disabled module's tier" {
-    printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
+    printf 'brew "marker-appledev"\n' >"$FAKE/features/brew/Brewfile.apple-dev"
     # appleDev is absent from .modules in the default stub data.
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 0 ]
@@ -242,7 +242,7 @@ EOF
 @test "_chez_brew_removals includes a module tier once its module is enabled" {
     # The other half of the same rule, and the apple-dev regression from #72: a
     # tier the machine DOES have enabled must never read as untracked.
-    printf 'brew "marker-appledev"\n' >"$FAKE/packages/Brewfile.apple-dev"
+    printf 'brew "marker-appledev"\n' >"$FAKE/features/brew/Brewfile.apple-dev"
     jq '.modules += ["appleDev"]' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
     mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
@@ -274,7 +274,7 @@ EOF
 }
 
 @test "_chez_brew_removals fails closed when the resolver lib is missing" {
-    rm -f "$FAKE/scripts/lib/brewfiles.sh"
+    rm -f "$FAKE/features/brew/lib/tiers.sh"
     run_fn "$(extract _chez_brew_removals); _chez_brew_removals '$FAKE'"
     [ "$status" -eq 1 ]
     [ ! -s "$ARGS_LOG" ]
