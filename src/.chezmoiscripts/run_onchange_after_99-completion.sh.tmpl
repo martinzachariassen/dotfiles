@@ -68,9 +68,9 @@ fi
 # 2FA, so it can't run unattended from here. Without this prompt the machine
 # looks finished while still unable to build a single iOS app.
 {{ if has "appleDev" (dig "modules" (list) .) -}}
-# shellcheck source=../../scripts/lib/xcode.sh
-if [ -r "{{ .chezmoi.workingTree }}/scripts/lib/xcode.sh" ]; then
-    . "{{ .chezmoi.workingTree }}/scripts/lib/xcode.sh"
+# shellcheck source=../../features/xcode/probe.sh
+if [ -r "{{ .chezmoi.workingTree }}/features/xcode/probe.sh" ]; then
+    . "{{ .chezmoi.workingTree }}/features/xcode/probe.sh"
     # Cheap probes only — this runs at the end of every apply, so the slower
     # xcodebuild round-trips are left to `chezxcode --check` and `chezdoctor`.
     if ! xcode_app_path >/dev/null 2>&1; then

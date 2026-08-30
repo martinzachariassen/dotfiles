@@ -10,7 +10,7 @@
 # every clean install. Upstream publishes a signed universal binary for this;
 # we fetch that, verify it, and drop it on PATH.
 #
-# The pin (version/url/sha256) lives in src/.chezmoidata/xcodes.toml so it sits
+# The pin (version/url/sha256) lives in src/.chezmoidata/xcode.toml so it sits
 # with the rest of the data model rather than being buried in a script.
 # shellcheck disable=SC2034,SC2329
 
@@ -52,7 +52,7 @@ xcodes_bootstrap() {
 
     local version url sha tmp zip
     version="$(xcodes_pin version)" || {
-        printf 'xcodes: no pin in .chezmoidata/xcodes.toml (is chezmoi initialised?)\n' >&2
+        printf 'xcodes: no pin in .chezmoidata/xcode.toml (is chezmoi initialised?)\n' >&2
         return 1
     }
     url="$(xcodes_pin url)" && sha="$(xcodes_pin sha256)" || {

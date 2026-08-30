@@ -11,7 +11,7 @@
 # JSON only when the module is on — render-check (bash/zsh only) never catches it.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../../../core/testing/helper'
     SRC_DIR="$REPO_ROOT/src"
     SETTINGS="$SRC_DIR/Library/Application Support/Code/User/settings.json.tmpl"
     VSCODE_HOOK="$SRC_DIR/.chezmoiscripts/run_onchange_after_03-vscode.sh.tmpl"
@@ -188,7 +188,7 @@ no_match_in() {
     _stub_config '["macApps","appleDev"]'
     run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
     [ "$status" -eq 0 ]
-    echo "$output" | grep -qF '_chez_run scripts/bin/xcode.sh'
+    echo "$output" | grep -qF '_chez_run features/xcode/cli.sh'
     echo "$output" | grep -qE '^chezxcode\(\) \{'
     echo "$output" | grep -q 'chezxcode        Install Xcode'
 }
@@ -215,7 +215,7 @@ no_match_in() {
     _stub_config '["macApps","appleDev"]'
     run _render "$SRC_DIR/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     [ "$status" -eq 0 ]
-    echo "$output" | grep -qF 'scripts/lib/xcode.sh'
+    echo "$output" | grep -qF 'features/xcode/probe.sh'
     echo "$output" | grep -qF 'chezxcode'
 }
 
@@ -244,7 +244,7 @@ xcode_app_path() { return 1; }
 xcode_selected_is_full() { return 1; }
 xcode_has_ios_runtime() { return 1; }
 EOF
-    sed -i.bak "s|\. \".*/scripts/lib/xcode.sh\"|. \"$BATS_TEST_TMPDIR/fake-xcode-lib.sh\"|" \
+    sed -i.bak "s|\. \".*/features/xcode/probe.sh\"|. \"$BATS_TEST_TMPDIR/fake-xcode-lib.sh\"|" \
         "$BATS_TEST_TMPDIR/completion.sh"
     sed -i.bak -e 's|^SIGNKEY=.*|SIGNKEY=""|' -e 's|^SIGNING=.*|SIGNING="1password"|' \
         "$BATS_TEST_TMPDIR/completion.sh"
@@ -270,7 +270,7 @@ xcode_app_path() { [ "$3" = 1 ] && { echo /Applications/Xcode.app; return 0; }; 
 xcode_selected_is_full() { case "$2" in */Xcode*.app/Contents/Developer) return 0 ;; esac; return 1; }
 xcode_has_ios_runtime() { [ "$4" = 1 ]; }
 EOF
-    sed -i.bak "s|\. \".*/scripts/lib/xcode.sh\"|. \"$BATS_TEST_TMPDIR/fake.sh\"|" \
+    sed -i.bak "s|\. \".*/features/xcode/probe.sh\"|. \"$BATS_TEST_TMPDIR/fake.sh\"|" \
         "$BATS_TEST_TMPDIR/c.sh"
     run bash "$BATS_TEST_TMPDIR/c.sh"
     [ "$status" -eq 0 ]

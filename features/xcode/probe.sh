@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # xcode.sh — read-only probes for the Xcode layer the appleDev module depends on.
-# Shared by scripts/bin/xcode.sh (which fixes what these report) and doctor.sh
+# Shared by features/xcode/cli.sh (which fixes what these report) and doctor.sh
 # (which only reports), so the two can never disagree about what "ready" means.
 #
 # Why a whole file for five checks: `brew bundle` gets you swiftlint/xcodes/

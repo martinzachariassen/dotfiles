@@ -47,7 +47,7 @@ run_isolated() {
 }
 
 @test "xcode.sh fails loudly when core/ui.sh is missing" {
-    run_isolated scripts/bin/xcode.sh
+    run_isolated features/xcode/cli.sh
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1
     [[ "$output" == *"ui.sh"* ]] || return 1

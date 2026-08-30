@@ -3,7 +3,7 @@
 # deliberately NOT in this file. Its only tap formula builds from source, and
 # that build needs `xcbuild` from a full Xcode.app, so it can never succeed on a
 # fresh Command-Line-Tools-only Mac. `chezxcode` fetches the upstream prebuilt
-# binary on demand instead; the pin lives in src/.chezmoidata/xcodes.toml.
+# binary on demand instead; the pin lives in src/.chezmoidata/xcode.toml.
 
 # Core: lint, format, SF Symbols browser
 # No maintained VS Code extension surfaces these live in the editor (vknabel's
