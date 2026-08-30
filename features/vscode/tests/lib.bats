@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Unit tests for scripts/lib/vscode.sh — the pure set logic behind the VS Code
+# Unit tests for features/vscode/lib.sh — the pure set logic behind the VS Code
 # extension mirror (install + prune). No `code` CLI is involved, so these run on
 # the Linux CI runner where the runtime 03-vscode hook cannot.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    # shellcheck source=../scripts/lib/vscode.sh
-    . "$REPO_ROOT/scripts/lib/vscode.sh"
+    load '../../../core/testing/helper'
+    # shellcheck source=../lib.sh
+    . "$REPO_ROOT/features/vscode/lib.sh"
 }
 
 # ─── vscode_normalize ──────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ Installed from [`Brewfile.mac-apps`](../packages/Brewfile.mac-apps):
 - **Claude** (`cask "claude"`) — the Anthropic desktop app.
 - **Claude Code** (`cask "claude-code"`) — the Anthropic CLI. The
   `anthropic.claude-code` VS Code extension is in the
-  [extension list](../packages/vscode-extensions.txt) too.
+  [extension list](../features/vscode/extensions.txt) too.
 
 ## The global defaults (claudePersona module)
 

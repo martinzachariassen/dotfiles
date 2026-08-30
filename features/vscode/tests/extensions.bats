@@ -1,11 +1,11 @@
 #!/usr/bin/env bats
-# Pins load-bearing entries in packages/vscode-extensions.txt. The 03-vscode
+# Pins load-bearing entries in features/vscode/extensions.txt. The 03-vscode
 # hook mirrors this file 1:1 (anything unlisted gets uninstalled), so a stray
 # edit has real teeth — only load-bearing extensions are pinned here.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    EXT="$REPO_ROOT/packages/vscode-extensions.txt"
+    load '../../../core/testing/helper'
+    EXT="$REPO_ROOT/features/vscode/extensions.txt"
 }
 
 # 0 if the manifest lists exactly this ID on its own line (ignores comments).

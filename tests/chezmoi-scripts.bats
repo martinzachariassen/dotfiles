@@ -201,3 +201,31 @@ _render_template() {
     }
     grep -qF 'did not complete' "$tmpl"
 }
+
+# ─── A thinned hook must hash the engine it delegates to ────────────────────
+# A run_onchange_ hook re-fires when its *rendered body* changes. Move the body
+# into a feature and the template stops changing, so chezmoi keeps matching the
+# hash it recorded and the hook silently never runs again — no error, no output,
+# and the feature quietly stops converging. Every hook that delegates must
+# therefore include the file it delegates to.
+
+@test "every hook that delegates to a feature also hashes that file" {
+    local missing=() tmpl rel
+    for tmpl in "$SCRIPTS_DIR"/run_*.sh.tmpl; do
+        # Delegation looks like: exec bash ".../features/<name>/hook.sh"
+        grep -oE 'features/[a-z]+/[a-z-]+\.sh' "$tmpl" | sort -u | while IFS= read -r rel; do
+            grep -qF "include \"../$rel\"" "$tmpl" || printf '%s -> %s\n' "$(basename "$tmpl")" "$rel"
+        done
+    done > "$BATS_TEST_TMPDIR/missing"
+    if [ -s "$BATS_TEST_TMPDIR/missing" ]; then
+        printf 'hook delegates to a file it does not hash (it will stop re-firing):\n' >&2
+        sed 's/^/  /' "$BATS_TEST_TMPDIR/missing" >&2
+    fi
+    [ ! -s "$BATS_TEST_TMPDIR/missing" ]
+}
+
+@test "the vscode hook hashes both its engine and its manifest" {
+    tmpl="$SCRIPTS_DIR/run_onchange_after_03-vscode.sh.tmpl"
+    grep -qF 'include "../features/vscode/hook.sh"' "$tmpl"
+    grep -qF 'include "../features/vscode/extensions.txt"' "$tmpl"
+}
