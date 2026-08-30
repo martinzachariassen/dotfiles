@@ -265,3 +265,33 @@ run_doctor_xcode() {
     # `grep -h PATTERN` with zero file operands reads stdin and hangs the run.
     grep -qF '[ "${#tracked_files[@]}" -eq 0 ]' "$DOCTOR"
 }
+
+# ─── cSpell personal dictionary ─────────────────────────────────────────────
+#
+# ~/.config/cspell/personal.txt is the only managed path that is a symlink into
+# this repo, so it is the one thing a repo-side file move can break for a
+# machine that pulls without applying. cSpell fails silently when the target is
+# gone — it just stops knowing the words — so doctor is the only place that can
+# ever say so.
+
+@test "doctor.sh passes when the cSpell dictionary resolves" {
+    mkdir -p "$ISO_HOME/.config/cspell"
+    printf 'chezmoi\n' >"$ISO_REPO/words.txt"
+    ln -s "$ISO_REPO/words.txt" "$ISO_HOME/.config/cspell/personal.txt"
+    run_doctor
+    [[ "$output" == *"cSpell personal dictionary resolves"* ]]
+}
+
+@test "doctor.sh fails on a dangling cSpell dictionary symlink" {
+    mkdir -p "$ISO_HOME/.config/cspell"
+    ln -s "$ISO_REPO/gone.txt" "$ISO_HOME/.config/cspell/personal.txt"
+    run_doctor
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"dangling symlink"* ]]
+}
+
+@test "doctor.sh only notes a cSpell dictionary that was never deployed" {
+    run_doctor
+    [[ "$output" == *"cSpell personal dictionary not deployed yet"* ]]
+    [[ "$output" != *"dangling symlink"* ]]
+}

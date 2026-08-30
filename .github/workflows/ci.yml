@@ -30,14 +30,24 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck shfmt zsh
-      - name: ShellCheck
-        run: shellcheck --severity=error --shell=bash install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
-      - name: shfmt
-        run: shfmt -d -i 4 -ci install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh
-      - name: Parser syntax
-        # bash -n / zsh -n only parse their first arg — loop, don't pass multiple files.
+      # Resolved from git rather than hardcoded per directory, so a script moved
+      # between scripts/, core/ and features/ can never silently drop out of
+      # linting. src/ is excluded: it is chezmoi's source tree, covered by
+      # `render` instead. .pre-commit-config.yaml carries the matching pattern,
+      # and tests/lint-coverage.bats holds the two together.
+      - name: Resolve shell scripts
         run: |
-          for f in install.sh scripts/bin/*.sh scripts/ci/*.sh scripts/lib/*.sh; do bash -n "$f"; done
+          git ls-files -z -- '*.sh' ':!:src/**' > "$RUNNER_TEMP/shell-files.z"
+          test -s "$RUNNER_TEMP/shell-files.z" || { echo 'no shell scripts matched — pathspec is wrong'; exit 1; }
+          tr '\0' '\n' < "$RUNNER_TEMP/shell-files.z"
+      - name: ShellCheck
+        run: xargs -0 shellcheck --severity=error --shell=bash < "$RUNNER_TEMP/shell-files.z"
+      - name: shfmt
+        run: xargs -0 shfmt -d -i 4 -ci < "$RUNNER_TEMP/shell-files.z"
+      - name: Parser syntax
+        # bash -n / zsh -n only parse their first arg — one file per call.
+        run: |
+          xargs -0 -n1 bash -n < "$RUNNER_TEMP/shell-files.z"
           for f in src/dot_zshenv src/dot_config/zsh/dot_zprofile; do zsh -n "$f"; done
 
   # `chezmoi apply --dry-run` against stub data — no disk writes, no prompts.
@@ -78,7 +88,8 @@ jobs:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
       - uses: ./.github/actions/install-chezmoi
-      - run: bats tests/
+      # -r so feature-owned suites under features/*/tests/ are discovered too.
+      - run: bats -r tests/
 
   # `render` proves templates render; this proves the JSON/JSONC/TOML output is valid.
   config:
