@@ -106,7 +106,7 @@ This is tuned to one person's Apple Silicon Mac — the profiles and modules exi
 | Packages and apps | [`packages/Brewfile*`](packages/) — core, per-profile, per-module |
 | VS Code extensions | [`features/vscode/extensions.txt`](features/vscode/extensions.txt) |
 | Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and per-profile defaults |
-| macOS defaults | [`scripts/bin/macos-defaults.sh`](scripts/bin/macos-defaults.sh) ([what it sets](docs/macos.md)) |
+| macOS defaults | [`features/macos/cli.sh`](features/macos/cli.sh) ([what it sets](docs/macos.md)) |
 | Repo URL in the installer | `REPO` in [`install.sh`](install.sh), or point at your fork without editing: `DOTFILES_REPO=<url> bash install.sh` |
 
 Install from a fork without touching the installer:

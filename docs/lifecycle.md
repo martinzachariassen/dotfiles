@@ -130,7 +130,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` (a thin template) + `features/vscode/{hook,lib}.sh` + `features/vscode/extensions.txt` (drift check in `scripts/bin/doctor.sh`) |
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
-| macOS defaults | `run_onchange_after_04-macos-defaults` + `scripts/bin/macos-defaults.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
+| macOS defaults | `run_onchange_after_04-macos-defaults` + `features/macos/cli.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `packages/Brewfile` (core) + `packages/Brewfile.{mac-apps,personal,work,apple-dev}` |
 | Data model + wizard | `src/.chezmoi.toml.tmpl` + `scripts/bin/wizard.sh` |

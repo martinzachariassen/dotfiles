@@ -1,7 +1,8 @@
 # macOS defaults
 
 Every system setting this repo changes, grouped by domain. Applied by
-[`scripts/bin/macos-defaults.sh`](../scripts/bin/macos-defaults.sh) — the
+[`features/macos/cli.sh`](../features/macos/cli.sh) (how and when it runs:
+[features/macos](../features/macos/README.md)) — the
 single source of truth — when the `macosDefaults` module is selected. This doc
 mirrors the script; if the two disagree, the script wins.
 
@@ -140,7 +141,7 @@ unchanged run touches nothing.
 the script:
 
 ```sh
-macos-defaults          # the zsh alias → scripts/bin/macos-defaults.sh
+macos-defaults          # the zsh alias → features/macos/cli.sh
 ```
 
 **Revert a setting.** There's no automatic undo — comment the line out in the

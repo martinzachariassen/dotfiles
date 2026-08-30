@@ -12,7 +12,7 @@ setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     INSTALL="$REPO_ROOT/install.sh"
     SUDO_LIB="$REPO_ROOT/core/sudo.sh"
-    MACOS="$REPO_ROOT/scripts/bin/macos-defaults.sh"
+    MACOS="$REPO_ROOT/features/macos/cli.sh"
     HOOK="$REPO_ROOT/src/.chezmoiscripts/run_before_00-sudo-cache.sh.tmpl"
     BREW="$REPO_ROOT/src/.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl"
 }

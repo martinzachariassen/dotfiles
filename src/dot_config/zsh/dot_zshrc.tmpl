@@ -372,7 +372,7 @@ _chez_explain() {
 }
 
 # Not auto-run by `chezmoi apply` — invoke on a fresh Mac or after resetting a pref pane.
-alias macos-defaults='_chez_run scripts/bin/macos-defaults.sh'
+alias macos-defaults='_chez_run features/macos/cli.sh'
 
 # No args: cd into the source repo. With args: point at the setup verbs.
 dotfiles() {
