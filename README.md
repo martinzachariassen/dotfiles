@@ -51,7 +51,7 @@ The apply prints these for you, in order:
 
 ```sh
 exec zsh                                                          # 1. reload the managed shell
-bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # 2. sign in to gh / cloud CLIs
+bash ~/Developer/personal/dotfiles/features/auth/cli.sh          # 2. sign in to gh / cloud CLIs
 chezdoctor                                                        # 3. health-check everything
 ```
 

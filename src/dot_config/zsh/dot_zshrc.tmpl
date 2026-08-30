@@ -591,7 +591,7 @@ chezsetup() {
 # lives in 1Password, which isn't installed until after the wizard runs). Offers
 # the SSH agent's keys, changes nothing else, then proves it with a signed commit.
 chezsign() {
-    _chez_run scripts/bin/signing.sh "$@"
+    _chez_run features/sign/cli.sh "$@"
 }
 {{- if has "appleDev" (dig "modules" (list) .) }}
 

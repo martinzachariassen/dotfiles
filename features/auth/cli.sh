@@ -18,9 +18,11 @@ fi
 . "$_UI_DIR/../../core/ui.sh"
 ui_init_logging
 
-# shellcheck source=../lib/git-signing.sh
-if [ -r "$_UI_DIR/../lib/git-signing.sh" ]; then
-    . "$_UI_DIR/../lib/git-signing.sh"
+# The signing smoke test belongs to the sign feature; auth borrows it rather
+# than keeping a second copy of the 1Password agent probe.
+# shellcheck source=../sign/lib.sh
+if [ -r "$_UI_DIR/../sign/lib.sh" ]; then
+    . "$_UI_DIR/../sign/lib.sh"
 fi
 # shellcheck source=../../core/chezmoi-data.sh
 if [ -r "$_UI_DIR/../../core/chezmoi-data.sh" ]; then
@@ -206,7 +208,7 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ] && [ "$signing_mode" != "off" ] && [ "$signi
     # git-signing.sh is sourced conditionally above; `set -u` would abort here.
     SSH_SIGN="${GIT_SIGNING_SSH_SIGN:-}"
     if [ -z "$SSH_SIGN" ]; then
-        warn "scripts/lib/git-signing.sh not readable - skipping the smoke test"
+        warn "features/sign/lib.sh not readable - skipping the smoke test"
     elif [ ! -x "$SSH_SIGN" ]; then
         fail "op-ssh-sign missing - install/launch 1Password and enable the SSH agent"
     elif [ -z "$(git config --global user.signingkey 2>/dev/null)" ]; then

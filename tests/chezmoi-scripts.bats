@@ -212,10 +212,14 @@ _render_template() {
 # therefore include the file it delegates to.
 
 @test "every hook that delegates to a feature also hashes that file" {
-    local missing=() tmpl rel
+    local tmpl rel
     for tmpl in "$SCRIPTS_DIR"/run_*.sh.tmpl; do
-        # Delegation looks like: exec bash ".../features/<name>/hook.sh"
-        grep -oE 'features/[a-z]+/[a-z-]+\.sh' "$tmpl" | sort -u | while IFS= read -r rel; do
+        # Only *executing* or *sourcing* a feature file is delegation. Hook 99
+        # prints features/auth/cli.sh as an instruction for the user to run
+        # later; that is not something whose content the hook depends on, so it
+        # must not demand a hash.
+        grep -oE '(exec +)?(bash|sh) +"[^"]*features/[a-z]+/[a-z-]+\.sh|(\.|source) +"[^"]*features/[a-z]+/[a-z-]+\.sh' "$tmpl" |
+            grep -oE 'features/[a-z]+/[a-z-]+\.sh' | sort -u | while IFS= read -r rel; do
             grep -qF "include \"../$rel\"" "$tmpl" || printf '%s -> %s\n' "$(basename "$tmpl")" "$rel"
         done
     done > "$BATS_TEST_TMPDIR/missing"

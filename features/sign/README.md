@@ -1,24 +1,42 @@
 # Git commit signing
 
-Setting the signing key on its own, because the key lives in 1Password and
-1Password is not installed until after the wizard has already asked for it.
+`chez sign` (today: `chezsign`) sets the commit signing key on its own, keeping
+profile, modules and identity exactly as they are.
 
-## Verbs
+## Why it exists
 
-- `chez sign` — Set the git signing key on its own; keeps every other answer.
+A bootstrap chicken-and-egg. The signing key lives in 1Password, and Homebrew
+does not install 1Password until *after* the wizard has already asked which key
+to use. So a fresh Mac has to defer that one answer, and needs a way to supply it
+later without re-running the whole wizard.
 
-## Where its code lives today
+It offers the keys the SSH agent is already holding — 1Password's socket first,
+then `$SSH_AUTH_SOCK` — so there is nothing to paste. It also accepts a key as an
+argument, stripping any trailing agent comment, because `allowed_signers` is
+`<email> <key>` per line and the comment would corrupt it.
 
-This feature has not been moved yet. Until it is, these are its parts:
+It finishes by making a real signed commit in a throwaway repo. Setting a key
+that turns out not to work is the failure this exists to prevent, and only an
+actual signature proves otherwise.
 
-- `scripts/bin/signing.sh`
-- `scripts/lib/git-signing.sh`
-- `src/dot_config/git/config.tmpl`
-- `src/dot_config/git/allowed_signers.tmpl`
-- `src/private_dot_ssh/config`
-- `tests/chezsign.bats`
-- `tests/git-email.bats`
-- `docs/commands.md`
+## How it keeps every other answer
 
-Moving them here — code, tests and this document — is what turns this stub into
-the dossier. See [docs/architecture.md](../../docs/architecture.md).
+Re-running `chezmoi init` would re-ask everything. Instead `cli.sh` reads the
+current answers out of `chezmoi data` and replays them as `--promptString` /
+`--promptChoice` flags, changing only the key.
+
+Those flags are keyed on the prompt's **message text**, not its data key, so the
+messages in `src/.chezmoi.toml.tmpl` are a public API. `core/prompt-meta.sh`
+scrapes them back out of the template rather than hardcoding them — change a
+message and the wizard silently falls through to chezmoi's raw TUI, which cannot
+run under `curl | bash`. Messages also cannot contain a comma, because chezmoi
+splits those flags on commas.
+
+## Gotchas
+
+It refuses when `signingMode` is `off`. Turning signing back on is a different
+decision, and belongs to `chez setup --reset`.
+
+`lib.sh` holds the 1Password agent probe and the smoke test. The `auth` feature
+borrows it rather than keeping a second copy, so a change to how signing is
+verified lands in both places at once.

@@ -66,7 +66,7 @@ When the wizard finishes, sign in and reload:
 open -a 1Password                                                 # skip if disabled
                                                                   # → Settings → Developer → enable the SSH agent
 chezsign                                                          # set the signing key deferred above
-bash ~/Developer/personal/dotfiles/scripts/bin/bootstrap-auth.sh  # sign in to gh / cloud CLIs
+bash ~/Developer/personal/dotfiles/features/auth/cli.sh          # sign in to gh / cloud CLIs
 exec zsh                                                          # reload the managed shell
 chezdoctor                                                        # verify everything is healthy
 sudo shutdown -r now                                              # reboot to finish macOS defaults

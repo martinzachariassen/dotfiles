@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Behavioural tests for scripts/bin/signing.sh, which backs `chezsign`: set the
+# Behavioural tests for features/sign/cli.sh, which backs `chezsign`: set the
 # git signing key on a machine that deferred it, replaying every other saved
 # answer so nothing else is re-asked. Runs the real script against a stubbed
 # chezmoi + ssh-add and a real (dead) unix socket standing in for the agent.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    SCRIPT="$REPO_ROOT/scripts/bin/signing.sh"
+    load '../../../core/testing/helper'
+    SCRIPT="$REPO_ROOT/features/sign/cli.sh"
     ZSHRC="$REPO_ROOT/src/dot_config/zsh/dot_zshrc.tmpl"
 
     STUBS="$(mktemp -d)"
@@ -137,7 +137,7 @@ run_sign() { # extra env is set by the caller
 
 @test "zshrc defines chezsign, routed through _chez_run" {
     grep -qE '^chezsign\(\) \{' "$ZSHRC"
-    sed -n '/^chezsign() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run scripts/bin/signing.sh'
+    sed -n '/^chezsign() {/,/^}/p' "$ZSHRC" | grep -qF '_chez_run features/sign/cli.sh'
 }
 
 @test "chezhelp lists chezsign" {
