@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for scripts/bin/chezup.sh — the everyday "converge this Mac to the
+# Tests for features/converge/up.sh — the everyday "converge this Mac to the
 # repo" verb (pull → preview drift → apply) behind the `chezup` zsh function.
 #
 # chezup runs most often, so its control flow must be exactly right across
@@ -9,8 +9,8 @@
 # branch by env var.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-    CHEZUP="$REPO_ROOT/scripts/bin/chezup.sh"
+    load '../../../core/testing/helper'
+    CHEZUP="$REPO_ROOT/features/converge/up.sh"
     command -v bash >/dev/null 2>&1 || skip "bash not installed"
 
     REPO="$(mktemp -d)"
@@ -157,9 +157,9 @@ run_chezup() {
 
 @test "chezup fails loudly (exit 1) when its core/ui.sh helper is missing" {
     ISO="$(mktemp -d)"
-    mkdir -p "$ISO/scripts/bin"  # note: no core/ ⇒ ui.sh is absent
-    cp "$CHEZUP" "$ISO/scripts/bin/chezup.sh"
-    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" bash "$ISO/scripts/bin/chezup.sh"
+    mkdir -p "$ISO/features/converge"  # note: no core/ ⇒ ui.sh is absent
+    cp "$CHEZUP" "$ISO/features/converge/up.sh"
+    run env PATH="$STUBS:$PATH" DOTFILES_DIR="$REPO" bash "$ISO/features/converge/up.sh"
     [ "$status" -eq 1 ]
     [[ "$output" == *"missing"* ]] || return 1
     [[ "$output" == *"ui.sh"* ]] || return 1
