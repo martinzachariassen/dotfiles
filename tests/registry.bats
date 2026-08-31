@@ -175,7 +175,7 @@ feature_list() { feature_names "$REPO_ROOT"; }
 
 # ─── the retired profile axis ───────────────────────────────────────────────
 #
-# v1.0 removed the `profile` enum. "No code mentions it" would be the guard you
+# v0.8 removed the `profile` enum. "No code mentions it" would be the guard you
 # want, and it is not available: the migration has to read the key to retire it,
 # the resolver has to detect it to fail closed, and the distiller has to fall
 # back to it or every Mac set up before `memoryScope` loses its corpus identity.

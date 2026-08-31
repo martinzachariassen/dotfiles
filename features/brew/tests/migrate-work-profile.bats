@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Coverage for features/brew/migrate-work-profile.sh — the one-time v1.0 step
+# Coverage for features/brew/migrate-work-profile.sh — the one-time v0.8 step
 # that retires the `profile` key without letting a single package fall out of
 # the declared set.
 #
-# The failure this suite exists to catch is silent and destructive: v1.0 deleted
+# The failure this suite exists to catch is silent and destructive: v0.8 deleted
 # features/brew/Brewfile.work, so on the Mac that ran that profile its fifteen
 # packages are installed and declared by nothing. Undeclared is precisely what
 # `chez mirror` offers to uninstall. Every test below is ultimately one

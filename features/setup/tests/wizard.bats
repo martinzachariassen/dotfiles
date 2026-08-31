@@ -65,7 +65,7 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
 #
 # The chain has to be the template's, in the template's order: the retired
 # `profile` first (a Mac whose corpus is stamped with it and whose config the
-# v1.0 migration has not reached), then the literal. A caller that skipped
+# v0.8 migration has not reached), then the literal. A caller that skipped
 # straight to "default" would hand that Mac a scope its own backup rejects.
 @test "an absent memoryScope is replayed through the same fallback chain" {
     local f

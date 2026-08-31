@@ -69,8 +69,8 @@ no_match_in() {
     [ "${#lines[@]}" -eq 1 ]
 }
 
-# ── the v1.0 migration's fail-closed guard ───────────────────────────────────
-# Between pulling v1.0 and running an apply, a Mac can be executing this code
+# ── the v0.8 migration's fail-closed guard ───────────────────────────────────
+# Between pulling v0.8 and running an apply, a Mac can be executing this code
 # against a config that still says `profile = "work"`: the profile tiers are
 # gone from the repo, the migration hook has not run, and Brewfile.local does
 # not exist yet. Resolving anyway would silently collapse "declared" to core

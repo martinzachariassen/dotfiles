@@ -36,7 +36,7 @@ setup() {
 # the rest gets its one offer. `name` discriminates the two: it is the oldest
 # key in [data] and is written unconditionally, so its absence uniquely means
 # "never initialised". (`profile` used to play this part and cannot any more —
-# v1.0 retired it, so it is absent in both cases.)
+# v0.8 retired it, so it is absent in both cases.)
 @test "modulesSeen defaults to the whole catalog only on a fresh init" {
     grep -qF 'hasKey . "name"' "$TMPL"
     grep -qF '$seenDefault = $allModules' "$TMPL"
@@ -118,7 +118,7 @@ setup() {
 }
 
 # ─── the retired profile axis ────────────────────────────────────────────────
-# Not a style rule. `profile` is now the marker the v1.0 migration keys on — a
+# Not a style rule. `profile` is now the marker the v0.8 migration keys on — a
 # template that wrote one back would re-arm the resolver's fail-closed guard on
 # a Mac that had already migrated, and `chez up` would start refusing to resolve
 # the package set on a machine with nothing wrong with it.

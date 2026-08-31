@@ -2,7 +2,7 @@
 # migrate-work-profile.sh — one-time: retire the `profile` key from this Mac's
 # chezmoi config, keeping every package the old `work` tier used to declare.
 #
-# v1.0 deleted features/brew/Brewfile.work along with the profile axis. On the
+# v0.8 deleted features/brew/Brewfile.work along with the profile axis. On the
 # one machine that ran that profile, those 15 packages are installed and would
 # otherwise become undeclared the moment the repo is pulled — which is exactly
 # what `chez mirror` offers to uninstall. Nothing here uninstalls anything; it

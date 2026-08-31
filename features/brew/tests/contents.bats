@@ -113,7 +113,7 @@ not_declares() {
 
 # ─── The retired profile tiers ─────────────────────────────────────────────
 #
-# v1.0 deleted Brewfile.work and Brewfile.personal. The work tier's fifteen
+# v0.8 deleted Brewfile.work and Brewfile.personal. The work tier's fifteen
 # entries live on inline in features/brew/migrate-work-profile.sh, which moves
 # them into a machine's own ~/.config/chez/Brewfile.local — see that script's
 # suite. Nothing may reintroduce them here: the repo is public, and a file

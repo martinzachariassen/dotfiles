@@ -31,7 +31,7 @@ command to `hook.sh`, which installs only when `storecode` is neither on `PATH`
 nor already unpacked at `~/.storecode`.
 
 **The installer command is the only gate.** It used to be `profile == "work"`;
-v1.0 retired the profile and the gate became the data instead of moving to a
+v0.8 retired the profile and the gate became the data instead of moving to a
 tick-box. That removes a gate rather than relocating one — `installCmd` is empty
 in the committed data, because the real installer URL is internal and this repo
 is public, so an extra to enable it would do nothing for everybody who can read

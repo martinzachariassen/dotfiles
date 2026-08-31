@@ -42,9 +42,9 @@ brew_active_files() {
     command -v jq >/dev/null 2>&1 || return 1
     [ -n "$json" ] || json="$(chezmoi data --format=json 2>/dev/null)"
     [ -n "$json" ] || return 1
-    # ─── Fail closed on a config the v1.0 migration has not reached ───────────
+    # ─── Fail closed on a config the v0.8 migration has not reached ───────────
     #
-    # The single most important line in the migration. Between pulling v1.0 and
+    # The single most important line in the migration. Between pulling v0.8 and
     # running an apply, a Mac can be executing this code against a config that
     # still says `profile = "work"`: the profile Brewfiles are gone from the
     # repo, the migration hook has not run, and Brewfile.local does not exist

@@ -11,7 +11,7 @@ USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
 # The retired `profile` key, absent by default because no current template
 # writes it. Set it and the stub config carries it, which is the only way to
-# render the v1.0 migration hook's real body — with the key gone the hook
+# render the v0.8 migration hook's real body — with the key gone the hook
 # renders to a bare `exit 0` and CI would never `bash -n` what it actually runs.
 # One matrix row sets LEGACY_PROFILE=work for exactly that reason.
 LEGACY_PROFILE="${LEGACY_PROFILE:-}"

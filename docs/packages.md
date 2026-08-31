@@ -17,7 +17,7 @@ is the core file plus whatever your modules add:
 | **Module** | `Brewfile.mac-apps`, `Brewfile.apple-dev` | The matching module is selected (`macApps` → GUI + AI apps; `appleDev` → Swift/iOS toolchain). |
 | **Machine-local** | `~/.config/chez/Brewfile.local` | Always, on the one Mac that has it. Outside the repo, never committed — see [adopt](../features/adopt/README.md). |
 
-There is no per-machine-kind tier. v1.0 retired the `profile` enum along with
+There is no per-machine-kind tier. v0.8 retired the `profile` enum along with
 `Brewfile.personal` and `Brewfile.work`; the cloud/Kubernetes/IaC stack the work
 tier used to declare now lives in the machine-local overlay of the one Mac that
 wants it, moved there automatically by

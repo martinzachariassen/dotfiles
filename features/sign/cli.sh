@@ -90,7 +90,7 @@ current_key="$(cm_data_string "$DATA_JSON" signingKey)"
 #
 # The fallback chain matches the template's `dig "profile" "default" .` exactly:
 # the retired profile first, for a Mac whose corpus is stamped with it and whose
-# config the v1.0 migration has not reached yet, then the literal.
+# config the v0.8 migration has not reached yet, then the literal.
 memory_scope="$(cm_data_string "$DATA_JSON" memoryScope)"
 [ -n "$memory_scope" ] || memory_scope="$(cm_data_string "$DATA_JSON" profile)"
 [ -n "$memory_scope" ] || memory_scope="default"

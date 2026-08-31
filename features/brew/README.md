@@ -16,7 +16,7 @@ repo entirely:
 | Module | `Brewfile.mac-apps`, `Brewfile.apple-dev` | When that module is on |
 | Machine-local | `~/.config/chez/Brewfile.local` | To this Mac only |
 
-There is no per-machine-kind tier. v1.0 retired the `profile` enum, and with it
+There is no per-machine-kind tier. v0.8 retired the `profile` enum, and with it
 `Brewfile.personal` and `Brewfile.work`: a Mac is not a *kind*, it is the core
 set plus the modules it ticked plus whatever it adopted locally. The fifteen
 packages the work tier used to declare were moved into the overlay on the one

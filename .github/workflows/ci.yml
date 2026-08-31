@@ -61,7 +61,7 @@ jobs:
       matrix:
         # The axis is the module set, not a machine kind. `legacy_profile` is
         # not a variety of Mac: it is the retired `profile` key, and the one row
-        # that sets it exists so the v1.0 migration hook renders a real body for
+        # that sets it exists so the v0.8 migration hook renders a real body for
         # `bash -n` — with the key absent the hook is a bare `exit 0`.
         include:
           - { modules: "macApps,theme,jvmStack", mac_apps: true,  use_one_password: true,  legacy_profile: "" }

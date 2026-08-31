@@ -7,7 +7,7 @@
 # render-time values the template threads into the engine, and the engine's own
 # behaviour.
 #
-# It used to be gated on `profile == "work"`. v1.0 retired the profile and the
+# It used to be gated on `profile == "work"`. v0.8 retired the profile and the
 # gate became the data: this public repo ships `installCmd = ""`, so the hook is
 # already a no-op on every machine but the one that fills it in. That removed a
 # gate rather than relocating it — a tick-box would have done nothing for

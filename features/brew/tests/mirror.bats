@@ -260,8 +260,8 @@ EOF
     }
 }
 
-@test "brew_removals fails closed on a config the v1.0 migration has not reached" {
-    # A Mac that has pulled v1.0 but not yet applied still has `profile` saved,
+@test "brew_removals fails closed on a config the v0.8 migration has not reached" {
+    # A Mac that has pulled v0.8 but not yet applied still has `profile` saved,
     # and its work stack is declared by nothing in the repo any more. Resolving
     # anyway would offer that whole stack for uninstall, so the resolver refuses
     # — and refusing must reach all the way out here, as an empty removal set.

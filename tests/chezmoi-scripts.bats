@@ -103,7 +103,7 @@ sourceDir = "$SRC_DIR"
     signingKey     = "ssh-ed25519 AAAAplaceholder"
     useOnePassword = true
 
-    # The retired profile key, kept on purpose and only here. v1.0 removed it
+    # The retired profile key, kept on purpose and only here. v0.8 removed it
     # from every other stub, but the migration hook is gated on its *presence*
     # — without it that hook renders down to a bare `exit 0` and the sweep below
     # would stop rendering the one script whose whole job is this transition.
