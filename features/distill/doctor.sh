@@ -14,7 +14,7 @@ doctor_distill() {
     # "is it still running", which is the question you never think to ask.
     section "Claude memory (claudeDistiller)"
     if ! command -v distill_last_run >/dev/null 2>&1; then
-        warn "scripts/lib/distill.sh missing — chezdistill checks skipped"
+        warn "features/distill/lib.sh missing — chezdistill checks skipped"
     else
         if [ "$(uname -s)" = "Darwin" ]; then
             if launchctl print "gui/$(id -u)/no.mlz.chezdistill.nightly" >/dev/null 2>&1; then

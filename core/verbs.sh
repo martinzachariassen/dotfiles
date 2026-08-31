@@ -32,7 +32,7 @@ setup	setup	features/setup/setup.sh	setup	-	Fill in newly-added setup keys; keep
 sign	sign	features/sign/cli.sh	setup	-	Set the git signing key on its own; keeps every other answer.
 auth	auth	features/auth/cli.sh	setup	-	Sign in to gh and the cloud CLIs after a fresh install.
 xcode	xcode	features/xcode/cli.sh	setup	appleDev	Install Xcode + iOS simulator runtime (Apple ID, ~40 GB).
-distill	distill	scripts/bin/distill.sh	setup	claudeDistiller	Distil Claude conversations into the MAIN.md Claude loads.
+distill	distill	features/distill/cli.sh	setup	claudeDistiller	Distil Claude conversations into the MAIN.md Claude loads.
 apply	converge	features/converge/apply.sh	maintenance	-	Apply without pulling. Flags drift; never uninstalls.
 status	converge	features/converge/status.sh	maintenance	-	Explain pending file + package drift in plain words (read-only).
 bump	brew	features/brew/bump.sh	maintenance	-	Upgrade deps: brew upgrade + mise upgrade.
