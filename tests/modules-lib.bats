@@ -8,7 +8,7 @@
 # recorded separately from being turned on.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../core/testing/helper'
     LIB="$REPO_ROOT/core/modules.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed (modules.sh needs it)"
 
@@ -31,14 +31,6 @@ EOF
 
 lib() { # lib EXPR — run an expression against the sourced library
     run bash -c ". '$LIB'; $1"
-}
-
-# A bare `! grep …` mid-body is exempt from set -e, so bats never sees it fail.
-no_match_in() {
-    if grep -qE "$2" <<<"$1"; then
-        echo "unexpected match for: $2"
-        return 1
-    fi
 }
 
 # ── Reading ──────────────────────────────────────────────────────────────────
@@ -140,7 +132,7 @@ no_match_in() {
     chmod 0600 "$CFG"
     lib "modules_write_list '$CFG' modules macApps"
     [ "$status" -eq 0 ]
-    [ "$(stat -f '%Lp' "$CFG" 2>/dev/null || stat -c '%a' "$CFG")" = "600" ]
+    [ "$(file_mode "$CFG")" = "600" ]
 }
 
 @test "modules_write_list keeps the mode when it inserts a new key too" {
@@ -149,7 +141,7 @@ no_match_in() {
     chmod 0600 "$CFG"
     lib "modules_write_list '$CFG' modulesSeen macApps"
     [ "$status" -eq 0 ]
-    [ "$(stat -f '%Lp' "$CFG" 2>/dev/null || stat -c '%a' "$CFG")" = "600" ]
+    [ "$(file_mode "$CFG")" = "600" ]
 }
 
 @test "modules_write_list inserts a missing key after the modules line" {

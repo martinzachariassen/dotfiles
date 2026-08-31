@@ -59,6 +59,20 @@ no_match_in() {
     fi
 }
 
+# file_mode PATH — the octal permission bits, on macOS and on the Linux runner.
+#
+# Not `stat -f '%Lp' … || stat -c '%a' …`: BSD's `-f` is GNU's `--file-system`,
+# which SUCCEEDS against a format string it does not understand and prints
+# something that is not a mode, so the fallback is never reached on Linux and
+# the assertion compares garbage. The engines under test read it the same way —
+# see _modules_mv in core/modules.sh.
+file_mode() {
+    local mode
+    mode="$(stat -f '%Lp' "$1" 2>/dev/null || true)"
+    case "$mode" in '' | *[!0-7]*) mode="$(stat -c '%a' "$1" 2>/dev/null || true)" ;; esac
+    printf '%s\n' "$mode"
+}
+
 # skip_unless CMD [REASON] — skip when a tool is not installed.
 skip_unless() {
     command -v "$1" >/dev/null 2>&1 || skip "${2:-$1 not installed}"

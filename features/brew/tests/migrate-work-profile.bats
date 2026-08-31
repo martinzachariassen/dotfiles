@@ -222,7 +222,7 @@ assert_all_declared() {
     chmod 600 "$CONFIG"
     migrate work
     [ "$status" -eq 0 ]
-    [ "$(stat -f '%Lp' "$CONFIG" 2>/dev/null || stat -c '%a' "$CONFIG")" = "600" ]
+    [ "$(file_mode "$CONFIG")" = "600" ]
 }
 
 @test "a profile key outside [data] is not touched" {

@@ -91,10 +91,20 @@ modules_toml_array() {
 # corpusRemote. A temp file created with `>` lands at 0644 under the default
 # umask, so without this every `chez up` that touches a module list quietly
 # widens it.
+#
+# The mode is read by validating the VALUE, not by trusting an exit status —
+# the same shape src/dot_config/claude/executable_statusline.sh uses for an
+# mtime. BSD's `-f` is GNU's `--file-system`: on Linux it succeeds against a
+# format string it does not understand and hands back something that is not a
+# mode at all, so a plain `a || b` never reaches the second spelling.
 _modules_mv() {
     local mode
-    mode="$(stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null)"
-    [ -n "$mode" ] && chmod "$mode" "$2" 2>/dev/null
+    mode="$(stat -f '%Lp' "$1" 2>/dev/null || true)"
+    case "$mode" in '' | *[!0-7]*) mode="$(stat -c '%a' "$1" 2>/dev/null || true)" ;; esac
+    case "$mode" in '' | *[!0-7]*) mode="" ;; esac
+    if [ -n "$mode" ]; then
+        chmod "$mode" "$2" 2>/dev/null || true
+    fi
     mv "$2" "$1"
 }
 

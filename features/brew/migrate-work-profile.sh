@@ -155,10 +155,20 @@ _data_key_line() {
 # chezmoi creates that file 0600 and it holds corpusRemote, the signing key and
 # an email. A plain `>` gives the temp file 0644 under the default umask, so
 # without this the migration is the step that makes them world-readable.
+#
+# The probe validates the VALUE rather than an exit status, matching
+# core/modules.sh's _modules_mv and statusline.sh's mtime read: BSD's `-f` is
+# GNU's `--file-system`, which succeeds against a format string it does not
+# understand, so a plain `a || b` never reaches the second spelling on Linux.
+# This script only ever runs on macOS, but the suite that proves it runs on both.
 _config_rewrite() {
     local tmp="$1" mode
-    mode="$(stat -f '%Lp' "$CONFIG" 2>/dev/null || stat -c '%a' "$CONFIG" 2>/dev/null)"
-    [ -n "$mode" ] && chmod "$mode" "$tmp" 2>/dev/null
+    mode="$(stat -f '%Lp' "$CONFIG" 2>/dev/null || true)"
+    case "$mode" in '' | *[!0-7]*) mode="$(stat -c '%a' "$CONFIG" 2>/dev/null || true)" ;; esac
+    case "$mode" in '' | *[!0-7]*) mode="" ;; esac
+    if [ -n "$mode" ]; then
+        chmod "$mode" "$tmp" 2>/dev/null || true
+    fi
     mv "$tmp" "$CONFIG"
 }
 
