@@ -43,3 +43,26 @@ setup() {
     # the first time.
     no_match 'byProfile|byModule' "$FRAGMENT"
 }
+
+@test "both sides of the untracked check are normalised the same way" {
+    # The asymmetry this guards: the Brewfile side was piped through
+    # `awk -F/ '{print $NF}'` and the `brew leaves` side was not, so a formula
+    # installed from a tap (hashicorp/tap/terraform vs terraform) could never
+    # match its own declaration and was reported as untracked on every run.
+    # Both sides now meet inside brew_untracked_of_kind, which normalises each
+    # through brew_bare_names; the fragment must not re-parse Brewfiles itself.
+    no_match "awk -F/ '\{print \\\$NF\}'" "$FRAGMENT"
+    no_match 'sed -E .s/\^\(brew' "$FRAGMENT"
+    grep -qF 'brew_untracked_of_kind' "$FRAGMENT"
+}
+
+@test "the untracked check covers casks, not just formulae" {
+    # `brew leaves` lists formulae only, so for a long time an installed cask
+    # that no active tier declared was invisible to doctor while chez status
+    # and chez mirror both reported it. The two sides must be asked separately,
+    # because a merged namespace lets a declared cask vouch for an undeclared
+    # formula of the same name (docker ships as both).
+    grep -qF 'brew_untracked_of_kind brew' "$FRAGMENT"
+    grep -qF 'brew_untracked_of_kind cask' "$FRAGMENT"
+    grep -qF 'brew list --cask' "$FRAGMENT"
+}

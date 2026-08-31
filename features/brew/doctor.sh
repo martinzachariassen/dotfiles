@@ -39,24 +39,34 @@ doctor_brew() {
             [ -n "$rel" ] || continue
             [ -f "$SOURCE_DIR/$rel" ] && tracked_files+=("$SOURCE_DIR/$rel")
         done <<<"$active_files"
-        # Guard the empty case explicitly: a bare `grep -h PATTERN` with no file
-        # operands reads stdin and would hang this check forever.
+        # Guard the empty case explicitly: brew_untracked_of_kind refuses a
+        # zero-length file list, and comparing against too FEW tiers would call
+        # most of the machine untracked.
+        n_formulae=0
+        n_casks=0
         if [ "${#tracked_files[@]}" -eq 0 ]; then
             warn "could not resolve the active Brewfiles — skipping the untracked-package check"
-            untracked=""
         else
-            leaves_tmp=$(mktemp)
-            brew leaves >"$leaves_tmp" 2>/dev/null || true
-            tracked=$(grep -h '^\(brew\|cask\) ' "${tracked_files[@]}" 2>/dev/null |
-                sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
-                awk -F/ '{print $NF}' |
-                sort -u)
-            untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked") 2>/dev/null || true)
-            rm -f "$leaves_tmp"
+            # Both directions, both namespaces. Casks used to be invisible here:
+            # the installed side was `brew leaves` alone, which lists formulae
+            # only, so an undeclared cask sat unreported while chez status and
+            # chez mirror — which read through brew bundle cleanup — both saw it.
+            untracked_formulae=$(brew_untracked_of_kind brew \
+                "$(brew leaves 2>/dev/null)" "${tracked_files[@]}")
+            # `brew leaves` deliberately hides formulae that exist only as
+            # someone else's dependency; those are the orphan check's business,
+            # below. Casks have no such notion — every installed cask is
+            # top-level — so the whole list is the installed side.
+            untracked_casks=$(brew_untracked_of_kind cask \
+                "$(brew list --cask 2>/dev/null)" "${tracked_files[@]}")
+            # grep -c over an unterminated string still counts its last line and
+            # yields 0 for the empty one, which `wc -l` would report as 1.
+            n_formulae=$(printf '%s' "$untracked_formulae" | grep -c . || true)
+            n_casks=$(printf '%s' "$untracked_casks" | grep -c . || true)
         fi
-        if [ -n "$untracked" ]; then
-            n=$(echo "$untracked" | wc -l | tr -d ' ')
-            warn "$n brew package(s) installed but declared by no active Brewfile (run \`chez status\` for the list)"
+        n=$((n_formulae + n_casks))
+        if [ "$n" -gt 0 ]; then
+            warn "$n brew package(s) installed but declared by no active Brewfile ($n_formulae formula(e), $n_casks cask(s)) — run \`chez status\` for the list"
         else
             pass "no untracked brew packages"
         fi
