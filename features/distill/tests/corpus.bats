@@ -154,6 +154,43 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     [[ "$output" != *"paths    unusable"* ]] || return 1
 }
 
+# `chez doctor` sends you here when the stamp and this Mac disagree, so --status
+# has to name the scope — including when it agrees, because the third state (no
+# scope at all, so every guard is abstaining) fails silently by construction and
+# has nothing else to surface it.
+@test "--status names the scope even when nothing is wrong" {
+    seed_setup lab
+    distill_state_repo_init
+    stamp lab
+    run distill_status
+    [[ "$output" == *"scope    lab"* ]] || return 1
+}
+
+@test "--status says so when the two scopes disagree" {
+    seed_setup work
+    distill_state_repo_init
+    stamp personal
+    run distill_status
+    [[ "$output" == *"this Mac is \"work\", the corpus is stamped \"personal\""* ]] ||
+        return 1
+}
+
+@test "--status calls out a Mac with no scope at all" {
+    as_data '{}'
+    distill_state_repo_init
+    run distill_status
+    [[ "$output" == *"leak boundary is not being enforced"* ]] || return 1
+}
+
+@test "--status flags a corpus that carries no stamp" {
+    seed_setup lab
+    distill_state_repo_init
+    jq 'del(.scope)' "$(distill_corpus_file)" >"$STATE/c.tmp"
+    mv "$STATE/c.tmp" "$(distill_corpus_file)"
+    run distill_status
+    [[ "$output" == *"the corpus carries no stamp yet"* ]] || return 1
+}
+
 # Kept because the normaliser is still load-bearing — for the tracked README and
 # for the drift advisory above. It is NOT a guard any more; comparing URLs is
 # exactly what a repo rename defeated.
@@ -631,6 +668,60 @@ as_data() {
     [ "$(jq -r .schema "$(distill_corpus_file)")" = "2" ]
     [ "$(jq -r .scope "$(distill_corpus_file)")" = "lab" ]
     [ "$(distill_corpus_scope)" = "lab" ]
+}
+
+# ─── Stamping a corpus that has none ──────────────────────────────────────────
+#
+# The one case where "written once, never rewritten" gives the wrong answer. Both
+# halves of every leak guard abstain when either side is empty, so an UNSCOPED
+# corpus disarms the boundary on this Mac and on every Mac that later clones it.
+# Left write-once, answering the scope prompt afterwards would not repair it.
+
+@test "a Mac with no scope leaves the key out rather than writing it empty" {
+    as_data '{}'
+    isolate_git
+    distill_state_repo_init
+
+    # Omitted, not "": distill_corpus_scope reads both as unscoped, but only an
+    # absent key cannot be mistaken for an answer by a later reader.
+    [ "$(jq -r 'has("scope")' "$(distill_corpus_file)")" = "false" ]
+    [ -z "$(distill_corpus_scope)" ]
+}
+
+@test "an unscoped corpus is stamped once a scope exists" {
+    as_data '{}'
+    isolate_git
+    distill_state_repo_init
+    id="$(distill_corpus_id)"
+    [ -n "$id" ]
+
+    as_data '{"memoryScope":"lab"}'
+    distill_corpus_seed
+
+    [ "$(distill_corpus_scope)" = "lab" ]
+    # Repaired in place: `id` is what the remote checks match on, so a fresh one
+    # would read as a different corpus entirely.
+    [ "$(distill_corpus_id)" = "$id" ]
+}
+
+@test "a corpus that already carries a stamp is not re-stamped" {
+    as_data '{"memoryScope":"lab"}'
+    isolate_git
+    stamp elsewhere
+    distill_corpus_seed
+
+    [ "$(distill_corpus_scope)" = "elsewhere" ]
+}
+
+@test "the repair leaves no temp file behind" {
+    as_data '{}'
+    isolate_git
+    distill_state_repo_init
+
+    as_data '{"memoryScope":"lab"}'
+    distill_corpus_seed
+
+    [ ! -e "$(distill_corpus_file).scope.tmp" ]
 }
 
 @test "unioning a shard twice changes nothing the second time" {

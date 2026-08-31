@@ -1,4 +1,0 @@
-# Brewfile.personal — extras layered on core for the `personal` profile.
-#
-# Currently empty: everything personal-only has moved out or is no longer used.
-# The file stays so the `personal` profile keeps a place to declare extras.

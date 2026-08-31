@@ -59,11 +59,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The axis is the module set, not a machine kind. `legacy_profile` is
+        # not a variety of Mac: it is the retired `profile` key, and the one row
+        # that sets it exists so the v0.8 migration hook renders a real body for
+        # `bash -n` — with the key absent the hook is a bare `exit 0`.
         include:
-          - { profile: personal, mac_apps: true,  use_one_password: true }
-          - { profile: work,     mac_apps: true,  use_one_password: true }
-          - { profile: personal, mac_apps: false, use_one_password: true }
-          - { profile: personal, mac_apps: true,  use_one_password: false }
+          - { modules: "macApps,theme,jvmStack", mac_apps: true,  use_one_password: true,  legacy_profile: "" }
+          - { modules: "none",                   mac_apps: false, use_one_password: true,  legacy_profile: "" }
+          - { modules: "appleDev,macApps,macosDefaults,claudeDistiller,claudePersona,cloudAuth,locale,theme,jvmStack", mac_apps: true, use_one_password: true, legacy_profile: "" }
+          - { modules: "macApps,theme",          mac_apps: true,  use_one_password: false, legacy_profile: "" }
+          - { modules: "macApps,theme",          mac_apps: true,  use_one_password: true,  legacy_profile: work }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,9 +81,10 @@ jobs:
       - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - name: Dry-run apply
         env:
-          PROFILE: ${{ matrix.profile }}
+          MODULES: ${{ matrix.modules }}
           MAC_APPS: ${{ matrix.mac_apps }}
           USE_ONE_PASSWORD: ${{ matrix.use_one_password }}
+          LEGACY_PROFILE: ${{ matrix.legacy_profile }}
         run: bash scripts/ci/render-check.sh "$PWD"
 
   # chezmoi-scripts.bats renders + runs each hook on Linux to confirm the darwin guard fires first.
@@ -223,14 +229,60 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [personal, work]
+        include:
+          - { modules: "macApps,theme,jvmStack", legacy_profile: "" }
+          - { modules: "macApps,theme,jvmStack", legacy_profile: work }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - env:
-          PROFILE: ${{ matrix.profile }}
+          MODULES: ${{ matrix.modules }}
           MAC_APPS: "true"
           USE_ONE_PASSWORD: "true"
+          LEGACY_PROFILE: ${{ matrix.legacy_profile }}
         run: bash scripts/ci/render-check.sh "$PWD"
+
+  # The one required status check on main. Everything above is advisory to the
+  # ruleset; this job is what it gates on.
+  #
+  # Branch protection pins required checks BY NAME, and a matrix job's name
+  # embeds its matrix values — so changing the render matrix silently retires a
+  # required context and leaves the ruleset waiting forever for a name that can
+  # never report again. Not hypothetical: retiring the profile axis stranded
+  # four `chezmoi render (personal, …)` contexts and blocked its own PR with
+  # every check green. One stable name, depending on everything, is the fix.
+  #
+  # `needs` must name every job above it — tests/lint-coverage.bats enforces
+  # that, because a job missing from the list is a check that stops gating
+  # without anything going red.
+  gate:
+    name: all checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs:
+      - shell
+      - render
+      - test
+      - config
+      - typos
+      - secrets
+      - actionlint
+      - zizmor
+      - pr-title
+      - brew
+      - render-macos
+    steps:
+      # `skipped` is deliberately not a failure: render-macos is gated to the
+      # weekly schedule and pr-title to pull requests, so on any given event one
+      # of them is skipped by design.
+      - name: Require every job to have passed or skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          printf 'dependency results: %s\n' "$RESULTS"
+          case " $RESULTS " in
+              *' failure '* | *' cancelled '*) exit 1 ;;
+          esac

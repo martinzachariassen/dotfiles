@@ -11,8 +11,8 @@ __DOTFILES_BREW_REMOVALS_SH=1
 # Brewfile tier declares — the removal set chez mirror acts on. $1 is the repo
 # root; pure/testable. The tier set comes from features/brew/lib/tiers.sh, the
 # same resolver chez doctor uses and the mirror of what the brew-bundle hook
-# installs from, so "tracked" means the same thing in both directions: a
-# work-profile cask on a personal machine is untracked here, not silently kept.
+# installs from, so "tracked" means the same thing in both directions: a cask
+# from a module this Mac has not enabled is untracked here, not silently kept.
 # The machine-local overlay is one of those tiers, which is what makes
 # `chez adopt --local` stick: a package listed there is declared, so it never
 # reaches this set at all.

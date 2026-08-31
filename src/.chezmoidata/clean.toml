@@ -18,7 +18,7 @@ keepConfig = [
     "homebrew",
     "gradle",
     "jgit",
-    "kafkactl",       # work profile only
+    "kafkactl",       # not in any Brewfile; kept for the Macs that have it
     "obsidian",
     "raycast",
     "siyuan",

@@ -173,6 +173,84 @@ feature_list() { feature_names "$REPO_ROOT"; }
     [ "${#bad[@]}" -eq 0 ]
 }
 
+# ─── the retired profile axis ───────────────────────────────────────────────
+#
+# v0.8 removed the `profile` enum. "No code mentions it" would be the guard you
+# want, and it is not available: the migration has to read the key to retire it,
+# the resolver has to detect it to fail closed, and the distiller has to fall
+# back to it or every Mac set up before `memoryScope` loses its corpus identity.
+#
+# So the guard is an allow-list. Every file below is a place the key is read,
+# written or explained on purpose; anywhere else is a gate that came back. The
+# list is meant to shrink — when the migration is retired, most of it goes with
+# it — and shrinking it is an edit here, which is the point.
+#
+# Scoped to code. Prose is excluded because the docs discuss the retirement at
+# length and a doc rewrite is not a regression.
+@test "only the migration's own files still mention the profile" {
+    local allowed=(
+        # The migration itself: the hook, its engine, and the config template
+        # that keeps passing the key through until the engine removes it.
+        "src/.chezmoi.toml.tmpl"
+        "src/.chezmoiscripts/run_once_before_00b-retire-work-profile.sh.tmpl"
+        "features/brew/migrate-work-profile.sh"
+        # Fail-closed: both refuse to answer while the key is present, because
+        # an un-migrated config resolves to a removal set that is far too broad.
+        "features/brew/lib/tiers.sh"
+        "features/brew/doctor.sh"
+        # The corpus leak boundary. A Mac stamped before `memoryScope` existed
+        # keeps its scope only by falling back to what the profile used to be.
+        "features/distill/lib/config.sh"
+        "features/distill/lib/corpus.sh"
+        "features/distill/lib/attach.sh"
+        "features/setup/cli.sh"
+        "features/sign/cli.sh"
+        # Tombstones: each says what its gate used to be and why it is now data.
+        "src/.chezmoidata/brew.toml"
+        "src/.chezmoidata/modules.toml"
+        "src/.chezmoidata/storecode.toml"
+        "src/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl"
+        "features/storecode/hook.sh"
+        # The un-migrated render path, exercised on demand by LEGACY_PROFILE.
+        "scripts/ci/render-check.sh"
+        # Not this profile: an Xcode simulator runtime's device profile.
+        "features/xcode/probe.sh"
+    )
+
+    # Line-level, not file-level: `grep -w` counts `.` as a word boundary, so
+    # the dotfiles named .profile / .zprofile / .bash_profile all match. Those
+    # are files in $HOME, not the retired key, and they are named all over the
+    # XDG-migration checks.
+    local found bad=() f rel
+    found="$(grep -rnw profile \
+        --include='*.sh' --include='*.tmpl' --include='*.toml' --include='*.zsh' \
+        --exclude-dir=tests \
+        "$REPO_ROOT/src" "$REPO_ROOT/core" "$REPO_ROOT/features" \
+        "$REPO_ROOT/scripts" 2>/dev/null |
+        grep -vE '(/\.profile|\.bash_profile|\.zprofile|dot_profile)' |
+        cut -d: -f1 | sort -u || true)"
+
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        rel="${f#"$REPO_ROOT"/}"
+        case " ${allowed[*]} " in *" $rel "*) continue ;; esac
+        bad+=("$rel")
+    done <<<"$found"
+
+    [ "${#bad[@]}" -eq 0 ] || printf 'profile is read somewhere new: %s\n' "${bad[@]}" >&2
+    [ "${#bad[@]}" -eq 0 ]
+
+    # …and the list may not rot in the other direction either: an entry whose
+    # file stopped mentioning the key is a line to delete, not to keep for
+    # safety. Otherwise the list only ever grows and stops meaning anything.
+    for rel in "${allowed[@]}"; do
+        case "$found" in *"$REPO_ROOT/$rel"*) continue ;; esac
+        bad+=("$rel (allow-listed but clean — drop the entry)")
+    done
+    [ "${#bad[@]}" -eq 0 ] || printf '%s\n' "${bad[@]}" >&2
+    [ "${#bad[@]}" -eq 0 ]
+}
+
 # ─── data files ─────────────────────────────────────────────────────────────
 
 @test "every .chezmoidata file belongs to a feature or to core" {

@@ -62,10 +62,6 @@ FILES=(
     "{{ $.chezmoi.workingTree }}/{{ $path }}"
 {{- end }}
 {{- end }}
-{{- $profileFile := index .brewfiles.byProfile .profile }}
-{{- if $profileFile }}
-    "{{ .chezmoi.workingTree }}/{{ $profileFile }}"
-{{- end }}
 )
 
 # The overlay is appended LAST and resolved at run time, not render time: its
@@ -89,9 +85,9 @@ if [ "$HAVE_LOCAL_TIER" -eq 1 ]; then
 fi
 
 echo
-printf '%s%s%s  %sHomebrew packages%s %s(profile: {{ .profile }})%s\n' \
-    "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET" "$DIM" "$RESET"
-explain "Installs what your profile declares. Never uninstalls; safe to re-run."
+printf '%s%s%s  %sHomebrew packages%s\n' \
+    "$CYAN" "$NODE" "$RESET" "$BOLD" "$RESET"
+explain "Installs everything the Brewfiles declare. Never uninstalls; safe to re-run."
 
 # ─── Fast path: presence-only check ───────────────────────────────────────────
 missing=0
@@ -149,7 +145,7 @@ fi
 
 # ─── Trust third-party taps declared in the Brewfiles ─────────────────────────
 # Homebrew 6.0 ignores non-official taps until trusted, and `brew bundle` skips
-# their entries without saying so — a work-profile install reported success with
+# their entries without saying so — an install once reported success with
 # neither kubelogin nor terraform on the machine. Trust is granted here, then
 # read back, and anything that didn't take is named loudly *before* the progress
 # bar starts, because a warning printed underneath the bar is a warning nobody

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# run_once_before_00b-retire-work-profile — the v0.8 profile migration.
+#
+# The profile axis is gone. On a Mac that still has `profile = "work"` saved,
+# the fifteen packages the old Brewfile.work declared are installed and are
+# about to stop being declared by anything — which is exactly what `chez mirror`
+# offers to uninstall. The engine moves them into ~/.config/chez/Brewfile.local
+# and then deletes the key. Nothing is uninstalled.
+#
+# `before`, and 00b so it lands between the sudo cache and Homebrew: the overlay
+# must exist before run_after_02-brew-bundle reads it, in this same apply.
+#
+# `once`, keyed on this file's rendered contents. That is belt-and-braces rather
+# than the real guard — the body below renders empty the moment the key is gone,
+# and the engine is idempotent besides.
+#
+# Engine hash: {{ include "../features/brew/migrate-work-profile.sh" | sha256sum }}
+
+set -uo pipefail
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "→ profile migration: not on macOS, skipping"
+exit 0
+{{ end -}}
+{{ if not (hasKey . "profile") -}}
+exit 0
+{{ end -}}
+
+# Status is propagated on purpose. Every way this can fail leaves the profile
+# key in place, and features/brew/lib/tiers.sh refuses to resolve a tier set
+# while it is there — so a failed migration is a machine where the removal verbs
+# are already fail-closed and only the migration itself needs a human. Stopping
+# here, before a single file is deployed, is the cheapest place to say so; a
+# `|| true` would instead record the hook as done and never try again.
+bash "{{ .chezmoi.workingTree }}/features/brew/migrate-work-profile.sh" \
+    {{ dig "profile" "" . | quote }} {{ .chezmoi.configFile | quote }}

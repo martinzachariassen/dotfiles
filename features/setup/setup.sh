@@ -63,7 +63,7 @@ main() {
 
     (cd "$src" && git pull --ff-only) || return $?
     echo "chez setup: filling in any new/unanswered setup keys only."
-    echo "           to re-choose profile/modules/signing, run: chez setup --reset"
+    echo "           to re-choose modules/signing, run: chez setup --reset"
     chezmoi init && bash "$_DIR/../converge/apply.sh" ${rest[@]+"${rest[@]}"}
 }
 

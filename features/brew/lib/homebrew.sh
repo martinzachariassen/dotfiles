@@ -27,8 +27,8 @@ homebrew_install() {
 # ── Third-party tap trust ─────────────────────────────────────────────────────
 # Homebrew 6.0 refuses to load formulae and casks from non-official taps until
 # the tap is trusted, and `brew bundle` skips the untrusted ones *silently* —
-# which is how a work-profile install finished "successfully" with no kubelogin
-# and no terraform.
+# which is how an install once finished "successfully" with no kubelogin and no
+# terraform.
 #
 # Shared by the brew-bundle hook (which grants trust) and chez doctor (which
 # reports on it) so the two can't disagree about which taps this machine needs.

@@ -60,15 +60,41 @@ distill_corpus_scope() {
 # and never rewritten: two machines that both edited it would be the only way to
 # manufacture a conflict in the one file whose whole job is to be agreed on.
 distill_corpus_seed() {
-    local f
+    local f scope tmp
     f="$(distill_corpus_file)"
-    [ -e "$f" ] && return 0
+    scope="$(distill_scope)"
+
+    # "Never rewritten" has one exception, and it is the reason this branch
+    # exists: a corpus that carries NO scope. Both halves of the guard abstain
+    # when either side is empty, so an unscoped corpus disarms the boundary —
+    # here and on every Mac that later reads it through distill_remote_survey.
+    # Left write-once that would be permanent, and setting a scope afterwards
+    # would not repair it. An absent identity is not an identity to protect.
+    #
+    # Repaired in place rather than re-created: `id` is what the remote checks
+    # match on, and a new one would read as a different corpus entirely.
+    if [ -e "$f" ]; then
+        [ -n "$scope" ] || return 0
+        [ -n "$(distill_corpus_scope)" ] && return 0
+        tmp="$f.scope.tmp"
+        if jq --arg s "$scope" '.scope = $s' "$f" >"$tmp" 2>/dev/null; then
+            mv "$tmp" "$f"
+        else
+            rm -f "$tmp"
+        fi
+        return 0
+    fi
+
     mkdir -p "$(dirname "$f")" || return 0
+    # The key is omitted rather than written empty, so "unscoped" is one state
+    # and not two. distill_corpus_scope reads both the same way; the difference
+    # is that an omitted key cannot be mistaken for an answer by a later reader.
     jq -n --arg id "$(distill_corpus_new_id)" \
-        --arg s "$(distill_scope)" \
+        --arg s "$scope" \
         --arg c "$(distill_iso_now)" \
         --arg by "$(distill_host)" \
-        '{schema: 2, id: $id, scope: $s, created: $c, createdBy: $by}' \
+        '{schema: 2, id: $id, created: $c, createdBy: $by}
+         + (if $s == "" then {} else {scope: $s} end)' \
         >"$f" 2>/dev/null || true
 }
 

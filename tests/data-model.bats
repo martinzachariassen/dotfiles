@@ -3,7 +3,7 @@
 # catalog, and the Brewfile map (single sources of truth in .chezmoidata/).
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../core/testing/helper'
     TMPL="$REPO_ROOT/src/.chezmoi.toml.tmpl"
     MODULES_DATA="$REPO_ROOT/src/.chezmoidata/modules.toml"
     PACKAGES_DATA="$REPO_ROOT/src/.chezmoidata/brew.toml"
@@ -33,12 +33,24 @@ setup() {
 
 # On a fresh init the wizard showed every box, so nothing is new; on a machine
 # whose config predates the key, only what it already has counts as seen and
-# the rest gets its one offer. `profile` discriminates the two — it has been in
-# [data] since v1, so its absence uniquely means "never initialised".
+# the rest gets its one offer. `name` discriminates the two: it is the oldest
+# key in [data] and is written unconditionally, so its absence uniquely means
+# "never initialised". (`profile` used to play this part and cannot any more —
+# v0.8 retired it, so it is absent in both cases.)
 @test "modulesSeen defaults to the whole catalog only on a fresh init" {
-    grep -qF 'hasKey . "profile"' "$TMPL"
+    grep -qF 'hasKey . "name"' "$TMPL"
     grep -qF '$seenDefault = $allModules' "$TMPL"
     grep -qF '$seenDefault := $modules' "$TMPL"
+}
+
+# The discriminator must be a key the template ALWAYS writes, or a machine that
+# left it blank would read as fresh forever and never be offered a new module.
+# email is the counter-example that makes this worth pinning: it is deliberately
+# omitted from [data] when empty.
+@test "the modulesSeen discriminator is a key the template always emits" {
+    grep -qE '^ +name +=' "$TMPL"
+    # …and not inside an emptiness guard, the way email is.
+    no_match '\{\{- if \$name \}\}' "$TMPL"
 }
 
 # core/modules.sh rewrites these two lines in the *generated* config, so
@@ -55,10 +67,19 @@ setup() {
     [ "$output" = '["a", "b"]' ]
 }
 
-@test "profile default module sets reference known modules" {
+# ─── the recommended set: one list, no longer one per machine kind ───────────
+# There used to be three [profileDefaults*] tables and a matching `eq $profile`
+# branch in the template, all to say "personal gets appleDev, work gets
+# cloudAuth". The profile never gated anything at apply time — it only decided
+# which boxes started ticked, which is a default. These tests survive the
+# collapse unchanged in purpose: the wizard and a raw `chezmoi init --prompt`
+# must pre-tick the same boxes, and every name in either place must be real.
+
+@test "the template's \$defaults reference known modules" {
     local known defaults bad
     known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
-    defaults="$(grep -E '\$defaults = list' "$TMPL" | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)"
+    defaults="$(grep -E '\$defaults := list' "$TMPL" | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)"
+    [ -n "$defaults" ]
     bad=""
     while IFS= read -r m; do
         [ -z "$m" ] && continue
@@ -67,35 +88,46 @@ setup() {
     [ -z "$bad" ] || { echo "unknown modules in defaults:$bad"; false; }
 }
 
-# wizard.sh composes defaults from [profileDefaults] (base ∪ extra, gated by
-# inherit); the template must restate the same per-profile set or the wizard
-# and a raw `chezmoi init --prompt` would pre-check different boxes.
-@test "[profileDefaults] mirrors the template's \$defaults per profile" {
-    local p tmpl data
-    for p in personal work minimal; do
-        tmpl="$(sed -nE '/eq [$]profile "'"$p"'"/{n;p;}' "$TMPL" \
-            | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tr '\n' ' ')"
-        data="$(WIZARD_LIB_ONLY=1 bash -c "source '$WIZ'; profile_defaults '$p'" \
-            | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')"
-        [ "$tmpl" = "$data" ] || {
-            echo "profile $p: template=[$tmpl] data=[$data]"
-            false
-        }
-    done
+# The wizard reads [recommended] out of modules.toml; the template restates it
+# literally because config templates render before .chezmoidata loads. Two
+# copies of one list is a chezmoi constraint, so the test is what holds them
+# together — drift means the two entry points pre-tick different boxes.
+@test "[recommended] mirrors the template's \$defaults" {
+    local tmpl data
+    tmpl="$(grep -E '\$defaults := list' "$TMPL" \
+        | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u | tr '\n' ' ')"
+    data="$(WIZARD_LIB_ONLY=1 bash -c "source '$WIZ'; recommended_modules" \
+        | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')"
+    [ -n "$data" ]
+    [ "$tmpl" = "$data" ] || {
+        echo "template=[$tmpl] data=[$data]"
+        false
+    }
 }
 
-# The inherit table holds bare bools, not quoted names, so it contributes
-# nothing to this scan.
-@test "[profileDefaults] entries reference known modules" {
+@test "[recommended] entries reference known modules" {
     local known bad m
     known="$(awk -F' *= *' '/^\[moduleCatalog\]/{f=1;next} /^\[/{f=0} f&&$1~/^[A-Za-z]/{print $1}' "$MODULES_DATA")"
     bad=""
     while IFS= read -r m; do
         [ -z "$m" ] && continue
         printf '%s\n' "$known" | grep -qx "$m" || bad="$bad $m"
-    done < <(awk '/^\[profileDefaults/{f=1;next} /^\[/{f=0} f' "$MODULES_DATA" \
+    done < <(awk '/^\[recommended\]/{f=1;next} /^\[/{f=0} f' "$MODULES_DATA" \
         | grep -oE '"[a-zA-Z]+"' | tr -d '"' | sort -u)
-    [ -z "$bad" ] || { echo "unknown modules in profileDefaults:$bad"; false; }
+    [ -z "$bad" ] || { echo "unknown modules in recommended:$bad"; false; }
+}
+
+# ─── the retired profile axis ────────────────────────────────────────────────
+# Not a style rule. `profile` is now the marker the v0.8 migration keys on — a
+# template that wrote one back would re-arm the resolver's fail-closed guard on
+# a Mac that had already migrated, and `chez up` would start refusing to resolve
+# the package set on a machine with nothing wrong with it.
+@test "no template prompts for a profile or writes a fresh one" {
+    no_match 'promptChoice(Once)? \. "profile"' "$TMPL"
+    # The one `profile =` line left is the passthrough for an un-migrated Mac,
+    # and it is guarded on a value that only such a Mac has.
+    grep -qF '{{- if $legacyProfile }}' "$TMPL"
+    [ "$(grep -cE '^ +profile +=' "$TMPL")" -eq 1 ]
 }
 
 @test "brew.toml Brewfile paths all exist" {

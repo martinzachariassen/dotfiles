@@ -61,6 +61,26 @@ distill_status() {
     s_pass "memory   $(distill_memory_dir)"
     s_pass "state    $(distill_state_dir)"
 
+    # The scope, unconditionally. `chez doctor` tells you to look here when the
+    # stamp and this Mac disagree, and until now the report it pointed at did not
+    # mention the scope at all. Printing it even when it agrees is what makes the
+    # third state — no scope, so the leak boundary is abstaining — visible; that
+    # one fails silently by construction and has nothing else to surface it.
+    local mine theirs
+    mine="$(distill_scope)"
+    theirs="$(distill_corpus_scope)"
+    if [ -z "$mine" ]; then
+        s_fail "scope    not set — the corpus leak boundary is not being enforced"
+        s_note "         set one with \`chez setup\`"
+    elif [ -n "$theirs" ] && [ "$mine" != "$theirs" ]; then
+        s_fail "scope    this Mac is \"$mine\", the corpus is stamped \"$theirs\""
+        s_note "         chez distill --remote <$mine corpus url>, or --remote none"
+    elif [ -z "$theirs" ]; then
+        s_warn "scope    $mine — the corpus carries no stamp yet"
+    else
+        s_pass "scope    $mine"
+    fi
+
     # The inputs, reported as plainly as the outputs. Without this line a machine
     # reading nothing at all looks exactly like a machine having a quiet week.
     distill_status_sources

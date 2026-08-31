@@ -9,6 +9,6 @@ core = "features/brew/Brewfile"
 macApps = "features/brew/Brewfile.mac-apps"
 appleDev = "features/brew/Brewfile.apple-dev"
 
-[brewfiles.byProfile]
-personal = "features/brew/Brewfile.personal"
-work = "features/brew/Brewfile.work"
+# There is no per-profile tier any more. A machine that wants a package the repo
+# does not declare says so in ~/.config/chez/Brewfile.local — one Mac's answer,
+# kept on that Mac. See features/adopt/README.md.

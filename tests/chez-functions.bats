@@ -28,26 +28,23 @@ setup() {
     cp "$REPO_ROOT/features/brew/lib/removals.sh" "$FAKE/features/brew/lib/removals.sh"
     printf 'brew "git"\n' >"$FAKE/features/brew/Brewfile"
     : >"$FAKE/features/brew/Brewfile.mac-apps"
-    : >"$FAKE/features/brew/Brewfile.personal"
-    : >"$FAKE/features/brew/Brewfile.work"
+    : >"$FAKE/features/brew/Brewfile.apple-dev"
 
     STUBS="$(mktemp -d)"
     APPLY_LOG="$STUBS/apply.log"
     DIFF_LOG="$STUBS/diff.log"
     DATA_JSON_FILE="$STUBS/data.json"
 
-    # A personal machine with macApps on — so mac-apps + personal are active
-    # tiers and Brewfile.work is not.
+    # A machine with macApps on — so core + mac-apps are the active tiers and
+    # the apple-dev tier, which it has not enabled, is not.
     cat >"$DATA_JSON_FILE" <<'EOF'
 {
-  "profile": "personal",
   "modules": ["macApps"],
   "brewfiles": {
     "core": "features/brew/Brewfile",
-    "byModule": {"macApps": "features/brew/Brewfile.mac-apps"},
-    "byProfile": {
-      "personal": "features/brew/Brewfile.personal",
-      "work": "features/brew/Brewfile.work"
+    "byModule": {
+      "macApps": "features/brew/Brewfile.mac-apps",
+      "appleDev": "features/brew/Brewfile.apple-dev"
     }
   }
 }

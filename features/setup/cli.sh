@@ -54,32 +54,22 @@ run_chezmoi() {
     exec chezmoi init "$@"
 }
 
-# profile_defaults PROFILE — space-separated default module keys: (inherit ?
-# base : []) ∪ extra, base first, de-duplicated.
-profile_defaults() {
-    local p="$1" inherits base extra out="" seen=" " tok
-
-    inherits="$(awk -v p="$p" '
-        /^\[profileDefaults\.inherit\]/ {f=1; next}
-        /^\[/                           {f=0}
-        f && $1==p {print $3; exit}
-    ' "$MODULES_TOML")"
-
-    # grep exits 1 on an empty array (personal/minimal have none); swallow it.
-    base="$(awk '
-        /^\[profileDefaults\]/ {f=1; next}
-        /^\[/                  {f=0}
+# recommended_modules — space-separated module keys the wizard pre-ticks on a
+# machine that has never answered, read from [recommended] in modules.toml.
+#
+# One list, where there used to be three tables keyed by profile. The profile
+# never gated anything at apply time; it only decided which boxes started
+# ticked, which is a default and does not need an axis of its own.
+#
+# grep exits 1 on an empty array; swallow it so an emptied [recommended] means
+# "nothing pre-ticked" rather than aborting the wizard under `set -e`.
+recommended_modules() {
+    local out="" seen=" " tok
+    for tok in $(awk '
+        /^\[recommended\]/ {f=1; next}
+        /^\[/              {f=0}
         f
-    ' "$MODULES_TOML" | grep -oE '"[a-zA-Z]+"' | tr -d '"' || true)"
-
-    extra="$(awk -v p="$p" '
-        /^\[profileDefaults\.extra\]/ {f=1; next}
-        /^\[/                         {f=0}
-        f { if ($0 ~ "^[ \t]*" p "[ \t]*=") c=1; if (c) { print; if ($0 ~ /\]/) c=0 } }
-    ' "$MODULES_TOML" | grep -oE '"[a-zA-Z]+"' | tr -d '"' || true)"
-
-    [ "$inherits" = "false" ] && base=""
-    for tok in $base $extra; do
+    ' "$MODULES_TOML" | grep -oE '"[a-zA-Z]+"' | tr -d '"' || true); do
         case "$seen" in *" $tok "*) continue ;; esac
         out="${out:+$out }$tok"
         seen="$seen$tok "
@@ -394,19 +384,21 @@ fi
 DATA_JSON="$(cm_data_json)"
 def_name="$(cm_data_string "$DATA_JSON" name)"
 def_email="$(cm_data_string "$DATA_JSON" email)"
-def_profile="$(cm_data_string "$DATA_JSON" profile)"
 def_signing="$(cm_data_string "$DATA_JSON" signingMode)"
 def_signkey="$(cm_data_string "$DATA_JSON" signingKey)"
 def_corpus="$(cm_data_string "$DATA_JSON" corpusRemote)"
 def_scope="$(cm_data_string "$DATA_JSON" memoryScope)"
-[ -n "$def_profile" ] || def_profile="personal"
 [ -n "$def_signing" ] || def_signing="1password"
-# Mirrors the template's `dig "profile" …` default: a Mac set up before
-# memoryScope existed keeps the scope its corpus is already stamped with.
-[ -n "$def_scope" ] || def_scope="$def_profile"
+# Mirrors the template's `dig "profile" "default" .`, in the same order and for
+# the same reason: a Mac set up before memoryScope existed keeps the scope its
+# corpus is already stamped with, which on that Mac was the profile. The profile
+# itself is retired and the migration deletes it, so this read only ever fires
+# on a config the migration has not reached — after that, "default".
+[ -n "$def_scope" ] || def_scope="$(cm_data_string "$DATA_JSON" profile)"
+[ -n "$def_scope" ] || def_scope="default"
 
 printf '%s\n' "$BOX_TOP" >/dev/tty
-say "Setup — 4 quick questions, then this Mac gets configured." >/dev/tty
+say "Setup — 3 quick questions, then this Mac gets configured." >/dev/tty
 printf '%s\n' "$BOX_BOTTOM" >/dev/tty
 {
     echo
@@ -419,7 +411,7 @@ printf '%s\n' "$BOX_BOTTOM" >/dev/tty
 
 # ask_step N TITLE WHY… — question header + why it is being asked.
 QSTEP=0
-QTOTAL=4
+QTOTAL=3
 ask_step() {
     QSTEP=$((QSTEP + 1))
     _ask_header "$(printf '%s[%d/%d]%s' "$DIM" "$QSTEP" "$QTOTAL" "$RESET")" "$@"
@@ -464,25 +456,15 @@ if [ -z "$email" ]; then
     } >/dev/tty
 fi
 
-ask_step "Profile" \
-    "Picks which set of packages this Mac installs." \
-    "  personal   everything, including Swift/iOS tooling" \
-    "  work       adds cloud CLIs (az, gcloud) instead" \
-    "  minimal    the neutral base only — no extras"
-# shellcheck disable=SC2046  # word-splitting of the choice list is intentional
-profile="$(ask_choice "$(prompt_msg profile)" "$def_profile" $(prompt_choices profile))"
-
-# Keep current picks only when the profile is unchanged; switching profile resets
-# to that profile's defaults so the switch starts clean.
-existing="$(existing_modules)"
-if [ -n "$existing" ] && [ "$profile" = "$def_profile" ]; then
-    mod_default="$existing"
-else
-    mod_default="$(profile_defaults "$profile")"
-fi
+# What this Mac already picked wins; the recommended set is only for a machine
+# that has never answered. There is nothing left that can invalidate a saved
+# selection — the profile used to, and resetting the boxes on a profile switch
+# was the only reason this was ever a branch on anything but emptiness.
+mod_default="$(existing_modules)"
+[ -n "$mod_default" ] || mod_default="$(recommended_modules)"
 ask_step "Optional modules" \
-    "Extras on top of the profile — each one is independent." \
-    "The defaults below are the usual pick for your profile; adjust if you like."
+    "Configuration on top of the packages — each one is independent." \
+    "The ticked ones are the usual pick; adjust if you like."
 # shellcheck disable=SC2086  # mod_default is a space-separated key list
 modules="$(select_modules $mod_default)"
 
@@ -551,7 +533,6 @@ dim "  name     $name" >/dev/tty
 # Never print an empty value as if it were an answer — that blank line is
 # exactly what made a missing email easy to walk past on a real install.
 dim "  email    ${email:-<not set — run \`chez setup\` to add one>}" >/dev/tty
-dim "  profile  $profile" >/dev/tty
 if [ "$signingMode" != "off" ] && [ -z "$signingKey" ]; then
     dim "  signing  $signingMode (key deferred — run \`chez sign\` later)" >/dev/tty
 else
@@ -563,7 +544,7 @@ dim "  modules  ${modules:-<none>}" >/dev/tty
     explain \
         "Saying yes will:" \
         "  · write these config files into your home folder" \
-        "  · install the packages your profile declares (the slow part)" \
+        "  · install every package the Brewfiles declare (the slow part)" \
         "  · apply macOS defaults, if you kept that module" \
         "" \
         "It never uninstalls anything, and it is safe to re-run." \
@@ -588,7 +569,6 @@ init_flags=(
     --apply --force --prompt --source="$SOURCE_DIR"
     --promptString "$(prompt_msg name)=$name"
     --promptString "$(prompt_msg email)=$email"
-    --promptChoice "$(prompt_msg profile)=$profile"
     --promptChoice "$(prompt_msg signingMode)=$signingMode"
     --promptMultichoice "$(prompt_msg modules)=$mods_slash"
     --promptString "$(prompt_msg corpusRemote)=$corpusRemote"

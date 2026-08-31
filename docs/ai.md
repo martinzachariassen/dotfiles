@@ -39,19 +39,19 @@ tier — `MAIN.md`, `Topics/`, `Candidates.md` — goes to
 `~/.config/claude/memory`, beside the persona that imports it. The extract
 corpus, the hand-written `Pinned.md`, the cursor, spend and run log go to
 `~/.local/state/chezdistill`, in a git repo that pushes to a private corpus
-you attach with `chez distill --remote <url>` — one private repo per profile,
-never one shared, because `hits` is counted over the whole
-corpus. That second one is the source
-of truth: the memory tier is derived from it on every render, so it is the only
-half worth backing up — and only the corpus and `Pinned.md` are tracked, because
-the cursor, spend and run log describe one machine and nothing else.
+you attach with `chez distill --remote <url>` — one private repo per scope,
+never one shared, because `hits` is counted over the whole corpus. That second
+one is the source of truth: the memory tier is derived from it on every render,
+so it is the only half worth backing up — and only the corpus and `Pinned.md`
+are tracked, because the cursor, spend and run log describe one machine and
+nothing else.
 
 There is no human-facing output. Nothing is written into an Obsidian vault or
 anywhere else you would browse — the audience is Claude, and what it knows you
-read with `chez distill --status`, `MAIN.md` or a note in `Topics/`. Because a job
-with no output is a job you stop thinking about, `chez doctor` carries a
-a chezdistill section: agent registered, last run recent and successful, `MAIN.md`
-present and under its cap, corpus backed up — to its own profile's repo.
+read with `chez distill --status`, `MAIN.md` or a note in `Topics/`. Because
+a job with no output is a job you stop thinking about, `chez doctor` carries
+a chezdistill section: agent registered, last run recent and successful,
+`MAIN.md` present and under its cap, corpus backed up — to its own scope's repo.
 
 Its guiding rule is that **the model extracts while bash decides and writes**:
 every judgement is computed in

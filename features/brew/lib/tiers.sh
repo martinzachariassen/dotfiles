@@ -4,8 +4,8 @@
 # Shared by chez doctor and the chez mirror / chez status removal set so the install
 # and removal directions can't disagree about what "tracked" means. Removal
 # used to compare against the `Brewfile.*` glob (every tier that exists), which
-# made a work-profile package look tracked on a personal machine and so never
-# offered it for uninstall.
+# made a tier this machine had not enabled look tracked anyway and so never
+# offered its packages for uninstall.
 
 [ -n "${__DOTFILES_BREWFILES_SH:-}" ] && return 0
 
@@ -28,9 +28,9 @@ __DOTFILES_BREWFILES_SH=1
 . "$__brewfiles_paths_sh"
 
 # brew_active_files [DATA_JSON] — the Brewfile paths that apply here, one per
-# line: core, then each enabled module's tier, then this profile's tier — the
-# same set, in the same order, that run_after_02-brew-bundle installs from —
-# and last, the machine-local overlay if this Mac has one.
+# line: core, then each enabled module's tier — the same set, in the same order,
+# that run_after_02-brew-bundle installs from — and last, the machine-local
+# overlay if this Mac has one.
 #
 # Repo tiers come out repo-relative; the overlay comes out ABSOLUTE, because it
 # deliberately lives outside the checkout. Resolve either with brew_resolve_file
@@ -42,6 +42,26 @@ brew_active_files() {
     command -v jq >/dev/null 2>&1 || return 1
     [ -n "$json" ] || json="$(chezmoi data --format=json 2>/dev/null)"
     [ -n "$json" ] || return 1
+    # ─── Fail closed on a config the v0.8 migration has not reached ───────────
+    #
+    # The single most important line in the migration. Between pulling v0.8 and
+    # running an apply, a Mac can be executing this code against a config that
+    # still says `profile = "work"`: the profile Brewfiles are gone from the
+    # repo, the migration hook has not run, and Brewfile.local does not exist
+    # yet — so *declared* would silently collapse to core plus modules and the
+    # removal verbs would line the whole work stack up for uninstall.
+    #
+    # The retired key is its own marker: it is written by no current template
+    # and deleted by the migration, so its presence means exactly "not migrated
+    # yet". Refusing is the only safe reading of that state, and it costs
+    # nothing — an apply never uninstalls, so `chez up` still installs normally
+    # while every removal path stays shut.
+    if printf '%s' "$json" | jq -e 'has("profile")' >/dev/null 2>&1; then
+        printf 'tiers.sh: this Mac still has the retired `profile` key in its\n' >&2
+        printf '  chezmoi config, so the declared package set cannot be trusted.\n' >&2
+        printf '  Run `chez up` (or `chez apply`) once to migrate it.\n' >&2
+        return 1
+    fi
     # `.key as $k` first: inside `select`, the input to `index` is $mods (an
     # array), so a bare `index(.key)` looks up ".key" on the array and errors.
     #
@@ -52,11 +72,9 @@ brew_active_files() {
     # uninstall. Every fail-closed guard downstream keys off this return.
     tiers="$(printf '%s' "$json" | jq -r '
         (.modules // []) as $mods
-        | (.profile // "") as $prof
         | ([.brewfiles.core]
            + ((.brewfiles.byModule // {}) | to_entries
-              | map(select(.key as $k | $mods | index($k))) | map(.value))
-           + ([(.brewfiles.byProfile // {})[$prof]]))
+              | map(select(.key as $k | $mods | index($k))) | map(.value)))
         | map(select(. != null))
         | .[]' 2>/dev/null)" || return 1
 

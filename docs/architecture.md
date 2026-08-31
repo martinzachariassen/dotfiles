@@ -43,7 +43,7 @@ The special prefixes/suffixes change how a file is deployed — preserve them:
 .chezmoiroot            # one line: "src" — points chezmoi at the src/ subdir
 src/                    # ← chezmoi's source dir; everything here deploys to $HOME
   .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup questions
-  .chezmoidata/         #   static data: module catalog + profile→Brewfile map
+  .chezmoidata/         #   static data: module catalog + module→Brewfile map
   .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
   dot_config/           #   → ~/.config; untracked entries reconciled on demand by chez clean (keep-list in clean.toml)
   dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)

@@ -1,9 +1,9 @@
-# storecode (work profile)
+# storecode
 
-The work-only exception, and the one place in the repo that installs software
-from outside Homebrew. `storecode` is a work security tool that ships its own
-installer, so it cannot be a Brewfile package — and because Homebrew does not
-know about it, `chez mirror` and `chez clean` have to be told to leave it alone.
+The one place in the repo that installs software from outside Homebrew.
+`storecode` is a security tool that ships its own installer, so it cannot be a
+Brewfile package — and because Homebrew does not know about it, `chez mirror`
+and `chez clean` have to be told to leave it alone.
 
 | Piece | Where |
 |---|---|
@@ -14,7 +14,7 @@ know about it, `chez mirror` and `chez clean` have to be told to leave it alone.
 ## The contract
 
 **Never add it to a Brewfile.** It is not in Homebrew; a `brew "storecode"` line
-would fail `brew bundle` for every work machine and do nothing for anyone else.
+would fail `brew bundle` on every machine.
 
 **Never offer `~/.storecode` for cleanup.** Nothing installed it that
 [`clean`](../clean) can recognise, so without the `keepHome` entry every
@@ -25,17 +25,20 @@ under the other.
 
 ## How the install works
 
-The template decides the two things only a render can: whether this is macOS and
-the work profile, and what the installer command is. It passes the destination
-home and that command to `hook.sh`, which installs only when `storecode` is
-neither on `PATH` nor already unpacked at `~/.storecode`.
+The template decides the two things only a render can: whether this is macOS,
+and what the installer command is. It passes the destination home and that
+command to `hook.sh`, which installs only when `storecode` is neither on `PATH`
+nor already unpacked at `~/.storecode`.
 
-`installCmd` is empty in the committed data, because the real installer URL is
-work-internal and this repo is public. With it empty the hook prints where to
-set it and exits 0, so a work machine converges cleanly and simply arrives
-without the tool — the alternative, a hard failure, would abort the apply and
-cost the user hook 99's "Next moves" block. Set it locally to a one-liner (a
-`curl -fsSL … | bash`, say) and the next `chez up` installs it.
+**The installer command is the only gate.** It used to be `profile == "work"`;
+v0.8 retired the profile and the gate became the data instead of moving to a
+tick-box. That removes a gate rather than relocating one — `installCmd` is empty
+in the committed data, because the real installer URL is internal and this repo
+is public, so an extra to enable it would do nothing for everybody who can read
+this. With it empty the hook prints where to set it and exits 0: the machine
+converges cleanly and simply arrives without the tool. A hard failure would
+abort the apply and cost the user hook 99's "Next moves" block. Set it locally
+to a one-liner (a `curl -fsSL … | bash`, say) and the next `chez up` installs it.
 
 The command runs through `eval`, so it may be a pipeline. One consequence worth
 knowing: an installer one-liner containing a bare `exit` ends the hook rather

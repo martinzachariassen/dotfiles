@@ -2,7 +2,7 @@
 # signing.sh — set the git commit-signing key on a machine that deferred it.
 # Backs the `chez sign` verb. Solves the fresh-Mac chicken-and-egg: the key lives
 # in 1Password, which isn't installed until after the wizard has already run.
-# Re-asks nothing else — profile, modules and identity are replayed as-is.
+# Re-asks nothing else — modules and identity are replayed as-is.
 # Env: DRY_RUN=1 print the chezmoi command instead of running it.
 #      YES=1 take the single offered key without prompting.
 #      SKIP_SIGNTEST=1 skip the closing smoke test.
@@ -79,7 +79,6 @@ agent_keys() {
 DATA_JSON="$(cm_data_json)"
 name="$(cm_data_string "$DATA_JSON" name)"
 email="$(cm_data_string "$DATA_JSON" email)"
-profile="$(cm_data_string "$DATA_JSON" profile)"
 mode="$(cm_data_string "$DATA_JSON" signingMode)"
 current_key="$(cm_data_string "$DATA_JSON" signingKey)"
 [ -n "$mode" ] || mode="1password"
@@ -88,8 +87,13 @@ current_key="$(cm_data_string "$DATA_JSON" signingKey)"
 # real answer to promptStringOnce, and jq's `//` treats "" as present — so an
 # empty memoryScope would shadow the `.profile` fallback in distill_scope and
 # leave the corpus leak boundary comparing "" against "", which always passes.
+#
+# The fallback chain matches the template's `dig "profile" "default" .` exactly:
+# the retired profile first, for a Mac whose corpus is stamped with it and whose
+# config the v0.8 migration has not reached yet, then the literal.
 memory_scope="$(cm_data_string "$DATA_JSON" memoryScope)"
-[ -n "$memory_scope" ] || memory_scope="$profile"
+[ -n "$memory_scope" ] || memory_scope="$(cm_data_string "$DATA_JSON" profile)"
+[ -n "$memory_scope" ] || memory_scope="default"
 
 if [ "$mode" = "off" ]; then
     warn "signing is set to \"off\" for this machine, so there's no key to set."
@@ -175,7 +179,6 @@ init_flags=(
     --apply --force --prompt --source="$SOURCE_DIR"
     --promptString "$(prompt_msg name)=$name"
     --promptString "$(prompt_msg email)=$email"
-    --promptChoice "$(prompt_msg profile)=$profile"
     --promptChoice "$(prompt_msg signingMode)=$mode"
     --promptString "$(prompt_msg signingKey)=$new_key"
     --promptString "$(prompt_msg corpusRemote)=$(cm_data_string "$DATA_JSON" corpusRemote)"

@@ -100,12 +100,13 @@ Dropped **Homebrew packages** are reconciled the same way, by hand:
 `chez mirror` runs `brew bundle cleanup` to uninstall anything no longer in a
 Brewfile, then `brew autoremove` to prune orphaned dependencies, while
 `chez status`/`chez doctor` report the drift read-only. "No longer in a Brewfile"
-means no Brewfile **active on this machine** — core, the enabled modules and
-this profile's tier. Both directions resolve that set through
+means no Brewfile **active on this machine** — the core file, the enabled
+modules' tiers, and `~/.config/chez/Brewfile.local`. Both directions resolve
+that set through
 [`features/brew/lib/tiers.sh`](../features/brew/lib/tiers.sh), so install and
-removal can't disagree: moving a package to the other profile's tier makes it
-removable here, exactly as deleting it would. The removal side fails closed —
-an unresolvable tier set offers nothing, never more. Nothing about removal is
+removal can't disagree: moving a package into a tier this Mac does not enable
+makes it removable here, exactly as deleting the line would. The removal side
+fails closed — an unresolvable tier set offers nothing, never more. Nothing about removal is
 automatic: if a machine drifts, its owner runs `chez mirror` and `chez clean`
 to bring it back in line. To do both package directions in one step —
 install what the Brewfiles declare, then remove what they don't —
@@ -127,7 +128,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Machine-local package overlay | `~/.config/chez/Brewfile.local` (path: `core/paths.sh`; seeded from `features/brew/Brewfile.local.template`; written by `chez adopt --local`) |
 | Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chez clean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
 | chez clean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
-| storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
+| storecode install (gated on `storecode.installCmd` being set) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` (a thin template) + `features/vscode/{hook,lib}.sh` + `features/vscode/extensions.txt` (drift check in `features/vscode/doctor.sh`) |
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chez clean` + `cleanup.owners` (`extension`) |

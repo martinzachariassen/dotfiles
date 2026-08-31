@@ -21,8 +21,19 @@
 {{-   $email = promptString "Email for git commits" -}}
 {{- end -}}
 
-{{/* personal = my full stack · work = work extras · minimal = neutral base */ -}}
-{{- $profile := promptChoiceOnce . "profile" "Profile" (list "personal" "work" "minimal") "personal" -}}
+{{/* `profile` was retired in v0.8. It is never prompted and nothing gates on it;
+     it survives here only on a Mac that already saved one, as the marker the
+     one-time migration reads — see
+     .chezmoiscripts/run_once_before_00b-retire-work-profile.sh.tmpl, which
+     seeds this Mac's Brewfile.local from the old work tier and then deletes the
+     key from the generated config. Preserved rather than dropped because
+     `chez setup` re-renders this file: dropping it here would erase the evidence
+     before the migration ever ran.
+
+     Two other readers deliberately keep working off it while it exists: the
+     memoryScope default below, and features/brew/lib/tiers.sh, which refuses to
+     resolve a tier set for a config still carrying it. */ -}}
+{{- $legacyProfile := dig "profile" "" . -}}
 
 {{/* Git commit signing: 1Password SSH agent · a plain SSH key · or off.
      Only ask for the public key when signing is actually enabled. */ -}}
@@ -34,14 +45,15 @@
 
 {{/* Rendered BEFORE .chezmoidata loads, so module names are listed literally here.
      Keep in sync with [moduleCatalog] in modules.toml — tests/data-model.bats
-     enforces the match. */ -}}
+     enforces the match.
+
+     One default set, not one per machine kind. It used to branch on the profile,
+     which meant choosing a kind of Mac up front decided a list of unrelated
+     add-ons for you; every module is independent, so the honest shape is one
+     recommended set you adjust. It must match [recommended] in modules.toml —
+     tests/data-model.bats enforces that too. */ -}}
 {{- $allModules := list "appleDev" "claudeDistiller" "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
-{{- $defaults := list -}}
-{{- if eq $profile "personal" -}}
-{{-   $defaults = list "appleDev" "claudeDistiller" "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
-{{- else if eq $profile "work" -}}
-{{-   $defaults = list "claudeDistiller" "claudePersona" "cloudAuth" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
-{{- end -}}
+{{- $defaults := list "appleDev" "claudeDistiller" "claudePersona" "jvmStack" "locale" "macApps" "macosDefaults" "theme" -}}
 {{- $modules := promptMultichoiceOnce . "modules" "Optional modules" $allModules $defaults -}}
 {{/* wizard.sh supplies the selection via --promptMultichoice; an empty one arrives
      as [""], so normalise it back to an empty list. */ -}}
@@ -66,11 +78,13 @@
      boundary: two Macs that share a scope share a corpus, two that don't must
      never merge theirs, because `hits` counts sightings across the whole corpus.
 
-     Defaults to the saved `profile` so a Mac set up before this key existed keeps
-     the scope it already had — its corpus.json is stamped `personal`, and a Mac
-     that suddenly claimed a different scope would refuse its own backup. Falls
-     back to "default" on a fresh init. Same load-bearing default as corpusRemote
-     above, and no comma in the message for the same reason. */ -}}
+     Defaults to the retired `profile` key so a Mac set up before this one existed
+     keeps the scope it already had — its corpus.json is stamped `personal`, and a
+     Mac that suddenly claimed a different scope would refuse its own backup. That
+     read outlives the profile axis on purpose and is the reason $legacyProfile is
+     preserved at all. Falls back to "default" on a fresh init. Same load-bearing
+     default as corpusRemote above, and no comma in the message for the same
+     reason. */ -}}
 {{- $memoryScope := promptStringOnce . "memoryScope" "Memory scope for the distiller (Macs sharing a scope share one corpus)" (dig "profile" "default" .) -}}
 
 {{/* Which modules this Mac has already been *offered* — not the same as which it
@@ -81,15 +95,19 @@
      the answer either way. Round-tripped through dig so a plain `chezmoi init`
      preserves what chez up wrote.
 
-     The default when the key is absent depends on WHY it is absent, and `profile`
-     tells the two cases apart because it has been saved since v1 of this config:
+     The default when the key is absent depends on WHY it is absent, and `name`
+     tells the two cases apart. It is the oldest key in this config — every
+     version has written it unconditionally — so it is present in exactly the
+     configs that predate modulesSeen and absent only when there is no prior
+     config at all. (`profile` used to play this part and cannot any more: it is
+     retired, so it is now absent in BOTH cases.)
 
-       no saved profile  → a fresh init, where the wizard just showed every box.
-                           Everything is seen; nothing is new.
-       saved profile     → a machine set up before this key existed. Only what it
-                           already has is seen, so whatever the catalog gained in
-                           the meantime gets its one offer. This is the case that
-                           makes claudeDistiller reachable on an existing Mac.
+       no saved name  → a fresh init, where the wizard just showed every box.
+                        Everything is seen; nothing is new.
+       saved name     → a machine set up before this key existed. Only what it
+                        already has is seen, so whatever the catalog gained in the
+                        meantime gets its one offer. This is the case that makes
+                        claudeDistiller reachable on an existing Mac.
 
      Edge case, deliberately left: the wizard shows every box, but cannot record
      that (wizard.sh ends in `exec chezmoi init`, so nothing runs after it). A
@@ -98,7 +116,7 @@
      there gets offered once more by chez up. One extra question, never a wrong
      answer. */ -}}
 {{- $seenDefault := $modules -}}
-{{- if not (hasKey . "profile") -}}
+{{- if not (hasKey . "name") -}}
 {{-   $seenDefault = $allModules -}}
 {{- end -}}
 {{- $modulesSeen := dig "modulesSeen" $seenDefault . -}}
@@ -114,7 +132,9 @@ sourceDir = {{ .chezmoi.workingTree | quote }}
 {{- if $email }}
     email       = {{ $email | quote }}
 {{- end }}
-    profile     = {{ $profile | quote }}
+{{- if $legacyProfile }}
+    profile     = {{ $legacyProfile | quote }}
+{{- end }}
     signingMode = {{ $signingMode | quote }}
     signingKey  = {{ $signingKey | quote }}
     corpusRemote = {{ $corpusRemote | quote }}

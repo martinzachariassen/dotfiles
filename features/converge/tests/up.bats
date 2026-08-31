@@ -209,7 +209,7 @@ setup_catalog() {
 sourceDir = "/repo"
 
 [data]
-    profile     = "work"
+    name        = "Ada L"
     modules     = ["macApps", "theme"]
     modulesSeen = ["macApps", "theme"]
 EOF

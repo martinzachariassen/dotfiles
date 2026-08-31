@@ -16,7 +16,14 @@ doctor_brew() {
         # removal set; --no-upgrade keeps this a presence check (freshness is
         # chez bump's job).
         active_files="$(brew_active_files "$DATA_JSON" 2>/dev/null)"
-        if [ -z "$active_files" ]; then
+        # The resolver has one refusal that is not a broken checkout and not a
+        # missing jq: a config still carrying the retired `profile` key, which
+        # it will not resolve a tier set for. Named separately because the
+        # generic message sends you looking for the wrong fault, and because
+        # this one has a one-line fix.
+        if printf '%s' "$DATA_JSON" | jq -e 'has("profile")' >/dev/null 2>&1; then
+            fail "this Mac's chezmoi config still has the retired \`profile\` key — run \`chez up\` once to migrate it"
+        elif [ -z "$active_files" ]; then
             warn "could not resolve active Brewfiles from chezmoi data"
         else
             while IFS= read -r rel; do

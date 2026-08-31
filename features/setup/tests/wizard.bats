@@ -24,8 +24,6 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$output" = "Full name for git commits" ]
     run wiz 'prompt_msg email'
     [ "$output" = "Email for git commits" ]
-    run wiz 'prompt_msg profile'
-    [ "$output" = "Profile" ]
     run wiz 'prompt_msg signingMode'
     [ "$output" = "Git commit signing" ]
     run wiz 'prompt_msg modules'
@@ -61,21 +59,34 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [[ "$output" == *"prompt_msg memoryScope"* ]] || return 1
 }
 
-# ...and neither caller may replay it as "". `chez sign` reads the key straight
-# out of the saved config, and on a Mac that predates it that read returns
-# empty — so both must fall back to the profile rather than pass "" through.
-@test "an absent memoryScope is replayed as the profile, not as empty" {
-    grep -q '\[ -n "\$memory_scope" \] || memory_scope="\$profile"' \
-        "$REPO_ROOT/features/sign/cli.sh"
-    grep -q '\[ -n "\$def_scope" \] || def_scope="\$def_profile"' \
-        "$REPO_ROOT/features/setup/cli.sh"
+# ...and neither caller may replay it as "". Both read the key straight out of
+# the saved config, and on a Mac that predates it that read returns empty — so
+# both must fall through to a non-empty value rather than pass "" on.
+#
+# The chain has to be the template's, in the template's order: the retired
+# `profile` first (a Mac whose corpus is stamped with it and whose config the
+# v0.8 migration has not reached), then the literal. A caller that skipped
+# straight to "default" would hand that Mac a scope its own backup rejects.
+@test "an absent memoryScope is replayed through the same fallback chain" {
+    local f
+    for f in "$REPO_ROOT/features/sign/cli.sh" "$REPO_ROOT/features/setup/cli.sh"; do
+        run grep -cE '\|\| (memory_scope|def_scope)=' "$f"
+        [ "$output" = "2" ] || {
+            echo "$f: expected two fallbacks (profile, then the literal)"
+            return 1
+        }
+        grep -qE '\|\| (memory_scope|def_scope)="\$\(cm_data_string "\$DATA_JSON" profile\)"' "$f"
+        grep -qE '\|\| (memory_scope|def_scope)="default"' "$f"
+    done
+    # …and the template it mirrors still says the same thing.
+    grep -qF '(dig "profile" "default" .)' "$REPO_ROOT/src/.chezmoi.toml.tmpl"
 }
 
 # The prompt message doubles as a chezmoi --prompt* flag KEY, and a comma in a
 # key would be misread by cobra's stringToString. None may contain one.
 @test "no prompt message contains a comma" {
     local k
-    for k in name email profile signingMode signingKey modules corpusRemote memoryScope; do
+    for k in name email signingMode signingKey modules corpusRemote memoryScope; do
         run wiz "prompt_msg $k"
         [ "$status" -eq 0 ]
         [ -n "$output" ]
@@ -83,20 +94,43 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     done
 }
 
-@test "prompt_choices returns the profile and signing options in order" {
-    run wiz 'prompt_choices profile | tr "\n" " "'
-    [ "$output" = "personal work minimal " ]
+@test "prompt_choices returns the signing options in order" {
     run wiz 'prompt_choices signingMode | tr "\n" " "'
     [ "$output" = "1password ssh-key off " ]
 }
 
-@test "profile_defaults reads [profileDefaults] from modules.toml" {
-    run wiz 'profile_defaults personal'
-    [ "$output" = "claudeDistiller claudePersona jvmStack locale macApps macosDefaults theme appleDev" ]
-    run wiz 'profile_defaults work'
-    [ "$output" = "claudeDistiller claudePersona jvmStack locale macApps macosDefaults theme cloudAuth" ]
-    run wiz 'profile_defaults minimal'
-    [ "$output" = "" ]
+# The wizard asks one fewer question than it used to. Not cosmetic: the profile
+# was a question whose only effect was on the NEXT question's defaults, and it
+# had to be answered before anything could be installed.
+@test "no profile is prompted, offered or replayed anywhere in the wizard" {
+    no_match 'promptChoice(Once)? \. "profile"' "$REPO_ROOT/src/.chezmoi.toml.tmpl"
+    no_match 'prompt_(msg|choices) profile' "$WIZ" "$REPO_ROOT/features/sign/cli.sh"
+    run sed -n '/^init_flags=(/,/^)/p' "$WIZ"
+    no_match_in "$output" 'profile'
+}
+
+@test "recommended_modules reads [recommended] from modules.toml" {
+    # One list for every Mac. The three profile-keyed lists this replaced are
+    # gone, and with them the idea that a machine has a kind.
+    run wiz 'recommended_modules'
+    [ "$output" = "appleDev claudeDistiller claudePersona jvmStack locale macApps macosDefaults theme" ]
+}
+
+# cloudAuth is the deliberate omission: the only module whose walkthrough needs
+# credentials the person at the keyboard may not have. Pinned so it cannot creep
+# back in as part of "the usual pick".
+@test "the recommended set leaves cloudAuth unticked" {
+    run wiz 'recommended_modules'
+    no_match_in "$output" 'cloudAuth'
+}
+
+@test "an emptied [recommended] pre-ticks nothing rather than aborting" {
+    # grep exits 1 on no match, and the wizard runs under `set -e`.
+    local fake="$BATS_TEST_TMPDIR/modules.toml"
+    printf '[moduleCatalog]\ntheme = "x"\n\n[recommended]\nmodules = []\n' >"$fake"
+    run bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; MODULES_TOML='$fake'; recommended_modules"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "module catalog loads keys and labels in parallel" {

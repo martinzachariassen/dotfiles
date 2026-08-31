@@ -44,7 +44,7 @@ EOF
     AGENT_SOCK="$STUBS/agent.sock"
     python3 -c 'import socket,sys; s=socket.socket(socket.AF_UNIX); s.bind(sys.argv[1])' "$AGENT_SOCK"
 
-    DATA_FULL='{"name":"Ada L","email":"ada@example.com","profile":"personal","signingMode":"1password","signingKey":"","modules":["theme","jvmStack"]}'
+    DATA_FULL='{"name":"Ada L","email":"ada@example.com","signingMode":"1password","signingKey":"","memoryScope":"default","modules":["theme","jvmStack"]}'
 
     export PATH="$STUBS:$PATH"
 }
@@ -80,9 +80,12 @@ run_sign() { # extra env is set by the caller
     local plain="${output//\\/}"
     [[ "$plain" == *"Ada L"* ]] || return 1
     [[ "$plain" == *"ada@example.com"* ]] || return 1
-    [[ "$plain" == *"Profile=personal"* ]] || return 1
     [[ "$plain" == *"theme/jvmStack"* ]] || return 1
     [[ "$plain" == *"BBBBKEYBBB"* ]] || return 1
+    # No profile is replayed, because there is no profile to replay. Replaying
+    # one would write the retired key back into a migrated config and re-arm
+    # the resolver's fail-closed guard on a Mac with nothing wrong with it.
+    no_match_in "$plain" 'Profile='
 }
 
 @test "the replayed init passes --force so it cannot stall on a drift prompt" {
@@ -92,7 +95,7 @@ run_sign() { # extra env is set by the caller
 }
 
 @test "the signing mode is replayed unchanged, never reset to a default" {
-    FAKE_DATA='{"name":"A","email":"a@b.c","profile":"work","signingMode":"ssh-key","signingKey":"","modules":[]}'
+    FAKE_DATA='{"name":"A","email":"a@b.c","signingMode":"ssh-key","signingKey":"","modules":[]}'
     run_sign "$KEY_B"
     [ "$status" -eq 0 ]
     [[ "$output" == *"ssh-key"* ]] || return 1
@@ -107,7 +110,7 @@ run_sign() { # extra env is set by the caller
 }
 
 @test "setting the key that is already configured changes nothing" {
-    FAKE_DATA='{"name":"A","email":"a@b.c","profile":"personal","signingMode":"1password","signingKey":"'"$KEY_A"'","modules":[]}'
+    FAKE_DATA='{"name":"A","email":"a@b.c","signingMode":"1password","signingKey":"'"$KEY_A"'","modules":[]}'
     run_sign "$KEY_A"
     [ "$status" -eq 0 ]
     [[ "$output" == *"already configured"* ]] || return 1

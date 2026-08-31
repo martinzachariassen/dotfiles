@@ -182,11 +182,11 @@ If the path differs in your clone, the provider-agnostic fallback is
 
 ## Changing your setup
 
-Change your profile, optional modules, or signing with `chez setup`:
+Change your optional modules or signing with `chez setup`:
 
 ```sh
 chez setup               # fill in any newly-added setup keys; keeps existing answers
-chez setup --reset       # re-ask profile / modules / signing, then apply
+chez setup --reset       # re-ask identity / signing / modules, then apply
 chez sign                # set only the git signing key; keeps every other answer
 chez xcode               # install Xcode + the iOS simulator runtime (appleDev only)
 ```

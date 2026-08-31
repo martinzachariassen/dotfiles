@@ -96,7 +96,6 @@ stub_config() {
         echo '[data]'
         echo '    name        = "Ada L"'
         [ -n "${2:-}" ] && printf '    email       = "%s"\n' "$2"
-        echo '    profile     = "personal"'
         echo '    signingMode = "off"'
         echo '    signingKey  = ""'
         echo '    modules     = []'

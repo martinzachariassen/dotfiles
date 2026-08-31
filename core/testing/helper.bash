@@ -50,6 +50,29 @@ no_match() {
     fi
 }
 
+# no_match_in TEXT REGEX — the same assertion against a string, usually $output.
+# Argument order is TEXT first to read as "no match in this, for that".
+no_match_in() {
+    if grep -qE "$2" <<<"$1"; then
+        printf 'unexpected match for: %s\n' "$2" >&2
+        return 1
+    fi
+}
+
+# file_mode PATH — the octal permission bits, on macOS and on the Linux runner.
+#
+# Not `stat -f '%Lp' … || stat -c '%a' …`: BSD's `-f` is GNU's `--file-system`,
+# which SUCCEEDS against a format string it does not understand and prints
+# something that is not a mode, so the fallback is never reached on Linux and
+# the assertion compares garbage. The engines under test read it the same way —
+# see _modules_mv in core/modules.sh.
+file_mode() {
+    local mode
+    mode="$(stat -f '%Lp' "$1" 2>/dev/null || true)"
+    case "$mode" in '' | *[!0-7]*) mode="$(stat -c '%a' "$1" 2>/dev/null || true)" ;; esac
+    printf '%s\n' "$mode"
+}
+
 # skip_unless CMD [REASON] — skip when a tool is not installed.
 skip_unless() {
     command -v "$1" >/dev/null 2>&1 || skip "${2:-$1 not installed}"
@@ -79,9 +102,13 @@ chezmoi_stub_config() {
     SRC_DIR="$REPO_ROOT/src"
     STUB_DIR="$BATS_TEST_TMPDIR/chezmoi-stub"
     mkdir -p "$STUB_DIR/home/.config/chezmoi" "$STUB_DIR/dst"
+    # No keys of its own. This used to seed `profile = "personal"` for every
+    # caller, which outlived the profile axis itself: a suite that never
+    # mentioned the profile still rendered against a config carrying it, and so
+    # exercised the un-migrated path without meaning to. A suite that wants the
+    # retired key now says so.
     {
         printf 'sourceDir = "%s"\n\n[data]\n' "$SRC_DIR"
-        printf '    profile = "personal"\n'
         local extra
         for extra in "$@"; do printf '    %s\n' "$extra"; done
     } >"$STUB_DIR/home/.config/chezmoi/chezmoi.toml"

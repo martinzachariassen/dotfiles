@@ -17,7 +17,7 @@ and **CI** on every push. Both call the same scripts in
 | Secret scan | `gitleaks dir` (no tokens/keys/credentials in the tree) | ✅ | ✅ |
 | Workflow lint | `actionlint` (workflow YAML + embedded `run:` bash) | ✅ | ✅ |
 | Workflow audit | `zizmor` (workflow security; `--offline` locally, online in CI) | ✅ | ✅ |
-| Render matrix | `scripts/ci/render-check.sh` (`chezmoi apply --dry-run` across profile × modules) | | ✅ |
+| Render matrix | `scripts/ci/render-check.sh` (`chezmoi apply --dry-run` across module sets) | | ✅ |
 | Unit tests | `bats tests/` | | ✅ |
 | Homebrew names | `scripts/ci/brew-resolve.sh` (macOS runner) | | ✅ |
 | Homebrew bundle check (advisory only) | `scripts/ci/brew-check-modules.sh` (macOS runner, `continue-on-error`) | | ✅ |
@@ -41,8 +41,8 @@ git ls-files -z -- '*.sh' '*.bash' ':!:src/**' | xargs -0 shfmt -d -i 4 -ci
 # Run every bats suite — cross-cutting ones and each feature's own
 bats -r tests/ features/
 
-# Render every template across one profile × module set (dry-run)
-PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"
+# Render every template against one module set (dry-run)
+MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"
 
 # Validate config outputs (JSON/JSONC/TOML)
 bash scripts/ci/lint-config.sh "$PWD"
@@ -63,7 +63,7 @@ fast:
 | `data-model.bats` | `[profileDefaults]` mirrors the `$defaults` blocks in `.chezmoi.toml.tmpl`. |
 | `chezmoi-data.bats` / `chezmoi-scripts.bats` | The data readers and hook conventions. |
 | `brewfile-contents.bats` | Brewfile tiers stay well-formed. |
-| `features/brew/tests/tiers.bats` | `brew_active_files` picks the tiers this profile/module set actually uses, plus the machine-local overlay. |
+| `features/brew/tests/tiers.bats` | `brew_active_files` picks the tiers this module set actually uses, plus the machine-local overlay. |
 | `features/adopt/tests/adopt.bats` | `chez adopt` writes to the right file, refuses what is not installed, and never writes twice. |
 | `mise-config.bats` | The rendered mise config. |
 | `wizard.bats` | The wizard's prompt tiers and flag mapping. |

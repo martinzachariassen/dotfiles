@@ -143,19 +143,21 @@ remove it once by hand instead (`rm -rf ~/.local/state/nix` for an empty
 leftover state dir, for example). On a fresh machine that never had the old
 stack, there's nothing to reconcile.
 
-## Work-profile security tooling (storecode)
+## Security tooling (storecode)
 
-On the **work** profile the apply also ensures `storecode` — an internal
-security tool that guards shell commands — is installed. It ships via its
-**own** installer, not Homebrew, so it's never a Brewfile entry and
+Where an installer command is configured, the apply also ensures `storecode` —
+an internal security tool that guards shell commands — is installed. It ships
+via its **own** installer, not Homebrew, so it's never a Brewfile entry and
 `chez status`/`chez mirror` never flag it; `~/.storecode` sits on the cleanup
-keep-list (`cleanup.keepHome`), so `chez clean` never offers to remove it. The
-installer command is data-driven in
+keep-list (`cleanup.keepHome`), so `chez clean` never offers to remove it.
+
+That command is data-driven in
 [`src/.chezmoidata/storecode.toml`](../src/.chezmoidata/storecode.toml)
-(`storecode.installCmd`); until it's set, the
+(`storecode.installCmd`) and is also the hook's **only** gate. This repo is
+public, so it ships empty: until it's set, the
 `run_onchange_after_05-storecode` hook prints how to finish the install and
-exits cleanly — an apply never fails just because storecode isn't wired up yet.
-On any non-work profile the hook is a no-op.
+exits cleanly — an apply never fails just because storecode isn't wired up yet,
+and on a machine that never sets it the hook is a permanent no-op.
 
 ### Coming from the direnv setup
 

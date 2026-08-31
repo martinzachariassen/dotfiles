@@ -8,7 +8,7 @@
 # recorded separately from being turned on.
 
 setup() {
-    REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    load '../core/testing/helper'
     LIB="$REPO_ROOT/core/modules.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed (modules.sh needs it)"
 
@@ -24,7 +24,6 @@ sourceDir = "/repo"
 
 [data]
     name        = "Test"
-    profile     = "work"
     modules     = ["macApps", "theme"]
     modulesSeen = ["macApps", "theme", "locale"]
 EOF
@@ -32,14 +31,6 @@ EOF
 
 lib() { # lib EXPR — run an expression against the sourced library
     run bash -c ". '$LIB'; $1"
-}
-
-# A bare `! grep …` mid-body is exempt from set -e, so bats never sees it fail.
-no_match_in() {
-    if grep -qE "$2" <<<"$1"; then
-        echo "unexpected match for: $2"
-        return 1
-    fi
 }
 
 # ── Reading ──────────────────────────────────────────────────────────────────
@@ -121,15 +112,36 @@ no_match_in() {
     lib "modules_write_list '$CFG' modules macApps theme claudeDistiller"
     [ "$status" -eq 0 ]
     grep -qF '    modules     = ["macApps", "theme", "claudeDistiller"]' "$CFG"
-    # Alignment and every neighbouring line survive untouched.
+    # Alignment and every neighbouring line survive untouched — the one above
+    # the rewritten key as well as the one below it.
     grep -qF '    modulesSeen = ["macApps", "theme", "locale"]' "$CFG"
-    grep -qF '    profile     = "work"' "$CFG"
-    [ "$(grep -c . "$CFG")" -eq 6 ]
+    grep -qF '    name        = "Test"' "$CFG"
+    [ "$(grep -c . "$CFG")" -eq 5 ]
 }
 
 @test "modules_write_list leaves no temp file behind" {
     lib "modules_write_list '$CFG' modules macApps"
     [ ! -e "$CFG.modules.tmp" ]
+}
+
+# That config is written 0600 by chezmoi and holds the signing key, an email and
+# corpusRemote. The rewrite goes via a temp file, which `>` creates 0644 under
+# the default umask — so without the mode carry every `chez up` that touches a
+# module list would quietly widen it, once, silently, and never narrow it again.
+@test "modules_write_list keeps the config's mode" {
+    chmod 0600 "$CFG"
+    lib "modules_write_list '$CFG' modules macApps"
+    [ "$status" -eq 0 ]
+    [ "$(file_mode "$CFG")" = "600" ]
+}
+
+@test "modules_write_list keeps the mode when it inserts a new key too" {
+    chmod 0600 "$CFG"
+    grep -v modulesSeen "$CFG" >"$CFG.trimmed" && mv "$CFG.trimmed" "$CFG"
+    chmod 0600 "$CFG"
+    lib "modules_write_list '$CFG' modulesSeen macApps"
+    [ "$status" -eq 0 ]
+    [ "$(file_mode "$CFG")" = "600" ]
 }
 
 @test "modules_write_list inserts a missing key after the modules line" {
