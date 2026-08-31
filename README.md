@@ -123,7 +123,7 @@ DOTFILES_REPO=https://github.com/you/dotfiles.git \
 <details>
 <summary><b>The full command set</b></summary>
 
-Every `chez*` verb is a zsh function in [`src/dot_config/zsh/dot_zshrc.tmpl`](src/dot_config/zsh/dot_zshrc.tmpl) that delegates to a script in [`scripts/bin/`](scripts/bin).
+Every verb is one row in [`core/verbs.sh`](core/verbs.sh); [`core/chez.sh`](core/chez.sh) reads it to dispatch, to render `chez help` and to feed the zsh completion. `chez` itself is a shell function so that `chez cd` can change your directory.
 
 | Command | What it does |
 | --- | --- |
@@ -156,7 +156,7 @@ flowchart LR
   Hooks --> Defaults[(macOS defaults)]
 ```
 
-The repo root splits into **what chezmoi deploys** (everything under `src/`, its source directory per [`.chezmoiroot`](.chezmoiroot)) and **the tooling that supports it** (everything else — `scripts/`, `packages/`, `tests/`, `docs/`, `install.sh`, never rendered to `$HOME`). The wizard is a plain-text picker because chezmoi's own raw-mode TUI is unreliable under `curl | bash`.
+The repo root splits into **what chezmoi deploys** (everything under `src/`, its source directory per [`.chezmoiroot`](.chezmoiroot)) and **the tooling that supports it** (everything else — `features/`, `core/`, `scripts/ci/`, `tests/`, `docs/`, `install.sh`, never rendered to `$HOME`). The wizard is a plain-text picker because chezmoi's own raw-mode TUI is unreliable under `curl | bash`.
 
 </details>
 

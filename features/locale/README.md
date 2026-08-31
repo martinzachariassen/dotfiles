@@ -10,7 +10,7 @@ Gated by the `locale` module.
 
 This feature has not been moved yet. Until it is, these are its parts:
 
-- `packages/cspell-words.txt`
+- `packages/cspell-words.txt` (the last file still outside a feature)
 - `src/dot_config/cspell/symlink_personal.txt.tmpl`
 - `src/Library/Application Support/Code/User/settings.json.tmpl (cSpell block)`
 

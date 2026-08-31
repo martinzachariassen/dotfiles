@@ -7,7 +7,7 @@ report read, so the mapping is never restated in more than one place.
 
 ## Package tiers
 
-Packages are layered Brewfiles under [`packages/`](../packages). The active set
+Packages are layered Brewfiles under [`features/brew/`](../features/brew). The active set
 is the core file plus whatever your profile and modules add:
 
 | Tier | File | Installed when |

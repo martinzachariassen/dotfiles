@@ -2,12 +2,12 @@
 
 How `chezmoi apply` (and therefore `install.sh` / `chezup`) turns this repo into
 a configured machine, and the rules the hook scripts follow. The
-`src/.chezmoiscripts/` hooks and `scripts/lib/` engines point back to this doc.
+`src/.chezmoiscripts/` hooks and the `features/*/hook.sh` engines point back here.
 
 For the repo split, naming conventions, and `scripts/` layout, see
 [architecture.md](architecture.md). The one path idiom worth repeating: inside a
 hook `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src`, so root-level tooling
-(`scripts/lib/*`, `features/brew/Brewfile*`) is reached via
+(`core/*`, a feature's `hook.sh`, `features/brew/Brewfile*`) is reached via
 `{{ .chezmoi.workingTree }}` (the git working tree = repo root).
 
 ## The stages
@@ -77,7 +77,7 @@ exception: they carry no data and are trivial to reinstall, so
 top-level dir in `$HOME` (`.sts4`, `.lemminx`, …); those are **not**
 touched by an apply — `chezclean` removes them on demand once their owning
 extension is gone (the `extension` field in `cleanup.owners` links each dir
-to its extension). Other custom logic lives in `scripts/lib/` so it stays
+to its extension). Other custom logic lives in `features/<name>/` so it stays
 shellcheck-able and unit-tested; hooks are thin drivers that do render-time
 config, source their lib (if any), and call the entry point.
 
@@ -114,7 +114,7 @@ install what the Brewfiles declare, then remove what they don't —
 ## Where each piece lives
 
 Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
-`packages/`) are at the repo root.
+`features/brew/Brewfile*`) are at the repo root.
 
 | Concern | Source |
 |---|---|
@@ -148,7 +148,7 @@ Homebrew-install step is necessarily its own inline copy of what
 `features/brew/lib/homebrew.sh` does for `run_once_before_01` below. It installs
 only the prerequisites (Xcode CLT → Homebrew → chezmoi → clone), then hands
 off to `features/setup/cli.sh` (repo now on disk, so it *can* source
-`scripts/lib/*`). The wizard asks the setup questions and feeds them to
+`core/*`). The wizard asks the setup questions and feeds them to
 `chezmoi init --apply`, whose `--apply` runs the hooks above. See
 [packages.md](packages.md#the-wizard) for the wizard's three prompt tiers.
 
