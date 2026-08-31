@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# chezapply — apply without pulling. Flags package drift; never uninstalls.
+# chez apply — apply without pulling. Flags package drift; never uninstalls.
 
 set -uo pipefail
 
@@ -31,12 +31,12 @@ main() {
         echo "  Status codes:"
         echo "    A add   M modify   D remove"
         echo "    left column = your \$HOME edits (drift), right column = repo → \$HOME (apply)"
-        echo "    plain-language breakdown: \`chezstatus\`"
+        echo "    plain-language breakdown: \`chez status\`"
         echo
         echo "  Choices:"
         echo "    y + Enter      apply now with \`chezmoi apply --force\`"
         echo "                   this overwrites drift in managed \$HOME files"
-        echo "    n or Enter     abort; inspect first with \`chezstatus\` (plain) or \`chezmoi diff\` (raw)"
+        echo "    n or Enter     abort; inspect first with \`chez status\` (plain) or \`chezmoi diff\` (raw)"
         echo
         printf "Apply these managed dotfile changes now? [y/N] "
         read -r response </dev/tty
@@ -50,14 +50,14 @@ main() {
     fi
     chezmoi apply --force "$@"
     local rc=$?
-    # Flag untracked packages so `chezapply` never silently uninstalls.
+    # Flag untracked packages so `chez apply` never silently uninstalls.
     if command -v brew >/dev/null 2>&1; then
         local untracked
         untracked=$(brew_removals "$src")
         if [ -n "$untracked" ]; then
             echo
             echo "  ℹ $(printf '%s\n' "$untracked" | grep -c .) brew package(s) installed locally but declared by no active Brewfile."
-            echo "    review: chezstatus   ·   reconcile (uninstall): chezmirror"
+            echo "    review: chez status   ·   reconcile (uninstall): chez mirror"
         fi
     fi
     return $rc

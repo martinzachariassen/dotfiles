@@ -65,7 +65,7 @@ distill_remote_adopt() {
     local repo url
     repo="$(distill_state_dir)"
     [ -z "$(git -C "$repo" remote 2>/dev/null)" ] || return 0
-    # `chezdistill --remote none` is a decision, not a gap to be filled in. Without
+    # `chez distill --remote none` is a decision, not a gap to be filled in. Without
     # this the next run would silently re-attach what was just detached.
     distill_corpus_detached && return 0
     url="$(distill_remote_seed)"
@@ -201,7 +201,7 @@ distill_render_state_readme() {
     mkdir -p "$(dirname "$out")"
     {
         printf '# %s\n\n' "$title"
-        printf 'The corpus behind my Claude Code memory. Written by `chezdistill`, a\n'
+        printf 'The corpus behind my Claude Code memory. Written by `chez distill`, a\n'
         printf 'nightly job in [dotfiles](https://github.com/martinzachariassen/dotfiles);\n'
         printf 'nothing here is edited by hand.\n\n'
 
@@ -228,7 +228,7 @@ distill_render_state_readme() {
         printf '```sh\n'
         printf 'git clone %s \\\n' "${remote:-<this repo>}"
         printf '    ~/.local/state/chezdistill\n'
-        printf 'chezdistill --render\n'
+        printf 'chez distill --render\n'
         printf '```\n\n'
         printf '`--render` makes no model calls and costs nothing. It rebuilds `MAIN.md`,\n'
         printf '`Topics/` and `Candidates.md` from the extracts, so the new machine starts\n'
@@ -243,7 +243,7 @@ distill_render_state_readme() {
 }
 
 # distill_state_repo_init — created on first use, and pointed at the corpus its
-# it was attached to (`chezdistill --remote`), so a replacement Mac fetches the corpus
+# it was attached to (`chez distill --remote`), so a replacement Mac fetches the corpus
 # instead of starting from an empty memory and nobody has to remember a
 # `git remote add`. A remote already set by hand is left alone unless it is
 # another profile's, which is refused — see distill_corpus_check_local.

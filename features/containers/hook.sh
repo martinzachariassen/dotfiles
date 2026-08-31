@@ -16,7 +16,7 @@ COLIMA_BIN="${COLIMA_BIN:-/opt/homebrew/bin/colima}"
 echo "▶ colima"
 
 if [ ! -x "$COLIMA_BIN" ]; then
-    echo "  ! colima not installed — brew bundle should have. Run: chezapply"
+    echo "  ! colima not installed — brew bundle should have. Run: chez apply"
     exit 0
 fi
 
@@ -65,7 +65,7 @@ else
         echo "  ✓ agent registered — colima starts at login"
     else
         echo "  ! could not register the agent: ${err:-no message from launchctl}"
-        echo "    Retry with: chezapply — or inspect: launchctl print gui/$(id -u)"
+        echo "    Retry with: chez apply — or inspect: launchctl print gui/$(id -u)"
     fi
 fi
 

@@ -30,7 +30,7 @@ homebrew_install() {
 # which is how a work-profile install finished "successfully" with no kubelogin
 # and no terraform.
 #
-# Shared by the brew-bundle hook (which grants trust) and chezdoctor (which
+# Shared by the brew-bundle hook (which grants trust) and chez doctor (which
 # reports on it) so the two can't disagree about which taps this machine needs.
 
 # brew_trust_store — pin the file Homebrew records trust in, and echo its path.

@@ -111,7 +111,7 @@ distill_status() {
     # The seed is only ever consulted for a repo with no origin, so an answer
     # given on an already-attached Mac would otherwise vanish without a word.
     if seed="$(distill_remote_drift)"; then
-        s_note "         setup names $seed — attach it with: chezdistill --remote $seed"
+        s_note "         setup names $seed — attach it with: chez distill --remote $seed"
     fi
 
     # Rounded for display. The raw sum is a float accumulated from per-call

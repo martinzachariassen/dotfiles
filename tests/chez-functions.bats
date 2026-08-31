@@ -21,7 +21,7 @@ setup() {
     # The real resolver, so these zsh-side tests exercise the committed lib —
     # _chez_brew_removals sources it out of the repo root it's handed.
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
-    # chezapply/chezstatus reach the resolver through the same lib the
+    # chez apply / chez status reach the resolver through the same lib the
     # extracted verbs do, so the fake repo has to carry it too.
     cp "$REPO_ROOT/features/brew/lib/removals.sh" "$FAKE/features/brew/lib/removals.sh"
     printf 'brew "git"\n' >"$FAKE/features/brew/Brewfile"
@@ -52,7 +52,7 @@ setup() {
 EOF
 
     # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and honours
-    # CHEZMOI_APPLY_RC; diff records args (chezstatus's raw-passthrough path);
+    # CHEZMOI_APPLY_RC; diff records args (chez status's raw-passthrough path);
     # data feeds the Brewfile-tier resolver.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
@@ -73,7 +73,7 @@ if [ "$1" = bundle ] && [ "$2" = cleanup ]; then
 fi
 exit 0
 EOF
-    # mise stub so chezbump's `mise upgrade` never hits the real network call.
+    # mise stub so chez bump's `mise upgrade` never hits the real network call.
     printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/mise"
     chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/mise"
 }
@@ -197,11 +197,11 @@ EOF
     no_match 'SHOULD-NOT-DISPATCH' <<<"$output"
 }
 
-# ─── chezbump: routine dependency-bump previewer ────────────────────────────
+# ─── chez bump: routine dependency-bump previewer ────────────────────────────
 # Only the untracked-removal PREVIEW is asserted (the interesting, shared logic);
 # brew update/upgrade + mise upgrade are stubbed no-ops.
 
-@test "chezbump previews the untracked removal set and points at chezmirror" {
+@test "chez bump previews the untracked removal set and points at chez mirror" {
     cat >"$STUBS/cleanup.out" <<'OUT'
 Would uninstall formulae:
 orphan-cli
@@ -212,10 +212,10 @@ OUT
     [ "$status" -eq 0 ]
     [[ "$output" == *"formula"* ]] || return 1
     [[ "$output" == *"orphan-cli"* ]] || return 1
-    [[ "$output" == *"chezmirror"* ]]  # reconcile hint
+    [[ "$output" == *"chez mirror"* ]]  # reconcile hint
 }
 
-@test "chezbump reports a fully-tracked machine when nothing is untracked" {
+@test "chez bump reports a fully-tracked machine when nothing is untracked" {
     : >"$STUBS/cleanup.out"  # brew bundle cleanup finds nothing to remove
     BREW_CLEANUP_OUT="$STUBS/cleanup.out" \
         run_bash "$REPO_ROOT/features/brew/bump.sh"

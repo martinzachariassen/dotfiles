@@ -64,7 +64,7 @@ distill_runs() {
     [ "${failed:-0}" -gt 0 ] &&
         s_fail "${failed} of the above failed — the reason is in the run record"
     if [ "${quiet:-0}" -eq 0 ] && [ "${total:-0}" -gt 0 ]; then
-        s_warn "not one of these runs saw a single session — check: chezdistill --status"
+        s_warn "not one of these runs saw a single session — check: chez distill --status"
     fi
     return 0
 }

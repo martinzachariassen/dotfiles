@@ -130,4 +130,4 @@ run_doctor_xcode() {
 # for BOTH directions — "is my active set installed?" and "what's installed
 # that no active tier declares?". They used to disagree: the first was
 # profile/module-gated, the second globbed every `Brewfile.*` that existed, so
-# chezdoctor called a work-only cask tracked on a personal machine.
+# chez doctor called a work-only cask tracked on a personal machine.

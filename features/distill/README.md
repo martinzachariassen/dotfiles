@@ -123,6 +123,6 @@ deliberately. The boundary is a *written* destination: no generated notes, no
 digest, no file anyone but Claude reads.
 
 Asking it questions from a terminal is fine, and is how you read what it knows.
-The one concession is a `chezdistill` section in `chez doctor` — passive
+The one concession is a `chez distill` section in `chez doctor` — passive
 liveness only, read-only, no API calls. Without it, a job that silently stopped
 running would leave `MAIN.md` merely not growing, and nothing would say so.

@@ -31,7 +31,7 @@ NNN`; you must be signed in to the App Store before an apply installs them.
 
 This is **install/reproducibility only** — it does *not* make App Store apps
 auto-prune, on purpose. `brew bundle cleanup` (the engine behind
-[`chezmirror`](commands.md)) never uninstalls `mas` apps, so dropping a `mas`
+[`chez mirror`](commands.md)) never uninstalls `mas` apps, so dropping a `mas`
 line does **not** remove the app; that stays a manual `mas uninstall <id>`.
 This matches the repo's [removal-is-manual model](lifecycle.md) — an apply
 only adds.
@@ -62,7 +62,7 @@ gate on membership with sprig `has`, e.g.
 | `theme` | Catppuccin Mocha across terminal and editor (see [terminal.md](terminal.md)). |
 | `locale` | Norwegian locale (cSpell `nb`, bokmål dictionary). |
 | `jvmStack` | JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle — see [shell.md](shell.md#runtimes-mise)). |
-| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcbeautify, fastlane, SF Symbols). On by default for `personal`. Installs the *tooling* only — Xcode.app, its licence and an iOS simulator runtime come from [`chezxcode`](commands.md#advanced--occasional-helpers), which needs an Apple ID and so can't run during an apply. The `xcodes` CLI is **not** a Brewfile entry: the only tap formula builds from source and that build needs a full Xcode.app, which is the thing it exists to install, so it could never succeed on a fresh Mac. `chezxcode` fetches upstream's signed prebuilt binary into `~/.local/bin` instead, verified against the sha256 pinned in [`src/.chezmoidata/xcode.toml`](../src/.chezmoidata/xcode.toml). |
+| `appleDev` | Swift/iOS toolchain (SwiftLint, SwiftFormat, xcbeautify, fastlane, SF Symbols). On by default for `personal`. Installs the *tooling* only — Xcode.app, its licence and an iOS simulator runtime come from [`chez xcode`](commands.md#advanced--occasional-helpers), which needs an Apple ID and so can't run during an apply. The `xcodes` CLI is **not** a Brewfile entry: the only tap formula builds from source and that build needs a full Xcode.app, which is the thing it exists to install, so it could never succeed on a fresh Mac. `chez xcode` fetches upstream's signed prebuilt binary into `~/.local/bin` instead, verified against the sha256 pinned in [`src/.chezmoidata/xcode.toml`](../src/.chezmoidata/xcode.toml). |
 
 The per-profile defaults the wizard pre-checks live in the `[profileDefaults]`
 table of `modules.toml`. That table **must** mirror the `$defaults` blocks in
@@ -95,8 +95,8 @@ The prompts degrade across three tiers to fit the terminal:
 
 `WIZARD_NO_GUM=1` skips the first tier, `WIZARD_NO_TUI=1` the first two.
 
-`bash features/setup/cli.sh` (or `chezsetup`) is the "change the setup" path;
-`chezsetup --reset` also replays first-time setup. See
+`bash features/setup/cli.sh` (or `chez setup`) is the "change the setup" path;
+`chez setup --reset` also replays first-time setup. See
 [commands.md](commands.md#changing-your-setup) for how the two modes differ.
 
 ## Adding a package

@@ -17,7 +17,7 @@ EXTENSIONS_DIR="${VSCODE_EXTENSIONS_DIR:-$HOME/.vscode/extensions}"
 
 if ! command -v code >/dev/null 2>&1; then
     echo "! VS Code CLI not found; extension sync skipped — re-runs automatically"
-    echo "  on the next \`chezup\`/\`chezapply\` once brew bundle has installed it"
+    echo "  on the next \`chez up\`/\`chez apply\` once brew bundle has installed it"
     exit 0
 fi
 
@@ -64,7 +64,13 @@ remove_extension_on_disk() {
 
     cache="$EXTENSIONS_DIR/extensions.json"
     if [ -f "$cache" ] && command -v python3 >/dev/null 2>&1; then
-        if python3 - "$cache" "$ext" <<'PY'; then
+        # The heredoc is its own statement rather than an `if` condition, because
+        # shfmt has no stable opinion about `if cmd <<'EOF'; then`: 3.14 wants
+        # `then` on its own line after the terminator and older builds want it on
+        # the opening line, so a local run and CI disagree forever depending on
+        # which one each has. Splitting it sidesteps the construct entirely.
+        pruned=0
+        python3 - "$cache" "$ext" <<'PY' || pruned=1
 import json, sys
 cache, ext = sys.argv[1], sys.argv[2].lower()
 try:
@@ -76,6 +82,7 @@ if len(kept) == len(data):
     sys.exit(1)  # nothing pruned
 json.dump(kept, open(cache, "w"))
 PY
+        if [ "$pruned" -eq 0 ]; then
             changed=true
         fi
     fi

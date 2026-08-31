@@ -135,30 +135,42 @@ feature_list() { feature_names "$REPO_ROOT"; }
 # context, so neither is a list and neither is enforced.
 
 @test "docs/commands.md documents every verb in the table" {
-    local missing=() v legacy
+    local missing=() v
     while IFS= read -r v; do
-        legacy="$(verbs_legacy_name "$v")"
-        [ -n "$legacy" ] || continue
-        # Either spelling counts: the docs are being rewritten from `chezup` to
-        # `chez up` a page at a time, and both name the same verb.
-        grep -qE "\b(${legacy}|chez ${v})\b" "$REPO_ROOT/docs/commands.md" ||
-            missing+=("$v ($legacy)")
+        grep -qF -- "chez $v" "$REPO_ROOT/docs/commands.md" || missing+=("$v")
     done < <(verbs_all)
     [ "${#missing[@]}" -eq 0 ] || printf 'absent from docs/commands.md: %s\n' "${missing[@]}" >&2
     [ "${#missing[@]}" -eq 0 ]
 }
 
-@test "docs/commands.md documents nothing that is not a verb" {
-    local known extra=() word v
-    known="$(while IFS= read -r v; do verbs_legacy_name "$v"; done < <(verbs_all))"
-    # Anything starting `chezmoi` belongs to the tool this repo drives, not to
-    # its verbs — the command itself, and .chezmoidata/.chezmoiroot besides.
-    while IFS= read -r word; do
-        printf '%s\n' "$known" | grep -qx "$word" || extra+=("$word")
-    done < <(grep -oE '\bchez[a-z]+\b' "$REPO_ROOT/docs/commands.md" |
-        grep -vE '^chezmoi' | sort -u)
-    [ "${#extra[@]}" -eq 0 ] || printf 'in docs/commands.md but not the table: %s\n' "${extra[@]}" >&2
-    [ "${#extra[@]}" -eq 0 ]
+# The aliases are retired, so a doc that still tells you to run `chezup` is
+# telling you to run something that does not exist. This is the guard that makes
+# the retirement real rather than aspirational.
+#
+# It looks for a retired name in the two shapes that mean "type this": wrapped in
+# backticks, or opening a line inside a shell block. Prose and output samples are
+# left alone on purpose — `chezdistill` is what the nightly job is *called*, it
+# prints `── chezdistill runs ──` as a heading, and its state lives in
+# ~/.local/state/chezdistill. Renaming the job is not what retiring an alias means.
+@test "no retired name is still offered as something to type" {
+    local bad=() v retired hits
+    while IFS= read -r v; do
+        retired="$(verbs_retired_name "$v")"
+        [ -n "$retired" ] || continue
+        # `dotfiles` is exempt: it is the repo's own name and an ordinary English
+        # word here ("untracked dotfiles"), so no textual rule separates a
+        # retired command from prose. The other fifteen are unambiguous.
+        [ "$retired" = "dotfiles" ] && continue
+        # core/verbs.sh is where the retired names are *defined*, so it is not a
+        # place they are being suggested.
+        hits="$(grep -rInE "(\`${retired}([ \`]|$)|^ *${retired}( |$))" \
+            --exclude=verbs.sh --exclude-dir=tests \
+            "$REPO_ROOT/docs" "$REPO_ROOT/README.md" "$REPO_ROOT/CLAUDE.md" \
+            "$REPO_ROOT/features" "$REPO_ROOT/core" 2>/dev/null || true)"
+        [ -z "$hits" ] || bad+=("$retired -> $(printf '%s' "$hits" | head -2 | tr '\n' ' ')")
+    done < <(verbs_all)
+    [ "${#bad[@]}" -eq 0 ] || printf 'retired name still offered: %s\n' "${bad[@]}" >&2
+    [ "${#bad[@]}" -eq 0 ]
 }
 
 # ─── data files ─────────────────────────────────────────────────────────────

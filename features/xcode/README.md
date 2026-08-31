@@ -1,6 +1,6 @@
 # Xcode and iOS
 
-`chez xcode` (today: `chezxcode`) brings a Mac from "has the Command Line Tools"
+`chez xcode` (today: `chez xcode`) brings a Mac from "has the Command Line Tools"
 to "can build and run an iOS app", in five idempotent steps: install Xcode.app,
 point `xcode-select` at it, accept the licence, run `xcodebuild -runFirstLaunch`,
 and download an iOS simulator runtime.
@@ -32,7 +32,7 @@ for a device.
 downloads since Xcode 16, so a fresh install shows every iOS simulator as
 "Unavailable" with no obvious cause.
 
-`probe.sh` holds the read-only checks for both, and `chezdoctor` runs exactly the
+`probe.sh` holds the read-only checks for both, and `chez doctor` runs exactly the
 same functions. That sharing is deliberate: a report that disagreed with the verb
 about whether the machine is ready would be worse than no report.
 

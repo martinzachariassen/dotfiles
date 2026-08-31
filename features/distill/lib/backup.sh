@@ -142,7 +142,7 @@ distill_state_sync() {
 # The question `--status` never asked. It printed the remote's URL and called
 # that a pass, so a push that had been failing for days still rendered as backed
 # up. Read-only and offline — it compares what is committed against what was last
-# known to be on the remote, so it is safe for `--status` and `chezdoctor`.
+# known to be on the remote, so it is safe for `--status` and `chez doctor`.
 #
 # Prints one verdict: no-repo · no-remote · wedged · no-upstream · synced ·
 # ahead N · behind N · diverged N M.

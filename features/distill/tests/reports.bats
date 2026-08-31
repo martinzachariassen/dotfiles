@@ -180,7 +180,7 @@ a_run() {
     extract 2026-08-22 "[$(item 'committed' s1)]"
     distill_commit_local "chore(distill): test"
 
-    grep -q 'chezdistill --render' "$STATE/README.md"
+    grep -q 'chez distill --render' "$STATE/README.md"
     grep -q '~/.local/state/chezdistill' "$STATE/README.md"
     git -C "$STATE" ls-files | grep -qx 'README.md'
 }

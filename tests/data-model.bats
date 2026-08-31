@@ -22,10 +22,10 @@ setup() {
     [ "$tmpl_names" = "$catalog_names" ]
 }
 
-# ─── modulesSeen: the key chezup's new-module gate reads and writes ─────────
+# ─── modulesSeen: the key chez up's new-module gate reads and writes ─────────
 # A key the template doesn't emit is wiped by the next `chezmoi init`, so this
 # one has to be both emitted and round-tripped through `dig`. Without that,
-# chezup would re-offer every declined module after any `chezsetup` run.
+# chez up would re-offer every declined module after any `chez setup` run.
 @test "the config template emits and round-trips modulesSeen" {
     grep -qE '^ +modulesSeen += +\[\{\{ range' "$TMPL"
     grep -qF 'dig "modulesSeen"' "$TMPL"
@@ -106,7 +106,7 @@ setup() {
 }
 
 # ─── sourceDir must follow the clone, not a hardcoded path ──────────────────
-# install.sh, wizard.sh, chezup.sh and doctor.sh all honour DOTFILES_DIR, and
+# install.sh, setup/cli.sh, converge/up.sh and the doctor runner all honour DOTFILES_DIR, and
 # docs/install.md advertises it. A hardcoded sourceDir made the wizard write a
 # config pointing at a directory that need not exist, breaking every later bare
 # `chezmoi` call on a non-default clone.
@@ -140,7 +140,7 @@ setup() {
 #
 # Blank means "local only", which is a permanent legitimate answer — so it must
 # be PERSISTED, the way signingKey is, and not omitted the way email deliberately
-# is. Omitting it would make chezsetup re-ask forever on every local-only Mac.
+# is. Omitting it would make chez setup re-ask forever on every local-only Mac.
 @test "a blank corpusRemote is persisted as a real answer" {
     grep -q 'corpusRemote = {{ \$corpusRemote | quote }}' "$TMPL"
     # ...and is NOT wrapped in the emptiness guard email uses.

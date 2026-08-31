@@ -187,8 +187,8 @@ _render_template() {
 }
 
 # ─── Nothing may abort the apply before the completion summary ──────────────
-# 99-completion prints the "Next moves" block (chezsign, bootstrap-auth,
-# chezdoctor) that a fresh Mac depends on. A hook that exits non-zero takes
+# 99-completion prints the "Next moves" block (chez sign, bootstrap-auth,
+# chez doctor) that a fresh Mac depends on. A hook that exits non-zero takes
 # chezmoi's whole apply down with it and the user never sees those steps.
 
 @test "the macOS-defaults hook cannot abort the apply" {
@@ -196,7 +196,7 @@ _render_template() {
     # set -e is on, so the invocation must be inside a condition, not bare.
     # Matched on the invocation's shape rather than the script's name, so moving
     # the script between directories cannot quietly disarm this.
-    grep -qE 'if .*(macos-defaults\.sh|features/macos/cli\.sh)"?; then' "$tmpl" || {
+    grep -qE 'if .*(chez macos\.sh|features/macos/cli\.sh)"?; then' "$tmpl" || {
         echo "the defaults script is invoked bare under set -e — a failed pass"
         echo "would abort the apply and skip 05-storecode and 99-completion."
         return 1

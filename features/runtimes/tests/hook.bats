@@ -23,7 +23,7 @@ run_hook() {
     run_hook
     [ "$status" -eq 0 ]
     [[ "$output" == *"mise not on PATH yet"* ]] || return 1
-    [[ "$output" == *chezup* ]] || return 1
+    [[ "$output" == *"chez up"* ]] || return 1
 }
 
 @test "with nothing missing it reports the current set and installs nothing" {

@@ -13,7 +13,7 @@ doctor_containers() {
     section "Containers (colima)"
     if command -v colima >/dev/null 2>&1; then
         if [ -d "$HOME/.colima" ]; then
-            fail "~/.colima shadows ~/.config/colima — the managed VM template is ignored. Fix: colima delete && rm -rf ~/.colima && chezapply"
+            fail "~/.colima shadows ~/.config/colima — the managed VM template is ignored. Fix: colima delete && rm -rf ~/.colima && chez apply"
         else
             pass "colima home is ~/.config/colima"
         fi
@@ -21,7 +21,7 @@ doctor_containers() {
             if launchctl print "gui/$(id -u)/no.mlz.colima" >/dev/null 2>&1; then
                 pass "login agent registered"
             else
-                warn "colima login agent not registered — the VM won't start at login. Run: chezapply"
+                warn "colima login agent not registered — the VM won't start at login. Run: chez apply"
             fi
         fi
         if colima status >/dev/null 2>&1; then
@@ -40,11 +40,11 @@ doctor_containers() {
             if [ -e "$HOME/.docker/cli-plugins/$plugin" ]; then
                 pass "$plugin plugin linked"
             else
-                warn "$plugin not linked into ~/.docker/cli-plugins — run: chezapply"
+                warn "$plugin not linked into ~/.docker/cli-plugins — run: chez apply"
             fi
         done
     else
-        fail "colima missing — there is no container runtime on this Mac. Run: chezapply"
+        fail "colima missing — there is no container runtime on this Mac. Run: chez apply"
     fi
     # Legacy guard: Docker Desktop was replaced by colima.
     if [ -d "/Applications/Docker.app" ]; then

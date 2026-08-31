@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Pins the "fail loudly if core/ui.sh is missing" guard shared by
-# doctor.sh and the feature entry points (chezup.sh's copy is in chezup.bats),
+# the doctor runner and the feature entry points (up.sh's copy is in converge/tests/up.bats),
 # so a refactor can't quietly turn the hard failure into a silent `|| true`.
 
 setup() {

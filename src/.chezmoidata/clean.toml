@@ -1,11 +1,11 @@
-# Cleanup catalog for `chezclean` — keepHome/keepConfig/owners in one place so its
+# Cleanup catalog for `chez clean` — keepHome/keepConfig/owners in one place so its
 # two scopes (~/.config, top-level $HOME) can't drift apart.
 #
 # .chezmoidata can't be templated; keep this namespace disjoint from prompted
 # answers (packages.toml/modules.toml) so merges don't collide.
 
 [cleanup]
-# Untracked ~/.config/X entries chezclean never offers to remove (auth material,
+# Untracked ~/.config/X entries chez clean never offers to remove (auth material,
 # chezmoi's own state, tool state we deliberately don't manage).
 keepConfig = [
     "chezmoi",        # never remove — breaks chezmoi itself
@@ -26,7 +26,7 @@ keepConfig = [
     "cagent",
 ]
 
-# Top-level ~/.* entries chezclean never offers to remove. Everything else under a
+# Top-level ~/.* entries chez clean never offers to remove. Everything else under a
 # dot and untracked by chezmoi becomes a removal candidate.
 keepHome = [
     ".storecode",         # installed by its own script, not brew — see storecode.toml
@@ -43,7 +43,7 @@ keepHome = [
     ".Trash",             # emptying is a separate, manual action
 ]
 
-# Tool-ownership map: chezclean keeps an entry (never offers it) while its owner is
+# Tool-ownership map: chez clean keeps an entry (never offers it) while its owner is
 # present — ANY of package (brew formula/cask), binary (on PATH), or extension (in
 # `code --list-extensions`) is enough. Uninstall the tool and it becomes a removable
 # orphan again.

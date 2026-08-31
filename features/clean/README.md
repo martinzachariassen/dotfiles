@@ -1,7 +1,7 @@
 # Untracked dotfiles
 
-`chez clean` (today: `chezclean`) is the confirm-gated **file** analogue of
-`chezmirror`. An apply never deletes — it only renders what the repo tracks — so
+`chez clean` (today: `chez clean`) is the confirm-gated **file** analogue of
+`chez mirror`. An apply never deletes — it only renders what the repo tracks — so
 untracked cruft accumulates: a directory some tool dropped, config for a package
 you removed months ago. This is the step that reconciles it, and it only ever
 runs because you ran it.
@@ -73,5 +73,5 @@ what you actually want.
 - **`~/.storecode` is permanently on `keepHome`.** storecode is installed by its
   own hook rather than by a Brewfile, so nothing else would keep it alive. See
   [features/storecode](../storecode/README.md).
-- Package removal is a different verb. `chezmirror` handles Homebrew;
-  `chezreconcile` chains install-then-remove for packages. Files stay here.
+- Package removal is a different verb. `chez mirror` handles Homebrew;
+  `chez reconcile` chains install-then-remove for packages. Files stay here.

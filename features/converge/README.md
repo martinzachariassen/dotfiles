@@ -20,9 +20,9 @@ missing runtimes — and stops there. Nothing it does deletes a package or a
 dotfile, so a routine converge can never surprise you by taking something away.
 
 `apply.sh` still *reports* untracked packages, because silence would be worse:
-you would not know the machine had drifted. It points at `chezmirror`, which is
+you would not know the machine had drifted. It points at `chez mirror`, which is
 the verb that removes, and which confirms every package separately. Files are
-`chezclean`. Both are things you run on purpose.
+`chez clean`. Both are things you run on purpose.
 
 That asymmetry is the whole design. `reconcile.sh` exists for when you want both
 directions in one step, and it is still two explicit passes rather than a single
@@ -47,5 +47,5 @@ shell functions calling shell functions when all four lived in the zshrc; as
 scripts they have to be executed, not called.
 
 The removal set comes from `../brew/lib/removals.sh` — the same resolver
-`chezmirror` acts on and `chezdoctor` reports against, so "untracked" cannot mean
+`chez mirror` acts on and `chez doctor` reports against, so "untracked" cannot mean
 three different things.

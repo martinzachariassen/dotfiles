@@ -4,7 +4,7 @@
 # On a real fresh install two packages failed and the report was useless: it
 # printed the last 15 log lines, which were four successful installs and a
 # "`brew bundle` complete!" banner, then advised "usually a transient download.
-# Re-run chezup". One of the two failures was permanent (a formula that needs a
+# Re-run chez up". One of the two failures was permanent (a formula that needs a
 # full Xcode.app in order to build), so that advice was an infinite loop.
 #
 # These pin the two parsers that turn the captured log and Homebrew's own state

@@ -36,7 +36,7 @@ not_declares() {
     [ -f "$CORE" ]
 }
 
-# Repo + git plumbing — `chezup`, `chezdoctor`, and the install wizard all
+# Repo + git plumbing — `chez up`, `chez doctor`, and the install wizard all
 # rely on chezmoi/git/gh/jq being on PATH.
 @test "core Brewfile declares chezmoi" { declares "$CORE" brew chezmoi; }
 @test "core Brewfile declares git"     { declares "$CORE" brew git; }

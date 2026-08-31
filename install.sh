@@ -229,7 +229,7 @@ else
     if [ -d "$SOURCE_DIR" ] && [ -n "$(ls -A "$SOURCE_DIR" 2>/dev/null)" ]; then
         die "$SOURCE_DIR exists but is not a git checkout — move it aside, or set DOTFILES_DIR."
     fi
-    explain "Your config lives here from now on; edit it, then run \`chezup\`."
+    explain "Your config lives here from now on; edit it, then run \`chez up\`."
     info "cloning into $SOURCE_DIR"
     mkdir -p "$(dirname "$SOURCE_DIR")"
     git clone "$REPO" "$SOURCE_DIR"
@@ -243,7 +243,7 @@ step "Setup wizard"
 if [ "$#" -eq 0 ]; then
     explain \
         "A few questions about how you want this Mac set up." \
-        "Every answer is changeable later with \`chezsetup\`."
+        "Every answer is changeable later with \`chez setup\`."
     exec bash "$SOURCE_DIR/features/setup/cli.sh"
 fi
 info "extra args given — skipping the wizard, handing off to chezmoi init"

@@ -14,10 +14,10 @@ doctor_sign() {
     if [ -n "$git_email" ]; then
         pass "git author: ${git_name:-?} <$git_email>"
     elif [ "$(git config --global user.useConfigOnly 2>/dev/null || true)" = "true" ]; then
-        fail "no git email set — commits are blocked. Run \`chezsetup\` to add one"
+        fail "no git email set — commits are blocked. Run \`chez setup\` to add one"
         note "GitHub noreply address: github.com → Settings → Emails"
     else
-        fail "no git email set, and nothing stops git inventing one — run \`chezsetup\`"
+        fail "no git email set, and nothing stops git inventing one — run \`chez setup\`"
     fi
 
     section "Git signing (${SIGNING_MODE:-1password})"

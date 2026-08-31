@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Behavioural tests for `chezsetup`, which merges the old chezreset/chezreinit
+# Behavioural tests for `chez setup`, which merges the old chezreset/chezreinit
 # into one verb: default mode fills in newly-added setup keys (chezmoi init +
-# chezapply, keeping existing answers); --reset/-r replays first-time setup
+# chez apply, keeping existing answers); --reset/-r replays first-time setup
 # (state reset + re-run the wizard, overriding saved answers). Extracts the
 # real function body from the committed template and runs it under zsh
-# against stubbed git/chezmoi/wizard.sh/chezapply/_chez_run.
+# against stubbed git/chezmoi/cli.sh/apply.sh/_chez_run.
 
 setup() {
     load '../../../core/testing/helper'
@@ -38,7 +38,7 @@ EOF
 
     cat >"$FAKE/features/converge/apply.sh" <<EOF
 #!/usr/bin/env bash
-printf 'chezapply %s\n' "\$*" >>"$APPLY_LOG"
+printf 'chez apply %s\n' "\$*" >>"$APPLY_LOG"
 EOF
     chmod +x "$FAKE/features/converge/apply.sh"
 
@@ -80,29 +80,29 @@ run_setup() {
 
 # ─── default mode: fill in new keys, never touch run-once state or the wizard ─
 
-@test "chezsetup (default) pulls, fills in new keys via chezmoi init, then applies" {
+@test "chez setup (default) pulls, fills in new keys via chezmoi init, then applies" {
     run_setup
     [ "$status" -eq 0 ]
     grep -q 'pull --ff-only' "$GIT_LOG"
     grep -q '^init ' "$INIT_LOG"
-    grep -q '^chezapply ' "$APPLY_LOG"
+    grep -q '^chez apply ' "$APPLY_LOG"
     [ ! -s "$RESET_LOG" ]  # never resets state in default mode
     [ ! -s "$WIZARD_LOG" ] # never touches the wizard in default mode
     [[ "$output" == *"filling in any new/unanswered setup keys only"* ]] || return 1
-    [[ "$output" == *"chezsetup --reset"* ]] || return 1
+    [[ "$output" == *"chez setup --reset"* ]] || return 1
 }
 
-@test "chezsetup (default) aborts before chezmoi init if git pull fails" {
+@test "chez setup (default) aborts before chezmoi init if git pull fails" {
     GIT_RC=7 run_setup
     [ "$status" -eq 7 ]
     [ ! -s "$INIT_LOG" ]
     [ ! -s "$APPLY_LOG" ]
 }
 
-@test "chezsetup forwards unrecognized args to chezapply in default mode" {
+@test "chez setup forwards unrecognized args to chez apply in default mode" {
     run_setup -v
     [ "$status" -eq 0 ]
-    grep -q '^chezapply -v' "$APPLY_LOG"
+    grep -q '^chez apply -v' "$APPLY_LOG"
 }
 
 # ─── --reset/-r: replay first-time setup ────────────────────────────────────
@@ -110,9 +110,9 @@ run_setup() {
 # bats subprocess can't script input into — so these tests exercise the
 # `[ -r /dev/tty ]` false branch (skips the prompt, proceeds unattended),
 # matching how a CI/non-interactive run actually behaves. They skip on a
-# real controlling tty rather than hang; see chezmirror.bats for the same pattern.
+# real controlling tty rather than hang; see brew/tests/mirror.bats for the same pattern.
 
-@test "chezsetup --reset resets state and runs the wizard when there's no controlling tty" {
+@test "chez setup --reset resets state and runs the wizard when there's no controlling tty" {
     have_tty && skip "has a controlling tty; the confirm prompt would block on read"
     run_setup --reset
     [ "$status" -eq 0 ]
@@ -120,17 +120,17 @@ run_setup() {
     grep -q '^state reset --force' "$RESET_LOG"
     grep -q '^wizard ' "$WIZARD_LOG"
     [ ! -s "$INIT_LOG" ]  # not the fill-mode path
-    [ ! -s "$APPLY_LOG" ] # reset mode never calls chezapply itself
+    [ ! -s "$APPLY_LOG" ] # reset mode never calls chez apply itself
 }
 
-@test "chezsetup -r is an alias for --reset" {
+@test "chez setup -r is an alias for --reset" {
     have_tty && skip "has a controlling tty; the confirm prompt would block on read"
     run_setup -r
     [ "$status" -eq 0 ]
     grep -q '^state reset --force' "$RESET_LOG"
 }
 
-@test "chezsetup --reset forwards unrecognized args to wizard.sh" {
+@test "chez setup --reset forwards unrecognized args to wizard.sh" {
     have_tty && skip "has a controlling tty; the confirm prompt would block on read"
     run_setup --reset -v
     [ "$status" -eq 0 ]
@@ -138,11 +138,11 @@ run_setup() {
 }
 
 # The self-heal for a missing script now belongs to _chez_run, which runs before
-# this script does — tests/zshrc-wiring.bats asserts chezsetup routes through it.
+# this script does — tests/zshrc-wiring.bats asserts chez setup routes through it.
 # What matters here is that a missing wizard cannot leave the machine half-reset:
 # --reset clears chezmoi's run-once state, so failing after that and before the
 # wizard would strand it.
-@test "chezsetup --reset does not reset state it cannot follow with a wizard" {
+@test "chez setup --reset does not reset state it cannot follow with a wizard" {
     rm -f "$FAKE/features/setup/cli.sh"
     run_setup --reset
     [ "$status" -ne 0 ]
@@ -151,10 +151,10 @@ run_setup() {
 
 # ─── shared ──────────────────────────────────────────────────────────────────
 
-@test "chezsetup --help prints usage and touches nothing" {
+@test "chez setup --help prints usage and touches nothing" {
     run_setup --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezsetup"* ]] || return 1
+    [[ "$output" == *"usage: chez setup"* ]] || return 1
     [[ "$output" == *"--reset"* ]] || return 1
     [ ! -s "$GIT_LOG" ]
     [ ! -s "$INIT_LOG" ]

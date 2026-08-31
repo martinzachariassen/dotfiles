@@ -92,7 +92,7 @@ distill_spend_ok() {
             explain \
                 "The rolling cost brake could not be read, so nothing is stopping a" \
                 "runaway. Check maxSpendUsd7d in src/.chezmoidata/distill.toml and" \
-                "~/.local/state/chezdistill/spend.jsonl, then: chezdistill --status"
+                "~/.local/state/chezdistill/spend.jsonl, then: chez distill --status"
             return 1
             ;;
     esac

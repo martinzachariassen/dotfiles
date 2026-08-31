@@ -66,7 +66,7 @@ minHits = 2
 demoteAfterDays = 21
 
 # Run log. Every run appends one record to runs.jsonl — read back by
-# `chezdistill --status`, so a night the job skipped everything is still visible
+# `chez distill --status`, so a night the job skipped everything is still visible
 # rather than leaving its only trace in a launchd log.
 runRetentionDays = 90
 

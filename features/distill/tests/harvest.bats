@@ -184,9 +184,9 @@ window_setup() {
     [[ "$output" == *"1 transcript"* ]] || return 1
 }
 
-# chezdoctor is the only passive liveness signal this job has, so the input side
+# chez doctor is the only passive liveness signal this job has, so the input side
 # has to reach it too — otherwise the next silent outage passes it green again.
-@test "chezdoctor checks that there is anything to read" {
+@test "chez doctor checks that there is anything to read" {
     # The section is its own file now, so this reads it directly rather than
     # awk-ing a range out of a 680-line script and hoping the range still holds.
     sect="$REPO_ROOT/features/distill/doctor.sh"

@@ -14,7 +14,7 @@ Two rules follow:
 
 1. **Edit source files, never the rendered copies in `$HOME`.** `chezmoi apply`
    overwrites local drift — every entry point (`install.sh`, the wizard,
-   `chezup`/`chezapply`) passes `--force`, since chezmoi has no config key for
+   `chez up`/`chez apply`) passes `--force`, since chezmoi has no config key for
    it and would otherwise prompt per changed file. Edit via
    `chezmoi edit ~/.X`, or capture a live edit back into source with
    `chezmoi re-add ~/.X`.
@@ -45,7 +45,7 @@ src/                    # ← chezmoi's source dir; everything here deploys to $
   .chezmoi.toml.tmpl    #   chezmoi config + the init-prompt setup questions
   .chezmoidata/         #   static data: module catalog + profile→Brewfile map
   .chezmoiscripts/      #   ordered run scripts (brew bundle, mise, vscode, macOS defaults…)
-  dot_config/           #   → ~/.config; untracked entries reconciled on demand by chezclean (keep-list in clean.toml)
+  dot_config/           #   → ~/.config; untracked entries reconciled on demand by chez clean (keep-list in clean.toml)
   dot_zshenv, …         #   other managed dotfiles (private_dot_ssh/, Library/, …)
 features/               # one directory per feature: code, tests, docs; _template/ is the skeleton
 core/                   # shared helpers + the registry (see below)
@@ -86,7 +86,7 @@ what stops the descriptions drifting apart again.
 | File | Declares |
 |---|---|
 | [`core/verbs.sh`](../core/verbs.sh) | Every verb: its owning feature, the script it runs, its group in `chez help`, its module gate, its one-line summary. The single source of truth for the command surface. |
-| `features/<name>/feature.sh` | What a feature *is*: name, title, the module that gates it, where its checks belong in `chezdoctor`'s order. Data only — sourced in a subshell, no side effects. |
+| `features/<name>/feature.sh` | What a feature *is*: name, title, the module that gates it, where its checks belong in `chez doctor`'s order. Data only — sourced in a subshell, no side effects. |
 
 [`core/chez.sh`](../core/chez.sh) is the only consumer that matters day to day.
 It reads the table three ways from the one row: to resolve `chez <verb>` to a
@@ -101,7 +101,7 @@ gating is passed in as `CHEZ_MODULES` at render time rather than read back from
 `chezmoi data`, so neither help nor dispatch pays a ~200 ms subprocess.
 
 Verbs are declared in exactly one of those files, never both. The list used to
-live in five hand-written places — the `chezhelp` heredoc, `README.md`,
+live in five hand-written places — the `chez help` heredoc, `README.md`,
 `docs/commands.md`, the `99-completion` hook and `CLAUDE.md` — with only one of
 them checked, in one direction. Three of the five are generated now.
 `tests/registry.bats` holds the prose that is left to the table in *both*

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# chezmirror — uninstall Homebrew packages no active Brewfile tier declares.
+# chez mirror — uninstall Homebrew packages no active Brewfile tier declares.
 #
 # Removal only. A routine apply must never silently uninstall, so this is a verb
-# you run deliberately; chezreconcile chains chezup (install) then this (remove),
-# and chezstatus is the read-only preview of the same set.
+# you run deliberately; chez reconcile chains chez up (install) then this (remove),
+# and chez status is the read-only preview of the same set.
 #
 # Was ~155 lines of zsh inside dot_zshrc.tmpl, where no linter could see it.
 
@@ -32,16 +32,16 @@ main() {
             -a | --all | -y | --yes) all=1 ;;
             -n | --dry-run) dry=1 ;;
             -h | --help)
-                echo "usage: chezmirror [--all|-a | --yes|-y] [--dry-run|-n]"
-                echo "  removal only — installs happen via chezup/chezapply; chezreconcile does both."
+                echo "usage: chez mirror [--all|-a | --yes|-y] [--dry-run|-n]"
+                echo "  removal only — installs happen via chez up / chez apply; chez reconcile does both."
                 echo "  (no flag)      confirm each untracked package individually"
                 echo "  --all, -a      uninstall the whole untracked set after ONE confirmation"
-                echo "  --yes, -y      alias of --all;  YES=1 chezmirror skips that confirmation"
-                echo "  --dry-run, -n  preview the untracked set only, remove nothing;  DRY_RUN=1 chezmirror does the same"
+                echo "  --yes, -y      alias of --all;  YES=1 chez mirror skips that confirmation"
+                echo "  --dry-run, -n  preview the untracked set only, remove nothing;  DRY_RUN=1 chez mirror does the same"
                 return 0
                 ;;
             *)
-                echo "chezmirror: unknown option: $arg (try --help)" >&2
+                echo "chez mirror: unknown option: $arg (try --help)" >&2
                 return 2
                 ;;
         esac
@@ -50,7 +50,7 @@ main() {
     explain_titled "Untracked packages" \
         "Finds Homebrew packages installed on this Mac that no Brewfile active for" \
         "this profile and module set declares, then offers to uninstall them. This is" \
-        "the only verb that removes packages; apply and chezup never do. Each removal" \
+        "the only verb that removes packages; apply and chez up never do. Each removal" \
         "is confirmed separately."
 
     # Distinguish "resolved, and nothing is untracked" from "could not resolve"
@@ -61,7 +61,7 @@ main() {
 
     if [ "$rc" -ne 0 ]; then
         echo "  ! could not determine what this machine tracks — nothing removed"
-        echo "    fix the error above (usually: run \`chezup\`), then re-run chezmirror"
+        echo "    fix the error above (usually: run \`chez up\`), then re-run chez mirror"
         return 1
     fi
     if [ -z "$parsed" ]; then

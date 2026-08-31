@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Coverage for features/brew/lib/tiers.sh — the single answer to "which Brewfile
-# tiers apply to THIS machine?", shared by chezdoctor and by chezmirror's
+# tiers apply to THIS machine?", shared by chez doctor and by chez mirror's
 # removal set so the install and removal directions can't disagree.
 #
 # Both directions used to resolve it separately: installs were gated on profile
@@ -48,7 +48,7 @@ no_match_in() {
 }
 
 @test "brew_active_files drops the other profile's tier" {
-    # The chezmirror bug in one assertion: on personal, work is NOT tracked.
+    # The chez mirror bug in one assertion: on personal, work is NOT tracked.
     resolve "$DATA"
     no_match_in "$output" 'Brewfile\.work'
 }

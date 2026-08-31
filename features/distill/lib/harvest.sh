@@ -53,7 +53,7 @@ distill_session_files() {
 # written, can the state dir, is the corpus pointed at the right remote. None
 # guarded an input. So when transcriptRoots shipped pointing at a directory that
 # has never existed, the nightly job read zero transcripts, recorded `status:
-# ok`, and both --status and chezdoctor showed green — for its entire life.
+# ok`, and both --status and chez doctor showed green — for its entire life.
 #
 # "Nothing was worth keeping last night" and "there is nowhere to read from" are
 # different facts and only one of them is fine. These functions are what keeps
@@ -130,7 +130,7 @@ distill_sources_ok() {
     explain \
         "Claude Code writes transcripts to ~/.claude/projects. CLAUDE_CONFIG_DIR" \
         "moves settings and skills, not these. Check transcriptRoots in" \
-        "src/.chezmoidata/distill.toml, then: chezdistill --status"
+        "src/.chezmoidata/distill.toml, then: chez distill --status"
     return 1
 }
 

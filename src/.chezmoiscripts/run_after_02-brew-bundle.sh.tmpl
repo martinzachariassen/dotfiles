@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run_after_02-brew-bundle — converge Homebrew to the active Brewfiles.
 # run_after (not onchange) reconciles real installed state; --no-upgrade gives
-# presence not freshness (freshness is chezbump's job).
+# presence not freshness (freshness is chez bump's job).
 
 set -uo pipefail
 
@@ -106,7 +106,7 @@ if ! sudo -n true </dev/null 2>/dev/null; then
         sudo_keep_warm "$$"
     else
         warn "no admin access — apps that need an installer package will be skipped"
-        dim "Everything else still installs. Re-run \`chezup\` to finish the rest."
+        dim "Everything else still installs. Re-run \`chez up\` to finish the rest."
     fi
     hr
 fi
@@ -128,7 +128,7 @@ if [ -n "$untrusted_taps" ]; then
     done <<EOF
 $untrusted_taps
 EOF
-    dim "    fix: brew trust --tap <name>, then re-run \`chezup\`"
+    dim "    fix: brew trust --tap <name>, then re-run \`chez up\`"
     hr
 fi
 
@@ -181,7 +181,7 @@ if [ "${#failures[@]}" -gt 0 ]; then
     # Keep the log somewhere that survives a reboot. mktemp lands in
     # /var/folders, which macOS purges — so the "full log:" path printed below
     # was routinely dead by the time anyone went looking for it. ~/.local is on
-    # cleanup.keepHome, so chezclean won't offer it either.
+    # cleanup.keepHome, so chez clean won't offer it either.
     log_dir="{{ .chezmoi.homeDir }}/.local/state/dotfiles"
     if mkdir -p "$log_dir" 2>/dev/null && cp "$BREW_LOG" "$log_dir/brew-bundle.log" 2>/dev/null; then
         BREW_LOG="$log_dir/brew-bundle.log"
@@ -221,7 +221,7 @@ if [ "${#failures[@]}" -gt 0 ]; then
     if brew_sudo_failed "$BREW_LOG"; then
         hr
         warn "at least one app failed because the admin password was not entered"
-        dim "    macOS stops waiting after about a minute. Re-run \`chezup\` and enter"
+        dim "    macOS stops waiting after about a minute. Re-run \`chez up\` and enter"
         dim "    your password at the \"macOS password\" prompt before the install starts;"
         dim "    everything already installed is skipped, so it picks up where it left off."
     fi
@@ -239,13 +239,13 @@ if [ "${#failures[@]}" -gt 0 ]; then
         done <<EOF
 $still_untrusted
 EOF
-        dim "    run the line(s) above, then re-run \`chezup\`."
+        dim "    run the line(s) above, then re-run \`chez up\`."
     fi
 
     # Deliberately not "usually transient". Sometimes it is a download; sometimes
     # the package cannot install on this machine at all, and telling someone to
     # re-run forever is worse than telling them to read the error.
-    explain "Re-run \`chezup\` to retry — already-installed packages are skipped," \
+    explain "Re-run \`chez up\` to retry — already-installed packages are skipped," \
         "so it picks up where it left off. If the same package fails again, the" \
         "error above is the real reason and retrying will not change it."
     exit 0

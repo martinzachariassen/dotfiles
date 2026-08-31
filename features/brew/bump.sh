@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# chezbump — routine dependency upgrade, plus a read-only untracked report.
+# chez bump — routine dependency upgrade, plus a read-only untracked report.
 
 set -uo pipefail
 
@@ -22,7 +22,7 @@ main() {
     removals=$(brew_removals "$src")
     if [ -n "$removals" ]; then
         printf '%s\n' "$removals" | awk -F'\t' '{ printf "  %-8s %s\n", $1, $2 }'
-        echo "  (reconcile with \`chezmirror\` to uninstall — it prompts per package)"
+        echo "  (reconcile with \`chez mirror\` to uninstall — it prompts per package)"
     else
         echo "  ✓ none — every installed package is tracked"
     fi

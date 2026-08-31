@@ -390,7 +390,7 @@ if [ ! -r /dev/tty ]; then
     run_chezmoi --apply --force --promptDefaults --source="$SOURCE_DIR" "$@"
 fi
 
-# Current answers become the defaults (nice on a `chezsetup --reset` re-run).
+# Current answers become the defaults (nice on a `chez setup --reset` re-run).
 DATA_JSON="$(cm_data_json)"
 def_name="$(cm_data_string "$DATA_JSON" name)"
 def_email="$(cm_data_string "$DATA_JSON" email)"
@@ -408,7 +408,7 @@ printf '%s\n' "$BOX_BOTTOM" >/dev/tty
     echo
     explain \
         "Nothing is permanent: every answer is saved and can be changed later" \
-        "with \`chezsetup\`, and applying never uninstalls anything." \
+        "with \`chez setup\`, and applying never uninstalls anything." \
         "" \
         "Press Enter to accept the value shown in [brackets]."
 } >/dev/tty
@@ -439,7 +439,7 @@ ask_step "Who you are" \
     "Use your GitHub noreply address if you'd rather not publish a real one" \
     "(github.com → Settings → Emails → keep my email address private)." \
     "" \
-    "Don't know it yet? Leave the email blank and run \`chezsetup\` later;" \
+    "Don't know it yet? Leave the email blank and run \`chez setup\` later;" \
     "until then git refuses to commit rather than guess an address."
 name="$(ask_string "$(prompt_msg name)" "$def_name")"
 email="$(ask_string "$(prompt_msg email)" "$def_email")"
@@ -455,7 +455,7 @@ if [ -z "$email" ]; then
             "\"$name <>\", which GitHub cannot attribute and only a history" \
             "rewrite undoes." \
             "" \
-            "Fix it any time with \`chezsetup\` — it re-asks this one question." \
+            "Fix it any time with \`chez setup\` — it re-asks this one question." \
             "Your GitHub noreply address is on github.com → Settings → Emails."
     } >/dev/tty
 fi
@@ -491,7 +491,7 @@ case " $modules " in
         ask_sub "Corpus backup (optional)" \
             "A private git repo the distiller pushes its corpus to so a new Mac inherits it." \
             "Leave blank to keep everything on this Mac — you can attach one later with:" \
-            "  chezdistill --remote <url>"
+            "  chez distill --remote <url>"
         printf '  %s[%s]%s ' "$DIM" "${def_corpus:-blank}" "$RESET"
         IFS= read -r corpusRemote </dev/tty || corpusRemote=""
         [ -n "$corpusRemote" ] || corpusRemote="$def_corpus"
@@ -522,7 +522,7 @@ if [ "$signingMode" != "off" ]; then
         ask_sub "Signing key" \
             "On a fresh Mac this key is still inside 1Password, which Homebrew" \
             "hasn't installed yet — so \"later\" is the normal answer here." \
-            "Commits just stay unsigned until you run \`chezsign\`."
+            "Commits just stay unsigned until you run \`chez sign\`."
         key_when="$(ask_choice "When do you want to set the signing key?" "$key_default" "$key_now" "$key_later")"
     fi
     if [ "$key_when" = "$key_now" ]; then
@@ -537,10 +537,10 @@ fi
 dim "  name     $name" >/dev/tty
 # Never print an empty value as if it were an answer — that blank line is
 # exactly what made a missing email easy to walk past on a real install.
-dim "  email    ${email:-<not set — run \`chezsetup\` to add one>}" >/dev/tty
+dim "  email    ${email:-<not set — run \`chez setup\` to add one>}" >/dev/tty
 dim "  profile  $profile" >/dev/tty
 if [ "$signingMode" != "off" ] && [ -z "$signingKey" ]; then
-    dim "  signing  $signingMode (key deferred — run \`chezsign\` later)" >/dev/tty
+    dim "  signing  $signingMode (key deferred — run \`chez sign\` later)" >/dev/tty
 else
     dim "  signing  $signingMode${signingKey:+ ($signingKey)}" >/dev/tty
 fi

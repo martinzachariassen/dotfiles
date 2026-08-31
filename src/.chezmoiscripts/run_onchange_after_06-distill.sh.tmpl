@@ -37,7 +37,7 @@ mkdir -p "$home/.local/state/chezdistill/logs"
 # would keep a registered agent invoking `distill.sh --weekly` — now an unknown
 # option — and fail every Sunday. Unregister and remove it here, once.
 #
-# EXPIRES: delete this block once every Mac has applied it (`chezdoctor` shows
+# EXPIRES: delete this block once every Mac has applied it (`chez doctor` shows
 # the registered agents). It is a migration, not a rule — left in place it reads
 # like the repo still has an opinion about a weekly agent.
 stale="$agents/no.mlz.chezdistill.weekly.plist"
@@ -60,4 +60,4 @@ else
 fi
 
 echo "  Nightly at 01:00. MAIN.md renders to ~/.config/claude/memory."
-echo "  Check: chezdistill --status"
+echo "  Check: chez distill --status"

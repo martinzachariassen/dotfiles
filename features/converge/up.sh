@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# chezup.sh — converge this Mac to the repo: pull, offer any module the catalog
+# up.sh — converge this Mac to the repo: pull, offer any module the catalog
 # gained since setup, preview drift, apply. No package version bumps (that's
-# chezbump).
+# chez bump).
 # Env: DRY_RUN=1 print instead of run; YES=1 skip the confirm gate; DOTFILES_DIR.
 
 set -uo pipefail
@@ -13,7 +13,7 @@ ASSUME_YES="${YES:-0}"
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=../../core/ui.sh
 if [ ! -r "$_DIR/../../core/ui.sh" ]; then
-    printf 'chezup: missing %s\n' "$_DIR/../../core/ui.sh" >&2
+    printf 'chez up: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
 # shellcheck source=../../core/ui.sh
@@ -27,9 +27,9 @@ ui_init_logging
 # offer_new_modules — offer every catalog module this Mac has never been asked
 # about, exactly once.
 #
-# promptMultichoiceOnce keeps the first answer forever and chezup only ever runs
+# promptMultichoiceOnce keeps the first answer forever and chez up only ever runs
 # `apply`, so without this a module added to the catalog after a machine was set
-# up is reachable only through `chezsetup --reset`, which re-asks everything.
+# up is reachable only through `chez setup --reset`, which re-asks everything.
 # Runs after the pull (the catalog may have just grown) and before the drift
 # check, so a module enabled here is applied in the same run.
 #
@@ -65,14 +65,14 @@ offer_new_modules() {
     # installing what it already asked for, so it is never done unattended:
     # YES=1 means "don't ask before applying", not "decide for me".
     if [ "$ASSUME_YES" = "1" ] || [ ! -r /dev/tty ]; then
-        explain "Not enabling anything unattended — run chezup from a terminal to choose."
+        explain "Not enabling anything unattended — run chez up from a terminal to choose."
         return 0
     fi
 
     cfg="$(modules_config_file)"
     if [ ! -w "$cfg" ]; then
         warn "$cfg is not writable — cannot record an answer"
-        explain "Choose modules by hand instead: chezsetup --reset"
+        explain "Choose modules by hand instead: chez setup --reset"
         return 0
     fi
 
@@ -121,7 +121,7 @@ if [ "$DRY_RUN" = "1" ]; then
     run git -C "$SOURCE_DIR" pull --ff-only
     after="$before"
 elif ! git -C "$SOURCE_DIR" pull --ff-only >/dev/null 2>&1; then
-    fail "git pull --ff-only failed — resolve it in $SOURCE_DIR, then re-run chezup"
+    fail "git pull --ff-only failed — resolve it in $SOURCE_DIR, then re-run chez up"
     exit 1
 else
     after="$(git -C "$SOURCE_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -144,7 +144,7 @@ offer_new_modules
 # Two questions, not one: managed files can be perfectly in sync while apply
 # hooks (brew bundle, mise, VS Code, macOS defaults) still have work to do —
 # a partial install leaves no file drift at all. Gating only on file drift is
-# what used to make chezup a no-op exactly when a retry was needed.
+# what used to make chez up a no-op exactly when a retry was needed.
 pending="$(chezmoi status --exclude scripts 2>/dev/null || true)"
 hooks="$(chezmoi status --include scripts 2>/dev/null || true)"
 count=0
@@ -195,4 +195,4 @@ else
         exit 1
     }
 fi
-ok "chezup complete"
+ok "chez up complete"

@@ -141,7 +141,7 @@ unchanged run touches nothing.
 the script:
 
 ```sh
-macos-defaults          # the zsh alias → features/macos/cli.sh
+chez macos          # the zsh alias → features/macos/cli.sh
 ```
 
 **Revert a setting.** There's no automatic undo — comment the line out in the

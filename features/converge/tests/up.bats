@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Tests for features/converge/up.sh — the everyday "converge this Mac to the
-# repo" verb (pull → preview drift → apply) behind the `chezup` zsh function.
+# repo" verb (pull → preview drift → apply) behind the `chez up` zsh function.
 #
-# chezup runs most often, so its control flow must be exactly right across
+# chez up runs most often, so its control flow must be exactly right across
 # every state: missing/renamed repo, failed pull, clean tree, drifted files,
 # missing chezmoi, DRY_RUN/YES overrides — none of which `bash -n` can see. We
 # run the real script with a fake repo and stubbed git/chezmoi, driving each
@@ -41,7 +41,7 @@ EOF
 
     # chezmoi stub: `status --exclude scripts` prints CHEZMOI_STATUS (file
     # drift), `status --include scripts` prints CHEZMOI_STATUS_SCRIPTS (pending
-    # hooks) — chezup asks both, and the two answers drive different branches.
+    # hooks) — chez up asks both, and the two answers drive different branches.
     # apply records args and honours CHEZMOI_APPLY_RC.
     # The module gate reads `chezmoi data`. Default is empty, which the gate
     # treats as "can't resolve, say nothing" — so every pre-existing test below
@@ -86,7 +86,7 @@ run_chezup() {
 
 # ─── Missing / broken repo ──────────────────────────────────────────────────
 
-@test "chezup fails when the source dir has no git repo" {
+@test "chez up fails when the source dir has no git repo" {
     rm -rf "$REPO/.git"
     run_chezup ""
     [ "$status" -eq 1 ]
@@ -94,14 +94,14 @@ run_chezup() {
     [ ! -s "$APPLY_LOG" ]  # never reached apply
 }
 
-@test "chezup aborts when git pull --ff-only fails" {
+@test "chez up aborts when git pull --ff-only fails" {
     run_chezup "GIT_PULL_RC=1"
     [ "$status" -eq 1 ]
     [[ "$output" == *"git pull --ff-only failed"* ]] || return 1
     [ ! -s "$APPLY_LOG" ]
 }
 
-@test "chezup fails when chezmoi is not on PATH" {
+@test "chez up fails when chezmoi is not on PATH" {
     # chezmoi lives in Homebrew's bin (outside /usr/bin:/bin), so this
     # reliably hides it.
     PATH="/usr/bin:/bin" command -v chezmoi >/dev/null 2>&1 && skip "chezmoi on system PATH"
@@ -115,7 +115,7 @@ run_chezup() {
 
 # ─── Clean tree ─────────────────────────────────────────────────────────────
 
-@test "chezup reports in-sync and exits 0 when nothing drifted" {
+@test "chez up reports in-sync and exits 0 when nothing drifted" {
     run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
     [[ "$output" == *"up to date"* ]] || return 1
@@ -126,11 +126,11 @@ run_chezup() {
 # ─── Pending hooks with no file drift ───────────────────────────────────────
 # The recovery case: a partial install (brew bundle died mid-way) leaves every
 # managed file correct, so file drift is empty while the run_after hooks are
-# still pending. chezup must apply anyway — every hook that fails tells the
-# user to re-run chezup, and that advice is only true if this branch applies.
+# still pending. chez up must apply anyway — every hook that fails tells the
+# user to re-run chez up, and that advice is only true if this branch applies.
 # (Stub values carry no spaces: run_chezup word-splits its env string.)
 
-@test "chezup applies when only hooks are pending (no file drift)" {
+@test "chez up applies when only hooks are pending (no file drift)" {
     run_chezup "CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
     [ "$status" -eq 0 ]
     [[ "$output" == *"no managed files drifted"* ]] || return 1
@@ -139,7 +139,7 @@ run_chezup() {
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chezup counts file drift and pending hooks separately" {
+@test "chez up counts file drift and pending hooks separately" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc CHEZMOI_STATUS_SCRIPTS=_R_.chezmoiscripts/02-brew-bundle.sh YES=1"
     [ "$status" -eq 0 ]
     [[ "$output" == *"1 managed file(s) drifted"* ]] || return 1
@@ -147,7 +147,7 @@ run_chezup() {
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chezup reports how many commits it pulled when the repo advanced" {
+@test "chez up reports how many commits it pulled when the repo advanced" {
     # before != after ⇒ the 'pulled N commit(s)' branch instead of 'up to date'.
     run_chezup "GIT_ADVANCE=1 GIT_PULLED_COUNT=3 CHEZMOI_STATUS= CHEZMOI_STATUS_SCRIPTS="
     [ "$status" -eq 0 ]
@@ -155,7 +155,7 @@ run_chezup() {
     [[ "$output" != *"up to date"* ]] || return 1
 }
 
-@test "chezup fails loudly (exit 1) when its core/ui.sh helper is missing" {
+@test "chez up fails loudly (exit 1) when its core/ui.sh helper is missing" {
     ISO="$(mktemp -d)"
     mkdir -p "$ISO/features/converge"  # note: no core/ ⇒ ui.sh is absent
     cp "$CHEZUP" "$ISO/features/converge/up.sh"
@@ -167,15 +167,15 @@ run_chezup() {
 
 # ─── Drift → apply ──────────────────────────────────────────────────────────
 
-@test "chezup applies drifted files when confirmation is bypassed with YES=1" {
+@test "chez up applies drifted files when confirmation is bypassed with YES=1" {
     run_chezup "CHEZMOI_STATUS=MM_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
     [[ "$output" == *"drifted"* ]] || return 1
-    [[ "$output" == *"chezup complete"* ]] || return 1
+    [[ "$output" == *"chez up complete"* ]] || return 1
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chezup surfaces a failing apply as exit 1" {
+@test "chez up surfaces a failing apply as exit 1" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc YES=1 CHEZMOI_APPLY_RC=1"
     [ "$status" -eq 1 ]
     [[ "$output" == *"apply failed"* ]] || return 1
@@ -183,7 +183,7 @@ run_chezup() {
 
 # ─── DRY_RUN: preview only, never mutate ────────────────────────────────────
 
-@test "chezup with DRY_RUN=1 previews the apply without running it" {
+@test "chez up with DRY_RUN=1 previews the apply without running it" {
     run_chezup "CHEZMOI_STATUS=M_dot_zshrc YES=1 DRY_RUN=1"
     [ "$status" -eq 0 ]
     [[ "$output" == *"dry-run"* ]] || return 1
@@ -193,7 +193,7 @@ run_chezup() {
 
 # ─── New modules since setup ────────────────────────────────────────────────
 #
-# promptMultichoiceOnce keeps the first answer forever and chezup only applies,
+# promptMultichoiceOnce keeps the first answer forever and chez up only applies,
 # so a module added to the catalog after a machine was set up is invisible on it
 # without this gate. The answer is recorded in `modulesSeen` either way, which is
 # what stops a declined module being asked about on every single run.
@@ -225,7 +225,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
         $2 bash "$CHEZUP"
 }
 
-@test "chezup lists a module the catalog gained since this Mac was set up" {
+@test "chez up lists a module the catalog gained since this Mac was set up" {
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     [ "$status" -eq 0 ]
@@ -235,7 +235,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     [[ "$output" == *"Nightly distillation of Claude sessions"* ]] || return 1
 }
 
-@test "chezup says nothing about modules when the catalog holds nothing new" {
+@test "chez up says nothing about modules when the catalog holds nothing new" {
     setup_catalog
     run_chezup_data "$(printf '%s' "$CATALOG" | tr -d '\n' |
         sed 's/"modulesSeen":\["macApps","theme"\]/"modulesSeen":["macApps","theme","claudeDistiller"]/')" \
@@ -244,7 +244,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     [[ "$output" != *"new module"* ]] || return 1
 }
 
-@test "chezup does not re-offer a module that was already declined" {
+@test "chez up does not re-offer a module that was already declined" {
     # Declined = in modulesSeen, absent from modules. The difference between
     # "never asked" and "asked and said no" is the whole point of the key.
     setup_catalog
@@ -255,7 +255,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     [[ "$output" != *"new module"* ]] || return 1
 }
 
-@test "chezup never enables a module unattended under YES=1" {
+@test "chez up never enables a module unattended under YES=1" {
     # YES=1 means "don't ask before applying", not "decide the config for me".
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
@@ -267,7 +267,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chezup with DRY_RUN=1 does not touch the module list" {
+@test "chez up with DRY_RUN=1 does not touch the module list" {
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1 DRY_RUN=1"
     [ "$status" -eq 0 ]
@@ -276,9 +276,9 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     grep -qF 'modulesSeen = ["macApps", "theme"]' "$CFG"
 }
 
-@test "chezup offers modules before the drift check, so one applies same-run" {
+@test "chez up offers modules before the drift check, so one applies same-run" {
     # Ordering matters: enabling a module renders new files, and those must be
-    # counted by the status call that follows — not left for the next chezup.
+    # counted by the status call that follows — not left for the next chez up.
     setup_catalog
     run_chezup_data "$CATALOG" "CHEZMOI_STATUS=M_dot_zshrc YES=1"
     local at_module at_drift
@@ -288,7 +288,7 @@ run_chezup_data() { # run_chezup_data DATA_JSON EXTRA_ENV
     [ "$at_module" -lt "$at_drift" ]
 }
 
-@test "chezup keeps going when chezmoi data cannot be resolved" {
+@test "chez up keeps going when chezmoi data cannot be resolved" {
     # No jq, a chezmoi too old to have moduleCatalog, a broken config: the gate
     # has nothing to compare and must stay silent rather than guess.
     setup_catalog

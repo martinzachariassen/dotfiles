@@ -27,7 +27,7 @@
 - [ ] `pre-commit run --all-files`
 - [ ] `bats tests/`
 - [ ] `chezmoi apply --dry-run` (or `scripts/ci/render-check.sh`) is clean
-- [ ] Applied on a real machine with `chezapply` / `chezup`
+- [ ] Applied on a real machine with `chez apply` / `chez up`
 
 ## Screenshots
 

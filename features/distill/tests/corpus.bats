@@ -73,7 +73,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     [ "$output" = "$WORK_URL" ]
 
     run distill_status
-    [[ "$output" == *"chezdistill --remote"* ]] || return 1
+    [[ "$output" == *"chez distill --remote"* ]] || return 1
 }
 
 @test "one repo spelled two ways is not drift" {

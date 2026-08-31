@@ -10,7 +10,7 @@ doctor_check_xdg() {
     section "XDG layout"
     for legacy in "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.gitconfig" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
         if [ -f "$legacy" ]; then
-            fail "legacy $legacy present — would shadow XDG-managed config. Run \`chezapply\` to remove."
+            fail "legacy $legacy present — would shadow XDG-managed config. Run \`chez apply\` to remove."
         else
             pass "no legacy $(basename "$legacy")"
         fi

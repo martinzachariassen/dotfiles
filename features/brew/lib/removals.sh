@@ -8,9 +8,9 @@
 __DOTFILES_BREW_REMOVALS_SH=1
 
 # "<kind>\t<name>" (cask | formula | tap) for every Homebrew item no ACTIVE
-# Brewfile tier declares — the removal set chezmirror acts on. $1 is the repo
+# Brewfile tier declares — the removal set chez mirror acts on. $1 is the repo
 # root; pure/testable. The tier set comes from features/brew/lib/tiers.sh, the
-# same resolver chezdoctor uses and the mirror of what the brew-bundle hook
+# same resolver chez doctor uses and the mirror of what the brew-bundle hook
 # installs from, so "tracked" means the same thing in both directions: a
 # work-profile cask on a personal machine is untracked here, not silently kept.
 # `brew bundle cleanup` only honours one --file, so the active tiers are

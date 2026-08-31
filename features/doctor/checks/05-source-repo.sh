@@ -16,7 +16,7 @@ doctor_check_source_repo() {
             if [ -n "$local_head" ] && [ "$local_head" = "$remote_head" ]; then
                 pass "repo in sync with origin"
             elif [ -n "$local_head" ] && [ -n "$remote_head" ]; then
-                warn "repo behind/ahead of origin — run \`chezup\` to sync"
+                warn "repo behind/ahead of origin — run \`chez up\` to sync"
             fi
         fi
         if (cd "$SOURCE_DIR" && [ -n "$(git status --porcelain 2>/dev/null)" ]); then

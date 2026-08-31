@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Tests for core/ui.sh — the dependency-free terminal UI helpers shared
-# by doctor.sh, chezup.sh, bootstrap-auth.sh, and macos-defaults.sh.
+# by the doctor runner, converge/up.sh, auth/cli.sh and macos/cli.sh.
 #
 # log.sh runs on a fresh machine before any package is installed, so two
 # invariants matter: never colorize non-TTY output, and glyphs must degrade to

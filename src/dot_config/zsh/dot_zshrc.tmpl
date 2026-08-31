@@ -405,32 +405,17 @@ _chez() {
 }
 compdef _chez chez
 
-# ─── The old names, kept as aliases ───────────────────────────────────────────
-# Every verb answered to `chez<verb>` before the dispatcher existed, and muscle
-# memory outlives a refactor. These are one line each and forward verbatim;
-# `chez help` is what documents the surface.
+# ─── The old names are gone ───────────────────────────────────────────────────
+# `chezup`, `chezdoctor`, `dotfiles`, `macos-defaults` and the rest were aliases
+# through the transition and are now retired. There is one spelling of every
+# verb: `chez <verb>`.
 #
-# Two do not follow the pattern: `dotfiles` predates the `chez` prefix, and
-# `macos-defaults` is the name the macOS docs and the 04 hook already use.
-alias chezup='chez up'
-alias chezdoctor='chez doctor'
-alias chezsetup='chez setup'
-alias chezsign='chez sign'
-alias chezapply='chez apply'
-alias chezstatus='chez status'
-alias chezbump='chez bump'
-alias chezmirror='chez mirror'
-alias chezreconcile='chez reconcile'
-alias chezclean='chez clean'
-alias chezhelp='chez help'
-alias dotfiles='chez cd'
-alias macos-defaults='chez macos'
-{{- if has "appleDev" (dig "modules" (list) .) }}
-alias chezxcode='chez xcode'
-{{- end }}
-{{- if has "claudeDistiller" (dig "modules" (list) .) }}
-alias chezdistill='chez distill'
-{{- end }}
+# Nothing is aliased back, deliberately. A stale alias is worse than a missing
+# one — it keeps two names alive in muscle memory and in half the docs, which is
+# the drift the registry exists to end. `command not found: chezup` is a clear
+# answer, and `chez help` is one keystroke away.
+#
+# tests/zshrc-wiring.bats proves none of them survives anywhere in this file.
 
 # ─── Zellij, in-session ───────────────────────────────────────────────────────
 # The auto-attach and the helpers it needs live at the top of this file, because

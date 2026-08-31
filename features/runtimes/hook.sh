@@ -20,7 +20,7 @@ echo "▶ mise runtimes"
 
 if ! command -v mise >/dev/null 2>&1; then
     echo "! mise not on PATH yet — skipping global install."
-    echo "  Re-run \`chezup\` after brew bundle finishes to install runtimes."
+    echo "  Re-run \`chez up\` after brew bundle finishes to install runtimes."
     exit 0
 fi
 
@@ -39,6 +39,6 @@ echo "  Downloads only what's missing; mise shows its own progress per tool."
 if (cd "$HOME" && mise install); then
     echo "✓ mise runtimes installed: $(cd "$HOME" && mise current 2>/dev/null | tr '\n' ' ')"
 else
-    echo "! mise install failed (network?). Re-run \`chezup\` or \`mise install\` to retry."
+    echo "! mise install failed (network?). Re-run \`chez up\` or \`mise install\` to retry."
     exit 0
 fi

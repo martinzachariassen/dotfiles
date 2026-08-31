@@ -8,7 +8,7 @@ set -euo pipefail
 _MD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 for _md_lib in ui.sh sudo.sh; do
     if [ ! -r "$_MD_DIR/../../core/$_md_lib" ]; then
-        printf 'macos-defaults: missing %s\n' "$_MD_DIR/../../core/$_md_lib" >&2
+        printf 'chez macos: missing %s\n' "$_MD_DIR/../../core/$_md_lib" >&2
         exit 1
     fi
 done
@@ -40,7 +40,7 @@ fi
 # a bare `sudo -v` would kill the hook, abort the whole apply, and take the
 # completion summary with it.
 if ! sudo -v -p "  macOS password for %u: "; then
-    s_warn "no sudo — skipping macOS defaults. Re-run later with: macos-defaults"
+    s_warn "no sudo — skipping macOS defaults. Re-run later with: chez macos"
     exit 0
 fi
 

@@ -26,7 +26,7 @@ hook would never run again — no error, no output, extensions silently drifting
 `tests/chezmoi-scripts.bats` enforces the pair for every delegating hook.
 
 `lib.sh` holds the pure set logic — read the manifest, diff it against what is
-installed — so it can be unit-tested without VS Code present. `chezdoctor`
+installed — so it can be unit-tested without VS Code present. `chez doctor`
 reports drift in both directions read-only, reading the same manifest through the
 same functions, so the report and the apply cannot disagree.
 

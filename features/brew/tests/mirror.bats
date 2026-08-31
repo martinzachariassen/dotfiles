@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for chezmirror and the helpers it shares with chezbump
+# Tests for chez mirror and the helpers it shares with chez bump
 # (brew_removals, brew_uninstall_one) — the reconciler that
 # uninstalls Homebrew packages tracked in NO Brewfile tier.
 #
@@ -111,7 +111,7 @@ exit 0
 EOF
 
     # stub mirrors real gum confirm (reads STDIN): one answer line per confirm.
-    # If chezmirror ever feeds the package list on stdin again, gum would read
+    # If chez mirror ever feeds the package list on stdin again, gum would read
     # packages instead of these answers — that's the regression this catches.
     cat >"$STUBS/gum" <<'EOF'
 #!/usr/bin/env bash
@@ -136,7 +136,7 @@ teardown() {
 # because that was the only way to reach 155 lines of zsh living inside a Go
 # template. Those lines are features/brew/mirror.sh now.
 
-# Mirrors chezmirror's own tty guard, for the TTY-gated tests below.
+# Mirrors chez mirror's own tty guard, for the TTY-gated tests below.
 have_tty() { { : </dev/tty; } >/dev/null 2>&1; }
 
 # _stubbed CMD… — run under the stubbed PATH and the log paths the stubs use.
@@ -150,7 +150,7 @@ _stubbed() {
         "$@"
 }
 
-# run_mirror [args…] — the real chezmirror.
+# run_mirror [args…] — the real chez mirror.
 run_mirror() { _stubbed bash "$REPO_ROOT/features/brew/mirror.sh" "$@"; }
 
 # run_removals [args…] — the shared resolver, called as the verbs call it.
@@ -202,7 +202,7 @@ no_match_in() {
 
 @test "brew_removals labels the untap section 'tap' without leaking its header" {
     # "Would untap:" entries must not inherit the preceding "formula" kind — the
-    # bug that made chezmirror `brew uninstall "Would untap:"` and a bare tap name.
+    # bug that made chez mirror `brew uninstall "Would untap:"` and a bare tap name.
     cat >"$CANNED" <<'EOF'
 Would uninstall formulae:
 orphan-cli
@@ -344,9 +344,9 @@ EOF
     [ "$(cat "$UNINSTALL_LOG")" = "untap acme/formulae" ]
 }
 
-# ─── chezmirror: end-to-end behaviour ───────────────────────────────────────
+# ─── chez mirror: end-to-end behaviour ───────────────────────────────────────
 
-@test "chezmirror refuses to call the set clean when it could not resolve it" {
+@test "chez mirror refuses to call the set clean when it could not resolve it" {
     # An empty removal set has two very different causes. Reporting the
     # unresolvable one as "✓ every installed package is tracked" would be a
     # false all-clear on exactly the machine that needs looking at.
@@ -358,7 +358,7 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
-@test "chezmirror reports nothing to remove when every package is tracked" {
+@test "chez mirror reports nothing to remove when every package is tracked" {
     : >"$CANNED" # nothing untracked
     run_mirror
     [ "$status" -eq 0 ]
@@ -366,7 +366,7 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ] # never uninstalled anything
 }
 
-@test "chezmirror refuses to uninstall without a controlling terminal (safety)" {
+@test "chez mirror refuses to uninstall without a controlling terminal (safety)" {
     have_tty && skip "has a controlling tty; see the confirm-loop test instead"
     run_mirror
     [ "$status" -eq 0 ]
@@ -375,10 +375,10 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
-@test "chezmirror uninstalls only the confirmed packages, one at a time" {
+@test "chez mirror uninstalls only the confirmed packages, one at a time" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # Regression test: confirm cask, decline bats-core, confirm the other formula.
-    # If chezmirror ever feeds the package list on stdin again, gum reads
+    # If chez mirror ever feeds the package list on stdin again, gum reads
     # packages instead of these answers and the loop miscounts.
     run env \
         PATH="$STUBS:$PATH" \
@@ -394,17 +394,17 @@ EOF
     [[ "$output" == *"removed 2 · kept 1"* ]] || return 1
 }
 
-# ─── chezmirror accept-all mode (--all / --yes / YES=1) ─────────────────────
+# ─── chez mirror accept-all mode (--all / --yes / YES=1) ─────────────────────
 
-@test "chezmirror --help prints usage and removes nothing" {
+@test "chez mirror --help prints usage and removes nothing" {
     run_mirror --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezmirror"* ]] || return 1
+    [[ "$output" == *"usage: chez mirror"* ]] || return 1
     [[ "$output" == *"--all"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ] # help path never touches brew
 }
 
-@test "chezmirror --dry-run previews the untracked set and removes nothing" {
+@test "chez mirror --dry-run previews the untracked set and removes nothing" {
     run_mirror --dry-run
     [ "$status" -eq 0 ]
     [[ "$output" == *"orphan-app"* ]] || return 1
@@ -412,7 +412,7 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ] # dry-run never touches brew
 }
 
-@test "DRY_RUN=1 chezmirror previews the same as --dry-run/-n" {
+@test "DRY_RUN=1 chez mirror previews the same as --dry-run/-n" {
     run env \
         PATH="$STUBS:$PATH" \
         CANNED="$CANNED" ARGS_LOG="$ARGS_LOG" STDIN_LOG="$STDIN_LOG" \
@@ -424,14 +424,14 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
-@test "chezmirror rejects an unknown option (exit 2, no uninstall)" {
+@test "chez mirror rejects an unknown option (exit 2, no uninstall)" {
     run_mirror --bogus
     [ "$status" -eq 2 ]
     [[ "$output" == *"unknown option"* ]] || return 1
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
-@test "chezmirror --all uninstalls the whole set after ONE confirmation" {
+@test "chez mirror --all uninstalls the whole set after ONE confirmation" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # One 'yes' gates the whole batch; the per-package loop then runs unattended.
     run env \
@@ -448,7 +448,7 @@ EOF
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
 }
 
-@test "chezmirror --all aborts cleanly when the bulk confirm is declined" {
+@test "chez mirror --all aborts cleanly when the bulk confirm is declined" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     run env \
         PATH="$STUBS:$PATH" \
@@ -461,7 +461,7 @@ EOF
     [ ! -s "$UNINSTALL_LOG" ]
 }
 
-@test "YES=1 chezmirror accepts all with no prompt at all" {
+@test "YES=1 chez mirror accepts all with no prompt at all" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # YES=1 must never read stdin — a stray read would hang; </dev/null proves it.
     run env \
@@ -474,7 +474,7 @@ EOF
     [[ "$output" == *"removed 3 · kept 0"* ]] || return 1
 }
 
-@test "chezmirror removes an interdependent set despite deps-first order (retry passes)" {
+@test "chez mirror removes an interdependent set despite deps-first order (retry passes)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # `brew bundle cleanup` lists a dependency BEFORE its dependent, so a one-shot
     # uninstall fails on the dep ("still required by …") — the retry-in-passes
@@ -519,7 +519,7 @@ EOF
     [ "$(grep -cF "still installed" <<<"$output")" -eq 0 ] # nothing left stuck
 }
 
-@test "chezmirror reports a package it can never remove instead of erroring out" {
+@test "chez mirror reports a package it can never remove instead of erroring out" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # libpng can never be uninstalled; zlib removes fine. The retry loop must
     # remove zlib, give up on libpng after a no-progress pass (no infinite loop).
@@ -559,8 +559,8 @@ EOF
     grep -qF "removed 1 · kept 0" <<<"$output"  # stuck ≠ kept (kept is declined only)
 }
 
-# ─── chezmirror: brew autoremove of orphaned dependencies ───────────────────
-# After the removal pass, chezmirror prunes formulae installed as dependencies
+# ─── chez mirror: brew autoremove of orphaned dependencies ───────────────────
+# After the removal pass, chez mirror prunes formulae installed as dependencies
 # nothing needs any more: preview via `brew autoremove -n`, then run it for
 # real — accept-all under --all/YES=1, else behind one confirm.
 
@@ -592,7 +592,7 @@ EOF
     chmod +x "$STUBS/brew"
 }
 
-@test "chezmirror prunes orphaned dependencies via brew autoremove (YES=1, accept-all)" {
+@test "chez mirror prunes orphaned dependencies via brew autoremove (YES=1, accept-all)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     AUTOREMOVE_LOG="$STUBS/autoremove.log"
     _stub_brew_with_orphan "$AUTOREMOVE_LOG"
@@ -609,7 +609,7 @@ EOF
     grep -qx "ran" "$AUTOREMOVE_LOG"
 }
 
-@test "chezmirror leaves orphaned deps alone when the autoremove confirm is declined" {
+@test "chez mirror leaves orphaned deps alone when the autoremove confirm is declined" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     AUTOREMOVE_LOG="$STUBS/autoremove.log"
     _stub_brew_with_orphan "$AUTOREMOVE_LOG"
@@ -626,7 +626,7 @@ EOF
     [ ! -f "$AUTOREMOVE_LOG" ]                           # prune declined ⇒ never ran
 }
 
-@test "chezmirror skips brew autoremove when nothing is orphaned (YES=1)" {
+@test "chez mirror skips brew autoremove when nothing is orphaned (YES=1)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     AUTOREMOVE_LOG="$STUBS/autoremove.log"
     # Header-only output (0 unneeded, no bare names) must read as "no orphans".
@@ -652,7 +652,7 @@ EOF
     [ ! -f "$AUTOREMOVE_LOG" ]                           # prune never ran
 }
 
-@test "chezmirror untaps an untracked tap end-to-end (Would untap regression)" {
+@test "chez mirror untaps an untracked tap end-to-end (Would untap regression)" {
     have_tty || skip "no controlling tty (headless/CI); run under: script -q /dev/null bats …"
     # Pre-fix, a tap-only preview fed `brew uninstall "Would untap:"` (errored).
     cat >"$CANNED" <<'EOF'

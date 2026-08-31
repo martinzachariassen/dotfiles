@@ -57,8 +57,8 @@ an existing `default` instance.
 **Registration can fail transiently.** `launchctl bootstrap` occasionally
 refuses while the preceding boot-out is still settling. The hook prints
 launchctl's own message rather than swallowing it, never fails the apply — hook
-99's "Next moves" block comes after this one — and the next `chezapply` fixes
-it. `chezdoctor` reports an unregistered agent too, so it does not go unnoticed.
+99's "Next moves" block comes after this one — and the next `chez apply` fixes
+it. `chez doctor` reports an unregistered agent too, so it does not go unnoticed.
 
 **The plugin symlinks are chezmoi's, not Homebrew's.** Homebrew's caveat
 suggests `cliPluginsExtraDirs` in `~/.docker/config.json`, but `docker login`

@@ -30,7 +30,7 @@ what spans features, plus a tour of the configured environment.
 | [lifecycle.md](lifecycle.md) | What `chezmoi apply` does stage by stage — the hook ordering, the convergence guarantee, and where each piece lives. |
 | [macos.md](macos.md) | Every macOS system setting applied — keyboard, Finder, Dock, screenshots, security, Touch ID for sudo. |
 | [development.md](development.md) | Quality gates, the CI matrix, the bats suites, and how to run every check locally. |
-| [distill.md](distill.md) | The nightly distiller: how `chezdistill` turns past Claude sessions into the `MAIN.md` every future session loads — setup, the two destinations, the rubric that decides what gets captured, backup and restore, cost, and troubleshooting. |
+| [distill.md](distill.md) | The nightly distiller: how `chez distill` turns past Claude sessions into the `MAIN.md` every future session loads — setup, the two destinations, the rubric that decides what gets captured, backup and restore, cost, and troubleshooting. |
 
 ## The configured environment
 
