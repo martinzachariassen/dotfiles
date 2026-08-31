@@ -84,6 +84,13 @@ mode="$(cm_data_string "$DATA_JSON" signingMode)"
 current_key="$(cm_data_string "$DATA_JSON" signingKey)"
 [ -n "$mode" ] || mode="1password"
 
+# Replayed below, and it must never be replayed as "". A saved empty string is a
+# real answer to promptStringOnce, and jq's `//` treats "" as present — so an
+# empty memoryScope would shadow the `.profile` fallback in distill_scope and
+# leave the corpus leak boundary comparing "" against "", which always passes.
+memory_scope="$(cm_data_string "$DATA_JSON" memoryScope)"
+[ -n "$memory_scope" ] || memory_scope="$profile"
+
 if [ "$mode" = "off" ]; then
     warn "signing is set to \"off\" for this machine, so there's no key to set."
     info "turn it on with: chez setup --reset  (then pick 1password or ssh-key)"
@@ -172,6 +179,7 @@ init_flags=(
     --promptChoice "$(prompt_msg signingMode)=$mode"
     --promptString "$(prompt_msg signingKey)=$new_key"
     --promptString "$(prompt_msg corpusRemote)=$(cm_data_string "$DATA_JSON" corpusRemote)"
+    --promptString "$(prompt_msg memoryScope)=$memory_scope"
 )
 [ -n "$mods_slash" ] && init_flags+=(--promptMultichoice "$(prompt_msg modules)=$mods_slash")
 

@@ -62,6 +62,17 @@
      itself would be saved and then treated as a git URL. */ -}}
 {{- $corpusRemote := promptStringOnce . "corpusRemote" "Corpus backup repo for the distiller (blank for local only)" "" -}}
 
+{{/* Which corpus this Mac's memory belongs to. A free-text label and the leak
+     boundary: two Macs that share a scope share a corpus, two that don't must
+     never merge theirs, because `hits` counts sightings across the whole corpus.
+
+     Defaults to the saved `profile` so a Mac set up before this key existed keeps
+     the scope it already had — its corpus.json is stamped `personal`, and a Mac
+     that suddenly claimed a different scope would refuse its own backup. Falls
+     back to "default" on a fresh init. Same load-bearing default as corpusRemote
+     above, and no comma in the message for the same reason. */ -}}
+{{- $memoryScope := promptStringOnce . "memoryScope" "Memory scope for the distiller (Macs sharing a scope share one corpus)" (dig "profile" "default" .) -}}
+
 {{/* Which modules this Mac has already been *offered* — not the same as which it
      has enabled. promptMultichoiceOnce reads the saved answer back and chez up
      only ever runs `apply`, so a module added to the catalog after a machine was
@@ -107,6 +118,7 @@ sourceDir = {{ .chezmoi.workingTree | quote }}
     signingMode = {{ $signingMode | quote }}
     signingKey  = {{ $signingKey | quote }}
     corpusRemote = {{ $corpusRemote | quote }}
+    memoryScope = {{ $memoryScope | quote }}
     modules     = [{{ range $i, $m := $modules }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
     modulesSeen = [{{ range $i, $m := $modulesSeen }}{{ if $i }}, {{ end }}{{ $m | quote }}{{ end }}]
 

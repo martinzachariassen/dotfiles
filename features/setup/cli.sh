@@ -398,8 +398,12 @@ def_profile="$(cm_data_string "$DATA_JSON" profile)"
 def_signing="$(cm_data_string "$DATA_JSON" signingMode)"
 def_signkey="$(cm_data_string "$DATA_JSON" signingKey)"
 def_corpus="$(cm_data_string "$DATA_JSON" corpusRemote)"
+def_scope="$(cm_data_string "$DATA_JSON" memoryScope)"
 [ -n "$def_profile" ] || def_profile="personal"
 [ -n "$def_signing" ] || def_signing="1password"
+# Mirrors the template's `dig "profile" …` default: a Mac set up before
+# memoryScope existed keeps the scope its corpus is already stamped with.
+[ -n "$def_scope" ] || def_scope="$def_profile"
 
 printf '%s\n' "$BOX_TOP" >/dev/tty
 say "Setup — 4 quick questions, then this Mac gets configured." >/dev/tty
@@ -486,6 +490,7 @@ modules="$(select_modules $mod_default)"
 # QTOTAL stays honest: a numbered question that is sometimes skipped would make
 # the header promise more questions than it asks (tests/setup-ux.bats).
 corpusRemote="$def_corpus"
+memoryScope="$def_scope"
 case " $modules " in
     *" claudeDistiller "*)
         ask_sub "Corpus backup (optional)" \
@@ -495,6 +500,14 @@ case " $modules " in
         printf '  %s[%s]%s ' "$DIM" "${def_corpus:-blank}" "$RESET"
         IFS= read -r corpusRemote </dev/tty || corpusRemote=""
         [ -n "$corpusRemote" ] || corpusRemote="$def_corpus"
+
+        ask_sub "Memory scope" \
+            "Which corpus this Mac's memory belongs to. Macs sharing a scope share one" \
+            "corpus; Macs that don't must never merge theirs, because a rule seen twice" \
+            "in one scope gets promoted into the other's persistent memory."
+        printf '  %s[%s]%s ' "$DIM" "$def_scope" "$RESET"
+        IFS= read -r memoryScope </dev/tty || memoryScope=""
+        [ -n "$memoryScope" ] || memoryScope="$def_scope"
         ;;
 esac
 
@@ -579,6 +592,7 @@ init_flags=(
     --promptChoice "$(prompt_msg signingMode)=$signingMode"
     --promptMultichoice "$(prompt_msg modules)=$mods_slash"
     --promptString "$(prompt_msg corpusRemote)=$corpusRemote"
+    --promptString "$(prompt_msg memoryScope)=$memoryScope"
 )
 if [ "$signingMode" != "off" ]; then
     init_flags+=(--promptString "$(prompt_msg signingKey)=$signingKey")

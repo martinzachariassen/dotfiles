@@ -72,15 +72,16 @@ doctor_distill() {
 
         # A corpus with no remote is one disk failure from gone, and it is the
         # only thing here that cannot be regenerated. Worse than no remote is the
-        # other profile's remote: it looks like a backup, and it isn't — it is
-        # work memory promoted into personal sessions, one push past undoing.
+        # other scope's remote: it looks like a backup, and it isn't — it is
+        # one scope's memory promoted into another's sessions, one push past
+        # undoing.
         # Whether it is REACHING the remote, not merely which remote it names.
         # This line used to pass on the strength of an origin URL existing, so a
         # push that had been rejected every night for two days still read green.
         # The verdict is computed once, in distill_backup_state, and only
         # rendered here — chez distill --status renders the same one.
         if ! distill_corpus_check_local >/dev/null 2>&1; then
-            fail "the corpus is stamped $(distill_corpus_profile) but this is a $(distill_profile) Mac. See: chez distill --status"
+            fail "the corpus is stamped $(distill_corpus_scope) but this is a $(distill_scope) Mac. See: chez distill --status"
         else
             distill_url="$(git -C "$(distill_state_dir)" remote get-url origin 2>/dev/null || true)"
             read -r distill_bv distill_bn _ <<<"$(distill_backup_state 2>/dev/null)"

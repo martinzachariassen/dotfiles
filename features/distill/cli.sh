@@ -315,10 +315,10 @@ _distill_count() {
 # the other end BEFORE asking — for a corpus with no identity of its own that
 # display is the only check available, so it has to be a human one.
 _distill_remote() {
-    local arg="${1:-}" repo url populated branch rprofile rid mine
+    local arg="${1:-}" repo url populated branch rscope rid mine
     distill_preflight || return $?
     repo="$(distill_state_dir)"
-    mine="$(distill_profile)"
+    mine="$(distill_scope)"
 
     if [ -z "$arg" ]; then
         url="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
@@ -330,7 +330,7 @@ _distill_remote() {
             say "this corpus is local only — this Mac is the only copy"
         fi
         [ -n "$(distill_corpus_id)" ] &&
-            dim "  identity $(distill_corpus_id) · stamped $(distill_corpus_profile)"
+            dim "  identity $(distill_corpus_id) · stamped $(distill_corpus_scope)"
         if [ -n "$url" ]; then
             explain "Move it with: chez distill --remote <url> · stop with: --remote none"
         else
@@ -353,11 +353,11 @@ _distill_remote() {
     fi
 
     say "would back this Mac's corpus up to $arg"
-    read -r populated branch rprofile rid <<<"$(distill_remote_survey "$arg")"
+    read -r populated branch rscope rid <<<"$(distill_remote_survey "$arg")"
     if [ "${populated:-0}" = "1" ]; then
-        dim "  found a corpus there: ${rprofile:-no profile stamp} · ${rid:-no identity} · branch ${branch:-?}"
-        if [ -n "$rprofile" ] && [ -n "$mine" ] && [ "$rprofile" != "$mine" ]; then
-            fail "that corpus is stamped $rprofile and this is a $mine Mac — refusing"
+        dim "  found a corpus there: ${rscope:-no scope stamp} · ${rid:-no identity} · branch ${branch:-?}"
+        if [ -n "$rscope" ] && [ -n "$mine" ] && [ "$rscope" != "$mine" ]; then
+            fail "that corpus is stamped $rscope and this is a $mine Mac — refusing"
             return 1
         fi
         [ -z "$rid" ] &&

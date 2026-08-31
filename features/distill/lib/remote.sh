@@ -27,7 +27,7 @@
 # config that is generated. Blank is a real, permanent answer meaning local only.
 
 # distill_remote_seed — the URL setup was given for this Mac, if any. Read like
-# distill_profile, from the prompted answers rather than the .distill table, so
+# distill_scope, from the prompted answers rather than the .distill table, so
 # it must stay a TOP-LEVEL key: prompted answers and .chezmoidata share one flat
 # namespace and have to stay disjoint.
 distill_remote_seed() {
@@ -110,7 +110,7 @@ distill_state_repo_pushurl() {
     git -C "$repo" config remote.origin.pushurl "$fetch" >/dev/null 2>&1 || true
 }
 
-# distill_commit_local MESSAGE — commit the state dir, and push to the profile's
+# distill_commit_local MESSAGE — commit the state dir, and push to this Mac's
 # corpus remote. The commit is what matters and it is made first, so the network
 # can never cost you a night's work: a failed push is reported and retried by the
 # next run, never treated as a failed run.
@@ -195,8 +195,8 @@ distill_render_state_readme() {
     # each night that changes nothing, and a merge conflict in the one file that
     # has no business having one.
     [ -n "$remote" ] && remote="https://$(distill_remote_id "$remote")"
-    # There is one of these repo per profile (…-personal, …-work), and a heading
-    # that names the wrong one on the wrong remote is worse than no heading.
+    # There is one of these repos per memory scope, and a heading that names the
+    # wrong one on the wrong remote is worse than no heading.
     title="$(basename "${remote:-claude-memory}" .git)"
     mkdir -p "$(dirname "$out")"
     {
@@ -246,7 +246,7 @@ distill_render_state_readme() {
 # it was attached to (`chez distill --remote`), so a replacement Mac fetches the corpus
 # instead of starting from an empty memory and nobody has to remember a
 # `git remote add`. A remote already set by hand is left alone unless it is
-# another profile's, which is refused — see distill_corpus_check_local.
+# another scope's, which is refused — see distill_corpus_check_local.
 #
 # What is tracked is exactly what cannot be regenerated: the extract corpus and
 # `Pinned.md`. Everything else here is per-machine telemetry and is excluded —

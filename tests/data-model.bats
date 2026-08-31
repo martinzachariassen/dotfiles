@@ -166,6 +166,39 @@ setup() {
     [[ "$output" == *'corpusRemote = ""'* ]] || return 1
 }
 
+# ─── the memory scope ─────────────────────────────────────────────────────────
+#
+# The corpus leak boundary compares this Mac's scope against the stamp on the
+# corpus it is being pointed at, and refuses a mismatch. Both halves of that
+# comparison being empty is a PASS — so anything that leaves the scope blank
+# disarms the guard rather than tripping it. These three tests are about the
+# three ways it could end up blank.
+@test "memoryScope is prompted unconditionally in the template" {
+    grep -q 'promptStringOnce . "memoryScope"' "$TMPL"
+}
+
+# A Mac set up before this key existed already has a corpus stamped with its old
+# profile. Defaulting to the saved `profile` is what keeps that Mac matching its
+# own backup; "default" is only for a machine that has neither.
+@test "memoryScope defaults to the saved profile, then to a non-empty literal" {
+    grep -q 'promptStringOnce . "memoryScope" "[^"]*" (dig "profile" "default" .)' "$TMPL"
+}
+
+@test "memoryScope is persisted, and never as the prompt message" {
+    grep -q 'memoryScope = {{ \$memoryScope | quote }}' "$TMPL"
+    command -v chezmoi >/dev/null || skip "chezmoi not installed"
+
+    # A scratch HOME so this asserts the FRESH-machine render. Against the real
+    # one it would read back whatever this Mac answered, and pass for the wrong
+    # reason on the author's laptop while proving nothing on CI.
+    local scratch="$BATS_TEST_TMPDIR/fresh"
+    mkdir -p "$scratch"
+    run env HOME="$scratch" XDG_CONFIG_HOME="$scratch/.config" \
+        chezmoi execute-template --init <"$TMPL"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'memoryScope = "default"'* ]] || return 1
+}
+
 # The public repo must not carry anyone's private corpus URLs.
 @test "no corpus remote is hardcoded in the data files" {
     run grep -rn "claude-memory" "$BATS_TEST_DIRNAME/../src/.chezmoidata/"

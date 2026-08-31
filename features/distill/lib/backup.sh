@@ -14,7 +14,7 @@
 #
 # One repo: the state dir. It exists so `--undo` still means something, since the
 # memory tier is derived and can always be re-rendered from the corpus. Its
-# remote comes from the profile, so the corpus survives the machine without
+# remote comes from setup, so the corpus survives the machine without
 # anyone opting in. This path never touches the repo this script ships in.
 
 # Never let the network block a headless job. Without these an unreachable remote
