@@ -111,7 +111,7 @@ fi
 if [ "${SKIP_AZ:-0}" != "1" ] && has_module cloudAuth; then
     step "Azure CLI" "Sign in to Azure for AKS, Azure DevOps, etc."
     if ! command -v az >/dev/null 2>&1; then
-        warn "az not installed - skipping. Use the work profile if this Mac needs Azure."
+        warn "az not installed - skipping. Add azure-cli to a Brewfile if this Mac needs Azure."
     elif az account show >/dev/null 2>&1; then
         ok "az already authenticated as $(az account show --query user.name -o tsv 2>/dev/null || echo '?')"
     else
@@ -135,7 +135,7 @@ fi
 if [ "${SKIP_GCLOUD:-0}" != "1" ] && has_module cloudAuth; then
     step "Google Cloud CLI" "Sign in for GCP/GKE work."
     if ! command -v gcloud >/dev/null 2>&1; then
-        warn "gcloud not installed - skipping. Use the work profile if this Mac needs GCP."
+        warn "gcloud not installed - skipping. Add gcloud-cli to a Brewfile if this Mac needs GCP."
     elif gcloud auth list 2>/dev/null | grep -q '\*'; then
         ok "gcloud already authenticated as $(gcloud config get-value account 2>/dev/null || echo '?')"
     else

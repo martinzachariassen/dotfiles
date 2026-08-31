@@ -17,7 +17,7 @@ main() {
     local status_output response
     explain_titled "Applying config" \
         "Writes this repo's files into your home folder and installs anything" \
-        "your profile declares that is missing. Never uninstalls." \
+        "this Mac's Brewfiles declare that is missing. Never uninstalls." \
         "Local edits to managed files are overwritten — you get one confirm first."
     status_output=$(chezmoi status --exclude scripts 2>&1)
     if [ -n "$status_output" ]; then

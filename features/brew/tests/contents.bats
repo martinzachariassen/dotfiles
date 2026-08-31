@@ -14,8 +14,6 @@ setup() {
     load '../../../core/testing/helper'
     CORE="$REPO_ROOT/features/brew/Brewfile"
     MAC_APPS="$REPO_ROOT/features/brew/Brewfile.mac-apps"
-    WORK="$REPO_ROOT/features/brew/Brewfile.work"
-    PERSONAL="$REPO_ROOT/features/brew/Brewfile.personal"
 }
 
 # 0 if FILE has a line declaring `KIND "NAME"`, ignoring trailing comments.
@@ -113,68 +111,17 @@ not_declares() {
     declares "$MAC_APPS" cask claude-code
 }
 
-# ─── Work module: cloud/k8s stack ──────────────────────────────────────────
+# ─── The retired profile tiers ─────────────────────────────────────────────
+#
+# v1.0 deleted Brewfile.work and Brewfile.personal. The work tier's fifteen
+# entries live on inline in features/brew/migrate-work-profile.sh, which moves
+# them into a machine's own ~/.config/chez/Brewfile.local — see that script's
+# suite. Nothing may reintroduce them here: the repo is public, and a file
+# named Brewfile.* is something every resolver and CI sweep globs.
 
-@test "work Brewfile exists" {
-    [ -f "$WORK" ]
-}
-@test "work Brewfile declares kubectl" {
-    declares "$WORK" brew kubernetes-cli
-}
-@test "work Brewfile declares helm" {
-    # Terminal-side companion to kubectl; the VS Code extensions that used to
-    # justify it were dropped 2026-08, the CLI stands on its own.
-    declares "$WORK" brew helm
-}
-@test "work Brewfile declares minikube" {
-    # Same story as helm — the local cluster CLI stays brew-managed so its
-    # version is pinned with the rest of the toolchain.
-    declares "$WORK" brew minikube
-}
-@test "work Brewfile declares kubectx" {
-    declares "$WORK" brew kubectx
-}
-@test "work Brewfile declares Azure kubelogin" {
-    # Tapped name — the literal "Azure/kubelogin/kubelogin" must appear.
-    declares "$WORK" brew Azure/kubelogin/kubelogin
-}
-@test "work Brewfile declares terraform from hashicorp/tap" {
-    # Tapped name — the literal "hashicorp/tap/terraform" must appear.
-    declares "$WORK" brew hashicorp/tap/terraform
-}
-@test "work Brewfile declares azure-cli" {
-    declares "$WORK" brew azure-cli
-}
-@test "work Brewfile declares gcloud-cli" {
-    declares "$WORK" cask gcloud-cli
-}
-
-# Not a casual app addition: a work Mac that isn't enrolled in Intune loses
-# access to the corporate resources the rest of this tier exists to reach.
-@test "work Brewfile declares intune-company-portal" {
-    declares "$WORK" cask intune-company-portal
-}
-
-# Microsoft 365 footgun: the suite cask `conflicts_with` every standalone
-# Office cask. If both are listed `brew bundle` fails outright on a clean
-# install — a real foot-cannon documented inline in the Brewfile.
-@test "work Brewfile declares the microsoft-office suite" {
-    declares "$WORK" cask microsoft-office
-}
-@test "work Brewfile does NOT also declare standalone Office apps that conflict with the suite" {
-    not_declares "$WORK" cask microsoft-outlook
-    not_declares "$WORK" cask microsoft-word
-    not_declares "$WORK" cask microsoft-excel
-    not_declares "$WORK" cask microsoft-powerpoint
-    not_declares "$WORK" cask microsoft-onenote
-    not_declares "$WORK" cask onedrive
-}
-
-# ─── Personal module: minimal, just verify file exists ─────────────────────
-
-@test "personal Brewfile exists" {
-    # Casks here are pure preference; only existence is pinned.
-    [ -f "$PERSONAL" ]
+@test "no profile Brewfile has come back" {
+    [ ! -e "$REPO_ROOT/features/brew/Brewfile.work" ]
+    [ ! -e "$REPO_ROOT/features/brew/Brewfile.personal" ]
 }
 
 # ─── The machine-local seed template ───────────────────────────────────────

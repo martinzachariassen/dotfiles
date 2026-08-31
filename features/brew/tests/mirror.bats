@@ -10,11 +10,10 @@
 # the REAL functions from the template and run them against a stubbed
 # brew/gum, so a regression in the committed source fails here.
 #
-# The tier set is the ACTIVE one (core + enabled modules + this profile),
-# resolved by the real features/brew/lib/tiers.sh against a stubbed `chezmoi
-# data` — not every `Brewfile.*` that exists. Too FEW tiers offers the
-# toolchain for uninstall; too MANY (the old glob) silently keeps packages
-# this machine's profile dropped.
+# The tier set is the ACTIVE one (core + enabled modules), resolved by the real
+# features/brew/lib/tiers.sh against a stubbed `chezmoi data` — not every
+# `Brewfile.*` that exists. Too FEW tiers offers the toolchain for uninstall;
+# too MANY (the old glob) silently keeps packages this machine has dropped.
 #
 # The interactive per-package loop needs a controlling terminal; the two
 # TTY-dependent tests are inverse-gated (safety runs headless in CI, the
@@ -27,9 +26,9 @@ setup() {
 
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
 
-    # Fake repo with four Brewfile tiers, each with a distinct marker, so we can
+    # Fake repo with the Brewfile tiers, each with a distinct marker, so we can
     # prove exactly which ones reach brew's stdin. It carries the REAL resolver
-    # lib, so these tests exercise the committed brewfiles.sh, not a mock of it.
+    # lib, so these tests exercise the committed tiers.sh, not a mock of it.
     FAKE="$(mktemp -d)"
     mkdir -p "$FAKE/features/brew/lib" "$FAKE/core"
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
@@ -39,8 +38,6 @@ setup() {
     cp "$REPO_ROOT/core/paths.sh" "$FAKE/core/paths.sh"
     printf 'brew "marker-core"\n' >"$FAKE/features/brew/Brewfile"
     printf 'cask "marker-macapps"\n' >"$FAKE/features/brew/Brewfile.mac-apps"
-    printf 'brew "marker-personal"\n' >"$FAKE/features/brew/Brewfile.personal"
-    printf 'brew "marker-work"\n' >"$FAKE/features/brew/Brewfile.work"
 
     # Stub bin dir (prepended to PATH) + log/queue files the stubs read/write.
     STUBS="$(mktemp -d)"
@@ -50,22 +47,16 @@ setup() {
     UNINSTALL_LOG="$STUBS/uninstall.log"
     DATA_JSON_FILE="$STUBS/data.json" # what stub `chezmoi data` prints
 
-    # Default machine: personal profile with macApps on, appleDev off — so the
-    # active set is core + mac-apps + personal, and Brewfile.work is NOT active.
-    # Tests that need another shape rewrite this file.
+    # Default machine: macApps on, appleDev off — so the active set is core +
+    # mac-apps. Tests that need another shape rewrite this file.
     cat >"$DATA_JSON_FILE" <<'EOF'
 {
-  "profile": "personal",
   "modules": ["macApps"],
   "brewfiles": {
     "core": "features/brew/Brewfile",
     "byModule": {
       "macApps": "features/brew/Brewfile.mac-apps",
       "appleDev": "features/brew/Brewfile.apple-dev"
-    },
-    "byProfile": {
-      "personal": "features/brew/Brewfile.personal",
-      "work": "features/brew/Brewfile.work"
     }
   }
 }
@@ -227,7 +218,7 @@ EOF
     # Each active tier's marker must reach brew's stdin — not just the last
     # file's. Missing one reports its packages as untracked and queues the
     # toolchain for uninstall.
-    for m in marker-core marker-macapps marker-personal; do
+    for m in marker-core marker-macapps; do
         grep -qF "$m" "$STDIN_LOG" || {
             echo "missing $m from brew stdin:"
             cat "$STDIN_LOG"
@@ -236,13 +227,14 @@ EOF
     done
 }
 
-@test "brew_removals excludes the other profile's tier (work-on-personal bug)" {
-    # The bug: the tier set was the `Brewfile.*` glob, so Brewfile.work counted
-    # as tracked on a personal machine — a cask moved from mac-apps to the work
-    # profile was never offered for removal on the machine that just dropped it.
+@test "brew_removals ignores a Brewfile no tier declares (no globbing)" {
+    # The bug: the tier set was the `Brewfile.*` glob, so any stray file counted
+    # as tracked — a cask moved out of a tier was never offered for removal on
+    # the machine that just dropped it. Only the resolver's answer may be fed in.
+    printf 'brew "marker-stray"\n' >"$FAKE/features/brew/Brewfile.stray"
     run_removals "$FAKE"
     [ "$status" -eq 0 ]
-    no_match 'marker-work' "$STDIN_LOG"
+    no_match 'marker-stray' "$STDIN_LOG"
 }
 
 @test "brew_removals excludes a disabled module's tier" {
@@ -268,13 +260,17 @@ EOF
     }
 }
 
-@test "brew_removals follows the profile: work data feeds work, not personal" {
+@test "brew_removals fails closed on a config the v1.0 migration has not reached" {
+    # A Mac that has pulled v1.0 but not yet applied still has `profile` saved,
+    # and its work stack is declared by nothing in the repo any more. Resolving
+    # anyway would offer that whole stack for uninstall, so the resolver refuses
+    # — and refusing must reach all the way out here, as an empty removal set.
     jq '.profile = "work"' "$DATA_JSON_FILE" >"$DATA_JSON_FILE.new"
     mv "$DATA_JSON_FILE.new" "$DATA_JSON_FILE"
     run_removals "$FAKE"
-    [ "$status" -eq 0 ]
-    grep -qF marker-work "$STDIN_LOG"
-    no_match 'marker-personal' "$STDIN_LOG"
+    [ "$status" -eq 1 ]
+    [ ! -s "$ARGS_LOG" ] # brew was never even asked
+    grep -qF 'could not resolve the active Brewfiles' <<<"$output"
 }
 
 @test "brew_removals fails closed when the tier set cannot be resolved" {

@@ -6,16 +6,21 @@ neither of them can reconcile.
 
 ## Tiers
 
-Packages are declared across five Brewfiles in the repo, and which ones apply to
-a machine depends on its profile and enabled modules. A sixth tier lives outside
-the repo entirely:
+Packages are declared across three Brewfiles in the repo, and which ones apply to
+a machine depends only on its enabled modules. A fourth tier lives outside the
+repo entirely:
 
 | Tier | File | Applies |
 |---|---|---|
 | Core | `Brewfile` | Always |
 | Module | `Brewfile.mac-apps`, `Brewfile.apple-dev` | When that module is on |
-| Profile | `Brewfile.personal`, `Brewfile.work` | To that profile |
 | Machine-local | `~/.config/chez/Brewfile.local` | To this Mac only |
+
+There is no per-machine-kind tier. v1.0 retired the `profile` enum, and with it
+`Brewfile.personal` and `Brewfile.work`: a Mac is not a *kind*, it is the core
+set plus the modules it ticked plus whatever it adopted locally. The fifteen
+packages the work tier used to declare were moved into the overlay on the one
+machine that had them — see [`migrate-work-profile.sh`](migrate-work-profile.sh).
 
 The repo mapping lives in [`src/.chezmoidata/brew.toml`](../../src/.chezmoidata/brew.toml)
 as repo-root-relative paths, which the hooks join with
@@ -52,17 +57,20 @@ directions go through it: the apply hook installs from that set, `chez mirror`
 offers everything *outside* it for removal, and `chez doctor` reports drift
 against it.
 
-They used to disagree. The install side was profile- and module-gated while the
-removal side globbed every `Brewfile.*` that existed, so `chez doctor` called a
-work-only cask "untracked" on a personal machine. One resolver is what stops
-that, and `tests/doctor.bats` pins the regression.
+They used to disagree. The install side asked the resolver while the removal side
+globbed every `Brewfile.*` that existed, so a tier this machine does not enable
+still vouched for whatever it declared and `chez doctor` under-reported drift.
+One resolver is what stops that, and `tests/doctor.bats` pins the regression.
 
-A consequence worth knowing: moving a package to the *other* profile's tier makes
-it removable here. The other profile's Brewfile does not keep it alive, which is
-the same thing deleting it would do.
+A consequence worth knowing: moving a package into a tier this Mac does not
+enable makes it removable here. A Brewfile that is not active does not keep
+anything alive, which is the same thing deleting the line would do.
 
 The removal side fails **closed** — if the tier set cannot be resolved it offers
-nothing rather than guessing wider.
+nothing rather than guessing wider. `brew_active_files` refuses outright on a
+config that still carries the retired `profile` key, because that is precisely
+the state where "declared" would silently collapse to the core file and offer a
+whole migrated-away stack for uninstall.
 
 ## Comparing installed against declared
 

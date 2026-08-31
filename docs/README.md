@@ -21,7 +21,7 @@ what spans features, plus a tour of the configured environment.
 |---|---|
 | [install.md](install.md) | Bootstrapping a Mac — the three scenarios, `install.sh` flags, cleaning up drift, migrating off the old direnv stack. |
 | [commands.md](commands.md) | The `chez <verb>` surface: the generated table of every verb, how `chez up` works phase by phase, and the output conventions every verb shares. |
-| [packages.md](packages.md) | Package tiers (core + profile + module Brewfiles), profiles, the optional-module catalog, and the plain-text setup wizard. |
+| [packages.md](packages.md) | Package tiers (the core Brewfile, the per-module ones and the machine-local overlay), the optional-module catalog, and the plain-text setup wizard. |
 
 ## Internals
 

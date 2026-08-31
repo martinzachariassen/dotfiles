@@ -12,6 +12,9 @@ setup() {
 
 # ─── cm_data_string ────────────────────────────────────────────────────────────
 
+# `profile` on purpose, retired though it is: the memoryScope fallback in both
+# features/sign/cli.sh and features/setup/cli.sh makes exactly this call against
+# an un-migrated config, so this is the real caller and not a stand-in.
 @test "cm_data_string reads a top-level string" {
     run cm_data_string "$JSON" profile
     [ "$output" = "work" ]

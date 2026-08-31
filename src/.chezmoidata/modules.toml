@@ -13,19 +13,19 @@ locale = "Norwegian locale (cSpell nb, bokmal dictionary)"
 jvmStack = "JVM runtimes via mise (Temurin, Kotlin, Maven, Gradle)"
 appleDev = "Swift/iOS dev (SwiftLint, SwiftFormat, xcbeautify, xcodes, fastlane)"
 
-# effective = (inherit ? base : []) ∪ extra. .chezmoi.toml.tmpl restates this
-# literally (renders before .chezmoidata loads); tests/data-model.bats enforces
-# the two match.
-[profileDefaults]
-base = ["claudeDistiller", "claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]
-
-# minimal is deliberately empty.
-[profileDefaults.inherit]
-personal = true
-work = true
-minimal = false
-
-[profileDefaults.extra]
-personal = ["appleDev"]
-work = ["cloudAuth"]
-minimal = []
+# The boxes the wizard pre-ticks on a fresh Mac. A suggestion, not a gate:
+# nothing reads this at apply time, and unticking any of it is a normal answer.
+#
+# One list, not one per machine kind. This used to be [profileDefaults] — a
+# base set, an inherit flag and a per-profile extra list, three tables to say
+# "personal gets appleDev and work gets cloudAuth". Every module is already
+# independent, so the profile only decided which boxes started ticked; that is
+# a default, and a default does not need an axis.
+#
+# cloudAuth is the one catalog entry deliberately left off: it is the only
+# module whose walkthrough needs credentials you may not have.
+#
+# .chezmoi.toml.tmpl restates this literally (it renders before .chezmoidata
+# loads); tests/data-model.bats enforces the two match.
+[recommended]
+modules = ["appleDev", "claudeDistiller", "claudePersona", "jvmStack", "locale", "macApps", "macosDefaults", "theme"]

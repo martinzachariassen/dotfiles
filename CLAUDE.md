@@ -52,7 +52,7 @@ fall behind. See [`docs/commands.md`](docs/commands.md).
 - Apply-time hooks live in `src/.chezmoiscripts/`, named
   `run_[once|onchange]_[before|after]_NN-name.sh.tmpl` (`NN` sets order). **Keep
   the body in the feature and the guards in the template**: the template resolves
-  only what a render can know (the OS, the profile, module gates) and execs
+  only what a render can know (the OS, module gates, data values) and execs
   `features/<n>/hook.sh`. Because hooks sit under `src/`,
   `{{ .chezmoi.sourceDir }}` is `…/dotfiles/src` — reach root-level tooling via
   `{{ .chezmoi.workingTree }}` (the git root).
@@ -82,9 +82,11 @@ the part that must not be broken by accident.
   probes live in `features/xcode/probe.sh` and are shared with `chez doctor`, so
   add checks there rather than in either caller. →
   [xcode](features/xcode/README.md)
-- **storecode is the work-only exception.** Installed by its own hook from an
-  installer set in data — never a Brewfile — and `~/.storecode` is permanently on
-  `keepHome`. → [storecode](features/storecode/README.md)
+- **storecode is the one package with its own installer.** Installed by its own
+  hook from an installer command set in data — never a Brewfile — and
+  `~/.storecode` is permanently on `keepHome`. That command is the hook's only
+  gate, and this public repo ships it empty, so the hook is a no-op everywhere
+  but the one Mac that fills it in. → [storecode](features/storecode/README.md)
 - **chezdistill writes to two places, neither of them this repo,** and has no
   human-facing output by design. Its guiding rule is *the model extracts, bash
   decides and writes*: every judgement is computed in `features/distill/lib/`,
@@ -101,7 +103,7 @@ the part that must not be broken by accident.
 
 1. Edit the feature (or `src/`, or the root tooling).
 2. Preview the render: `chezmoi apply --dry-run`, or
-   `PROFILE=personal MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"`.
+   `MODULES=macApps,theme,jvmStack bash scripts/ci/render-check.sh "$PWD"`.
 3. Run the quality gates below.
 4. Open a PR.
 
@@ -142,7 +144,7 @@ bash scripts/ci/lint-config.sh "$PWD"  # every JSON/JSONC/TOML output parses
 
 - Shell: `shellcheck --severity=error`, `shfmt -i 4 -ci`, `bash -n` / `zsh -n`.
   The file list comes from `git ls-files`, so a moved script cannot drop out.
-- Render: `chezmoi apply --dry-run` across the profile/module matrix.
+- Render: `chezmoi apply --dry-run` across the module matrix.
 - Workflows: `actionlint` + `zizmor`. Spelling: `typos`.
 - **Never commit secrets** — tokens, keys, credentials, signing material. Use
   placeholders or a secret-manager reference; `gitleaks` scans every push.

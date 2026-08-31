@@ -1,7 +1,7 @@
 # Git commit signing
 
-`chez sign` (today: `chez sign`) sets the commit signing key on its own, keeping
-profile, modules and identity exactly as they are.
+`chez sign` sets the commit signing key on its own, keeping modules, identity and
+every other saved answer exactly as they are.
 
 ## Why it exists
 

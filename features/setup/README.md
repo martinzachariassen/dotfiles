@@ -1,7 +1,7 @@
 # Setup wizard and saved answers
 
-Four questions on a fresh Mac — name and email, profile, optional modules, git
-signing — and the way to change any of them later.
+Four questions on a fresh Mac — name, email, git signing and optional modules —
+and the way to change any of them later.
 
 ## Verbs
 

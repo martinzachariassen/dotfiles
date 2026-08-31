@@ -3,23 +3,22 @@
 # tiers apply to THIS machine?", shared by chez doctor and by chez mirror's
 # removal set so the install and removal directions can't disagree.
 #
-# Both directions used to resolve it separately: installs were gated on profile
-# + modules, removals globbed every `Brewfile.*` that existed. A cask moved
-# from a module tier to the work profile therefore stayed "tracked" on a
-# personal machine and was never offered for uninstall.
+# Both directions used to resolve it separately: installs were gated on the
+# module set, removals globbed every `Brewfile.*` that existed. A cask moved
+# from one tier to another therefore stayed "tracked" on a machine that had
+# stopped declaring it, and was never offered for uninstall.
 
 setup() {
     load '../../../core/testing/helper'
     LIB="$REPO_ROOT/features/brew/lib/tiers.sh"
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
 
-    # Mirrors src/.chezmoidata/brew.toml's shape; both tiers of both
-    # profiles and both optional modules exist, so every test below is really
-    # about selection, not about which files happen to be defined.
-    DATA='{"profile":"personal","modules":["macApps","theme"],"brewfiles":{
+    # Mirrors src/.chezmoidata/brew.toml's shape; both optional module tiers
+    # exist, so every test below is really about selection, not about which
+    # files happen to be defined.
+    DATA='{"modules":["macApps","theme"],"brewfiles":{
         "core":"features/brew/Brewfile",
-        "byModule":{"macApps":"features/brew/Brewfile.mac-apps","appleDev":"features/brew/Brewfile.apple-dev"},
-        "byProfile":{"personal":"features/brew/Brewfile.personal","work":"features/brew/Brewfile.work"}}}'
+        "byModule":{"macApps":"features/brew/Brewfile.mac-apps","appleDev":"features/brew/Brewfile.apple-dev"}}}'
 }
 
 resolve() { # resolve JSON — run brew_active_files against fixture data
@@ -38,19 +37,12 @@ no_match_in() {
     fi
 }
 
-@test "brew_active_files emits core + enabled modules + this profile" {
+@test "brew_active_files emits core + enabled modules" {
     resolve "$DATA"
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "features/brew/Brewfile" ]
     [ "${lines[1]}" = "features/brew/Brewfile.mac-apps" ]
-    [ "${lines[2]}" = "features/brew/Brewfile.personal" ]
-    [ "${#lines[@]}" -eq 3 ]
-}
-
-@test "brew_active_files drops the other profile's tier" {
-    # The chez mirror bug in one assertion: on personal, work is NOT tracked.
-    resolve "$DATA"
-    no_match_in "$output" 'Brewfile\.work'
+    [ "${#lines[@]}" -eq 2 ]
 }
 
 @test "brew_active_files drops a module the machine hasn't enabled" {
@@ -64,35 +56,57 @@ no_match_in() {
     grep -qF 'features/brew/Brewfile.apple-dev' <<<"$output"
 }
 
-@test "brew_active_files follows the profile switch" {
-    resolve "$(jq -c '.profile = "work"' <<<"$DATA")"
-    [ "$status" -eq 0 ]
-    grep -qF 'features/brew/Brewfile.work' <<<"$output"
-    no_match_in "$output" 'Brewfile\.personal'
-}
-
-@test "brew_active_files orders core first, profile last (install order)" {
-    # Same order run_after_02-brew-bundle installs in: core, modules, profile.
+@test "brew_active_files orders core first (install order)" {
+    # Same order run_after_02-brew-bundle installs in: core, then modules.
     resolve "$(jq -c '.modules += ["appleDev"]' <<<"$DATA")"
     [ "${lines[0]}" = "features/brew/Brewfile" ]
-    [ "${lines[$((${#lines[@]} - 1))]}" = "features/brew/Brewfile.personal" ]
-}
-
-@test "brew_active_files survives a profile with no Brewfile of its own" {
-    # The lookup is null and must be dropped — not emitted as the string
-    # "null", which callers would turn into a bogus \$SOURCE_DIR/null path.
-    resolve "$(jq -c '.profile = "minimal"' <<<"$DATA")"
-    [ "$status" -eq 0 ]
-    no_match_in "$output" '^null$'
-    grep -qF 'features/brew/Brewfile' <<<"$output"
 }
 
 @test "brew_active_files survives absent modules/byModule keys" {
-    resolve '{"profile":"personal","brewfiles":{"core":"features/brew/Brewfile","byProfile":{"personal":"p"}}}'
+    resolve '{"brewfiles":{"core":"features/brew/Brewfile"}}'
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "features/brew/Brewfile" ]
-    [ "${lines[1]}" = "p" ]
-    [ "${#lines[@]}" -eq 2 ]
+    [ "${#lines[@]}" -eq 1 ]
+}
+
+# ── the v1.0 migration's fail-closed guard ───────────────────────────────────
+# Between pulling v1.0 and running an apply, a Mac can be executing this code
+# against a config that still says `profile = "work"`: the profile tiers are
+# gone from the repo, the migration hook has not run, and Brewfile.local does
+# not exist yet. Resolving anyway would silently collapse "declared" to core
+# plus modules — and the removal verbs would line the whole work stack up for
+# uninstall. Refusing is the only safe reading of that state.
+
+@test "brew_active_files refuses a config that still carries a profile key" {
+    # stderr is discarded, not merged: `run` folds both streams together, and
+    # the refusal explains itself on stderr. What must be empty is *stdout* —
+    # a caller pipes it into the removal set and reads any line as declared.
+    run bash -c ". '$LIB'; brew_active_files \"\$1\" 2>/dev/null" _ \
+        "$(jq -c '.profile = "work"' <<<"$DATA")"
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
+}
+
+@test "the refusal is on the key's PRESENCE, not on its value" {
+    # A migration that blanked the value instead of deleting the line would
+    # otherwise disarm the guard while leaving the machine un-migrated.
+    resolve "$(jq -c '.profile = ""' <<<"$DATA")"
+    [ "$status" -eq 1 ]
+    resolve "$(jq -c '.profile = null' <<<"$DATA")"
+    [ "$status" -eq 1 ]
+}
+
+@test "the refusal names the fix on stderr" {
+    run bash -c ". '$LIB'; brew_active_files \"\$1\" 2>&1 >/dev/null" _ \
+        "$(jq -c '.profile = "work"' <<<"$DATA")"
+    grep -qF 'profile' <<<"$output"
+    grep -qF 'chez up' <<<"$output"
+}
+
+@test "a migrated config resolves normally again" {
+    resolve "$(jq -c 'del(.profile)' <<<"$(jq -c '.profile = "work"' <<<"$DATA")")"
+    [ "$status" -eq 0 ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
 }
 
 @test "brew_active_files yields nothing for data with no brewfiles map" {
@@ -150,7 +164,7 @@ overlay() {
 
 @test "the overlay is not emitted when the Mac has none" {
     resolve "$DATA"
-    [ "${#lines[@]}" -eq 3 ]
+    [ "${#lines[@]}" -eq 2 ]
     no_match_in "$output" 'Brewfile\.local'
 }
 
@@ -160,9 +174,9 @@ overlay() {
     overlay 'brew "ffmpeg"'
     resolve "$DATA"
     [ "$status" -eq 0 ]
-    [ "${#lines[@]}" -eq 4 ]
+    [ "${#lines[@]}" -eq 3 ]
     [ "${lines[0]}" = "features/brew/Brewfile" ]
-    [ "${lines[3]}" = "$CHEZ_CONFIG_DIR/Brewfile.local" ]
+    [ "${lines[2]}" = "$CHEZ_CONFIG_DIR/Brewfile.local" ]
 }
 
 @test "the overlay is emitted absolute, not repo-relative" {
@@ -172,7 +186,7 @@ overlay() {
     # the removal list. brew_resolve_file is what keeps callers honest.
     overlay 'brew "ffmpeg"'
     resolve "$DATA"
-    [[ "${lines[3]}" == /* ]] || return 1
+    [[ "${lines[2]}" == /* ]] || return 1
 }
 
 @test "an overlay does not rescue a failed resolve" {
@@ -313,7 +327,7 @@ bare() { run bash -c ". '$LIB'; brew_bare_names" <<<"$1"; }
 }
 
 @test "brew_bare_names folds the case a tap owner carries" {
-    # Brewfile.work says `brew "Azure/kubelogin/kubelogin"`; brew leaves prints
+    # A Brewfile may say `brew "Azure/kubelogin/kubelogin"`; brew leaves prints
     # azure/kubelogin/kubelogin. Same package, and they must compare equal.
     bare 'Azure/kubelogin/kubelogin'
     [ "$output" = "kubelogin" ] || return 1
@@ -409,7 +423,7 @@ rectangle' "$f"
 @test "brew_untracked_of_kind unions every tier it is given" {
     local a b
     a=$(bf Brewfile 'brew "jq"')
-    b=$(bf Brewfile.work 'brew "hashicorp/tap/terraform"')
+    b=$(bf Brewfile.extra 'brew "hashicorp/tap/terraform"')
     untracked_of brew 'jq
 terraform
 ripgrep' "$a" "$b"

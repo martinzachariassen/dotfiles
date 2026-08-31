@@ -41,8 +41,7 @@ with `chez setup`.
 | Question | Options | If unsure |
 | --- | --- | --- |
 | **Name + email** | for git commits | Your GitHub noreply address is fine. Don't leave the email blank — git refuses to commit without one. |
-| **Profile** | `personal` · `work` · `minimal` | `personal`. It picks which package sets you get. |
-| **Optional modules** | apps, macOS defaults, theme, JVM, Swift/iOS… | Keep the defaults for your profile. |
+| **Optional modules** | apps, macOS defaults, theme, JVM, Swift/iOS… | Keep what's pre-ticked — one recommended set, the same on every Mac. |
 | **Git commit signing** | `1password` · `ssh-key` · `off` | On a **fresh** Mac, choose to set the key **later** — it's still locked inside 1Password, which hasn't been installed yet. |
 
 ### When it finishes
@@ -91,7 +90,7 @@ Every check names the fix. It changes nothing — the two `!` lines and the one 
 | Runtimes | [mise](https://mise.jdx.dev) for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml` |
 | iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols. Xcode itself comes from `chez xcode` (Apple ID, ~40 GB), not from an apply |
 | AI | Default `macApps` module: the Claude and Claude Code apps |
-| Apps | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers |
+| Apps | Homebrew-managed core apps, optional Mac app extras, plus a machine-local `~/.config/chez/Brewfile.local` for whatever only this Mac wants |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md) |
 
 ---
@@ -99,13 +98,13 @@ Every check names the fix. It changes nothing — the two `!` lines and the one 
 <details>
 <summary><b>Forking this for your own Mac</b></summary>
 
-This is tuned to one person's Apple Silicon Mac — the profiles and modules exist for my own personal/work split, not as a general customization framework. It forks cleanly, but expect to swap in your own choices:
+This is tuned to one person's Apple Silicon Mac — the module catalog reflects my own choices, not a general customization framework. It forks cleanly, but expect to swap in your own:
 
 | Change | Where |
 | --- | --- |
-| Packages and apps | [`features/brew/Brewfile*`](features/brew/) — core, per-profile, per-module |
+| Packages and apps | [`features/brew/Brewfile*`](features/brew/) — a core file plus one per optional module |
 | VS Code extensions | [`features/vscode/extensions.txt`](features/vscode/extensions.txt) |
-| Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and per-profile defaults |
+| Optional modules | [`src/.chezmoidata/modules.toml`](src/.chezmoidata/modules.toml) — the catalog and the recommended set |
 | macOS defaults | [`features/macos/cli.sh`](features/macos/cli.sh) ([what it sets](docs/macos.md)) |
 | Repo URL in the installer | `REPO` in [`install.sh`](install.sh), or point at your fork without editing: `DOTFILES_REPO=<url> bash install.sh` |
 
@@ -130,7 +129,7 @@ Every verb is one row in [`core/verbs.sh`](core/verbs.sh); [`core/chez.sh`](core
 | `chez up` | Converge this Mac to the repo. Pull latest → preview the drift → apply. |
 | `chez doctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout, distiller. |
 | `chez status` / `chez apply` | Explain pending drift, or apply without pulling. Both read the same `chezmoi status`. |
-| `chez setup` | Re-run the wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added keys. |
+| `chez setup` | Re-run the wizard to change modules or signing (`--reset`/`-r`), or just fill in newly added keys. |
 | `chez sign` | Set **only** the git signing key, replaying every other answer untouched. |
 | `chez mirror` / `chez clean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. The deliberate, manual undo an apply never does. |
 | `chez reconcile` / `chez bump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |

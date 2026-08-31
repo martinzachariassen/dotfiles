@@ -34,7 +34,6 @@ sourceDir = "$SRC_DIR"
     email          = "ci@example.com"
     modules        = $1
     signingKey     = "ssh-ed25519 AAAAplaceholder"
-    profile        = "personal"
     useOnePassword = false
 
     [data.features]

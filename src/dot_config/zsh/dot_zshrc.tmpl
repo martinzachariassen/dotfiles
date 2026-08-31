@@ -1,5 +1,5 @@
 # ~/.config/zsh/.zshrc — interactive shell. Rendered from dot_zshrc.tmpl; edit via
-# `chezmoi edit ~/.config/zsh/.zshrc`. Profile: {{ .profile }}
+# `chezmoi edit ~/.config/zsh/.zshrc`.
 
 # Startup profiler, opt-in: `ZSH_PROFILE=1 zsh -i -c exit` prints a per-function
 # cost table. Must be the first thing loaded to see everything below it.
@@ -291,7 +291,7 @@ alias n='nvim'
 alias lg='lazygit'
 alias d='docker'
 alias dc='docker compose'
-command -v terraform >/dev/null && alias tf='terraform'  # work profile only
+command -v terraform >/dev/null && alias tf='terraform'  # only if you have it
 alias mw='./mvnw'
 alias gw='./gradlew'
 command -v kubectl >/dev/null && {
@@ -459,18 +459,9 @@ if [[ -n "$ZELLIJ" ]]; then
     _zj_record_cwd
 fi
 
-{{ if eq .profile "work" -}}
-# ─── Work-only shell config ───────────────────────────────────────────────────
-# export CORP_VPN_PROFILE="default"
-# alias k="kubectl --context=work-prod"
-{{ end -}}
-
-{{ if eq .profile "personal" -}}
-# ─── Personal-only shell config ───────────────────────────────────────────────
-# alias music='open -a "Spotify"'
-{{ end -}}
-
 # ─── Local overrides (not versioned) ──────────────────────────────────────────
+# The one hatch: whatever this machine wants that the repo should not carry.
+# Sourced last, so it wins over everything above it, and gated on nothing.
 [ -f "$ZDOTDIR/.zshrc.local" ] && source "$ZDOTDIR/.zshrc.local"
 
 # ─── zsh-autosuggestions ──────────────────────────────────────────────────────

@@ -68,7 +68,7 @@ Aliased only when present, and only where the replacement is a safe drop-in:
 
 Plus single-letter shortcuts for the tools run constantly: `n` (nvim), `lg`
 (lazygit), `g`/`gs`/`gd`/`gl` (git), `d`/`dc` (docker), `k`/`kgp`/`klf`
-(kubectl, guarded), `tf` (terraform, work profile only), `mw`/`gw`
+(kubectl, guarded), `tf` (terraform, when installed), `mw`/`gw`
 (Maven/Gradle wrappers), `xcb`/`xcderived`/`simulator` (Xcode, `appleDev`
 module only), and `mkcd` (mkdir + cd). `mkdir` and `find` are deliberately
 *not* aliased — the notes in the `.zshrc` explain why.

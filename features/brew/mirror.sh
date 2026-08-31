@@ -48,10 +48,10 @@ main() {
     done
 
     explain_titled "Untracked packages" \
-        "Finds Homebrew packages installed on this Mac that no Brewfile active for" \
-        "this profile and module set declares, then offers to uninstall them. This is" \
-        "the only verb that removes packages; apply and chez up never do. Each removal" \
-        "is confirmed separately."
+        "Finds Homebrew packages installed on this Mac that no active Brewfile" \
+        "declares — the core file, your modules' tiers and Brewfile.local — then" \
+        "offers to uninstall them. This is the only verb that removes packages;" \
+        "apply and chez up never do. Each removal is confirmed separately."
 
     # Distinguish "resolved, and nothing is untracked" from "could not resolve"
     # — both yield an empty set, but only the first is a clean bill of health.

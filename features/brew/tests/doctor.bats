@@ -4,9 +4,9 @@
 # The resolver itself lives in features/brew/lib/tiers.sh and is exercised in
 # features/brew/tests/tiers.bats. What matters here is that the report keeps
 # using it for BOTH directions — "is my active set installed?" and "what is
-# installed that no active tier declares?". They used to disagree: the first was
-# profile/module-gated, the second globbed every `Brewfile.*` that existed, so
-# the report called a work-only cask tracked on a personal machine.
+# installed that no active tier declares?". They used to disagree: the first
+# asked the resolver, the second globbed every `Brewfile.*` on disk, so a tier
+# this machine does not enable still vouched for whatever it declared.
 
 setup() {
     load '../../../core/testing/helper'
@@ -16,7 +16,7 @@ setup() {
 @test "both directions read the same active tier set" {
     grep -qE 'active_files="\$\(brew_active_files "\$DATA_JSON"' "$FRAGMENT"
     # The old code globbed features/brew/Brewfile.* for the untracked check,
-    # which counts every tier that exists — including the other profile's.
+    # which counts every tier that exists — including ones nothing enables.
     no_match 'features/brew/Brewfile\.\*' "$FRAGMENT"
     # Through brew_resolve_file, not by prefixing the repo root by hand. A repo
     # tier is repo-relative and the machine-local overlay is absolute, so a bare

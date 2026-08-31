@@ -1,9 +1,14 @@
-# storecode — work-only security tool, installed by its OWN installer, NOT
-# Homebrew (never belongs in a Brewfile). ~/.storecode is on cleanup.keepHome. See
-# src/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl (work profile only).
+# storecode — a security tool installed by its OWN installer, NOT Homebrew
+# (it never belongs in a Brewfile). ~/.storecode is on cleanup.keepHome. See
+# src/.chezmoiscripts/run_onchange_after_05-storecode.sh.tmpl.
 
 [storecode]
 # Environment-specific installer, so it ships empty: unset means the hook prints
 # how to finish and exits 0 rather than failing the apply. Set the real installer,
 # e.g. "curl -fsSL https://…/install.sh | bash", then run `chez up`.
+#
+# This value is also the hook's ONLY gate — it used to be `profile == "work"`,
+# and the profile axis is gone. Empty is the honest default for a public repo:
+# nothing installs, nothing is asked, and a machine that needs the tool says so
+# here.
 installCmd = ""

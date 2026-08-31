@@ -2,7 +2,7 @@
 
 Two editors are managed: **VS Code** for GUI work and **Neovim** (LazyVim) in
 the terminal, both themed Catppuccin Mocha. IntelliJ is installed for
-non-trivial Java/Kotlin (via the `work` profile) but isn't config-managed
+non-trivial Java/Kotlin but isn't config-managed
 here.
 
 ## VS Code

@@ -22,7 +22,7 @@ stub_xcode_machine() {
 #!/usr/bin/env bash
 case "\$1" in
     --version) echo "chezmoi version v2.72.0, commit none, built none" ;;
-    data) echo '{"modules":$modules,"profile":"personal"}' ;;
+    data) echo '{"modules":$modules}' ;;
     doctor | status) exit 0 ;;
     *) exit 0 ;;
 esac
@@ -126,8 +126,8 @@ run_doctor_xcode() {
 
 # ─── Brewfile resolution ────────────────────────────────────────────────────
 # The resolver itself lives in features/brew/lib/tiers.sh and is exercised in
-# tests/brewfiles-lib.bats. What matters here is that doctor.sh keeps using it
-# for BOTH directions — "is my active set installed?" and "what's installed
-# that no active tier declares?". They used to disagree: the first was
-# profile/module-gated, the second globbed every `Brewfile.*` that existed, so
-# chez doctor called a work-only cask tracked on a personal machine.
+# features/brew/tests/tiers.bats. What matters here is that doctor.sh keeps
+# using it for BOTH directions — "is my active set installed?" and "what's
+# installed that no active tier declares?". They used to disagree: the first
+# asked the resolver, the second globbed every `Brewfile.*` on disk, so a tier
+# this machine does not enable still vouched for whatever it declared.

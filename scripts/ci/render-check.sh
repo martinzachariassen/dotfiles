@@ -6,14 +6,20 @@ set -euo pipefail
 SOURCE_DIR="${1:-$(pwd)}"
 # $SOURCE_DIR stays the repo root so .chezmoi.workingTree resolves; chezmoi's source is src/.
 SRC_DIR="$SOURCE_DIR/src"
-PROFILE="${PROFILE:-personal}"
 MAC_APPS="${MAC_APPS:-true}"
 USE_ONE_PASSWORD="${USE_ONE_PASSWORD:-true}"
 
-case "$PROFILE" in
-    personal | work | minimal) ;;
+# The retired `profile` key, absent by default because no current template
+# writes it. Set it and the stub config carries it, which is the only way to
+# render the v1.0 migration hook's real body — with the key gone the hook
+# renders to a bare `exit 0` and CI would never `bash -n` what it actually runs.
+# One matrix row sets LEGACY_PROFILE=work for exactly that reason.
+LEGACY_PROFILE="${LEGACY_PROFILE:-}"
+
+case "$LEGACY_PROFILE" in
+    "" | personal | work | minimal) ;;
     *)
-        echo "PROFILE must be one of: personal, work, minimal" >&2
+        echo "LEGACY_PROFILE must be empty or one of: personal, work, minimal" >&2
         exit 2
         ;;
 esac
@@ -49,6 +55,13 @@ fi
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
+# Emitted only when set: a `profile = ""` line would still be a profile key, and
+# the resolver's fail-closed guard keys on the key's presence, not its value.
+legacy_profile_line=""
+if [ -n "$LEGACY_PROFILE" ]; then
+    legacy_profile_line="    profile        = \"$LEGACY_PROFILE\""
+fi
+
 mkdir -p "$tmpdir/.config/chezmoi"
 cat >"$tmpdir/.config/chezmoi/chezmoi.toml" <<EOF
 sourceDir = "$SRC_DIR"
@@ -58,14 +71,14 @@ sourceDir = "$SRC_DIR"
     email          = "ci@example.com"
     modules        = $modules_toml
     signingKey     = "ssh-ed25519 AAAAplaceholder"
-    profile        = "$PROFILE"
+$legacy_profile_line
     useOnePassword = $USE_ONE_PASSWORD
 
     [data.features]
         macApps   = $MAC_APPS
 EOF
 
-echo "Rendering chezmoi templates: profile=$PROFILE macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
+echo "Rendering chezmoi templates: modules=[${MODULES}] legacyProfile=${LEGACY_PROFILE:-none} macApps=$MAC_APPS useOnePassword=$USE_ONE_PASSWORD"
 render_output="$tmpdir/chezmoi-render.out"
 if ! HOME="$tmpdir" XDG_CONFIG_HOME="$tmpdir/.config" chezmoi apply --dry-run \
     --config="$tmpdir/.config/chezmoi/chezmoi.toml" \

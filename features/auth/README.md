@@ -21,11 +21,12 @@ check for `kubelogin` and `gke-gcloud-auth-plugin`, because an authenticated CLI
 without its cluster auth plugin fails only later, at the point you try to reach a
 cluster.
 
-The `cloudAuth` module gates the Azure and Google steps. Note the asymmetry: the
-CLIs themselves come from the **work profile's** Brewfile, not from a module, so
-on a personal machine `cloudAuth` gates steps for tools that were never
-installed. Harmless — they skip — but worth knowing before you go looking for the
-bug.
+The `cloudAuth` module gates the Azure and Google steps. Note the asymmetry: it
+gates the *walkthrough*, never the CLIs. No repo Brewfile declares `az` or
+`gcloud` — a Mac that needs them adopts them into its own
+`~/.config/chez/Brewfile.local` — so ticking `cloudAuth` on a machine without
+them gates steps for tools that are not installed. Harmless, since each step
+skips on a missing CLI, but worth knowing before you go looking for the bug.
 
 ## Gotchas
 

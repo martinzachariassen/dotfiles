@@ -59,11 +59,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The axis is the module set, not a machine kind. `legacy_profile` is
+        # not a variety of Mac: it is the retired `profile` key, and the one row
+        # that sets it exists so the v1.0 migration hook renders a real body for
+        # `bash -n` — with the key absent the hook is a bare `exit 0`.
         include:
-          - { profile: personal, mac_apps: true,  use_one_password: true }
-          - { profile: work,     mac_apps: true,  use_one_password: true }
-          - { profile: personal, mac_apps: false, use_one_password: true }
-          - { profile: personal, mac_apps: true,  use_one_password: false }
+          - { modules: "macApps,theme,jvmStack", mac_apps: true,  use_one_password: true,  legacy_profile: "" }
+          - { modules: "none",                   mac_apps: false, use_one_password: true,  legacy_profile: "" }
+          - { modules: "appleDev,macApps,macosDefaults,claudeDistiller,claudePersona,cloudAuth,locale,theme,jvmStack", mac_apps: true, use_one_password: true, legacy_profile: "" }
+          - { modules: "macApps,theme",          mac_apps: true,  use_one_password: false, legacy_profile: "" }
+          - { modules: "macApps,theme",          mac_apps: true,  use_one_password: true,  legacy_profile: work }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,9 +81,10 @@ jobs:
       - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - name: Dry-run apply
         env:
-          PROFILE: ${{ matrix.profile }}
+          MODULES: ${{ matrix.modules }}
           MAC_APPS: ${{ matrix.mac_apps }}
           USE_ONE_PASSWORD: ${{ matrix.use_one_password }}
+          LEGACY_PROFILE: ${{ matrix.legacy_profile }}
         run: bash scripts/ci/render-check.sh "$PWD"
 
   # chezmoi-scripts.bats renders + runs each hook on Linux to confirm the darwin guard fires first.
@@ -223,14 +229,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [personal, work]
+        include:
+          - { modules: "macApps,theme,jvmStack", legacy_profile: "" }
+          - { modules: "macApps,theme,jvmStack", legacy_profile: work }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - env:
-          PROFILE: ${{ matrix.profile }}
+          MODULES: ${{ matrix.modules }}
           MAC_APPS: "true"
           USE_ONE_PASSWORD: "true"
+          LEGACY_PROFILE: ${{ matrix.legacy_profile }}
         run: bash scripts/ci/render-check.sh "$PWD"

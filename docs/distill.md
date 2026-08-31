@@ -59,9 +59,9 @@ be wrong about, so they are simply created.
 
 ### Doing it by hand
 
-1. **Enable the module**: `chez setup`, tick *claudeDistiller*. It's in the base
-   profile, so new machines get it by default. A machine set up *before* the
-   module existed is offered it once by `chez up` itself — see
+1. **Enable the module**: `chez setup`, tick *claudeDistiller*. It's in the
+   recommended set, so new machines get it ticked by default. A machine set up
+   *before* the module existed is offered it once by `chez up` itself — see
    [the new-module gate](commands.md#new-modules-since-this-mac-was-set-up);
    answer `y` there and this step is done.
 2. **Apply**: `chez up`. Hook 06 registers the launchd agent.
@@ -337,7 +337,7 @@ output is a job you stop thinking about. So the health check you already run for
 everything else carries a **chezdistill** section: the agent registered with
 launchd, how long ago the last run was (a failure fails, more than three days
 warns), whether `MAIN.md` exists and how it sits against the cap, and whether the
-corpus is *reaching* its remote — to *its own* profile's corpus, and whether there
+corpus is *reaching* its remote — to *its own* scope's corpus, and whether there
 are any transcripts to read at all. It is read-only and makes no API calls.
 
 ## The promotion gate
@@ -496,12 +496,12 @@ empty remote:
 gh repo create claude-memory-personal --private
 ```
 
-**One repo per profile, never one shared.** `hits` is derived by counting
+**One repo per scope, never one shared.** `hits` is derived by counting
 sightings across the whole corpus, so a work Mac and a personal one sharing a
 remote does not merely mix the two — it merges them irreversibly, and a rule
 learned at work starts being applied to personal sessions.
 
-That is what the `profile` in `corpus.json` guards, and it is checked from the
+That is what the `scope` in `corpus.json` guards, and it is checked from the
 **local** copy, so it costs nothing and works offline at 01:00:
 
 ```
@@ -572,7 +572,7 @@ its own push URL to whatever it was cloned from, when that is HTTPS and no push
 URL is already set; an SSH remote is left exactly as you configured it.
 
 On the new Mac: run `install.sh` for the dotfiles, then `chez distill --render`.
-The first time the state repo is created it now **fetches the corpus its profile
+The first time the state repo is created it now **fetches the corpus its scope
 points at and checks it out**, so the machine inherits everything rather than
 starting empty. `--render` then rebuilds `MAIN.md`, `Topics/` and `Candidates.md`
 from it for free — they are pure output and are deliberately not tracked. The
@@ -593,11 +593,13 @@ one.
 
 ### A corpus says who it is
 
-Every corpus carries a tracked `corpus.json`: a `schema`, an `id`, the `profile`
-it was stamped with, and when. It holds **no URL and nothing derived from one**,
-which is the whole point. The guard it replaces compared the origin URL against a
-table of known ones, and that failed in the direction that actually happened
-here — GitHub renamed the repo, so the URL changed, every string comparison still
+Every corpus carries a tracked `corpus.json`: a `schema`, an `id`, the `scope`
+it was stamped with, and when. Schema 1 spelled that field `profile` and is
+still read, so a corpus written before the rename keeps its identity instead of
+needing a re-clone. It holds **no URL and nothing derived from one**, which is
+the whole point. The guard it replaces compared the origin URL against a table
+of known ones, and that failed in the direction that actually happened here —
+GitHub renamed the repo, so the URL changed, every string comparison still
 passed, and the push had been failing for two days behind a green tick. A
 location is not an identity.
 
@@ -605,7 +607,7 @@ It is written once, when a corpus is created, and never rewritten — two machin
 editing it would be the only way to manufacture a conflict in the one file whose
 job is to be agreed on. From it come two different questions:
 
-- **`profile` is the leak boundary.** `hits` counts sightings across the whole
+- **`scope` is the leak boundary.** `hits` counts sightings across the whole
   corpus, so a rule seen in two work sessions would be promoted into a personal
   Mac's `MAIN.md`. A mismatch is a hard stop, checked from the *local* copy so it
   costs nothing and works offline at 01:00.
@@ -614,7 +616,7 @@ job is to be agreed on. From it come two different questions:
   asked).
 
 A corpus older than this file has no stamp. It is adopted and then stamped with
-the attaching machine's profile, so the window is one machine wide and closes
+the attaching machine's scope, so the window is one machine wide and closes
 permanently. While it is open nothing can check it for you, which is why
 `--remote` prints what it found and makes you say yes.
 
@@ -653,7 +655,7 @@ same one command.
 
 ### Two Macs on one remote
 
-Within a profile this is safe, and the corpus layout is the reason. Each machine
+Within a scope this is safe, and the corpus layout is the reason. Each machine
 writes `extracts/<date>.<host>.json` — its own file — so a day both Macs
 contributed to is two files that merge without a conflict, and the derivation
 groups by entry id across all of them, counting **distinct sessions**. A rule seen
@@ -664,7 +666,7 @@ Nothing needs migrating. `distill_extract_date` reads the date off the front of
 the filename, so a pre-sharding `extracts/<date>.json` written before this keeps
 deriving, ageing and pruning identically alongside the new ones.
 
-What is *not* safe is one remote across profiles, which is why the profile picks
+What is *not* safe is one remote across scopes, which is why the scope picks
 the remote and a foreign one is refused — see the table above.
 
 ## Configuration

@@ -4,8 +4,8 @@
 # pass/warn/note/fail helpers and keep the tallies in one process.
 #
 # Not owned by a feature: the Nerd Font is what makes the prompt, the status
-# line and half the CLI output legible, and it is installed by a cask that any
-# profile may or may not carry.
+# line and half the CLI output legible, and it is installed by a cask that a
+# given machine may or may not carry.
 
 doctor_check_fonts() {
     section "Fonts"

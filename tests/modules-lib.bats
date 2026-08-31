@@ -24,7 +24,6 @@ sourceDir = "/repo"
 
 [data]
     name        = "Test"
-    profile     = "work"
     modules     = ["macApps", "theme"]
     modulesSeen = ["macApps", "theme", "locale"]
 EOF
@@ -121,10 +120,11 @@ no_match_in() {
     lib "modules_write_list '$CFG' modules macApps theme claudeDistiller"
     [ "$status" -eq 0 ]
     grep -qF '    modules     = ["macApps", "theme", "claudeDistiller"]' "$CFG"
-    # Alignment and every neighbouring line survive untouched.
+    # Alignment and every neighbouring line survive untouched — the one above
+    # the rewritten key as well as the one below it.
     grep -qF '    modulesSeen = ["macApps", "theme", "locale"]' "$CFG"
-    grep -qF '    profile     = "work"' "$CFG"
-    [ "$(grep -c . "$CFG")" -eq 6 ]
+    grep -qF '    name        = "Test"' "$CFG"
+    [ "$(grep -c . "$CFG")" -eq 5 ]
 }
 
 @test "modules_write_list leaves no temp file behind" {

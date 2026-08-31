@@ -4,6 +4,6 @@
 # shellcheck disable=SC2034  # every variable here is read by the registry
 
 FEATURE_NAME="storecode"
-FEATURE_TITLE="storecode (work profile)"
+FEATURE_TITLE="storecode (own installer)"
 FEATURE_MODULE=""
 FEATURE_DOCTOR_ORDER=""

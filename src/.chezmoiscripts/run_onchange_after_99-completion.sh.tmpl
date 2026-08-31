@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-PROFILE="{{ .profile }}"
 SOURCE="{{ .chezmoi.workingTree }}"
 SIGNING="{{ dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . }}"
 EMAIL="{{ dig "email" "" . }}"
@@ -98,7 +97,6 @@ ${C}│${R}  ${G}${B}chezmoi apply complete${R}                                 
 ${C}╰────────────────────────────────────────────────────────────╯${R}
 
   ${B}Setup${R}
-    Profile       ${G}${PROFILE}${R}
     Modules       ${EXTRAS}
     Signing       ${G}${SIGNING}${R}
     Source        ${D}${SOURCE}${R}

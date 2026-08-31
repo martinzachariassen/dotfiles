@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
-# run_onchange_after_05-storecode — install storecode, the work-only security
-# tool. The engine is features/storecode/hook.sh; this template holds only the
-# render-time decisions: the OS and profile guards, and the install command read
-# from storecode.toml.
+# run_onchange_after_05-storecode — install storecode, a security tool that
+# ships its own installer rather than a formula. The engine is
+# features/storecode/hook.sh; this template holds only the render-time
+# decisions: the OS guard and the install command read from storecode.toml.
+#
+# The gate IS the install command. This public repo ships `installCmd = ""`
+# (the URL is not ours to publish), so on every machine but the one that fills
+# it in the hook is already a no-op — which makes the data the honest gate and
+# removes one entirely, rather than moving it to a tick-box that would do
+# nothing for everyone who can see it. This used to read `ne .profile "work"`.
 #
 # Both halves are hashed, so an edit to either re-fires the hook. Hashing only
 # this file would freeze the engine — chezmoi would keep matching the recorded
@@ -16,8 +22,8 @@ set -euo pipefail
 echo "→ storecode: not on macOS, skipping"
 exit 0
 {{ end -}}
-{{ if ne .profile "work" -}}
-echo "→ storecode: not the work profile, skipping"
+{{ if not .storecode.installCmd -}}
+echo "→ storecode: no installer configured, skipping"
 exit 0
 {{ end -}}
 
