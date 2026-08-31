@@ -43,3 +43,16 @@ setup() {
     # the first time.
     no_match 'byProfile|byModule' "$FRAGMENT"
 }
+
+@test "both sides of the untracked check are normalised the same way" {
+    # The asymmetry this guards: the Brewfile side was piped through
+    # `awk -F/ '{print $NF}'` and the `brew leaves` side was not, so a formula
+    # installed from a tap (hashicorp/tap/terraform vs terraform) could never
+    # match its own declaration and was reported as untracked on every run.
+    # Both sides must go through the one shared normaliser in tiers.sh.
+    # the installed side …
+    grep -qF 'brew leaves 2>/dev/null | brew_bare_names' "$FRAGMENT"
+    # … and the declared side, immediately after the Brewfile lines are parsed.
+    grep -qE '^ +brew_bare_names\)$' "$FRAGMENT"
+    no_match "awk -F/ '\{print \\\$NF\}'" "$FRAGMENT"
+}

@@ -134,3 +134,54 @@ EOF
     [ "$status" -eq 0 ]
     [ "${lines[0]}" = "features/brew/Brewfile" ]
 }
+
+# ── brew_bare_names ──────────────────────────────────────────────────────────
+# The comparison key behind doctor's untracked-package check. It exists because
+# the two sides of that comparison are spelled differently: `brew leaves`
+# reports a tap formula qualified (hashicorp/tap/terraform), a Brewfile may
+# declare it either way, and tap owners carry capitals the installed name
+# drops. doctor normalised only the Brewfile side, so every tap-installed
+# package was reported as untracked on every run, forever.
+
+bare() { run bash -c ". '$LIB'; brew_bare_names" <<<"$1"; }
+
+@test "brew_bare_names strips the tap prefix" {
+    bare 'hashicorp/tap/terraform'
+    [ "$output" = "terraform" ] || return 1
+}
+
+@test "brew_bare_names folds the case a tap owner carries" {
+    # Brewfile.work says `brew "Azure/kubelogin/kubelogin"`; brew leaves prints
+    # azure/kubelogin/kubelogin. Same package, and they must compare equal.
+    bare 'Azure/kubelogin/kubelogin'
+    [ "$output" = "kubelogin" ] || return 1
+}
+
+@test "brew_bare_names leaves a core formula untouched" {
+    bare 'jq'
+    [ "$output" = "jq" ] || return 1
+}
+
+@test "brew_bare_names sorts, dedupes and drops blank lines" {
+    bare 'zoxide
+hashicorp/tap/terraform
+
+terraform
+jq'
+    [ "${#lines[@]}" -eq 3 ] || return 1
+    [ "${lines[0]}" = "jq" ] || return 1
+    [ "${lines[1]}" = "terraform" ] || return 1
+    [ "${lines[2]}" = "zoxide" ] || return 1
+}
+
+@test "a tap formula declared qualified is tracked, not untracked" {
+    # The end-to-end shape of doctor's comparison: installed side qualified,
+    # declared side straight out of a Brewfile. comm must find no difference.
+    local leaves declared
+    leaves=$(bash -c ". '$LIB'; brew_bare_names" <<<'azure/kubelogin/kubelogin
+hashicorp/tap/terraform')
+    declared=$(bash -c ". '$LIB'; brew_bare_names" <<<'Azure/kubelogin/kubelogin
+hashicorp/tap/terraform')
+    run comm -23 <(printf '%s\n' "$leaves") <(printf '%s\n' "$declared")
+    [ -z "$output" ] || return 1
+}

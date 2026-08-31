@@ -45,13 +45,17 @@ doctor_brew() {
             warn "could not resolve the active Brewfiles — skipping the untracked-package check"
             untracked=""
         else
+            # Both sides go through brew_bare_names, and that symmetry is the
+            # whole point: `brew leaves` reports tap formulae qualified
+            # (hashicorp/tap/terraform) while the Brewfile side was being
+            # stripped to `terraform`, so no tap-installed package could ever
+            # match and every one of them was reported as untracked.
             leaves_tmp=$(mktemp)
-            brew leaves >"$leaves_tmp" 2>/dev/null || true
+            brew leaves 2>/dev/null | brew_bare_names >"$leaves_tmp" || true
             tracked=$(grep -h '^\(brew\|cask\) ' "${tracked_files[@]}" 2>/dev/null |
                 sed -E 's/^(brew|cask) "([^"]+)".*/\2/' |
-                awk -F/ '{print $NF}' |
-                sort -u)
-            untracked=$(comm -23 <(sort -u "$leaves_tmp") <(echo "$tracked") 2>/dev/null || true)
+                brew_bare_names)
+            untracked=$(comm -23 "$leaves_tmp" <(echo "$tracked") 2>/dev/null || true)
             rm -f "$leaves_tmp"
         fi
         if [ -n "$untracked" ]; then

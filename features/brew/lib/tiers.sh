@@ -31,3 +31,17 @@ brew_active_files() {
         | map(select(. != null))
         | .[]' 2>/dev/null
 }
+
+# brew_bare_names — stdin → sorted, deduped, bare formula names on stdout.
+#
+# The comparison key for "is this install declared anywhere?", and it must be
+# applied to BOTH sides or nothing tap-installed ever matches. `brew leaves`
+# prints a tap-qualified name for anything outside homebrew/core
+# (hashicorp/tap/terraform), while a Brewfile may declare the same formula
+# either way — and tap owners carry capitals that the installed name does not
+# (`brew "Azure/kubelogin/kubelogin"` installs as azure/kubelogin/kubelogin).
+# So: last path component, lowercased. Normalising only the Brewfile side is
+# exactly the bug this replaces — every tap formula read as untracked forever.
+brew_bare_names() {
+    awk -F/ 'NF { print tolower($NF) }' | sort -u
+}
