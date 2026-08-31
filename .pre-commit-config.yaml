@@ -52,6 +52,13 @@ repos:
         language: system
         pass_filenames: false
 
+      # The verb table in docs/commands.md is generated from core/verbs.sh.
+      - id: gen-commands
+        name: docs/commands.md verb table is current
+        entry: bash scripts/ci/gen-commands.sh --check
+        language: system
+        pass_filenames: false
+
       - id: gitleaks
         name: gitleaks (secret scan)
         entry: gitleaks dir . --redact --no-banner

@@ -69,7 +69,11 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
-      - uses: ./.github/actions/install-chezmoi
+      # zizmor wants `$/…` here, which pins a local action to the workflow's
+      # own commit — but actionlint rejects that spelling outright ("ref is
+      # missing"), and both linters gate every push. Suppressed rather than
+      # traded for the other linter's failure.
+      - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - name: Dry-run apply
         env:
           PROFILE: ${{ matrix.profile }}
@@ -87,7 +91,7 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq bats zsh
-      - uses: ./.github/actions/install-chezmoi
+      - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       # Both roots, recursively: cross-cutting suites live in tests/, and each
       # feature owns its own under features/<name>/tests/. Miss one and its
       # tests simply do not run, with nothing in the log saying so —
@@ -104,6 +108,10 @@ jobs:
         with:
           persist-credentials: false
       - run: bash scripts/ci/lint-config.sh "$PWD"
+      # The verb table in docs/commands.md is generated from core/verbs.sh. A
+      # verb added without regenerating would leave the docs quietly wrong,
+      # which is the failure mode the registry exists to end.
+      - run: bash scripts/ci/gen-commands.sh --check "$PWD"
 
   typos:
     name: typos
@@ -220,7 +228,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/install-chezmoi
+      - uses: ./.github/actions/install-chezmoi  # zizmor: ignore[self-repository]
       - env:
           PROFILE: ${{ matrix.profile }}
           MAC_APPS: "true"
