@@ -176,3 +176,24 @@ not_declares() {
     # Casks here are pure preference; only existence is pinned.
     [ -f "$PERSONAL" ]
 }
+
+# ─── The machine-local seed template ───────────────────────────────────────
+#
+# Copied verbatim to ~/.config/chez/Brewfile.local on every Mac's first apply,
+# so anything it declares is something every Mac silently installs. It must
+# stay a pure comment block: the file exists to explain the hatch, not to use
+# it. See features/adopt/README.md.
+
+@test "the Brewfile.local template declares nothing" {
+    local template="$REPO_ROOT/features/brew/Brewfile.local.template"
+    [ -f "$template" ]
+    no_match '^[[:space:]]*(brew|cask|tap|mas|vscode) ' "$template"
+}
+
+@test "the CI Brewfile sweeps skip the template" {
+    # Both scripts glob features/brew/Brewfile.*, which now matches the
+    # template. Resolving a file with no entries is only noise today, but the
+    # skip is what keeps it from becoming a checked package list by accident.
+    grep -qF '*.lock.json | *.template' "$REPO_ROOT/scripts/ci/brew-resolve.sh"
+    grep -qF '*.lock.json | *.template' "$REPO_ROOT/scripts/ci/brew-check-modules.sh"
+}

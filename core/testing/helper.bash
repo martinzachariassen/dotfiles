@@ -12,6 +12,18 @@
 # the suite sits. ZSHRC is here because eight suites want it.
 _helper_init() {
     local d="$BATS_TEST_DIRNAME"
+
+    # Pin the machine-local dirs into the test's own tmpdir, ALWAYS.
+    #
+    # core/paths.sh otherwise resolves them under the real $HOME, so any suite
+    # touching the Brewfile overlay would read whatever the person running it
+    # happens to keep there — green on CI, where the file does not exist, and
+    # red (or worse, wrongly green) on a Mac that has adopted a package. That is
+    # the same non-hermeticity that made the distill corpus suite depend on
+    # whose laptop it ran on. A test that wants an overlay writes one here.
+    export CHEZ_CONFIG_DIR="$BATS_TEST_TMPDIR/chez-config"
+    export CHEZ_STATE_DIR="$BATS_TEST_TMPDIR/chez-state"
+
     while [ "$d" != "/" ]; do
         if [ -f "$d/.chezmoiroot" ]; then
             REPO_ROOT="$d"

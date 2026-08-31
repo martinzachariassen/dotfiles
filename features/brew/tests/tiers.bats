@@ -135,6 +135,168 @@ EOF
     [ "${lines[0]}" = "features/brew/Brewfile" ]
 }
 
+# ── the machine-local overlay ────────────────────────────────────────────────
+# ~/.config/chez/Brewfile.local is how a Mac says "this package is mine, on
+# purpose". It is read as one more tier, so an adopted package is declared in
+# exactly the sense a repo package is — which is what stops chez mirror offering
+# it. helper.bash pins CHEZ_CONFIG_DIR into the test tmpdir, so none of this
+# touches the overlay of whoever is running the suite.
+
+# overlay LINE… — write the machine-local Brewfile.
+overlay() {
+    mkdir -p "$CHEZ_CONFIG_DIR"
+    printf '%s\n' "$@" >"$CHEZ_CONFIG_DIR/Brewfile.local"
+}
+
+@test "the overlay is not emitted when the Mac has none" {
+    resolve "$DATA"
+    [ "${#lines[@]}" -eq 3 ]
+    no_match_in "$output" 'Brewfile\.local'
+}
+
+@test "the overlay is emitted last, after every repo tier" {
+    # Last so it can only ADD to the declared set. Emitting it earlier would
+    # reorder the install, and `brew bundle` applies tiers in the order given.
+    overlay 'brew "ffmpeg"'
+    resolve "$DATA"
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 4 ]
+    [ "${lines[0]}" = "features/brew/Brewfile" ]
+    [ "${lines[3]}" = "$CHEZ_CONFIG_DIR/Brewfile.local" ]
+}
+
+@test "the overlay is emitted absolute, not repo-relative" {
+    # It lives outside the checkout, so a caller that prefixed the repo root
+    # would resolve it to a path that does not exist and silently drop it —
+    # which reads as "declared nothing" and puts every adopted package back on
+    # the removal list. brew_resolve_file is what keeps callers honest.
+    overlay 'brew "ffmpeg"'
+    resolve "$DATA"
+    [[ "${lines[3]}" == /* ]] || return 1
+}
+
+@test "an overlay does not rescue a failed resolve" {
+    # The fail-closed contract. A jq failure must stay a failure even when the
+    # overlay exists: returning 0 with one tier would tell every caller that the
+    # machine declares almost nothing, and chez mirror would offer the rest of it
+    # for uninstall. Appending the overlay after a bare pipeline would have made
+    # the function's exit status the overlay's — this is why it is captured.
+    overlay 'brew "ffmpeg"'
+    resolve 'this is not json'
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
+}
+
+# ── brew_seed_local_brewfile ─────────────────────────────────────────────────
+
+seed() { run bash -c ". '$LIB'; brew_seed_local_brewfile '$1'"; }
+
+@test "seeding creates the overlay from the shipped template" {
+    # A hatch nobody knows about is not a hatch: the apply hook writes the file
+    # on every Mac so it explains itself in place, rather than only in the repo.
+    seed "$REPO_ROOT"
+    [ "$status" -eq 0 ]
+    grep -q 'packages THIS Mac keeps' "$CHEZ_CONFIG_DIR/Brewfile.local"
+}
+
+@test "a seeded overlay declares nothing" {
+    # Every line is a comment, so seeding cannot change what this Mac installs
+    # or what the removal verbs spare. It is discoverability, not configuration.
+    seed "$REPO_ROOT"
+    no_match '^[[:space:]]*(brew|cask|tap|mas|vscode) ' "$CHEZ_CONFIG_DIR/Brewfile.local"
+}
+
+@test "seeding never touches an overlay that already exists" {
+    # It runs on every apply. Rewriting the file would silently discard every
+    # package this Mac had adopted.
+    overlay 'brew "ffmpeg"'
+    seed "$REPO_ROOT"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$CHEZ_CONFIG_DIR/Brewfile.local")" = 'brew "ffmpeg"' ]
+}
+
+@test "seeding falls back to a header when the template is missing" {
+    # The template is a repo file and the seeder runs from a hook; an incomplete
+    # checkout should still leave a usable Brewfile, not a zero-byte one.
+    seed "$BATS_TEST_TMPDIR/no-such-repo"
+    [ "$status" -eq 0 ]
+    [ -s "$CHEZ_CONFIG_DIR/Brewfile.local" ]
+}
+
+# ── the apply hook reads the same overlay ────────────────────────────────────
+
+@test "the brew-bundle hook installs from the overlay, and seeds it" {
+    # Without this the overlay is half a mechanism: doctor would call an adopted
+    # package declared and chez mirror would spare it, but nothing would ever
+    # install it — so a Mac restored from the repo would quietly lose it.
+    #
+    # The hook builds its file list in the template, from render-time data. The
+    # overlay's path comes from XDG_CONFIG_HOME, which a render cannot know, so
+    # it is appended in bash and must be appended LAST.
+    local hook="$REPO_ROOT/src/.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl"
+    grep -qF 'features/brew/lib/tiers.sh' "$hook"
+    grep -qF 'LOCAL_BREWFILE="$(chez_local_brewfile)"' "$hook"
+    grep -qF 'brew_seed_local_brewfile' "$hook"
+    grep -qF 'FILES+=("$LOCAL_BREWFILE")' "$hook"
+    # Appended after the array literal closes, never inside it.
+    local at_close at_append
+    at_close="$(grep -n '^)$' "$hook" | head -n1 | cut -d: -f1)"
+    at_append="$(grep -n 'FILES+=("\$LOCAL_BREWFILE")' "$hook" | head -n1 | cut -d: -f1)"
+    [ "$at_append" -gt "$at_close" ]
+}
+
+@test "the hook checks that tiers.sh loaded before calling into it" {
+    # The hook runs under `set -uo pipefail`, not `-e`, so a refused source is
+    # not fatal on its own — it would just leave chez_local_brewfile undefined
+    # and print `command not found` on every apply. Gating on the status turns
+    # that into one warning and no overlay, which is the safe reading here.
+    local hook="$REPO_ROOT/src/.chezmoiscripts/run_after_02-brew-bundle.sh.tmpl"
+    grep -qF 'HAVE_LOCAL_TIER=0' "$hook"
+    grep -qF '[ "$HAVE_LOCAL_TIER" -eq 1 ]' "$hook"
+}
+
+# ── loading ──────────────────────────────────────────────────────────────────
+
+@test "tiers.sh refuses to load without core/paths.sh" {
+    # The dangerous degradation, so it is a refusal instead. Without paths.sh
+    # there is no chez_local_brewfile, the overlay drops out of the tier set,
+    # and every package adopted with `chez adopt --local` reads as undeclared —
+    # which is precisely the list chez mirror offers to uninstall. Callers all
+    # treat a failed load as "resolve nothing", which is the safe direction.
+    local orphan="$BATS_TEST_TMPDIR/orphan/features/brew/lib"
+    mkdir -p "$orphan"
+    cp "$LIB" "$orphan/tiers.sh"
+    run bash -c ". '$orphan/tiers.sh'"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"this checkout is incomplete"* ]] || return 1
+}
+
+# ── brew_resolve_file ────────────────────────────────────────────────────────
+
+@test "brew_resolve_file resolves a repo tier against the repo root" {
+    run bash -c ". '$LIB'; brew_resolve_file '$REPO_ROOT' features/brew/Brewfile"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$REPO_ROOT/features/brew/Brewfile" ]
+}
+
+@test "brew_resolve_file passes an absolute path through untouched" {
+    overlay 'brew "ffmpeg"'
+    run bash -c ". '$LIB'; brew_resolve_file '$REPO_ROOT' '$CHEZ_CONFIG_DIR/Brewfile.local'"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$CHEZ_CONFIG_DIR/Brewfile.local" ]
+}
+
+@test "brew_resolve_file yields nothing for a file that is not there" {
+    # Silence, not the path: callers append what it prints straight into the
+    # tier array, and a non-existent entry would reach `grep -h` and `cat`.
+    run bash -c ". '$LIB'; brew_resolve_file '$REPO_ROOT' features/brew/Brewfile.nope"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    run bash -c ". '$LIB'; brew_resolve_file '$REPO_ROOT' /nowhere/Brewfile.local"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
 # ── brew_bare_names ──────────────────────────────────────────────────────────
 # The comparison key behind doctor's untracked-package check. It exists because
 # the two sides of that comparison are spelled differently: `brew leaves`

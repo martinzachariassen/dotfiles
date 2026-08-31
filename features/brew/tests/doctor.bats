@@ -18,7 +18,21 @@ setup() {
     # The old code globbed features/brew/Brewfile.* for the untracked check,
     # which counts every tier that exists — including the other profile's.
     no_match 'features/brew/Brewfile\.\*' "$FRAGMENT"
-    grep -qF 'tracked_files+=("$SOURCE_DIR/$rel")' "$FRAGMENT"
+    # Through brew_resolve_file, not by prefixing the repo root by hand. A repo
+    # tier is repo-relative and the machine-local overlay is absolute, so a bare
+    # "$SOURCE_DIR/$rel" turns the overlay into a path that does not exist —
+    # silently dropping it, which reports every locally adopted package as
+    # untracked. One resolver, so no caller can get half the rule.
+    grep -qF 'abs="$(brew_resolve_file "$SOURCE_DIR" "$rel")"' "$FRAGMENT"
+    no_match 'tracked_files\+=\("\$SOURCE_DIR/\$rel"\)' "$FRAGMENT"
+}
+
+@test "the overlay is reported, and only when it declares something" {
+    # It lives outside the checkout, so it appears in no diff and no git status;
+    # doctor is the only place it ever surfaces. But it is seeded on every Mac,
+    # so its mere existence must not print a line.
+    grep -qF 'chez_local_brewfile' "$FRAGMENT"
+    grep -qF '[ "${n_local:-0}" -gt 0 ]' "$FRAGMENT"
 }
 
 @test "the empty tier set is guarded before grepping (no stdin hang)" {

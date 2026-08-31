@@ -1,0 +1,27 @@
+# Brewfile.local — packages THIS Mac keeps that the repo does not declare.
+#
+# Copied to ~/.config/chez/Brewfile.local on your first apply. It lives
+# outside the checkout on purpose: it is your machine's answer, not the
+# repo's, so it is never committed and never shows up in `git status`.
+#
+# It is read as one more Brewfile tier, which means a package listed here is
+# declared in exactly the sense a repo package is:
+#
+#   chez doctor   stops reporting it as untracked
+#   chez mirror   never offers it for uninstall
+#   chez up       installs it if it is missing
+#
+# Deleting a line hands the package straight back — it becomes untracked again
+# on the next run, and the removal verbs will offer it. That round trip is the
+# point: diverging from the repo is allowed, as long as it is written down.
+#
+# Add entries with `chez adopt --local <package>`, or by hand in the same syntax
+# as any Brewfile:
+#
+#   brew "ffmpeg"
+#   cask "obs"
+#   tap  "some/tap"
+#
+# If you find yourself copying the same line into this file on every Mac, it
+# belongs in features/brew/Brewfile instead — `chez adopt <package>`.
+

@@ -36,6 +36,7 @@ distill	distill	features/distill/cli.sh	setup	claudeDistiller	Distil Claude conv
 apply	converge	features/converge/apply.sh	maintenance	-	Apply without pulling. Flags drift; never uninstalls.
 status	converge	features/converge/status.sh	maintenance	-	Explain pending file + package drift in plain words (read-only).
 bump	brew	features/brew/bump.sh	maintenance	-	Upgrade deps: brew upgrade + mise upgrade.
+adopt	adopt	features/adopt/cli.sh	maintenance	-	Declare an installed package or existing file so it stops counting as drift.
 mirror	brew	features/brew/mirror.sh	maintenance	-	Uninstall untracked packages (removal only), confirming each.
 reconcile	converge	features/converge/reconcile.sh	maintenance	-	Full package reconcile: install then remove.
 clean	clean	features/clean/cli.sh	maintenance	-	Remove untracked top-level ~/.* entries, confirming each.

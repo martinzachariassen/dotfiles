@@ -49,6 +49,7 @@ ui_init_status
 for _lib in \
     core/chezmoi-data.sh \
     core/semver.sh \
+    core/paths.sh \
     features/brew/lib/tiers.sh \
     features/vscode/lib.sh \
     features/sign/lib.sh \
@@ -58,8 +59,15 @@ for _lib in \
         printf 'doctor: missing %s — this checkout is incomplete\n' "$ROOT/$_lib" >&2
         exit 1
     fi
+    # An engine that loads only halfway is the same problem one layer down: an
+    # engine may itself refuse to load (tiers.sh does, without core/paths.sh),
+    # and a half-loaded engine is exactly the green-pass-from-nothing this loop
+    # exists to prevent.
     # shellcheck source=/dev/null
-    . "$ROOT/$_lib"
+    if ! . "$ROOT/$_lib"; then
+        printf 'doctor: %s failed to load — this checkout is incomplete\n' "$ROOT/$_lib" >&2
+        exit 1
+    fi
 done
 unset _lib
 
