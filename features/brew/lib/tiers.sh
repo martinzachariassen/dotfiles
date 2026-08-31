@@ -45,3 +45,29 @@ brew_active_files() {
 brew_bare_names() {
     awk -F/ 'NF { print tolower($NF) }' | sort -u
 }
+
+# brew_untracked_of_kind KIND INSTALLED FILE… — the installed items of KIND
+# (`brew` or `cask`) that none of the given Brewfiles declare, one bare name
+# per line.
+#
+# KIND is a parameter rather than the two sets being folded together on
+# purpose. Formulae and casks are separate Homebrew namespaces and some names
+# exist in both — docker ships as a formula *and* as a cask — so a merged
+# comparison lets a declared cask vouch for an undeclared formula of the same
+# name. Comparing within one kind cannot make that mistake.
+#
+# Both sides go through brew_bare_names so the tap-qualification and casing of
+# each is irrelevant; see that function for why that symmetry matters.
+brew_untracked_of_kind() {
+    local kind=$1 installed=$2
+    shift 2
+    # `grep -h PATTERN` with zero file operands reads stdin and would hang the
+    # caller forever, so an empty tier set is refused rather than compared
+    # against.
+    [ "$#" -gt 0 ] || return 1
+    comm -23 \
+        <(printf '%s\n' "$installed" | brew_bare_names) \
+        <(grep -h "^${kind} " "$@" 2>/dev/null |
+            sed -E "s/^${kind} \"([^\"]+)\".*/\1/" |
+            brew_bare_names)
+}

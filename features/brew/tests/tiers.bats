@@ -185,3 +185,96 @@ hashicorp/tap/terraform')
     run comm -23 <(printf '%s\n' "$leaves") <(printf '%s\n' "$declared")
     [ -z "$output" ] || return 1
 }
+
+# ── brew_untracked_of_kind ───────────────────────────────────────────────────
+# "What is installed that no active tier declares?", asked one namespace at a
+# time. Casks were invisible to this question for a long time: doctor's
+# installed side was `brew leaves`, which lists formulae only, so an undeclared
+# cask went unreported while chez status and chez mirror both saw it.
+
+# bf <name> <line…> — a throwaway Brewfile, path echoed on stdout
+bf() {
+    local f="$BATS_TEST_TMPDIR/$1"
+    shift
+    printf '%s\n' "$@" >"$f"
+    printf '%s' "$f"
+}
+
+untracked_of() { # untracked_of KIND INSTALLED FILE…
+    run bash -c '. "$1"; shift; brew_untracked_of_kind "$@"' _ "$LIB" "$@"
+}
+
+@test "brew_untracked_of_kind reports an installed cask no tier declares" {
+    local f
+    f=$(bf Brewfile 'cask "rectangle"' 'brew "jq"')
+    untracked_of cask 'rectangle
+transmit' "$f"
+    [ "$output" = "transmit" ] || return 1
+}
+
+@test "brew_untracked_of_kind stays quiet when every cask is declared" {
+    local f
+    f=$(bf Brewfile 'cask "rectangle"' 'cask "ghostty"')
+    untracked_of cask 'ghostty
+rectangle' "$f"
+    [ -z "$output" ] || return 1
+}
+
+@test "brew_untracked_of_kind does not let a cask vouch for a formula" {
+    # docker exists as a formula AND as a cask. Declaring the cask must not
+    # make an undeclared formula of the same name read as tracked — the bug a
+    # single merged namespace would reintroduce.
+    local f
+    f=$(bf Brewfile 'cask "docker"')
+    untracked_of brew 'docker' "$f"
+    [ "$output" = "docker" ] || return 1
+}
+
+@test "brew_untracked_of_kind ignores the other kind's declarations" {
+    local f
+    f=$(bf Brewfile 'brew "rectangle"')
+    untracked_of cask 'rectangle' "$f"
+    [ "$output" = "rectangle" ] || return 1
+}
+
+@test "brew_untracked_of_kind matches a tap-qualified cask declaration" {
+    local f
+    f=$(bf Brewfile 'cask "homebrew/cask-versions/firefox-beta"')
+    untracked_of cask 'firefox-beta' "$f"
+    [ -z "$output" ] || return 1
+}
+
+@test "brew_untracked_of_kind unions every tier it is given" {
+    local a b
+    a=$(bf Brewfile 'brew "jq"')
+    b=$(bf Brewfile.work 'brew "hashicorp/tap/terraform"')
+    untracked_of brew 'jq
+terraform
+ripgrep' "$a" "$b"
+    [ "$output" = "ripgrep" ] || return 1
+}
+
+@test "brew_untracked_of_kind reports everything when no tier declares anything" {
+    local f
+    f=$(bf Brewfile '# nothing here')
+    untracked_of brew 'jq
+ripgrep' "$f"
+    [ "${#lines[@]}" -eq 2 ] || return 1
+}
+
+@test "brew_untracked_of_kind refuses an empty tier set rather than hanging" {
+    # `grep -h PATTERN` with zero file operands reads stdin and would hang the
+    # run forever. Fail closed instead: no files means no answer, not "all
+    # installed packages are untracked".
+    untracked_of cask 'rectangle'
+    [ "$status" -eq 1 ] || return 1
+    [ -z "$output" ] || return 1
+}
+
+@test "brew_untracked_of_kind handles an empty installed list" {
+    local f
+    f=$(bf Brewfile 'cask "rectangle"')
+    untracked_of cask '' "$f"
+    [ "$status" -eq 0 ] || return 1
+    [ -z "$output" ] || return 1
+}

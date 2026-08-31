@@ -38,6 +38,30 @@ the same thing deleting it would do.
 The removal side fails **closed** — if the tier set cannot be resolved it offers
 nothing rather than guessing wider.
 
+## Comparing installed against declared
+
+`chez doctor` answers "what is installed that no active tier declares" itself,
+rather than through `brew bundle cleanup` the way `chez mirror` and `chez
+status` do — that path calls `brew trust --tap`, and doctor is read-only. Two
+rules keep the cheap comparison honest, both in
+`lib/tiers.sh:brew_untracked_of_kind`:
+
+- **Both sides are normalised, never just one.** `brew leaves` prints a tap
+  formula qualified (`hashicorp/tap/terraform`) and tap owners carry capitals
+  the installed name drops (`Azure/kubelogin` → `azure/…`), while a Brewfile may
+  declare either spelling. `brew_bare_names` reduces both to the bare,
+  lowercased name. Stripping only the Brewfile side was a real bug: every
+  tap-installed package read as untracked on every run.
+- **Formulae and casks are compared separately.** They are distinct Homebrew
+  namespaces and some names live in both — docker ships as a formula *and* as a
+  cask — so a merged set would let a declared cask vouch for an undeclared
+  formula. The installed side is `brew leaves` for formulae (dependencies are
+  the orphan check's business) and `brew list --cask` for casks, which have no
+  leaf/dependency distinction.
+
+`tests/tiers.bats` pins both, and `tests/doctor.bats` pins that the fragment
+keeps reading through the shared helper instead of re-parsing Brewfiles.
+
 ## The progress bar is real
 
 `lib/progress.sh` derives its denominator by counting entries in the Brewfiles
