@@ -9,10 +9,11 @@ what spans features, plus a tour of the configured environment.
 
 | | | | |
 |---|---|---|---|
-| [auth](../features/auth/README.md) | [brew](../features/brew/README.md) | [claude](../features/claude/README.md) | [clean](../features/clean/README.md) |
-| [containers](../features/containers/README.md) | [converge](../features/converge/README.md) | [distill](../features/distill/README.md) | [doctor](../features/doctor/README.md) |
-| [locale](../features/locale/README.md) | [macos](../features/macos/README.md) | [runtimes](../features/runtimes/README.md) | [setup](../features/setup/README.md) |
-| [sign](../features/sign/README.md) | [storecode](../features/storecode/README.md) | [vscode](../features/vscode/README.md) | [xcode](../features/xcode/README.md) |
+| [adopt](../features/adopt/README.md) | [auth](../features/auth/README.md) | [brew](../features/brew/README.md) | [claude](../features/claude/README.md) |
+| [clean](../features/clean/README.md) | [containers](../features/containers/README.md) | [converge](../features/converge/README.md) | [distill](../features/distill/README.md) |
+| [doctor](../features/doctor/README.md) | [locale](../features/locale/README.md) | [macos](../features/macos/README.md) | [runtimes](../features/runtimes/README.md) |
+| [setup](../features/setup/README.md) | [sign](../features/sign/README.md) | [storecode](../features/storecode/README.md) | [vscode](../features/vscode/README.md) |
+| [xcode](../features/xcode/README.md) | | | |
 
 ## Setup & workflow
 

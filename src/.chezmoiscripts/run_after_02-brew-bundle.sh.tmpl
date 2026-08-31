@@ -19,6 +19,22 @@ exit 0
 . "{{ .chezmoi.workingTree }}/features/brew/lib/progress.sh"
 # shellcheck source=../../features/brew/lib/homebrew.sh
 . "{{ .chezmoi.workingTree }}/features/brew/lib/homebrew.sh"
+# The machine-local overlay: same path vocabulary and same seeding that chez
+# doctor, chez mirror and chez adopt use, so all four agree on what "declared"
+# means. tiers.sh pulls in core/paths.sh itself, and refuses to load without it.
+#
+# A refusal degrades safely *here* — the overlay is simply not installed from,
+# and an apply never uninstalls anything — so this warns and carries on rather
+# than aborting the whole apply over one tier. The removal side takes the
+# opposite view and must: there, a resolver that cannot find the overlay would
+# line every locally adopted package up for uninstall.
+# shellcheck source=../../features/brew/lib/tiers.sh
+if . "{{ .chezmoi.workingTree }}/features/brew/lib/tiers.sh"; then
+    HAVE_LOCAL_TIER=1
+else
+    HAVE_LOCAL_TIER=0
+    warn "features/brew/lib/tiers.sh did not load — skipping the machine-local Brewfile"
+fi
 ui_init_logging
 tty_reattach || warn "no terminal available; casks needing sudo may ask later"
 
@@ -51,6 +67,26 @@ FILES=(
     "{{ .chezmoi.workingTree }}/{{ $profileFile }}"
 {{- end }}
 )
+
+# The overlay is appended LAST and resolved at run time, not render time: its
+# path comes from XDG_CONFIG_HOME, which a template render cannot know. Last so
+# it can only ever add to what the repo declares — it never reorders or shadows
+# a repo tier.
+#
+# Without this the overlay would be half a mechanism: doctor would call an
+# adopted package declared and the removal verbs would spare it, but nothing
+# would ever install it. Adopting is meant to make a package as real as one in
+# the repo, on this Mac.
+if [ "$HAVE_LOCAL_TIER" -eq 1 ]; then
+    LOCAL_BREWFILE="$(chez_local_brewfile)"
+    if [ ! -f "$LOCAL_BREWFILE" ] && brew_seed_local_brewfile "{{ .chezmoi.workingTree }}"; then
+        explain "" \
+            "Created ${LOCAL_BREWFILE/#$HOME/\~} for packages you want on this Mac" \
+            "only. Add them with \`chez adopt --local <package>\`; delete a line to" \
+            "hand the package back."
+    fi
+    [ -f "$LOCAL_BREWFILE" ] && FILES+=("$LOCAL_BREWFILE")
+fi
 
 echo
 printf '%s%s%s  %sHomebrew packages%s %s(profile: {{ .profile }})%s\n' \

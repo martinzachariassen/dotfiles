@@ -44,7 +44,10 @@ check_deprecation() {
 
 for f in "$SOURCE_DIR"/features/brew/Brewfile "$SOURCE_DIR"/features/brew/Brewfile.*; do
     [ -f "$f" ] || continue
-    case "$f" in *.lock.json) continue ;; esac
+    # .template is the seed for ~/.config/chez/Brewfile.local — a commented,
+    # empty file that never applies to a machine as it sits in the repo. Same
+    # reason .lock.json is skipped: matched by the glob, not a package list.
+    case "$f" in *.lock.json | *.template) continue ;; esac
     echo "── $(basename "$f") ──"
     while IFS= read -r line; do
         if [[ "$line" =~ ^[[:space:]]*tap[[:space:]]+\"([^\"]+)\" ]]; then

@@ -14,10 +14,12 @@ setup() {
     command -v jq >/dev/null 2>&1 || skip "jq not installed (brew_active_files needs it)"
 
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/features/brew/lib" "$FAKE/scripts/bin"
+    mkdir -p "$FAKE/features/brew/lib" "$FAKE/scripts/bin" "$FAKE/core"
     # The real resolver, so these zsh-side tests exercise the committed lib —
     # _chez_brew_removals sources it out of the repo root it's handed.
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
+    # tiers.sh refuses to load without core/paths.sh; see its header.
+    cp "$REPO_ROOT/core/paths.sh" "$FAKE/core/paths.sh"
     # chez apply / chez status reach the resolver through the same lib the
     # extracted verbs do, so the fake repo has to carry it too.
     cp "$REPO_ROOT/features/brew/lib/removals.sh" "$FAKE/features/brew/lib/removals.sh"

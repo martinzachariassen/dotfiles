@@ -83,6 +83,12 @@ chez_details() {
                 '--dry-run/-n  preview only, remove nothing.'
             ;;
         clean) printf '%s\n' '--all/-a  remove the whole set after one confirmation.' ;;
+        adopt)
+            printf '%s\n' \
+                '<package>  add it to the repo Brewfile — every Mac gets it.' \
+                '--local    add it to this Mac only (~/.config/chez/Brewfile.local).' \
+                '<path>     hand an existing dotfile to chezmoi.'
+            ;;
     esac
 }
 

@@ -124,6 +124,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
 | Homebrew package cleanup (confirm-gated) | `chez mirror` / `chez status` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
 | Active Brewfile tier set (shared by install check, cleanup, doctor) | `features/brew/lib/tiers.sh` (`brew_active_files`, reads `brew.toml` via `chezmoi data`) |
+| Machine-local package overlay | `~/.config/chez/Brewfile.local` (path: `core/paths.sh`; seeded from `features/brew/Brewfile.local.template`; written by `chez adopt --local`) |
 | Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chez clean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
 | chez clean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
@@ -132,7 +133,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chez clean` + `cleanup.owners` (`extension`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `features/macos/cli.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
-| Package tiers | `features/brew/Brewfile` (core) + `features/brew/Brewfile.{mac-apps,personal,work,apple-dev}` |
+| Package tiers | `features/brew/Brewfile` (core) + `features/brew/Brewfile.{mac-apps,personal,work,apple-dev}` + `~/.config/chez/Brewfile.local` (this Mac only) |
 | Data model + wizard | `src/.chezmoi.toml.tmpl` + `features/setup/cli.sh` |
 | Module catalog + Brewfile map | `src/.chezmoidata/{modules,packages}.toml` |
 

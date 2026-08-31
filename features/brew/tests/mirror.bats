@@ -31,8 +31,12 @@ setup() {
     # prove exactly which ones reach brew's stdin. It carries the REAL resolver
     # lib, so these tests exercise the committed brewfiles.sh, not a mock of it.
     FAKE="$(mktemp -d)"
-    mkdir -p "$FAKE/features/brew/lib"
+    mkdir -p "$FAKE/features/brew/lib" "$FAKE/core"
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
+    # tiers.sh refuses to load without it, on purpose: without core/paths.sh it
+    # cannot find the machine-local overlay, and every package adopted there
+    # would land in exactly the removal set these tests are about.
+    cp "$REPO_ROOT/core/paths.sh" "$FAKE/core/paths.sh"
     printf 'brew "marker-core"\n' >"$FAKE/features/brew/Brewfile"
     printf 'cask "marker-macapps"\n' >"$FAKE/features/brew/Brewfile.mac-apps"
     printf 'brew "marker-personal"\n' >"$FAKE/features/brew/Brewfile.personal"

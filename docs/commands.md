@@ -62,6 +62,7 @@ needs editing — not this page's list, not the completion, not the help.
 | `chez apply` | — | Apply without pulling. Flags drift; never uninstalls. |
 | `chez status` | — | Explain pending file + package drift in plain words (read-only). |
 | `chez bump` | — | Upgrade deps: brew upgrade + mise upgrade. |
+| `chez adopt` | — | Declare an installed package or existing file so it stops counting as drift. |
 | `chez mirror` | — | Uninstall untracked packages (removal only), confirming each. |
 | `chez reconcile` | — | Full package reconcile: install then remove. |
 | `chez clean` | — | Remove untracked top-level ~/.* entries, confirming each. |
@@ -86,9 +87,10 @@ feature's README, because that is where its code lives:
 
 | | | |
 |---|---|---|
-| [brew](../features/brew/README.md) | [clean](../features/clean/README.md) | [converge](../features/converge/README.md) |
-| [distill](../features/distill/README.md) | [doctor](../features/doctor/README.md) | [macos](../features/macos/README.md) |
-| [setup](../features/setup/README.md) | [sign](../features/sign/README.md) | [xcode](../features/xcode/README.md) |
+| [adopt](../features/adopt/README.md) | [brew](../features/brew/README.md) | [clean](../features/clean/README.md) |
+| [converge](../features/converge/README.md) | [distill](../features/distill/README.md) | [doctor](../features/doctor/README.md) |
+| [macos](../features/macos/README.md) | [setup](../features/setup/README.md) | [sign](../features/sign/README.md) |
+| [xcode](../features/xcode/README.md) | | |
 
 ## `chez up`, in four phases
 

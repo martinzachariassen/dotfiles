@@ -15,12 +15,19 @@ is the core file plus whatever your profile and modules add:
 | **Core** | [`Brewfile`](../features/brew/Brewfile) | Always. The smallest set that makes the documented shell experience work. |
 | **Profile** | `Brewfile.personal` / `Brewfile.work` | Your profile matches. `work` adds the cloud/Kubernetes/IaC CLIs (az, gcloud, kubectl, kubectx, kubelogin, terraform, helm, minikube) and work apps (IntelliJ IDEA, M365, Teams, Slack). |
 | **Module** | `Brewfile.mac-apps`, `Brewfile.apple-dev` | The matching module is selected (`macApps` → GUI + AI apps; `appleDev` → Swift/iOS toolchain). |
+| **Machine-local** | `~/.config/chez/Brewfile.local` | Always, on the one Mac that has it. Outside the repo, never committed — see [adopt](../features/adopt/README.md). |
 
 The profile→file and module→file mappings live in
 [`src/.chezmoidata/brew.toml`](../src/.chezmoidata/brew.toml) — the
 single source of truth. The `run_after_02-brew-bundle` hook reads the active
 set and runs `brew bundle --no-upgrade`, converging *presence*, not freshness.
 See [lifecycle.md](lifecycle.md#where-each-piece-lives).
+
+The machine-local tier is the answer to "this package is mine, on purpose". It
+is read last, so it can only ever *add* to the declared set, and it makes the
+package declared in the full sense: installed by the apply, spared by
+`chez mirror`, not reported by `chez doctor`. `chez adopt --local <package>`
+writes to it; deleting the line hands the package straight back.
 
 ### Mac App Store apps (mas)
 

@@ -6,18 +6,44 @@ neither of them can reconcile.
 
 ## Tiers
 
-Packages are declared across five Brewfiles, and which ones apply to a machine
-depends on its profile and enabled modules:
+Packages are declared across five Brewfiles in the repo, and which ones apply to
+a machine depends on its profile and enabled modules. A sixth tier lives outside
+the repo entirely:
 
 | Tier | File | Applies |
 |---|---|---|
 | Core | `Brewfile` | Always |
 | Module | `Brewfile.mac-apps`, `Brewfile.apple-dev` | When that module is on |
 | Profile | `Brewfile.personal`, `Brewfile.work` | To that profile |
+| Machine-local | `~/.config/chez/Brewfile.local` | To this Mac only |
 
-The mapping lives in [`src/.chezmoidata/brew.toml`](../../src/.chezmoidata/brew.toml)
+The repo mapping lives in [`src/.chezmoidata/brew.toml`](../../src/.chezmoidata/brew.toml)
 as repo-root-relative paths, which the hooks join with
 `{{ .chezmoi.workingTree }}`.
+
+### The machine-local tier
+
+`~/.config/chez/Brewfile.local` is how one Mac says *this package is mine, on
+purpose*. It is a real Brewfile, read as one more tier, so a package listed there
+is declared in exactly the sense a repo package is: installed by the apply hook,
+spared by `chez mirror`, and not reported by `chez doctor`. Deleting the line
+hands it straight back. Write to it with
+[`chez adopt --local`](../adopt/README.md).
+
+Three rules keep it from blurring into the repo:
+
+- **It is emitted last**, so it can only ever *add* to the declared set — it
+  never reorders a repo tier, and `brew bundle` applies tiers in the order given.
+- **It is emitted absolute**, because it lives outside the checkout. Callers
+  resolve every tier through `brew_resolve_file`, the one place that knows a repo
+  tier is repo-relative and this one is not.
+- **`lib/tiers.sh` refuses to load without `core/paths.sh`.** Degrading to "no
+  overlay" would report every locally adopted package as undeclared and line the
+  lot up for uninstall, so a missing dependency is a refusal, not a default.
+
+It is seeded from `Brewfile.local.template` on the first apply, commented and
+declaring nothing. A hatch nobody knows about is not a hatch, and the file
+explains itself where you would find it.
 
 ## Why install and removal must resolve the same set
 

@@ -13,6 +13,9 @@ __DOTFILES_BREW_REMOVALS_SH=1
 # same resolver chez doctor uses and the mirror of what the brew-bundle hook
 # installs from, so "tracked" means the same thing in both directions: a
 # work-profile cask on a personal machine is untracked here, not silently kept.
+# The machine-local overlay is one of those tiers, which is what makes
+# `chez adopt --local` stick: a package listed there is declared, so it never
+# reaches this set at all.
 # `brew bundle cleanup` only honours one --file, so the active tiers are
 # concatenated onto stdin (--file=-).
 brew_removals() {
@@ -22,17 +25,25 @@ brew_removals() {
         echo "  ! cannot resolve the active Brewfiles: no $src/features/brew/lib/tiers.sh — nothing offered for removal" >&2
         return 1
     fi
-    . "$src/features/brew/lib/tiers.sh"
+    # tiers.sh refuses to load without core/paths.sh, because a resolver that
+    # cannot find the machine-local overlay would report every locally adopted
+    # package as undeclared — and this function's whole output is the uninstall
+    # list. Half-loaded is not usable here.
+    if ! . "$src/features/brew/lib/tiers.sh"; then
+        echo "  ! cannot load $src/features/brew/lib/tiers.sh — nothing offered for removal" >&2
+        return 1
+    fi
 
     # Fail closed: an unresolvable tier set means an empty removal set, never a
     # broader one. Comparing against too FEW tiers would offer the whole
     # toolchain for uninstall.
-    local rel
+    local rel abs
     local -a files
     files=()
     while IFS= read -r rel; do
         [ -n "$rel" ] || continue
-        [ -f "$src/$rel" ] && files+=("$src/$rel")
+        abs="$(brew_resolve_file "$src" "$rel")"
+        [ -n "$abs" ] && files+=("$abs")
     done < <(brew_active_files)
     if [ "${#files[@]}" -eq 0 ]; then
         echo "  ! could not resolve the active Brewfiles (is jq installed?) — nothing offered for removal" >&2

@@ -21,8 +21,8 @@ doctor_brew() {
         else
             while IFS= read -r rel; do
                 [ -n "$rel" ] || continue
-                f="$SOURCE_DIR/$rel"
-                if [ ! -f "$f" ]; then
+                f="$(brew_resolve_file "$SOURCE_DIR" "$rel")"
+                if [ -z "$f" ]; then
                     warn "Brewfile missing: $rel"
                 elif brew bundle check --no-upgrade --file="$f" >/dev/null 2>&1; then
                     pass "$rel satisfied"
@@ -37,7 +37,8 @@ doctor_brew() {
         tracked_files=()
         while IFS= read -r rel; do
             [ -n "$rel" ] || continue
-            [ -f "$SOURCE_DIR/$rel" ] && tracked_files+=("$SOURCE_DIR/$rel")
+            abs="$(brew_resolve_file "$SOURCE_DIR" "$rel")"
+            [ -n "$abs" ] && tracked_files+=("$abs")
         done <<<"$active_files"
         # Guard the empty case explicitly: brew_untracked_of_kind refuses a
         # zero-length file list, and comparing against too FEW tiers would call
@@ -69,6 +70,22 @@ doctor_brew() {
             warn "$n brew package(s) installed but declared by no active Brewfile ($n_formulae formula(e), $n_casks cask(s)) — run \`chez status\` for the list"
         else
             pass "no untracked brew packages"
+        fi
+        # The overlay is machine-local and outside the checkout, so it appears in
+        # no diff and no `git status`. Doctor is the only place it ever surfaces.
+        # Staying quiet about it would let an adopted package read as a repo
+        # package — the one thing this whole mechanism must not blur.
+        #
+        # Silent when it declares nothing: install seeds the file on every Mac,
+        # so its mere existence says nothing, and "0 package(s) kept only on
+        # this Mac" would be a line every machine prints forever.
+        overlay="$(chez_local_brewfile)"
+        n_local=0
+        if [ -f "$overlay" ]; then
+            n_local=$(grep -cE '^[[:space:]]*(brew|cask|tap|mas|vscode) ' "$overlay" 2>/dev/null || true)
+        fi
+        if [ "${n_local:-0}" -gt 0 ]; then
+            note "$n_local package(s) kept only on this Mac — ${overlay/#$HOME/\~}"
         fi
         # -n previews only (chez mirror runs the real `brew autoremove`); filter out
         # brew's "==>" headers so only formula names count.
