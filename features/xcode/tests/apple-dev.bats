@@ -178,21 +178,24 @@ no_match_in() {
     grep -qE '^[[:space:]]*warning:[[:space:]]*120\b' "$SRC_DIR/dot_config/swiftlint/config.yml"
 }
 
-# ─── chezxcode wiring ───────────────────────────────────────────────────────────
+# ─── chez xcode wiring ───────────────────────────────────────────────────────────
 # The Xcode layer is the one thing an apply can't install (Apple ID + 2FA, ~40 GB),
 # so it ships as a verb the setup points at. Three surfaces have to agree with the
 # module gate, or a machine either loses the verb it needs or grows one it can't use.
 
-@test "appleDev on: the zshrc keeps the chezxcode alias and the table routes it" {
-    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
+@test "the table routes chez xcode at this feature, gated on appleDev" {
     # shellcheck source=../../../core/verbs.sh
     . "$REPO_ROOT/core/verbs.sh"
     [ "$(verbs_path xcode)" = "features/xcode/cli.sh" ]
     [ "$(verbs_module xcode)" = "appleDev" ]
+    # The gate lives in the table, not in the zshrc: the dispatcher reads it at
+    # run time, so the rendered shell config carries no xcode-specific line at
+    # all any more — with the module on or off.
+    [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _stub_config '["macApps","appleDev"]'
     run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
     [ "$status" -eq 0 ]
-    echo "$output" | grep -qxF "alias chezxcode='chez xcode'"
+    no_match_in "$output" 'chezxcode'
 }
 
 @test "appleDev on: chez help lists the verb; off, it says which module is missing" {
@@ -205,12 +208,12 @@ no_match_in() {
     echo "$output" | grep -qF 'needs the `appleDev` module'
 }
 
-@test "appleDev off: the zshrc has no chezxcode at all" {
+@test "appleDev off: the zshrc has no chez xcode at all" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _stub_config '["macApps"]'
     run _render "$SRC_DIR/dot_config/zsh/dot_zshrc.tmpl"
     [ "$status" -eq 0 ]
-    no_match_in "$output" 'chezxcode'
+    no_match_in "$output" 'chez xcode'
 }
 
 @test "the rendered zshrc stays valid zsh with appleDev on" {
@@ -309,8 +312,8 @@ EOF
 }
 
 # A ready machine must not be nagged — the step disappears entirely.
-@test "completion step: a ready machine gets no chezxcode step" {
+@test "completion step: a ready machine gets no chez xcode step" {
     [ "$HAS_CHEZMOI" -eq 1 ] || skip "chezmoi not installed"
     _completion_says '["appleDev"]' /Applications/Xcode.app/Contents/Developer 1 1
-    no_match_in "$output" 'chezxcode'
+    no_match_in "$output" 'chez xcode'
 }

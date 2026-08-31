@@ -20,7 +20,7 @@ is_jsonc() {
 }
 
 validate_strict_json() {
-    local f="$1"
+    local f="$1" ok
     if ! python3 -m json.tool "$f" >/dev/null 2>/tmp/lint-config.err; then
         echo "::error file=${f#./}::invalid JSON"
         sed 's/^/  /' /tmp/lint-config.err >&2
@@ -29,8 +29,13 @@ validate_strict_json() {
 }
 
 validate_jsonc() {
-    local f="$1"
-    if ! python3 - "$f" <<'PY' 2>/tmp/lint-config.err; then
+    local f="$1" ok
+    # The heredoc is its own statement rather than an `if` condition: shfmt has
+    # no stable opinion about `if cmd <<'EOF'; then` — 3.14 wants `then` on its
+    # own line after the terminator, older builds want it on the opening line —
+    # so a local run and CI disagree forever depending on which each has.
+    ok=0
+    python3 - "$f" <<'PY' 2>/tmp/lint-config.err || ok=1
 import json, re, sys
 path = sys.argv[1]
 with open(path, encoding="utf-8") as fh:
@@ -70,14 +75,20 @@ try:
 except json.JSONDecodeError as e:
     raise SystemExit(f"invalid JSONC: {e}")
 PY
+    if [ "$ok" -ne 0 ]; then
         echo "::error file=${f#./}::$(cat /tmp/lint-config.err)"
         return 1
     fi
 }
 
 validate_toml() {
-    local f="$1"
-    if ! python3 - "$f" <<'PY' 2>/tmp/lint-config.err; then
+    local f="$1" ok
+    # The heredoc is its own statement rather than an `if` condition: shfmt has
+    # no stable opinion about `if cmd <<'EOF'; then` — 3.14 wants `then` on its
+    # own line after the terminator, older builds want it on the opening line —
+    # so a local run and CI disagree forever depending on which each has.
+    ok=0
+    python3 - "$f" <<'PY' 2>/tmp/lint-config.err || ok=1
 import sys, tomllib
 path = sys.argv[1]
 try:
@@ -86,6 +97,7 @@ try:
 except tomllib.TOMLDecodeError as e:
     raise SystemExit(f"invalid TOML: {e}")
 PY
+    if [ "$ok" -ne 0 ]; then
         echo "::error file=${f#./}::$(cat /tmp/lint-config.err)"
         return 1
     fi

@@ -30,7 +30,7 @@ status/diff/log/show, `rg`, `ls`, `Read`, `Grep`, `WebSearch`).
 
 ## The nightly distiller (claudeDistiller module)
 
-`chezdistill` reads the Claude Code transcripts this Mac wrote and renders a
+`chez distill` reads the Claude Code transcripts this Mac wrote and renders a
 size-capped `MAIN.md` that the persona above `@`-imports — so what you and Claude
 worked out yesterday is in context tomorrow. launchd runs it at 01:00.
 
@@ -39,7 +39,7 @@ tier — `MAIN.md`, `Topics/`, `Candidates.md` — goes to
 `~/.config/claude/memory`, beside the persona that imports it. The extract
 corpus, the hand-written `Pinned.md`, the cursor, spend and run log go to
 `~/.local/state/chezdistill`, in a git repo that pushes to a private corpus
-you attach with `chezdistill --remote <url>` — one private repo per profile,
+you attach with `chez distill --remote <url>` — one private repo per profile,
 never one shared, because `hits` is counted over the whole
 corpus. That second one is the source
 of truth: the memory tier is derived from it on every render, so it is the only
@@ -48,9 +48,9 @@ the cursor, spend and run log describe one machine and nothing else.
 
 There is no human-facing output. Nothing is written into an Obsidian vault or
 anywhere else you would browse — the audience is Claude, and what it knows you
-read with `chezdistill --status`, `MAIN.md` or a note in `Topics/`. Because a job
-with no output is a job you stop thinking about, `chezdoctor` carries a
-chezdistill section: agent registered, last run recent and successful, `MAIN.md`
+read with `chez distill --status`, `MAIN.md` or a note in `Topics/`. Because a job
+with no output is a job you stop thinking about, `chez doctor` carries a
+a chezdistill section: agent registered, last run recent and successful, `MAIN.md`
 present and under its cap, corpus backed up — to its own profile's repo.
 
 Its guiding rule is that **the model extracts while bash decides and writes**:

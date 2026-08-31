@@ -3,7 +3,7 @@
 The work-only exception, and the one place in the repo that installs software
 from outside Homebrew. `storecode` is a work security tool that ships its own
 installer, so it cannot be a Brewfile package — and because Homebrew does not
-know about it, `chezmirror` and `chezclean` have to be told to leave it alone.
+know about it, `chez mirror` and `chez clean` have to be told to leave it alone.
 
 | Piece | Where |
 |---|---|
@@ -18,7 +18,7 @@ would fail `brew bundle` for every work machine and do nothing for anyone else.
 
 **Never offer `~/.storecode` for cleanup.** Nothing installed it that
 [`clean`](../clean) can recognise, so without the `keepHome` entry every
-`chezclean` run would offer to delete a working security tool. The entry is
+`chez clean` run would offer to delete a working security tool. The entry is
 permanent, not a deprecation waiting to be tidied — both halves are pinned by
 [`tests/storecode.bats`](tests/storecode.bats) so neither can drift out from
 under the other.
@@ -35,7 +35,7 @@ work-internal and this repo is public. With it empty the hook prints where to
 set it and exits 0, so a work machine converges cleanly and simply arrives
 without the tool — the alternative, a hard failure, would abort the apply and
 cost the user hook 99's "Next moves" block. Set it locally to a one-liner (a
-`curl -fsSL … | bash`, say) and the next `chezup` installs it.
+`curl -fsSL … | bash`, say) and the next `chez up` installs it.
 
 The command runs through `eval`, so it may be a pipeline. One consequence worth
 knowing: an installer one-liner containing a bare `exit` ends the hook rather

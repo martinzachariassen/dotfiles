@@ -2,7 +2,7 @@
 # Xcode itself is managed with `xcodes`, not the App Store — but `xcodes` is
 # deliberately NOT in this file. Its only tap formula builds from source, and
 # that build needs `xcbuild` from a full Xcode.app, so it can never succeed on a
-# fresh Command-Line-Tools-only Mac. `chezxcode` fetches the upstream prebuilt
+# fresh Command-Line-Tools-only Mac. `chez xcode` fetches the upstream prebuilt
 # binary on demand instead; the pin lives in src/.chezmoidata/xcode.toml.
 
 # Core: lint, format, SF Symbols browser

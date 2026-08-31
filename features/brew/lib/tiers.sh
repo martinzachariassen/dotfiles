@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # brewfiles.sh — resolve which Brewfile tiers apply to THIS machine.
 #
-# Shared by chezdoctor and the chezmirror/chezstatus removal set so the install
+# Shared by chez doctor and the chez mirror / chez status removal set so the install
 # and removal directions can't disagree about what "tracked" means. Removal
 # used to compare against the `Brewfile.*` glob (every tier that exists), which
 # made a work-profile package look tracked on a personal machine and so never

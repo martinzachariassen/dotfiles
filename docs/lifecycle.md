@@ -1,6 +1,6 @@
 # Apply lifecycle
 
-How `chezmoi apply` (and therefore `install.sh` / `chezup`) turns this repo into
+How `chezmoi apply` (and therefore `install.sh` / `chez up`) turns this repo into
 a configured machine, and the rules the hook scripts follow. The
 `src/.chezmoiscripts/` hooks and the `features/*/hook.sh` engines point back here.
 
@@ -66,29 +66,29 @@ that ship an Apple installer package need admin access, so the hook confirms
 the sudo ticket (asking on a clean screen, before the progress bar) and keeps
 it warm for the length of the bundle rather than letting a prompt surface from
 behind the bar. It
-only *adds* — freshness is `chezbump`'s job, and *removal* (uninstalling
-packages the Brewfile no longer lists) is `chezmirror`'s: an apply must never
-silently uninstall, so `chezapply` flags untracked packages and `chezmirror`
+only *adds* — freshness is `chez bump`'s job, and *removal* (uninstalling
+packages the Brewfile no longer lists) is `chez mirror`'s: an apply must never
+silently uninstall, so `chez apply` flags untracked packages and `chez mirror`
 reconciles them behind a confirm. VS Code extensions are the deliberate
 exception: they carry no data and are trivial to reinstall, so
 `run_onchange_after_03-vscode` mirrors them outright — installing what
 `features/vscode/extensions.txt` lists and pruning what it doesn't — with
-`chezdoctor` surfacing the drift read-only. Some extensions also drop a
+`chez doctor` surfacing the drift read-only. Some extensions also drop a
 top-level dir in `$HOME` (`.sts4`, `.lemminx`, …); those are **not**
-touched by an apply — `chezclean` removes them on demand once their owning
+touched by an apply — `chez clean` removes them on demand once their owning
 extension is gone (the `extension` field in `cleanup.owners` links each dir
 to its extension). Other custom logic lives in `features/<name>/` so it stays
 shellcheck-able and unit-tested; hooks are thin drivers that do render-time
 config, source their lib (if any), and call the entry point.
 
-## Reconciling untracked dotfiles (chezclean)
+## Reconciling untracked dotfiles (chez clean)
 
 Presence-convergence keeps installed *state* matching the repo; a parallel,
 **manual** step keeps the dotfiles matching it *structurally*. An apply never
 deletes — it only renders what the repo tracks — so untracked cruft (a dir some
 tool dropped, config for a package you've since removed) accumulates until you
-reconcile it. That's `chezclean`'s job: the confirm-gated file analogue of
-`chezmirror`.
+reconcile it. That's `chez clean`'s job: the confirm-gated file analogue of
+`chez mirror`.
 
 It reconciles two scopes — the top level of `$HOME` and `~/.config` — against
 what chezmoi manages, keeps anything whose owning tool is still installed, and
@@ -97,19 +97,19 @@ tool-presence signals and the keep-lists, is in
 [features/clean](../features/clean/README.md).
 
 Dropped **Homebrew packages** are reconciled the same way, by hand:
-`chezmirror` runs `brew bundle cleanup` to uninstall anything no longer in a
+`chez mirror` runs `brew bundle cleanup` to uninstall anything no longer in a
 Brewfile, then `brew autoremove` to prune orphaned dependencies, while
-`chezstatus`/`chezdoctor` report the drift read-only. "No longer in a Brewfile"
+`chez status`/`chez doctor` report the drift read-only. "No longer in a Brewfile"
 means no Brewfile **active on this machine** — core, the enabled modules and
 this profile's tier. Both directions resolve that set through
 [`features/brew/lib/tiers.sh`](../features/brew/lib/tiers.sh), so install and
 removal can't disagree: moving a package to the other profile's tier makes it
 removable here, exactly as deleting it would. The removal side fails closed —
 an unresolvable tier set offers nothing, never more. Nothing about removal is
-automatic: if a machine drifts, its owner runs `chezmirror` and `chezclean`
+automatic: if a machine drifts, its owner runs `chez mirror` and `chez clean`
 to bring it back in line. To do both package directions in one step —
 install what the Brewfiles declare, then remove what they don't —
-`chezreconcile` chains `chezup` and `chezmirror` (files stay with `chezclean`).
+`chez reconcile` chains `chez up` and `chez mirror` (files stay with `chez clean`).
 
 ## Where each piece lives
 
@@ -122,14 +122,14 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 | Homebrew install (first run) | `run_once_before_01-install-homebrew.sh.tmpl` (installer: `features/brew/lib/homebrew.sh`) |
 | Package convergence | `run_after_02-brew-bundle` (native `brew bundle`, reads `brew.toml`) |
 | Runtime convergence (mise) | `run_after_02b-mise-install` |
-| Homebrew package cleanup (confirm-gated) | `chezmirror` / `chezstatus` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
+| Homebrew package cleanup (confirm-gated) | `chez mirror` / `chez status` (zsh verbs) → `brew bundle cleanup` + `brew autoremove` |
 | Active Brewfile tier set (shared by install check, cleanup, doctor) | `features/brew/lib/tiers.sh` (`brew_active_files`, reads `brew.toml` via `chezmoi data`) |
-| Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chezclean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
-| chezclean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
+| Untracked dotfile cleanup (confirm-gated) | `features/clean/cli.sh` (`chez clean`) + `cleanup.keepHome` (`$HOME`) + `cleanup.keepConfig` (`~/.config`) |
+| chez clean tool-ownership map (keep-while-installed; package/binary/extension) | `src/.chezmoidata/clean.toml` (`cleanup.owners`) |
 | storecode install (work profile) | `run_onchange_after_05-storecode` + `src/.chezmoidata/storecode.toml` |
 | pre-commit hook install | `run_onchange_after_02e-pre-commit-install` |
 | VS Code extension mirror | `run_onchange_after_03-vscode` (a thin template) + `features/vscode/{hook,lib}.sh` + `features/vscode/extensions.txt` (drift check in `features/vscode/doctor.sh`) |
-| VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chezclean` + `cleanup.owners` (`extension`) |
+| VS Code extension-owned `$HOME`-dir cleanup (on demand) | `chez clean` + `cleanup.owners` (`extension`) |
 | macOS defaults | `run_onchange_after_04-macos-defaults` + `features/macos/cli.sh` (shares `core/sudo.sh`'s keeper; skips it under a chezmoi apply via `DOTFILES_SUDO_KEPT_WARM=1`) |
 | Closing summary | `run_onchange_after_99-completion` |
 | Package tiers | `features/brew/Brewfile` (core) + `features/brew/Brewfile.{mac-apps,personal,work,apple-dev}` |
@@ -138,7 +138,7 @@ Hook paths are under `src/.chezmoiscripts/`; tooling paths (`scripts/`,
 
 ## Bootstrap
 
-`install.sh` (fresh-Mac bootstrap) and `chezup` (everyday converge) are
+`install.sh` (fresh-Mac bootstrap) and `chez up` (everyday converge) are
 separate, plain scripts — see [install.md](install.md) and
 [commands.md](commands.md).
 
@@ -152,7 +152,7 @@ off to `features/setup/cli.sh` (repo now on disk, so it *can* source
 `chezmoi init --apply`, whose `--apply` runs the hooks above. See
 [packages.md](packages.md#the-wizard) for the wizard's three prompt tiers.
 
-The everyday verbs (`chezup`, `chezdoctor`, …) are shell functions that bake
+The everyday verbs (`chez up`, `chez doctor`, …) are shell functions that bake
 their helper-script path into `~/.config/zsh/.zshrc` **at apply time**.
 Because a `git pull` never rewrites the live rc, a restructure that moves a
 script can strand a machine that pulled but hasn't re-applied. The functions

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# chezclean — reconcile untracked dotfiles to what chezmoi manages, across two
+# chez clean — reconcile untracked dotfiles to what chezmoi manages, across two
 # scopes: $HOME's top level (dot-entries) and ~/.config (all children). Removes
 # only what you confirm. Config whose owning tool is still installed is kept
 # automatically (brew package, PATH command, or VS Code extension present).
@@ -15,7 +15,7 @@ ASSUME_YES="${YES:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_DIR/../../core/ui.sh" ]; then
-    printf 'chezclean: missing %s\n' "$_DIR/../../core/ui.sh" >&2
+    printf 'chez clean: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
 # shellcheck source=../../core/ui.sh
@@ -214,7 +214,7 @@ _clean_remove_one() {
 
 _clean_help() {
     cat <<'EOF'
-usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
+usage: chez clean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
 
   Reconcile untracked dotfiles to what chezmoi manages, across two scopes — the
   top level of $HOME (keep-list keepHome) and ~/.config (keep-list keepConfig) —
@@ -230,7 +230,7 @@ usage: chezclean [--all|-a | --yes|-y] [--dry-run|-n] [--verbose|-v]
   --dry-run, -n preview what would be removed; delete nothing (also DRY_RUN=1)
   --verbose, -v also list the entries kept because their tool is installed
 
-  YES=1 chezclean   accept-all with no prompt (still needs a terminal).
+  YES=1 chez clean   accept-all with no prompt (still needs a terminal).
   Keep an entry for good: add it to keepHome / keepConfig in
   src/.chezmoidata/clean.toml; map a tool's config dir to its command in
   cleanup.owners (e.g. .kube -> kubectl).

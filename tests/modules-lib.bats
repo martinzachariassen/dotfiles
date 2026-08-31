@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Coverage for core/modules.sh — the single answer to "which modules has
-# THIS Mac been offered, and how is that list written back?", shared by chezup's
-# new-module gate, and by `chezdistill --setup` when it enables claudeDistiller.
+# THIS Mac been offered, and how is that list written back?", shared by chez up's
+# new-module gate, and by `chez distill --setup` when it enables claudeDistiller.
 #
 # The distinction the whole feature rests on is `unseen` vs `not enabled`: a
 # module the user declined must never be offered again, so being asked about is
@@ -174,7 +174,7 @@ no_match_in() {
 }
 
 @test "modules.sh is idempotent when sourced twice" {
-    # chezup, wizard.sh and distill.sh can pull it in alongside other libs.
+    # chez up, wizard.sh and distill.sh can pull it in alongside other libs.
     run bash -c ". '$LIB'; . '$LIB'; modules_unseen '$DATA'"
     [ "$status" -eq 0 ]
     [ "$output" = "claudeDistiller" ]

@@ -220,29 +220,31 @@ _zprofile_path() {
         -lt "$(grep -n 'compdef _chez chez' "$ZSHRC" | cut -d: -f1)" ]
 }
 
-# Every verb answered to `chez<verb>` before the dispatcher. Both directions are
-# checked: an alias that names a verb the table does not have would break on
-# use, and a verb with no alias silently breaks muscle memory.
-@test "every table verb keeps its old name as an alias" {
-    local missing=() v legacy
+# The aliases are retired. `chezup`, `chezdoctor`, `dotfiles`, `macos-defaults`
+# and the rest existed through the transition and are gone; there is one
+# spelling of every verb. A stale alias is worse than a missing one — it keeps
+# two names alive in muscle memory and in half the docs, which is the drift the
+# registry exists to end.
+@test "no retired name survives as an alias" {
+    local bad=() v retired
     while IFS= read -r v; do
-        legacy="$(verbs_legacy_name "$v")"
-        [ -n "$legacy" ] || continue # auth never had one
-        grep -qE "^alias ${legacy}='chez ${v}'\$" "$ZSHRC" || missing+=("$legacy -> chez $v")
+        retired="$(verbs_retired_name "$v")"
+        [ -n "$retired" ] || continue
+        grep -qE "^alias ${retired}=" "$ZSHRC" && bad+=("$retired")
     done < <(verbs_all)
-    [ "${#missing[@]}" -eq 0 ] || printf 'no alias: %s\n' "${missing[@]}" >&2
-    [ "${#missing[@]}" -eq 0 ]
+    [ "${#bad[@]}" -eq 0 ] || printf 'retired alias still defined: %s\n' "${bad[@]}" >&2
+    [ "${#bad[@]}" -eq 0 ]
 }
 
-@test "every alias in the zshrc names a verb the table has" {
-    local extra=() line verb
-    while IFS= read -r line; do
-        verb="${line##*chez }"
-        verb="${verb%\'}"
-        verbs_all | grep -qx "$verb" || extra+=("$line")
-    done < <(grep -E "^alias [a-z-]+='chez [a-z]+'\$" "$ZSHRC")
-    [ "${#extra[@]}" -eq 0 ] || printf 'alias for an unknown verb: %s\n' "${extra[@]}" >&2
-    [ "${#extra[@]}" -eq 0 ]
+@test "the zshrc defines no chez-prefixed alias at all" {
+    # Broader than the list above: it also catches a new `chezfoo` growing back,
+    # which would reintroduce the second spelling this stage removed.
+    local strays
+    strays="$(grep -oE "^alias chez[a-z]+=" "$ZSHRC" || true)"
+    [ -z "$strays" ] || {
+        printf 'a chez-prefixed alias reappeared: %s\n' "$strays" >&2
+        return 1
+    }
 }
 
 # Every verb that touches Homebrew is a script now, so no copy of the removal
@@ -263,12 +265,12 @@ _zprofile_path() {
     }
 }
 
-# chezapply reports package drift and points at chezmirror; it must never
+# chez apply reports package drift and points at chez mirror; it must never
 # uninstall. Asserted against the script now — the template only wraps it.
-@test "chezapply surfaces Brewfile drift but never auto-uninstalls" {
+@test "chez apply surfaces Brewfile drift but never auto-uninstalls" {
     APPLY="$REPO_ROOT/features/converge/apply.sh"
     grep -qF 'brew_removals' "$APPLY"
-    grep -qF 'reconcile (uninstall): chezmirror' "$APPLY"
+    grep -qF 'reconcile (uninstall): chez mirror' "$APPLY"
     no_match 'brew (bundle cleanup|uninstall|untap)' "$APPLY"
 }
 

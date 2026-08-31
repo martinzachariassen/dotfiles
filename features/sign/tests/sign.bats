@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioural tests for features/sign/cli.sh, which backs `chezsign`: set the
+# Behavioural tests for features/sign/cli.sh, which backs `chez sign`: set the
 # git signing key on a machine that deferred it, replaying every other saved
 # answer so nothing else is re-asked. Runs the real script against a stubbed
 # chezmoi + ssh-add and a real (dead) unix socket standing in for the agent.
@@ -60,7 +60,7 @@ run_sign() { # extra env is set by the caller
 @test "--help explains the verb without touching chezmoi" {
     FAKE_DATA="$DATA_FULL" run_sign --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezsign"* ]] || return 1
+    [[ "$output" == *"usage: chez sign"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 
@@ -68,7 +68,7 @@ run_sign() { # extra env is set by the caller
     FAKE_DATA='{"signingMode":"off"}' run_sign
     [ "$status" -eq 0 ]
     [[ "$output" == *"off"* ]] || return 1
-    [[ "$output" == *"chezsetup --reset"* ]] || return 1
+    [[ "$output" == *"chez setup --reset"* ]] || return 1
     [ ! -s "$INIT_LOG" ]
 }
 
@@ -146,11 +146,13 @@ run_sign() { # extra env is set by the caller
     [ -n "$(verbs_summary sign)" ]
 }
 
-@test "chezsign still works as the old name" {
-    grep -qxF "alias chezsign='chez sign'" "$ZSHRC"
+@test "the retired chezsign alias is gone" {
+    # There is one spelling now. Asserted here as well as centrally, because
+    # this is the feature whose verb it was.
+    no_match "^alias chezsign=" "$ZSHRC"
 }
 
-@test "the completion script offers chezsign only when the key is deferred" {
+@test "the completion script offers chez sign only when the key is deferred" {
     local tmpl="$REPO_ROOT/src/.chezmoiscripts/run_onchange_after_99-completion.sh.tmpl"
     grep -qF 'SIGNKEY' "$tmpl"
     # Guarded on both "signing is on" and "key is empty".

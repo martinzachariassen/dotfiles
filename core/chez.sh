@@ -112,7 +112,7 @@ chez_help() {
   QUIET=1 on any verb (and install.sh) drops the explanations, leaving just results
   chez mirror also honors DRY_RUN=1 / -n (preview only) and YES=1 (accept-all, no prompts)
   YES=1 chez clean:  accept-all — remove everything untracked, no prompts
-  Every verb also answers to its old name for now: chez up == chezup.
+  Every verb also answers to its old name for now: chez up == chez up.
   Deeper docs:  run `chez cd`, then see docs/commands.md
 EOF
 }

@@ -5,5 +5,5 @@
 [storecode]
 # Environment-specific installer, so it ships empty: unset means the hook prints
 # how to finish and exits 0 rather than failing the apply. Set the real installer,
-# e.g. "curl -fsSL https://…/install.sh | bash", then run `chezup`.
+# e.g. "curl -fsSL https://…/install.sh | bash", then run `chez up`.
 installCmd = ""

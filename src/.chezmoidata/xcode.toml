@@ -1,4 +1,4 @@
-# xcodes — the CLI that installs Xcode.app, used by `chezxcode` and nothing else.
+# xcodes — the CLI that installs Xcode.app, used by `chez xcode` and nothing else.
 #
 # Deliberately NOT a Brewfile entry. The `xcodesorg/made` tap ships a
 # source-build formula whose only bottles are tagged `arm64_mojave`/`mojave`,
@@ -11,7 +11,7 @@
 # Which is the circle — `xcodes` is the thing that installs Xcode.app. On a
 # fresh Mac with only the Command Line Tools it can never build, so the
 # `appleDev` Brewfile failed on every clean install. Upstream ships a signed,
-# universal prebuilt binary for exactly this case; `chezxcode` fetches that on
+# universal prebuilt binary for exactly this case; `chez xcode` fetches that on
 # demand instead. See scripts/lib/xcodes.sh.
 
 [xcodes]

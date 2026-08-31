@@ -4,6 +4,6 @@
 # shellcheck disable=SC2034  # every variable here is read by the registry
 
 FEATURE_NAME="<name>"         # must match this directory's name
-FEATURE_TITLE="<Human title>" # heading chezdoctor prints for its section
+FEATURE_TITLE="<Human title>" # heading chez doctor prints for its section
 FEATURE_MODULE=""             # module that gates the whole feature; empty = always on
-FEATURE_DOCTOR_ORDER=""       # position in chezdoctor; empty = contributes no checks
+FEATURE_DOCTOR_ORDER=""       # position in chez doctor; empty = contributes no checks

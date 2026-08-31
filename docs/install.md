@@ -16,7 +16,7 @@ line or two on why it matters. `QUIET=1` drops the prose and keeps the results.
 **About the password prompts.** You are asked for your macOS login password
 more than once: `install.sh` needs it to create `/opt/homebrew`, the apply
 pre-authorises it again for Homebrew casks (several link binaries into
-`/usr/local/bin`), and `macos-defaults` needs it if that session has since
+`/usr/local/bin`), and `chez macos` needs it if that session has since
 expired. Each ask says why it is happening and that nothing echoes as you type;
 if **Touch ID for sudo** is enabled ([macos.md](macos.md#touch-id-for-sudo-sonoma-14),
 applied by the `macosDefaults` module) you can tap instead. Immediately after
@@ -38,9 +38,9 @@ SourceKit-LSP. Selecting the `appleDev` module gets you the Swift *tooling*
 (SwiftLint, SwiftFormat, SweetPad …) but still not Xcode itself — `xcodes
 install` needs an Apple ID with 2FA, so it can't run unattended from an apply.
 The `xcodes` CLI isn't a Brewfile entry either: its formula builds from source
-and that build needs a full Xcode.app, so `chezxcode` fetches the upstream
-prebuilt binary (pinned by sha256 in `src/.chezmoidata/xcode.toml`) itself. Run **`chezxcode`** once afterwards to close that gap; the apply's
-closing summary prompts you when it's outstanding, and `chezdoctor` stays red
+and that build needs a full Xcode.app, so `chez xcode` fetches the upstream
+prebuilt binary (pinned by sha256 in `src/.chezmoidata/xcode.toml`) itself. Run **`chez xcode`** once afterwards to close that gap; the apply's
+closing summary prompts you when it's outstanding, and `chez doctor` stays red
 until it's done. See [commands.md](commands.md#advanced--occasional-helpers).
 
 ## Scenarios
@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/in
 > Homebrew only installs a few steps *later*. So when the wizard asks *when* you
 > want to set the key, answer **later**. Signing is simply omitted from the
 > rendered gitconfig until a key exists (git works fine, commits are just
-> unsigned), and the closing summary reminds you to finish with `chezsign`.
+> unsigned), and the closing summary reminds you to finish with `chez sign`.
 
 When the wizard finishes, sign in and reload:
 
@@ -100,12 +100,12 @@ Afterwards, reload and sanity-check:
 
 ```sh
 exec zsh
-chezdoctor      # warns about any leftover direnv it couldn't remove
+chez doctor      # warns about any leftover direnv it couldn't remove
 ```
 
 ### Already set up
 
-Just stay current with [`chezup`](commands.md#everyday) — no installer needed.
+Just stay current with [`chez up`](commands.md#everyday) — no installer needed.
 
 ## Advanced flags
 
@@ -130,15 +130,15 @@ manages (an old `~/.config/direnv`, a dropped `node` formula, leftover Nix
 remnants). Reconciling that drift back to the repo is a deliberate, **manual**
 step you run when you want to:
 
-- `chezmirror` — remove Homebrew packages, casks, and taps the Brewfiles no
+- `chez mirror` — remove Homebrew packages, casks, and taps the Brewfiles no
   longer declare (confirm-gated, one at a time), then `brew autoremove` orphaned
   dependencies.
-- `chezclean` — remove untracked dotfiles the repo doesn't manage, across the
+- `chez clean` — remove untracked dotfiles the repo doesn't manage, across the
   top level of `$HOME` (the dangling `~/.nix-profile` symlink, say) and
   `~/.config` (`~/.config/direnv`). Tool-aware, confirm-gated. See
-  [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chezclean).
+  [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chez-clean).
 
-Anything nested deeper than an immediate child is out of `chezclean`'s scope —
+Anything nested deeper than an immediate child is out of `chez clean`'s scope —
 remove it once by hand instead (`rm -rf ~/.local/state/nix` for an empty
 leftover state dir, for example). On a fresh machine that never had the old
 stack, there's nothing to reconcile.
@@ -148,8 +148,8 @@ stack, there's nothing to reconcile.
 On the **work** profile the apply also ensures `storecode` — an internal
 security tool that guards shell commands — is installed. It ships via its
 **own** installer, not Homebrew, so it's never a Brewfile entry and
-`chezstatus`/`chezmirror` never flag it; `~/.storecode` sits on the cleanup
-keep-list (`cleanup.keepHome`), so `chezclean` never offers to remove it. The
+`chez status`/`chez mirror` never flag it; `~/.storecode` sits on the cleanup
+keep-list (`cleanup.keepHome`), so `chez clean` never offers to remove it. The
 installer command is data-driven in
 [`src/.chezmoidata/storecode.toml`](../src/.chezmoidata/storecode.toml)
 (`storecode.installCmd`); until it's set, the

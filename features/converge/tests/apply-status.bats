@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioural tests for chezapply and chezstatus — the two converge verbs that
+# Behavioural tests for chez apply and chez status — the two converge verbs that
 # read and write $HOME. They run the committed scripts against a fake repo with
 # git, chezmoi and brew stubbed, so every branch is driven by env var.
 #
@@ -18,7 +18,7 @@ setup() {
     # The real resolver, so these zsh-side tests exercise the committed lib —
     # _chez_brew_removals sources it out of the repo root it's handed.
     cp "$REPO_ROOT/features/brew/lib/tiers.sh" "$FAKE/features/brew/lib/tiers.sh"
-    # chezapply/chezstatus reach the resolver through the same lib the
+    # chez apply / chez status reach the resolver through the same lib the
     # extracted verbs do, so the fake repo has to carry it too.
     cp "$REPO_ROOT/features/brew/lib/removals.sh" "$FAKE/features/brew/lib/removals.sh"
     printf 'brew "git"\n' >"$FAKE/features/brew/Brewfile"
@@ -49,7 +49,7 @@ setup() {
 EOF
 
     # chezmoi stub: status prints CHEZMOI_STATUS; apply records args and honours
-    # CHEZMOI_APPLY_RC; diff records args (chezstatus's raw-passthrough path);
+    # CHEZMOI_APPLY_RC; diff records args (chez status's raw-passthrough path);
     # data feeds the Brewfile-tier resolver.
     cat >"$STUBS/chezmoi" <<EOF
 #!/usr/bin/env bash
@@ -70,7 +70,7 @@ if [ "$1" = bundle ] && [ "$2" = cleanup ]; then
 fi
 exit 0
 EOF
-    # mise stub so chezbump's `mise upgrade` never hits the real network call.
+    # mise stub so chez bump's `mise upgrade` never hits the real network call.
     printf '#!/usr/bin/env bash\nexit 0\n' >"$STUBS/mise"
     chmod +x "$STUBS/chezmoi" "$STUBS/brew" "$STUBS/mise"
 }
@@ -106,9 +106,9 @@ run_bash() {
         bash "$@"
 }
 
-# ─── chezapply: the smart apply wrapper ─────────────────────────────────────
+# ─── chez apply: the smart apply wrapper ─────────────────────────────────────
 
-@test "chezapply applies without prompting when there is no drift" {
+@test "chez apply applies without prompting when there is no drift" {
     # Empty status ⇒ straight to `chezmoi apply --force`, no confirmation gate.
     CHEZMOI_STATUS="" \
         run_bash "$REPO_ROOT/features/converge/apply.sh"
@@ -116,8 +116,8 @@ run_bash() {
     grep -q 'apply --force' "$APPLY_LOG"
 }
 
-@test "chezapply surfaces a Brewfile-removal drift notice after applying, including casks" {
-    # Notice names chezmirror as the reconcile path; chezapply itself never
+@test "chez apply surfaces a Brewfile-removal drift notice after applying, including casks" {
+    # Notice names chez mirror as the reconcile path; chez apply itself never
     # uninstalls. Regression: the notice must use _chez_brew_removals (brew
     # bundle cleanup), not a `brew leaves`-only check — that older approach
     # missed casks entirely.
@@ -130,21 +130,21 @@ OUT
         run_bash "$REPO_ROOT/features/converge/apply.sh"
     [ "$status" -eq 0 ]
     [[ "$output" == *"no active Brewfile"* ]] || return 1
-    [[ "$output" == *"chezmirror"* ]] || return 1
+    [[ "$output" == *"chez mirror"* ]] || return 1
 }
 
-@test "chezapply propagates a failing apply's exit code" {
+@test "chez apply propagates a failing apply's exit code" {
     CHEZMOI_STATUS="" CHEZMOI_APPLY_RC=3 \
         run_bash "$REPO_ROOT/features/converge/apply.sh"
     [ "$status" -eq 3 ]
 }
 
-# ─── chezstatus: read-only file + package drift explainer ──────────────────
+# ─── chez status: read-only file + package drift explainer ──────────────────
 # The status codes are two columns (left = local $HOME drift, right = repo →
-# $HOME apply). chezstatus splits them into two labelled sections; these tests
+# $HOME apply). chez status splits them into two labelled sections; these tests
 # feed the stub a fixed CHEZMOI_STATUS and assert the plain-language grouping.
 
-@test "chezstatus reports in-sync and no untracked packages when everything is clean" {
+@test "chez status reports in-sync and no untracked packages when everything is clean" {
     CHEZMOI_STATUS="" \
         run_bash "$REPO_ROOT/features/converge/status.sh"
     [ "$status" -eq 0 ]
@@ -152,9 +152,9 @@ OUT
     [[ "$output" != *"Untracked Homebrew"* ]] || return 1
 }
 
-@test "chezstatus flags untracked casks, not just formulae, and points at chezmirror" {
+@test "chez status flags untracked casks, not just formulae, and points at chez mirror" {
     # Regression: the old chezaudit used `brew leaves`, which is formula-only
-    # and silently missed untracked casks. chezstatus must not repeat that.
+    # and silently missed untracked casks. chez status must not repeat that.
     cat >"$STUBS/cleanup.out" <<'OUT'
 Would uninstall casks:
 obs
@@ -166,11 +166,11 @@ OUT
     [[ "$output" == *"Untracked Homebrew"* ]] || return 1
     [[ "$output" == *"cask"* ]] || return 1
     [[ "$output" == *"obs"* ]] || return 1
-    [[ "$output" == *"chezmirror"* ]] || return 1
+    [[ "$output" == *"chez mirror"* ]] || return 1
 }
 
-@test "chezstatus groups repo → \$HOME changes under the apply section with plain verbs" {
-    # Right column drives the 'what chezapply would write' list: ' M' → modify,
+@test "chez status groups repo → \$HOME changes under the apply section with plain verbs" {
+    # Right column drives the 'what chez apply would write' list: ' M' → modify,
     # ' A' → add. No local drift (left column blank) ⇒ no drift section.
     CHEZMOI_STATUS=$' M .config/zsh/.zshrc\n A .config/foo/bar' \
         run_bash "$REPO_ROOT/features/converge/status.sh"
@@ -183,7 +183,7 @@ OUT
     [[ "$output" != *"Local drift"* ]]  # nothing edited locally
 }
 
-@test "chezstatus surfaces local drift and the re-add hint" {
+@test "chez status surfaces local drift and the re-add hint" {
     # 'MM' = edited locally (left col) AND repo differs (right col): it must
     # appear under BOTH sections, and the drift section warns about overwrite.
     CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
@@ -195,7 +195,7 @@ OUT
     [[ "$output" == *"re-add"* ]] || return 1
 }
 
-@test "chezstatus -v hands off to the raw \`chezmoi diff\`" {
+@test "chez status -v hands off to the raw \`chezmoi diff\`" {
     # Verbose (and any path arg) must bypass the summary entirely and shell out
     # to `chezmoi diff` — recorded in DIFF_LOG by the stub.
     CHEZMOI_STATUS=$'MM .config/zsh/.zshrc' \
@@ -205,16 +205,16 @@ OUT
     grep -q '^diff' "$DIFF_LOG"
 }
 
-@test "chezstatus PATH forwards the path to \`chezmoi diff\`" {
+@test "chez status PATH forwards the path to \`chezmoi diff\`" {
     run_bash "$REPO_ROOT/features/converge/status.sh" ~/.zshrc
     [ "$status" -eq 0 ]
     grep -q 'diff .*\.zshrc' "$DIFF_LOG"
 }
 
-@test "chezstatus --help prints usage without touching chezmoi" {
+@test "chez status --help prints usage without touching chezmoi" {
     run_bash "$REPO_ROOT/features/converge/status.sh" --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezstatus"* ]] || return 1
+    [[ "$output" == *"usage: chez status"* ]] || return 1
     [ ! -s "$DIFF_LOG" ]  # help path shells out to nothing
 }
 

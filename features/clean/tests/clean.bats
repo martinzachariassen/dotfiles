@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for the clean feature (chezclean): reconciles untracked dotfiles across $HOME's
+# Tests for the clean feature (chez clean): reconciles untracked dotfiles across $HOME's
 # top level and ~/.config to what chezmoi manages, removing only what's
 # confirmed. Candidates = entries minus managed minus keep-list; a drift there
 # could offer auth/state dirs for deletion, so these tests pin that computation
@@ -82,7 +82,7 @@ case "\$1" in
 esac
 EOF
 
-    # brew stub like chezmirror.bats: list --formula / --cask cat canned files.
+    # brew stub like brew/tests/mirror.bats: list --formula / --cask cat canned files.
     cat >"$STUBS/brew" <<EOF
 #!/usr/bin/env bash
 case "\$2" in
@@ -276,7 +276,7 @@ no_match_in() {
 @test "--help prints usage and removes nothing" {
     run_clean --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezclean"* ]] || return 1
+    [[ "$output" == *"usage: chez clean"* ]] || return 1
     [[ "$output" == *"--all"* ]] || return 1
     [ -d "$FAKEHOME/.hawtjni" ]
 }

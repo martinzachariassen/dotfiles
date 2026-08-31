@@ -53,7 +53,7 @@ distill_remote_detach() {
     git -C "$repo" remote remove origin >/dev/null 2>&1 || true
     git -C "$repo" config distill.detached true >/dev/null 2>&1 || true
     ok "detached — the corpus stays here and stops being pushed anywhere"
-    info "re-attach whenever with: chezdistill --remote <url>"
+    info "re-attach whenever with: chez distill --remote <url>"
     return 0
 }
 

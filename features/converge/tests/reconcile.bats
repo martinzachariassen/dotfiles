@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavioural tests for chezreconcile, which orchestrates chezup and chezmirror
+# Behavioural tests for chez reconcile, which orchestrates chez up and chez mirror
 # (install, removal, DRY_RUN preview).
 #
 # reconcile.sh reaches its siblings by path, not as shell functions, so this
@@ -34,7 +34,7 @@ run_reconcile() {
         bash "$FAKE/features/converge/reconcile.sh" "$@"
 }
 
-@test "chezreconcile runs chezup then chezmirror, in that order" {
+@test "chez reconcile runs chez up then chez mirror, in that order" {
     run_reconcile
     [ "$status" -eq 0 ]
     [[ "$output" == *CHEZUP* ]] || return 1
@@ -43,20 +43,20 @@ run_reconcile() {
     [[ "${output%%CHEZMIRROR*}" == *CHEZUP* ]] || return 1
 }
 
-@test "chezreconcile forwards trailing args to chezup (→ chezmoi apply)" {
+@test "chez reconcile forwards trailing args to chez up (→ chezmoi apply)" {
     run_reconcile -v
     [ "$status" -eq 0 ]
     [[ "$output" == *"CHEZUP -v"* ]] || return 1
 }
 
-@test "chezreconcile under DRY_RUN previews via chezmirror -n and never removes" {
+@test "chez reconcile under DRY_RUN previews via chez mirror -n and never removes" {
     DRY_RUN=1 run_reconcile
     [ "$status" -eq 0 ]
     [[ "$output" == *CHEZUP* ]] || return 1
     [[ "$output" == *"CHEZMIRROR -n"* ]] || return 1
 }
 
-@test "chezreconcile aborts before chezmirror when chezup fails" {
+@test "chez reconcile aborts before chez mirror when chez up fails" {
     CHEZUP_RC=4 run_reconcile
     [ "$status" -eq 4 ]
     [[ "$output" == *CHEZUP* ]] || return 1

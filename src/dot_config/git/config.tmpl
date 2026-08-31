@@ -4,7 +4,7 @@
 {{- $signingMode := dig "signingMode" (ternary "1password" "off" (dig "useOnePassword" true .)) . -}}
 {{- $signing := and (ne $signingMode "off") .signingKey -}}
 {{/* `dig`, not `.email`: setup no longer stores the key at all when the answer
-     was left blank, so that `chezsetup` re-asks instead of treating "" as a
+     was left blank, so that `chez setup` re-asks instead of treating "" as a
      final answer. A bare `.email` would abort the whole apply on those
      machines with "map has no entry for key". */ -}}
 {{- $email := dig "email" "" . -}}
@@ -13,7 +13,7 @@
 {{- if $email }}
     email = {{ $email }}
 {{- else }}
-    # No email is set yet — run `chezsetup` to fill it in.
+    # No email is set yet — run `chez setup` to fill it in.
     #
     # useConfigOnly makes git *refuse* to commit rather than invent an address.
     # Emitting `email =` with nothing after it was worse than useless: git

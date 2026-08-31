@@ -36,7 +36,7 @@ Almost all of it is downloading. You'll be asked for your macOS password (Homebr
 
 Plain `read` prompts and a pure-bash picker — so it works under `curl | bash` on a Mac with
 nothing installed yet. Sensible defaults throughout, and every answer is changeable later
-with `chezsetup`.
+with `chez setup`.
 
 | Question | Options | If unsure |
 | --- | --- | --- |
@@ -59,26 +59,26 @@ If you deferred the signing key, open 1Password, enable its SSH agent (**Setting
 
 ## Day to day
 
-Three verbs cover almost everything. `chezhelp` prints the rest.
+Three verbs cover almost everything. `chez help` prints the rest.
 
 | Command | What it does |
 | --- | --- |
-| `chezup` | **The one you run.** Pull latest → show what will change → apply. |
-| `chezdoctor` | Read-only health check: repo, brew, auth, signing, mise, shell. Fixes nothing. |
-| `chezstatus` | Explains pending file and package drift in plain words. |
+| `chez up` | **The one you run.** Pull latest → show what will change → apply. |
+| `chez doctor` | Read-only health check: repo, brew, auth, signing, mise, shell. Fixes nothing. |
+| `chez status` | Explains pending file and package drift in plain words. |
 
 Prefix any of them with `DRY_RUN=1` to print what the verb would do instead of doing it.
 
 <details>
-<summary><b>What <code>chezdoctor</code> reports</b></summary>
+<summary><b>What <code>chez doctor</code> reports</b></summary>
 
-![chezdoctor's report: source repo, chezmoi, XDG layout, Claude config, commit author, git signing, Homebrew packages, VS Code extensions, mise runtimes, Xcode/iOS, cloud auth, fonts, privacy permissions, and a pass/action/fail summary](assets/chezdoctor.png)
+![chez doctor's report: source repo, chezmoi, XDG layout, Claude config, commit author, git signing, Homebrew packages, VS Code extensions, mise runtimes, Xcode/iOS, cloud auth, fonts, privacy permissions, and a pass/action/fail summary](assets/chezdoctor.png)
 
 Every check names the fix. It changes nothing — the two `!` lines and the one `✗` above are this Mac's real state, not a mock-up.
 
 </details>
 
-**An apply only ever adds.** It renders files, installs what the Brewfiles declare, and runs `mise install` — it never uninstalls anything. Removing what the repo no longer tracks is a separate, confirm-gated step you run by hand (`chezmirror` for packages, `chezclean` for dotfiles).
+**An apply only ever adds.** It renders files, installs what the Brewfiles declare, and runs `mise install` — it never uninstalls anything. Removing what the repo no longer tracks is a separate, confirm-gated step you run by hand (`chez mirror` for packages, `chez clean` for dotfiles).
 
 ## What you get
 
@@ -89,7 +89,7 @@ Every check names the fix. It changes nothing — the two `!` lines and the one 
 | Editors | VS Code via Homebrew (extensions in [`features/vscode/extensions.txt`](features/vscode/extensions.txt)), Neovim with LazyVim |
 | Git | 1Password SSH signing, delta diffs, useful aliases, pull rebase, rerere |
 | Runtimes | [mise](https://mise.jdx.dev) for per-project Java/Node/Python; global defaults in `~/.config/mise/config.toml` |
-| iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols. Xcode itself comes from `chezxcode` (Apple ID, ~40 GB), not from an apply |
+| iOS / Swift | Optional `appleDev` module: SwiftLint, SwiftFormat, [xcodes](https://github.com/XcodesOrg/xcodes), xcbeautify, fastlane, SF Symbols. Xcode itself comes from `chez xcode` (Apple ID, ~40 GB), not from an apply |
 | AI | Default `macApps` module: the Claude and Claude Code apps |
 | Apps | Homebrew-managed core apps, optional Mac app extras, profile-specific personal/work layers |
 | macOS | Keyboard, Finder, Dock, screenshots, TextEdit, and security defaults — [full list](docs/macos.md) |
@@ -127,15 +127,15 @@ Every verb is one row in [`core/verbs.sh`](core/verbs.sh); [`core/chez.sh`](core
 
 | Command | What it does |
 | --- | --- |
-| `chezup` | Converge this Mac to the repo. Pull latest → preview the drift → apply. |
-| `chezdoctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout, distiller. |
-| `chezstatus` / `chezapply` | Explain pending drift, or apply without pulling. Both read the same `chezmoi status`. |
-| `chezsetup` | Re-run the wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added keys. |
-| `chezsign` | Set **only** the git signing key, replaying every other answer untouched. |
-| `chezmirror` / `chezclean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. The deliberate, manual undo an apply never does. |
-| `chezreconcile` / `chezbump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
-| `chezxcode` | Install Xcode.app, select it, accept the licence, fetch a simulator runtime. Needs an Apple ID; ~40 GB. |
-| `chezdistill` | Distil this Mac's Claude Code conversations nightly into the `MAIN.md` every future session loads (`~/.config/claude/memory`), from a corpus in `~/.local/state/chezdistill`. |
+| `chez up` | Converge this Mac to the repo. Pull latest → preview the drift → apply. |
+| `chez doctor` | Read-only health check: repo, chezmoi, brew, auth, signing, mise, shell layout, distiller. |
+| `chez status` / `chez apply` | Explain pending drift, or apply without pulling. Both read the same `chezmoi status`. |
+| `chez setup` | Re-run the wizard to change profile/modules (`--reset`/`-r`), or just fill in newly added keys. |
+| `chez sign` | Set **only** the git signing key, replaying every other answer untouched. |
+| `chez mirror` / `chez clean` | Confirm-gated **removal**: untracked Homebrew packages, and untracked dotfiles under `$HOME`/`~/.config`. The deliberate, manual undo an apply never does. |
+| `chez reconcile` / `chez bump` | Full package reconcile in one step (install + remove), or a routine `brew`/`mise` upgrade. |
+| `chez xcode` | Install Xcode.app, select it, accept the licence, fetch a simulator runtime. Needs an Apple ID; ~40 GB. |
+| `chez distill` | Distil this Mac's Claude Code conversations nightly into the `MAIN.md` every future session loads (`~/.config/claude/memory`), from a corpus in `~/.local/state/chezdistill`. |
 
 Full reference including `DRY_RUN=1`/`YES=1` and what each verb touches: [docs/commands.md](docs/commands.md).
 
@@ -144,7 +144,7 @@ Full reference including `DRY_RUN=1`/`YES=1` and what each verb touches: [docs/c
 <details>
 <summary><b>How it works</b></summary>
 
-`install.sh` is a tiny bootstrap fetched via `curl | bash` **before the repo exists on disk** — it installs only the prerequisites, then hands off to the setup wizard, which feeds your answers to `chezmoi init --apply`. `chezup` runs that same `chezmoi apply` every time after, which is what makes this convergent (it reconciles real installed state against the repo) rather than a one-shot script you can only run once.
+`install.sh` is a tiny bootstrap fetched via `curl | bash` **before the repo exists on disk** — it installs only the prerequisites, then hands off to the setup wizard, which feeds your answers to `chezmoi init --apply`. `chez up` runs that same `chezmoi apply` every time after, which is what makes this convergent (it reconciles real installed state against the repo) rather than a one-shot script you can only run once.
 
 ```mermaid
 flowchart LR
@@ -182,7 +182,7 @@ Edit sources under `src/` — never the rendered copies in `$HOME`, since every 
 | Doc | Covers |
 | --- | --- |
 | [install.md](docs/install.md) | Bootstrap scenarios, `install.sh` flags, cleaning up drift |
-| [commands.md](docs/commands.md) | Every verb — `chezup`, `chezdoctor`, and the occasional helpers |
+| [commands.md](docs/commands.md) | Every verb — `chez up`, `chez doctor`, and the occasional helpers |
 | [packages.md](docs/packages.md) | Package tiers, profiles, the module catalog, and the wizard |
 | [architecture.md](docs/architecture.md) | The `src/` split, repo layout, and `scripts/` organization |
 | [lifecycle.md](docs/lifecycle.md) | What `chezmoi apply` does, stage by stage |

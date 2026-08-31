@@ -34,7 +34,7 @@ doctor_runtimes() {
             warn "node not installed via mise — run: mise install"
         fi
     else
-        fail "mise missing — language runtimes (java, node, …) won't activate. Run: chezapply"
+        fail "mise missing — language runtimes (java, node, …) won't activate. Run: chez apply"
     fi
     # Legacy guard: direnv was replaced by mise.
     if command -v direnv >/dev/null 2>&1; then

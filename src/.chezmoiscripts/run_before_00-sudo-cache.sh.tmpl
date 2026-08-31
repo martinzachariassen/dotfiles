@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run_before_00-sudo-cache — pre-authenticate sudo so later steps (brew casks,
-# macos-defaults) don't prompt mid-apply. A clean TTY here also dodges a race
+# chez macos) don't prompt mid-apply. A clean TTY here also dodges a race
 # where the first keystroke is eaten before sudo goes no-echo.
 
 set -uo pipefail
@@ -45,7 +45,7 @@ EOF
 fi
 
 # Background keeper: refreshes the sudo timestamp until chezmoi exits, so later
-# steps (brew casks, macos-defaults) don't hit a lapsed cache mid-apply.
+# steps (brew casks, chez macos) don't hit a lapsed cache mid-apply.
 # shellcheck source=../../core/sudo.sh
 . "{{ .chezmoi.workingTree }}/core/sudo.sh"
 sudo_keep_warm "$PPID"

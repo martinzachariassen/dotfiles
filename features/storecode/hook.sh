@@ -20,8 +20,8 @@ if [ -z "$install_cmd" ]; then
     echo "◆ storecode: not installed, and no installer is configured yet."
     echo "  Set [storecode].installCmd in src/.chezmoidata/storecode.toml to the"
     echo "  work installer (e.g. a 'curl -fsSL …/install.sh | bash' one-liner),"
-    echo "  then run 'chezup'. storecode is intentionally not a Homebrew package;"
-    echo "  ~/.storecode is kept automatically by chezclean."
+    echo "  then run 'chez up'. storecode is intentionally not a Homebrew package;"
+    echo "  ~/.storecode is kept automatically by chez clean."
     exit 0
 fi
 

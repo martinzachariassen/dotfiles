@@ -6,7 +6,7 @@
 {{- $name  := promptStringOnce . "name"  "Full name for git commits" -}}
 
 {{/* Email gets asked twice on purpose. promptStringOnce treats a saved "" as a
-     real answer, so a blank first run stuck permanently: `chezsetup` skipped the
+     real answer, so a blank first run stuck permanently: `chez setup` skipped the
      key forever, git wrote every commit as "Name <>", and nothing said so. The
      re-ask makes an empty value mean "not answered yet" on this run *and* on
      machines that already saved one. Non-interactive runs (--promptDefaults, CI)
@@ -63,12 +63,12 @@
 {{- $corpusRemote := promptStringOnce . "corpusRemote" "Corpus backup repo for the distiller (blank for local only)" "" -}}
 
 {{/* Which modules this Mac has already been *offered* — not the same as which it
-     has enabled. promptMultichoiceOnce reads the saved answer back and chezup
+     has enabled. promptMultichoiceOnce reads the saved answer back and chez up
      only ever runs `apply`, so a module added to the catalog after a machine was
-     set up would otherwise stay invisible on it forever. chezup diffs the
+     set up would otherwise stay invisible on it forever. chez up diffs the
      catalog against this list and offers the difference exactly once, recording
      the answer either way. Round-tripped through dig so a plain `chezmoi init`
-     preserves what chezup wrote.
+     preserves what chez up wrote.
 
      The default when the key is absent depends on WHY it is absent, and `profile`
      tells the two cases apart because it has been saved since v1 of this config:
@@ -83,8 +83,8 @@
      Edge case, deliberately left: the wizard shows every box, but cannot record
      that (wizard.sh ends in `exec chezmoi init`, so nothing runs after it). A
      module already in the list is fine — dig round-trips it, so unticking it in
-     `chezsetup` sticks. Only one that was never seen *and* was left unticked
-     there gets offered once more by chezup. One extra question, never a wrong
+     `chez setup` sticks. Only one that was never seen *and* was left unticked
+     there gets offered once more by chez up. One extra question, never a wrong
      answer. */ -}}
 {{- $seenDefault := $modules -}}
 {{- if not (hasKey . "profile") -}}
@@ -117,5 +117,5 @@ sourceDir = {{ .chezmoi.workingTree | quote }}
 # No `[apply] force` here: chezmoi has no such config key — `--force` is flag-only
 # (verified against v2.72.0; `chezmoi dump-config` has no `apply` section, and the
 # key was silently ignored). Every entry point passes `--force` explicitly instead:
-# install.sh, wizard.sh, signing.sh, and the `chezapply`/`chezup` wrappers — each
+# install.sh, wizard.sh, signing.sh, and the `chez apply`/`chez up` wrappers — each
 # gates on its own y/N first.

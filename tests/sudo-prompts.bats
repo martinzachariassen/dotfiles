@@ -3,7 +3,7 @@
 #
 # From a real fresh install: the overview promised "your macOS password (once,
 # for Homebrew)" and then asked three times — install.sh, run_before_00, and
-# macos-defaults. The first ask printed at column 0, outside the script's rail,
+# chez macos. The first ask printed at column 0, outside the script's rail,
 # and was immediately buried under twenty lines of raw `/usr/bin/sudo /bin/mkdir
 # …` from Homebrew's own installer. The later two were bare bracketed prompts
 # with no stated reason, appearing minutes apart.
@@ -64,7 +64,7 @@ setup() {
     grep -q 'Nothing appears as you type' "$HOOK"
 }
 
-@test "macos-defaults gives a reason before asking a second time" {
+@test "chez macos gives a reason before asking a second time" {
     grep -q 'the earlier admin session expired' "$MACOS"
     ! grep -q '\[macos-defaults\] sudo password' "$MACOS"
 }

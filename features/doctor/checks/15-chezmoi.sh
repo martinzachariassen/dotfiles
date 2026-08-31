@@ -31,7 +31,7 @@ doctor_check_chezmoi() {
         if [ "$drift" = "0" ]; then
             pass "no drift between source and \$HOME"
         else
-            warn "$drift file(s) drifted — run \`chezapply\` to apply or \`chezmoi diff\` to inspect"
+            warn "$drift file(s) drifted — run \`chez apply\` to apply or \`chezmoi diff\` to inspect"
         fi
     else
         fail "chezmoi not installed — re-run install.sh"

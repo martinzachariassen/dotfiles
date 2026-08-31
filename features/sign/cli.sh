@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # signing.sh — set the git commit-signing key on a machine that deferred it.
-# Backs the `chezsign` verb. Solves the fresh-Mac chicken-and-egg: the key lives
+# Backs the `chez sign` verb. Solves the fresh-Mac chicken-and-egg: the key lives
 # in 1Password, which isn't installed until after the wizard has already run.
 # Re-asks nothing else — profile, modules and identity are replayed as-is.
 # Env: DRY_RUN=1 print the chezmoi command instead of running it.
@@ -19,7 +19,7 @@ SOURCE_DIR="${DOTFILES_DIR:-$ROOT}"
 TMPL="$ROOT/src/.chezmoi.toml.tmpl"
 
 if [ ! -r "$_DIR/../../core/ui.sh" ]; then
-    printf 'chezsign: missing %s\n' "$_DIR/../../core/ui.sh" >&2
+    printf 'chez sign: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
 # shellcheck source=../../core/ui.sh
@@ -45,7 +45,7 @@ trap on_interrupt INT TERM
 }
 
 usage() {
-    echo "usage: chezsign [KEY]"
+    echo "usage: chez sign [KEY]"
     echo "  (no arg)   pick a key from the SSH agent, or paste one"
     echo "  KEY        set this public key line non-interactively"
     echo
@@ -86,7 +86,7 @@ current_key="$(cm_data_string "$DATA_JSON" signingKey)"
 
 if [ "$mode" = "off" ]; then
     warn "signing is set to \"off\" for this machine, so there's no key to set."
-    info "turn it on with: chezsetup --reset  (then pick 1password or ssh-key)"
+    info "turn it on with: chez setup --reset  (then pick 1password or ssh-key)"
     exit 0
 fi
 
@@ -113,7 +113,7 @@ else
         if [ "$mode" = "1password" ]; then
             info "open 1Password → Settings → Developer → enable the SSH agent, then re-run."
         fi
-        info "or paste the public key line directly: chezsign \"ssh-ed25519 AAAA... comment\""
+        info "or paste the public key line directly: chez sign \"ssh-ed25519 AAAA... comment\""
         exit 1
     fi
 

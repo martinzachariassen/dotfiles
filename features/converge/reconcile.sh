@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# chezreconcile — chezup (install) then chezmirror (remove).
-# Untracked *files* are a separate step: chezclean.
+# chez reconcile — chez up (install) then chez mirror (remove).
+# Untracked *files* are a separate step: chez clean.
 
 set -uo pipefail
 
@@ -16,17 +16,17 @@ ui_init_logging
 main() {
     local src="$SOURCE_DIR"
     explain_titled "Full package reconcile" \
-        "Two passes: chezup installs what the Brewfiles declare, then chezmirror" \
+        "Two passes: chez up installs what the Brewfiles declare, then chez mirror" \
         "offers to remove what they don't. Together they make this Mac match the repo."
     bash "$_DIR/up.sh" "$@" || return $?
     echo
     if [ "${DRY_RUN:-}" = 1 ]; then
-        echo "── Package removals chezmirror would reconcile (preview) ──────"
+        echo "── Package removals chez mirror would reconcile (preview) ──────"
         bash "$_DIR/../brew/mirror.sh" -n
-        echo "  (DRY_RUN=1 — re-run without it to prune, or run \`chezmirror\`.)"
+        echo "  (DRY_RUN=1 — re-run without it to prune, or run \`chez mirror\`.)"
         return 0
     fi
-    echo "── Reconciling package removals (chezmirror) ─────────────────"
+    echo "── Reconciling package removals (chez mirror) ─────────────────"
     bash "$_DIR/../brew/mirror.sh"
 }
 

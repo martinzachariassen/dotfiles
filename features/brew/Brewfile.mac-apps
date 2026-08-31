@@ -10,7 +10,7 @@ cask "stats"                    # menu bar resource monitor
 
 # ─── Notes / Obsidian ─────────────────────────────────────────────────────────
 # Vault lives at ~/Documents/TheArchive (its own git repo, not chezmoi-managed).
-# Nothing in this repo writes into it — `chezdistill` deliberately does not.
+# Nothing in this repo writes into it — `chez distill` deliberately does not.
 cask "obsidian"
 cask "font-inter"               # Obsidian interface font
 cask "font-ia-writer-quattro"   # Obsidian editor font

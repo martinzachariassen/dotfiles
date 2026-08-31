@@ -5,8 +5,8 @@ for the list this Mac actually has — it is generated, so it cannot fall behind
 the code, and it hides the verbs whose module is off.
 
 Every verb also answers to the name it had before the dispatcher existed:
-`chezup` is `chez up`, `chezdoctor` is `chez doctor`, `dotfiles` is `chez cd`,
-`macos-defaults` is `chez macos`. The old names are aliases and are not going
+`chez up` is `chez up`, `chez doctor` is `chez doctor`, `dotfiles` is `chez cd`,
+`chez macos` is `chez macos`. The old names are aliases and are not going
 away in this release; the pages below still use them in places.
 
 The everyday surface is **two verbs plus a health check**. Both verbs end in the
@@ -40,39 +40,39 @@ needs editing — not this page's list, not the completion, not the help.
 
 ### Everyday
 
-| Verb | Also known as | Module | What it does |
-|---|---|---|---|
-| `chez up` | `chezup` | — | Pull → preview → apply. The command you run most. |
-| `chez doctor` | `chezdoctor` | — | Read-only health check (repo, brew, auth, mise, shell). |
+| Verb | Module | What it does |
+|---|---|---|
+| `chez up` | — | Pull → preview → apply. The command you run most. |
+| `chez doctor` | — | Read-only health check (repo, brew, auth, mise, shell). |
 
 ### Changing your setup
 
-| Verb | Also known as | Module | What it does |
-|---|---|---|---|
-| `chez setup` | `chezsetup` | — | Fill in newly-added setup keys; keeps existing answers. |
-| `chez sign` | `chezsign` | — | Set the git signing key on its own; keeps every other answer. |
-| `chez auth` |  | — | Sign in to gh and the cloud CLIs after a fresh install. |
-| `chez xcode` | `chezxcode` | `appleDev` | Install Xcode + iOS simulator runtime (Apple ID, ~40 GB). |
-| `chez distill` | `chezdistill` | `claudeDistiller` | Distil Claude conversations into the MAIN.md Claude loads. |
+| Verb | Module | What it does |
+|---|---|---|
+| `chez setup` | — | Fill in newly-added setup keys; keeps existing answers. |
+| `chez sign` | — | Set the git signing key on its own; keeps every other answer. |
+| `chez auth` | — | Sign in to gh and the cloud CLIs after a fresh install. |
+| `chez xcode` | `appleDev` | Install Xcode + iOS simulator runtime (Apple ID, ~40 GB). |
+| `chez distill` | `claudeDistiller` | Distil Claude conversations into the MAIN.md Claude loads. |
 
 ### Maintenance
 
-| Verb | Also known as | Module | What it does |
-|---|---|---|---|
-| `chez apply` | `chezapply` | — | Apply without pulling. Flags drift; never uninstalls. |
-| `chez status` | `chezstatus` | — | Explain pending file + package drift in plain words (read-only). |
-| `chez bump` | `chezbump` | — | Upgrade deps: brew upgrade + mise upgrade. |
-| `chez mirror` | `chezmirror` | — | Uninstall untracked packages (removal only), confirming each. |
-| `chez reconcile` | `chezreconcile` | — | Full package reconcile: install then remove. |
-| `chez clean` | `chezclean` | — | Remove untracked top-level ~/.* entries, confirming each. |
-| `chez cd` | `dotfiles` | — | cd into the source repo. |
+| Verb | Module | What it does |
+|---|---|---|
+| `chez apply` | — | Apply without pulling. Flags drift; never uninstalls. |
+| `chez status` | — | Explain pending file + package drift in plain words (read-only). |
+| `chez bump` | — | Upgrade deps: brew upgrade + mise upgrade. |
+| `chez mirror` | — | Uninstall untracked packages (removal only), confirming each. |
+| `chez reconcile` | — | Full package reconcile: install then remove. |
+| `chez clean` | — | Remove untracked top-level ~/.* entries, confirming each. |
+| `chez cd` | — | cd into the source repo. |
 
 ### Under the hood
 
-| Verb | Also known as | Module | What it does |
-|---|---|---|---|
-| `chez macos` | `macos-defaults` | — | (Re-)apply macOS system defaults on their own. |
-| `chez help` | `chezhelp` | — | Show this list. |
+| Verb | Module | What it does |
+|---|---|---|
+| `chez macos` | — | (Re-)apply macOS system defaults on their own. |
+| `chez help` | — | Show this list. |
 
 <!-- verbs:end -->
 
@@ -94,7 +94,7 @@ feature's README, because that is where its code lives:
 
 It honours `DRY_RUN=1` (print, don't run) and
 `YES=1` (skip the confirm gate), and passing any trailing arguments through to
-`chezmoi apply` (e.g. `chezup -v`):
+`chezmoi apply` (e.g. `chez up -v`):
 
 1. **Update repo** — `git pull --ff-only` in the source dir; reports how many
    commits arrived.
@@ -106,16 +106,16 @@ It honours `DRY_RUN=1` (print, don't run) and
    repo and `$HOME` (`A` add, `M` modify, `D` remove), and
    `chezmoi status --include scripts` lists pending apply hooks. Stops here only
    when **both** are empty. A partial install (a brew bundle that died mid-way)
-   leaves no file drift at all, so gating on files alone would make `chezup` a
+   leaves no file drift at all, so gating on files alone would make `chez up` a
    no-op exactly when a retry is needed.
 4. **Apply** — one confirmation gate, then `chezmoi apply --force`.
 
 ### New modules since this Mac was set up
 
 Module choices are saved by `promptMultichoiceOnce`, which reads the saved answer
-back on every later run, and `chezup` only ever calls `chezmoi apply` — never
+back on every later run, and `chez up` only ever calls `chezmoi apply` — never
 `init`. So a module **added to the catalog after a machine was set up** would stay
-invisible on it forever; the only way in was `chezsetup --reset`, which re-asks
+invisible on it forever; the only way in was `chez setup --reset`, which re-asks
 about everything.
 
 Phase 2 closes that gap. It diffs `[moduleCatalog]` against two saved lists —
@@ -132,10 +132,10 @@ offers the difference:
   your configuration rather than installing something you already asked for.
 - **Every module offered is written to `modulesSeen`, accepted or not.** That is
   what stops a declined module being asked about on every single run. Enabling it
-  later is `chezsetup` (tick the box); the gate itself asks exactly once.
+  later is `chez setup` (tick the box); the gate itself asks exactly once.
 - **`YES=1` or no TTY: nothing is enabled.** The new modules are listed and the
   run continues to the apply. `YES=1` means "don't ask before applying", not
-  "decide my configuration for me" — an unattended `chezreconcile` or a cron job
+  "decide my configuration for me" — an unattended `chez reconcile` or a cron job
   must not silently take on a module.
 - **`DRY_RUN=1`**: lists what's new, asks nothing, writes nothing.
 - If `jq` is missing or `chezmoi data` can't be read, the phase stays silent
@@ -145,7 +145,7 @@ Both lists live in `~/.config/chezmoi/chezmoi.toml`, are emitted by
 [`src/.chezmoi.toml.tmpl`](../src/.chezmoi.toml.tmpl) (so `chezmoi init`
 round-trips them rather than wiping them), and are read and rewritten through
 [`core/modules.sh`](../core/modules.sh), shared with
-`chezdistill --setup` so the two can't write the list differently.
+`chez distill --setup` so the two can't write the list differently.
 
 ## When a command says its script is missing
 
@@ -180,21 +180,21 @@ If the path differs in your clone, the provider-agnostic fallback is
 
 ## Changing your setup
 
-Change your profile, optional modules, or signing with `chezsetup`:
+Change your profile, optional modules, or signing with `chez setup`:
 
 ```sh
-chezsetup               # fill in any newly-added setup keys; keeps existing answers
-chezsetup --reset       # re-ask profile / modules / signing, then apply
-chezsign                # set only the git signing key; keeps every other answer
-chezxcode               # install Xcode + the iOS simulator runtime (appleDev only)
+chez setup               # fill in any newly-added setup keys; keeps existing answers
+chez setup --reset       # re-ask profile / modules / signing, then apply
+chez sign                # set only the git signing key; keeps every other answer
+chez xcode               # install Xcode + the iOS simulator runtime (appleDev only)
 ```
 
-**Left the email blank during setup?** `chezsetup` is the fix — it re-asks that
+**Left the email blank during setup?** `chez setup` is the fix — it re-asks that
 one question and keeps every other answer. A blank email is not stored as an
 answer, so it stays "unanswered" until you fill it in, and until then
 `~/.config/git/config` carries `user.useConfigOnly = true` so git *refuses* to
 commit rather than authoring one as `Your Name <>` (unattributable on GitHub,
-and undoable only by rewriting history). `chezdoctor` reports it, and the
+and undoable only by rewriting history). `chez doctor` reports it, and the
 apply's closing summary lists it as a numbered next move. Your GitHub noreply
 address is at github.com → Settings → Emails.
 
@@ -249,7 +249,7 @@ trust it.
 ### Output and quietness
 
 Every verb opens with a short plain-language note: what it is about to do, and
-what it will never do (`chezmirror` removes packages; nothing else does). Long
+what it will never do (`chez mirror` removes packages; nothing else does). Long
 steps are numbered `[2/5]` and print elapsed time once they pass a few seconds,
 so a slow install reads as *working* rather than *hung*.
 
@@ -257,7 +257,7 @@ Set `QUIET=1` on any verb — including `install.sh` — to drop the explanation
 keep only results:
 
 ```sh
-QUIET=1 chezup
+QUIET=1 chez up
 ```
 
 The vocabulary lives in [`core/ui.sh`](../core/ui.sh)
@@ -269,12 +269,12 @@ uses a `printf '\uXXXX'` escape, which bash 3.2 (what a fresh Mac ships) prints
 literally.
 
 > **Why apply never uninstalls.** An apply must be safe to run at any time, so
-> it only *adds* presence. Freshness is `chezbump`'s job; *removal* is
-> `chezmirror`'s, always behind a confirm. See
+> it only *adds* presence. Freshness is `chez bump`'s job; *removal* is
+> `chez mirror`'s, always behind a confirm. See
 > [lifecycle.md](lifecycle.md#convergence-guarantee).
 
-> **`~/.config` is reconciled by `chezclean` too.** It's a normal `dot_config`
-> dir, so an apply never prunes it; `chezclean` handles untracked
+> **`~/.config` is reconciled by `chez clean` too.** It's a normal `dot_config`
+> dir, so an apply never prunes it; `chez clean` handles untracked
 > `~/.config/X` (keep-list `cleanup.keepConfig`) alongside the top level of
 > `$HOME`. See
-> [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chezclean).
+> [lifecycle.md](lifecycle.md#reconciling-untracked-dotfiles-chez-clean).

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# features/xcode/probe.sh — the probes both `chezxcode` and `chezdoctor` read.
+# features/xcode/probe.sh — the probes both `chez xcode` and `chez doctor` read.
 #
 # These pin the two states that look healthy but aren't, because both are
 # reachable straight out of install.sh and neither shows up in `brew bundle

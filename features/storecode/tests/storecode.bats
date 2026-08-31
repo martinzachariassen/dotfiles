@@ -2,7 +2,7 @@
 # storecode: the work-only exception.
 #
 # It is installed by its own hook from an installer set in data — never from a
-# Brewfile — and ~/.storecode is permanently on chezclean's keepHome list. Both
+# Brewfile — and ~/.storecode is permanently on chez clean's keepHome list. Both
 # halves of that contract are pinned here, along with the hook's guards, the
 # render-time values the template threads into the engine, and the engine's own
 # behaviour.

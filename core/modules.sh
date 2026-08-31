@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # modules.sh — read and update THIS Mac's module selection.
 #
-# Shared by chezup (the "new modules since this Mac was set up" gate), wizard.sh
-# and chezdistill --setup, so the three can't disagree about what the module
+# Shared by chez up (the "new modules since this Mac was set up" gate), wizard.sh
+# and chez distill --setup, so the three can't disagree about what the module
 # list is or how it is written — the same reason features/xcode/probe.sh is shared
-# between chezxcode and chezdoctor.
+# between chez xcode and chez doctor.
 #
 # Why the config file is edited line-by-line rather than re-running
 # `chezmoi init`: init re-derives every saved answer, and these callers have to

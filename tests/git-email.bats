@@ -8,11 +8,11 @@
 #   1. `~/.config/git/config` rendered `email = ` with nothing after it. git
 #      accepts that and authors every commit as "Martin Zachariassen <>" —
 #      unattributable on GitHub, and undoable only by rewriting history.
-#   2. promptStringOnce had stored "" as a *real answer*, so plain `chezsetup`
+#   2. promptStringOnce had stored "" as a *real answer*, so plain `chez setup`
 #      ("fill in newly-added setup keys only") skipped the key forever. The only
-#      way back was `chezsetup --reset`, which replays the whole wizard.
+#      way back was `chez setup --reset`, which replays the whole wizard.
 #   3. Nothing reported it — not the wizard summary, not the completion screen,
-#      not chezdoctor.
+#      not chez doctor.
 
 setup() {
     REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -69,7 +69,7 @@ EOF
 # ─── the config template ──────────────────────────────────────────────────────
 
 @test "a blank email is not persisted as an answer" {
-    # This is what makes `chezsetup` re-ask instead of skipping the key.
+    # This is what makes `chez setup` re-ask instead of skipping the key.
     grep -q '{{- if \$email }}' "$TMPL"
 }
 
@@ -140,20 +140,20 @@ render_gitconfig() {
     grep -q 'not set — run' "$WIZ"
 }
 
-@test "the wizard points at chezsetup, not chezsetup --reset" {
+@test "the wizard points at chez setup, not chez setup --reset" {
     # --reset replays the entire wizard; this one question does not need that.
-    grep -A6 'no email set' "$WIZ" | grep -q 'chezsetup'
-    ! grep -A6 'no email set' "$WIZ" | grep -q 'chezsetup --reset'
+    grep -A6 'no email set' "$WIZ" | grep -q 'chez setup'
+    ! grep -A6 'no email set' "$WIZ" | grep -q 'chez setup --reset'
 }
 
 # ─── the reporters ────────────────────────────────────────────────────────────
 
-@test "chezdoctor checks the commit author" {
+@test "chez doctor checks the commit author" {
     grep -q 'section "Commit author"' "$DOCTOR"
     grep -q 'user.email' "$DOCTOR"
 }
 
-@test "chezdoctor fails, not warns, on a missing email" {
+@test "chez doctor fails, not warns, on a missing email" {
     # warn() only bumps the ACTION tally and keeps exit 0; an unattributable
     # commit is a defect, so this has to be red.
     grep -A8 'section "Commit author"' "$DOCTOR" | grep -q 'fail "no git email set'

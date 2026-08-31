@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # xcode.sh — bring the Xcode layer up to "can build and run an iOS app", backing
-# the `chezxcode` verb. Idempotent; safe to re-run.
+# the `chez xcode` verb. Idempotent; safe to re-run.
 #
 # Deliberately NOT a chezmoi apply hook. `xcodes install` authenticates against
 # an Apple ID with 2FA, so it cannot run unattended, and the downloads are tens
 # of gigabytes — parking that inside `chezmoi apply` would stall an otherwise
 # silent apply on an interactive prompt and blow past the runtime install.sh
-# promises. Same shape as `chezsign`: an interactive step the setup points you
-# at, with `chezdoctor` staying red until it's done.
+# promises. Same shape as `chez sign`: an interactive step the setup points you
+# at, with `chez doctor` staying red until it's done.
 #
 # Env: DRY_RUN=1 print each command instead of running it.
 #      YES=1 don't ask before the two large downloads.
@@ -23,7 +23,7 @@ SKIP_RUNTIME="${SKIP_RUNTIME:-0}"
 
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 if [ ! -r "$_DIR/../../core/ui.sh" ]; then
-    printf 'chezxcode: missing %s\n' "$_DIR/../../core/ui.sh" >&2
+    printf 'chez xcode: missing %s\n' "$_DIR/../../core/ui.sh" >&2
     exit 1
 fi
 # shellcheck source=../../core/ui.sh
@@ -38,7 +38,7 @@ fi
 . "$_DIR/xcodes-cli.sh"
 
 usage() {
-    echo "usage: chezxcode [--check]"
+    echo "usage: chez xcode [--check]"
     echo "  (no arg)   install/repair Xcode until an iOS app can be built and run"
     echo "  --check    report the five checks and exit; changes nothing"
     echo
@@ -74,32 +74,32 @@ if [ "$CHECK_ONLY" = "1" ]; then
     if [ -n "$app" ]; then
         s_pass "Xcode installed: $app"
     else
-        s_fail "no Xcode.app — run: chezxcode"
+        s_fail "no Xcode.app — run: chez xcode"
     fi
     if xcode_selected_is_full; then
         s_pass "active developer dir: $(xcode-select -p)"
     else
-        s_fail "active developer dir is $(xcode-select -p 2>/dev/null || echo none) (not a full Xcode) — run: chezxcode"
+        s_fail "active developer dir is $(xcode-select -p 2>/dev/null || echo none) (not a full Xcode) — run: chez xcode"
     fi
     if xcode_build_works; then
         s_pass "xcodebuild runs"
     else
-        s_fail "xcodebuild fails — run: chezxcode"
+        s_fail "xcodebuild fails — run: chez xcode"
     fi
     if xcode_first_launch_done; then
         s_pass "first-launch components installed"
     else
-        s_fail "first-launch components pending — run: chezxcode"
+        s_fail "first-launch components pending — run: chez xcode"
     fi
     if xcode_has_ios_sdk; then
         s_pass "iOS Simulator SDK present"
     else
-        s_fail "no iOS Simulator SDK — run: chezxcode"
+        s_fail "no iOS Simulator SDK — run: chez xcode"
     fi
     if xcode_has_ios_runtime; then
         s_pass "iOS simulator runtime(s): $(xcode_ios_runtimes_summary)"
     else
-        s_fail "no iOS simulator runtime downloaded — run: chezxcode"
+        s_fail "no iOS simulator runtime downloaded — run: chez xcode"
     fi
     echo
     if xcode_ready; then
@@ -112,7 +112,7 @@ ui_init_steps 5
 
 on_interrupt() {
     printf '\033[?25h\n' >/dev/tty 2>/dev/null || true
-    warn "aborted — anything already installed is kept; re-run chezxcode to continue."
+    warn "aborted — anything already installed is kept; re-run chez xcode to continue."
     exit 130
 }
 trap on_interrupt INT TERM
@@ -158,7 +158,7 @@ confirm() {
 }
 
 # Fail closed with no terminal to ask on: every remaining step either prompts or
-# starts a multi-gigabyte download, and chezclean sets the precedent that a verb
+# starts a multi-gigabyte download, and chez clean sets the precedent that a verb
 # with a confirm gate does nothing at all when it can't reach one. YES=1 is the
 # deliberate way past it.
 #
@@ -167,7 +167,7 @@ confirm() {
 # download start unasked (after printing raw "Device not configured" errors).
 if [ "$DRY_RUN" != "1" ] && [ "$ASSUME_YES" != "1" ] && ! { : </dev/tty; } 2>/dev/null; then
     fail "no terminal to confirm on — refusing to start a ~40 GB download unasked."
-    info "run this from a terminal, or accept both downloads up front: YES=1 chezxcode"
+    info "run this from a terminal, or accept both downloads up front: YES=1 chez xcode"
     exit 1
 fi
 
@@ -202,7 +202,7 @@ else
         "code. Nothing is stored by this repo — xcodes keeps the session in your" \
         "keychain. Use the same Apple ID you'll sign apps with."
     if ! confirm "Download and install Xcode ${XCODE_VERSION:-(latest)} (~40 GB)?"; then
-        info "skipped — re-run chezxcode when you're ready."
+        info "skipped — re-run chez xcode when you're ready."
         exit 0
     fi
     # Only now that the big download is consented to: `xcodes` itself can't come
@@ -313,8 +313,8 @@ if xcode_ready; then
         "Settings → Accounts, add your Apple ID, and pick the team on a target's" \
         "Signing & Capabilities tab. Xcode stores it per-project, not per-machine." \
         "" \
-        "Verify any time with \`chezxcode --check\` or \`chezdoctor\`."
+        "Verify any time with \`chez xcode --check\` or \`chez doctor\`."
     exit 0
 fi
-fail "not ready yet — \`chezxcode --check\` lists what's still missing."
+fail "not ready yet — \`chez xcode --check\` lists what's still missing."
 exit 1

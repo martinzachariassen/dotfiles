@@ -118,7 +118,7 @@ setup() {
 }
 
 @test "the wizard says answers are changeable later" {
-    grep -qF 'chezsetup' "$WIZARD"
+    grep -qF 'chez setup' "$WIZARD"
     grep -q 'Nothing is permanent' "$WIZARD"
 }
 
@@ -140,7 +140,7 @@ setup() {
 }
 
 @test "the destructive verbs explain themselves before acting" {
-    # chezmirror is a bash script now and uses core/ui.sh's explain_titled,
+    # chez mirror is a bash script now and uses core/ui.sh's explain_titled,
     # which is kept byte-identical to the zsh _chez_explain by tests/ui.bats.
     # All three are bash scripts now and use core/ui.sh's explain_titled, which
     # tests/ui.bats keeps byte-identical to the zsh _chez_explain they used.

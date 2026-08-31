@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# The data that drives chezclean's reconciliation of $HOME and ~/.config.
+# The data that drives chez clean's reconciliation of $HOME and ~/.config.
 #
-# chezclean reads three lists from clean.toml: keepConfig, keepHome, and owners
+# chez clean reads three lists from clean.toml: keepConfig, keepHome, and owners
 # (keep an entry while its owning tool or extension is present). If any renders
-# wrong, chezclean offers an in-use directory for removal — so these pin the
+# wrong, chez clean offers an in-use directory for removal — so these pin the
 # render and the entries that must never be lost.
 
 setup() {
@@ -13,14 +13,14 @@ setup() {
     chezmoi_stub_config
 }
 
-# The rendered tool-ownership map — the exact template chezclean reads: one
+# The rendered tool-ownership map — the exact template chez clean reads: one
 # "entry<TAB>package<TAB>binary<TAB>extension" row per cleanup.owners entry.
 # dig-guarded so a missing map renders empty rather than erroring.
 _render_owners() {
     chezmoi_render_str '{{ range $e, $m := (dig "cleanup" "owners" (dict) .) }}{{ $e }}{{ "\t" }}{{ dig "package" "" $m }}{{ "\t" }}{{ dig "binary" "" $m }}{{ "\t" }}{{ dig "extension" "" $m }}{{ "\n" }}{{ end }}'
 }
 
-# ─── keepConfig: the ~/.config keep-list chezclean spares ────────────────────
+# ─── keepConfig: the ~/.config keep-list chez clean spares ────────────────────
 
 @test "the critical auth/state dirs are pinned in keepConfig (chezmoi first)" {
     chezmoi_stub_config
@@ -46,7 +46,7 @@ _render_owners() {
     # .config stays whole here (children reconciled separately vs keepConfig);
     # .ssh holds keys; .storecode is installed by 05-storecode; .swiftpm is
     # SwiftPM state with no `swiftpm` binary for the stem heuristic to match, so
-    # without the pin chezclean offers to delete it on every appleDev machine.
+    # without the pin chez clean offers to delete it on every appleDev machine.
     for e in .storecode .config .ssh .swiftpm; do
         grep -qxF "$e" <<<"$keephome" || {
             echo "keepHome missing required entry: $e"
@@ -55,8 +55,8 @@ _render_owners() {
     done
 }
 
-# ─── cleanup.owners: the tool-ownership map chezclean reads ───────────────────
-# If this renders wrong (a lost binary, an empty row) chezclean would offer
+# ─── cleanup.owners: the tool-ownership map chez clean reads ───────────────────
+# If this renders wrong (a lost binary, an empty row) chez clean would offer
 # in-use config for removal.
 
 @test "cleanup.owners renders as entry→package/binary/extension rows" {
@@ -93,7 +93,7 @@ _render_owners() {
     [ -z "$output" ]
 }
 
-@test "every extension-owned owners row carries an extension ID (chezclean's extension signal)" {
+@test "every extension-owned owners row carries an extension ID (chez clean's extension signal)" {
     chezmoi_stub_config
     local owners
     owners="$(_render_owners)"

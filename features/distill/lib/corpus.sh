@@ -84,9 +84,9 @@ distill_corpus_check_local() {
 
     fail "the corpus at $(distill_state_dir) was stamped $theirs, but this is a $mine Mac"
     info "nothing will be distilled until that is settled. Either attach this Mac to its own corpus:"
-    info "  chezdistill --remote <$mine corpus url>"
+    info "  chez distill --remote <$mine corpus url>"
     info "or start a fresh one here, keeping what is already backed up:"
-    info "  chezdistill --remote none"
+    info "  chez distill --remote none"
     return 1
 }
 

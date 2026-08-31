@@ -29,7 +29,7 @@ _distill_daily_body() {
     # Before the cursor, before the temp dir, before anything: a run with nowhere
     # to read from is a failure, not a quiet night. Going through distill_fail
     # puts the reason in the run record, so it reaches --status, --runs,
-    # chezdoctor and the commit pushed to the corpus — rather than scrolling past
+    # chez doctor and the commit pushed to the corpus — rather than scrolling past
     # in a launchd log nobody opens.
     distill_sources_ok || return 1
 
@@ -119,14 +119,14 @@ _distill_daily_body() {
         explain \
             "The nightly job runs under launchd, which does not read your shell" \
             "config, so provider variables set in ~/.zshenv are absent there." \
-            "Check the last error with: chezdistill --logs 40"
+            "Check the last error with: chez distill --logs 40"
     elif [ "$n_failed" -gt 0 ]; then
         distill_warn "$n_failed of $n_called model call(s) failed — those sessions were skipped, not retried"
     fi
 
     # A dry run must not consume the very window it is previewing. Everything
     # above this point is read-only (distill_claude short-circuits under DRY_RUN);
-    # everything below writes. Without this guard `chezdistill -n` advanced the
+    # everything below writes. Without this guard `chez distill -n` advanced the
     # cursor and re-rendered the memory tier, so the "free preview" step in the
     # docs destroyed the window you were about to validate for real.
     if [ "${DRY_RUN:-0}" = "1" ]; then

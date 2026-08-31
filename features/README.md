@@ -30,9 +30,9 @@ needs them.
 
 ```sh
 FEATURE_NAME=brew                     # must match the directory name
-FEATURE_TITLE="Homebrew packages"     # heading used by chezdoctor
+FEATURE_TITLE="Homebrew packages"     # heading used by chez doctor
 FEATURE_MODULE=""                     # module that gates it; empty = always on
-FEATURE_DOCTOR_ORDER="60"             # position in chezdoctor; empty = no checks
+FEATURE_DOCTOR_ORDER="60"             # position in chez doctor; empty = no checks
 ```
 
 Three rules, each enforced by `tests/registry.bats`:

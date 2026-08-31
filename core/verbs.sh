@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verbs.sh — the single source of truth for the dotfiles command surface.
 #
-# The verb list used to exist in five hand-synced places: the `chezhelp`
+# The verb list used to exist in five hand-synced places: the `chez help`
 # heredoc, README.md, docs/commands.md, the 99-completion hook, and CLAUDE.md.
 # Nothing checked four of them. This table is now the one that counts:
 # core/chez.sh dispatches and renders `chez help` straight from it, and
@@ -16,7 +16,7 @@
 #   module   module that must be enabled for the verb to exist, or "-"
 #   summary  one line, present tense, no trailing period beyond the first
 #
-# Summaries are the wording already shipped in `chezhelp`; keep them that way
+# Summaries are the wording already shipped in `chez help`; keep them that way
 # unless the behaviour changes.
 
 [ -n "${__DOTFILES_VERBS_SH:-}" ] && return 0
@@ -69,9 +69,11 @@ verbs_groups() { verbs_table | cut -f4 | awk '!seen[$0]++'; }
 # verbs_in_group GROUP — the verbs in one group, in table order.
 verbs_in_group() { verbs_table | awk -F'\t' -v g="$1" '$4 == g { print $1 }'; }
 
-# verbs_legacy_name VERB — the pre-dispatcher name, kept as an alias through the
-# transition and still used by the docs that have not been rewritten.
-verbs_legacy_name() {
+# verbs_retired_name VERB — the name this verb answered to before the
+# dispatcher. The aliases are gone; this is kept so the guards can prove it —
+# tests/zshrc-wiring.bats asserts none of these survives in the zshrc, and
+# tests/registry.bats that none is still being suggested to a user.
+verbs_retired_name() {
     case "$1" in
         cd) printf 'dotfiles\n' ;;
         macos) printf 'macos-defaults\n' ;;

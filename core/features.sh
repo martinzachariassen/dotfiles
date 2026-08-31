@@ -3,7 +3,7 @@
 #
 # Each directory under features/ carries a feature.sh manifest describing what
 # the feature *is*: its name, its human title, the module that gates it, and
-# where its checks belong in chezdoctor's running order. What it *does* lives in
+# where its checks belong in chez doctor's running order. What it *does* lives in
 # the sibling files (cli.sh, lib.sh, doctor.sh, hook.sh); which verbs it owns
 # lives in core/verbs.sh, so the two never disagree.
 #

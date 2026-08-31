@@ -99,7 +99,7 @@ So every bare `[[ ]]` carries an explicit `|| return 1`:
 grep -q 'pattern' "$file"                    # gates: a command
 ```
 
-The same reasoning is why `doctor.bats` and `chezmirror.bats` route negative
+The same reasoning is why `doctor.bats` and `mirror.bats` route negative
 checks through a `no_match` helper: `! grep …` is exempt from failure detection,
 but a function call is not.
 

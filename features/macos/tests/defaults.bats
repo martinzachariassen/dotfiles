@@ -28,7 +28,7 @@ setup() {
     ! grep -qF 'PARENT_PID=$$' "$MD"
 }
 
-@test "the macos-defaults hook marks sudo as already kept warm before invoking the script" {
+@test "the chez macos hook marks sudo as already kept warm before invoking the script" {
     grep -qF 'DOTFILES_SUDO_KEPT_WARM=1 bash' "$HOOK"
 }
 

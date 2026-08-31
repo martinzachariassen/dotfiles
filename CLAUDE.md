@@ -38,7 +38,7 @@ Two files describe the whole surface and everything else reads them:
   `chez doctor`'s running order.
 
 Day to day: **`chez <verb>`** — `chez up`, `chez doctor`, `chez cd`. The old
-`chezup`-style names remain as aliases. `chez help` is generated, so it cannot
+`chez up`-style names remain as aliases. `chez help` is generated, so it cannot
 fall behind. See [`docs/commands.md`](docs/commands.md).
 
 ## chezmoi conventions

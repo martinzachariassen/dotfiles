@@ -106,5 +106,5 @@ exit 5'
     # Never fails the apply — hook 99 prints the "Next moves" block after this.
     [ "$status" -eq 0 ]
     [[ "$output" == *"Bootstrap failed: 5: Input/output error"* ]] || return 1
-    [[ "$output" == *chezapply* ]] || return 1
+    [[ "$output" == *"chez apply"* ]] || return 1
 }

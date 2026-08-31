@@ -8,9 +8,9 @@ explains when it runs and why it is shaped the way it is.
 ## When it runs
 
 Two ways, and they share one script. `run_onchange_after_04-macos-defaults`
-applies it during a `chezup`/`chezapply` when the `macosDefaults` module is on
+applies it during a `chez up`/`chez apply` when the `macosDefaults` module is on
 and the script's contents have changed — `run_onchange_` rather than `run_once_`
-because `run_once_` would silently ignore every later edit. The `macos-defaults`
+because `run_once_` would silently ignore every later edit. The `chez macos`
 verb runs the same file by hand, which is what you want after resetting a
 preference pane, or on a machine where the module is off.
 
@@ -22,8 +22,8 @@ you can run them yourself.
 
 The hook invokes the script inside an `if`, never bare under `set -e`, and
 reports failure rather than propagating it. Hooks 05 and 99 run after this one,
-and 99 prints the "Next moves" block — `chezsign`, `bootstrap-auth`,
-`chezdoctor` — that a fresh Mac depends on. A failed defaults pass must never
+and 99 prints the "Next moves" block — `chez sign`, `bootstrap-auth`,
+`chez doctor` — that a fresh Mac depends on. A failed defaults pass must never
 cost the user those instructions. `tests/chezmoi-scripts.bats` pins that shape.
 
 ## sudo, and the two ways it can hang

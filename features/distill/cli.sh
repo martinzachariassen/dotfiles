@@ -61,7 +61,7 @@ Looking at it, rather than running it — all read-only, none cost anything:
   --logs [N] [-f]   tail the nightly launchd log (default 50 lines); -f follows
   --remote          where this corpus backs up, or that it is local only
 
-Before the module is enabled the `chezdistill` shell verb does not exist yet, so
+Before the module is enabled the `chez distill` shell verb does not exist yet, so
 the very first run goes through the script:
   bash ~/Developer/personal/dotfiles/features/distill/cli.sh --setup
 EOF
@@ -143,7 +143,7 @@ _distill_confirm() {
 # _distill_setup_module — put claudeDistiller into the chezmoi module list.
 # Edits the single `modules = [...]` line rather than re-running `chezmoi init`:
 # init re-derives every other saved answer, and this has to change exactly one.
-# The edit itself lives in core/modules.sh, shared with chezup's
+# The edit itself lives in core/modules.sh, shared with chez up's
 # new-module gate so the two cannot write the list differently.
 # 0 = already on · 3 = turned on now (an apply is needed) · 1 = could not.
 _distill_setup_module() {
@@ -161,12 +161,12 @@ _distill_setup_module() {
     cfg="$(modules_config_file)"
     if [ ! -w "$cfg" ]; then
         s_fail "module   claudeDistiller is off, and $cfg is not writable"
-        explain "Turn it on by hand instead: chezsetup, and tick claudeDistiller."
+        explain "Turn it on by hand instead: chez setup, and tick claudeDistiller."
         return 1
     fi
     if ! grep -q '^[[:space:]]*modules[[:space:]]*=' "$cfg"; then
         s_fail "module   no 'modules =' line in $cfg"
-        explain "Turn it on by hand instead: chezsetup, and tick claudeDistiller."
+        explain "Turn it on by hand instead: chez setup, and tick claudeDistiller."
         return 1
     fi
 
@@ -189,7 +189,7 @@ _distill_setup_module() {
         s_fail "module   could not rewrite $cfg"
         return 1
     fi
-    # Record it as offered too, so chezup's gate stays quiet about a module
+    # Record it as offered too, so chez up's gate stays quiet about a module
     # that has just been answered here.
     modules_write_list "$cfg" modulesSeen $seen || true
     s_pass "module   claudeDistiller enabled"
@@ -255,7 +255,7 @@ _distill_setup() {
             run chezmoi apply --force || s_warn "apply    chezmoi apply reported an error"
             _distill_setup_agents || true
         else
-            s_warn "apply    skipped — run chezup before the timer can fire"
+            s_warn "apply    skipped — run chez up before the timer can fire"
         fi
     fi
 
@@ -289,7 +289,7 @@ _distill_setup() {
     echo
     ok "setup done"
     explain \
-        "Backfill the last week now:  chezdistill --since 7d" \
+        "Backfill the last week now:  chez distill --since 7d" \
         "Preview without paying:      chezdistill -n" \
         "Otherwise the nightly job runs at 01:00."
     return 0
@@ -332,9 +332,9 @@ _distill_remote() {
         [ -n "$(distill_corpus_id)" ] &&
             dim "  identity $(distill_corpus_id) · stamped $(distill_corpus_profile)"
         if [ -n "$url" ]; then
-            explain "Move it with: chezdistill --remote <url> · stop with: --remote none"
+            explain "Move it with: chez distill --remote <url> · stop with: --remote none"
         else
-            explain "Attach one with: chezdistill --remote <url>"
+            explain "Attach one with: chez distill --remote <url>"
         fi
         return 0
     fi
@@ -451,7 +451,7 @@ _distill_main() {
     fi
 
     # Following anything but the log means nothing, and quietly ignoring a flag
-    # someone typed is how `chezdistill -f` becomes a bug report about a job that
+    # someone typed is how `chez distill -f` becomes a bug report about a job that
     # "stopped streaming".
     if [ "$follow" = "1" ] && [ "$mode" != "logs" ]; then
         fail "-f/--follow only applies to --logs"

@@ -109,7 +109,7 @@ a_conversation() {
     grep -rq 'a rule' "$STATE/extracts"
 }
 
-# `chezdistill -n` is the documented free preview, and it used to consume the
+# `chez distill -n` is the documented free preview, and it used to consume the
 # very window it was previewing: no DRY_RUN guard sat between the harvest loop
 # and distill_cursor_write, so the next real run started after the sessions you
 # had just asked it to look at.

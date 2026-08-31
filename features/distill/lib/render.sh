@@ -63,7 +63,7 @@ distill_eligible() {
         distill_fail "could not score the extract corpus — it may be corrupt"
         explain \
             "Every rendering decision reads this. Find the bad file with:" \
-            "for f in \$(chezdistill --status >/dev/null; echo ~/.local/state/chezdistill/extracts/*.json);" \
+            "for f in \$(chez distill --status >/dev/null; echo ~/.local/state/chezdistill/extracts/*.json);" \
             "do jq -e . \"\$f\" >/dev/null || echo \"\$f\"; done"
         return 1
     fi

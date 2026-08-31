@@ -1,6 +1,6 @@
 # The nightly distiller
 
-`chezdistill` reads the Claude Code transcripts this Mac wrote and renders a
+`chez distill` reads the Claude Code transcripts this Mac wrote and renders a
 size-capped `MAIN.md` that every future Claude session loads. What you and Claude
 worked out yesterday is in context tomorrow.
 
@@ -25,7 +25,7 @@ in a local repo so `--undo` works, and that repo pushes to a private remote you
 attach once — or to nowhere at all, which is a supported, permanent choice.
 
 **Everything under `memory/` is derived and disposable.** Delete it and
-`chezdistill --render` puts it back, for free. Never edit it — the next run
+`chez distill --render` puts it back, for free. Never edit it — the next run
 overwrites it. The one exception is `Pinned.md`, which is hand-written and
 therefore lives in state, with the other inputs.
 
@@ -33,7 +33,7 @@ therefore lives in state, with the other inputs.
 daily and weekly notes into an Obsidian vault once; that half was removed
 deliberately, and reintroducing a reporting destination is a design change, not
 a feature. To see what it knows, read `MAIN.md`, a note in `Topics/`, or ask on
-demand: `chezdistill --status`, `--stats`, `--runs`, `--logs`. Those print to a
+demand: `chez distill --status`, `--stats`, `--runs`, `--logs`. Those print to a
 terminal you asked at; they write nothing and nobody has to read them.
 
 ## Turning it on
@@ -50,22 +50,22 @@ from the first session rather than after the first successful night, then print
 `--status`. Every step is confirmed and every step is idempotent, so re-running
 it on a machine that is already set up just reports green. It makes no API calls.
 
-The long form of the script path is not an accident: the `chezdistill` shell verb
+The long form of the script path is not an accident: the `chez distill` shell verb
 is gated on the module, so until `--setup` has turned the module on, the verb does
-not exist. Afterwards, `chezdistill --setup` works normally.
+not exist. Afterwards, `chez distill --setup` works normally.
 
 The memory dir and the state dir are ordinary local directories with no mount to
 be wrong about, so they are simply created.
 
 ### Doing it by hand
 
-1. **Enable the module**: `chezsetup`, tick *claudeDistiller*. It's in the base
+1. **Enable the module**: `chez setup`, tick *claudeDistiller*. It's in the base
    profile, so new machines get it by default. A machine set up *before* the
-   module existed is offered it once by `chezup` itself — see
+   module existed is offered it once by `chez up` itself — see
    [the new-module gate](commands.md#new-modules-since-this-mac-was-set-up);
    answer `y` there and this step is done.
-2. **Apply**: `chezup`. Hook 06 registers the launchd agent.
-3. **Check**: `chezdistill --status`.
+2. **Apply**: `chez up`. Hook 06 registers the launchd agent.
+3. **Check**: `chez distill --status`.
 
 ## Running it now
 
@@ -73,30 +73,30 @@ Nothing has to wait for 01:00 — the flags below are the same code path launchd
 takes, just started by hand:
 
 ```sh
-chezdistill              # the nightly job, right now
-chezdistill -n           # preview: what it would read and run, no model calls
-chezdistill --since 7d   # backfill the last week
-chezdistill --render     # rebuild the memory tier from the corpus, free
-chezdistill --status     # where things live, MAIN size vs cap, spend, last run
-chezdistill --undo       # revert the last state commit and re-render
+chez distill             # the nightly job, right now
+chez distill -n          # preview: what it would read and run, no model calls
+chez distill --since 7d  # backfill the last week
+chez distill --render     # rebuild the memory tier from the corpus, free
+chez distill --status     # where things live, MAIN size vs cap, spend, last run
+chez distill --undo       # revert the last state commit and re-render
 ```
 
 And to look at it rather than run it — all read-only, none of them costs
 anything:
 
 ```sh
-chezdistill --stats      # the corpus: funnel, topics, hit spread, spend, runs
-chezdistill --runs [N]   # the last N nights, one row each (default 14)
-chezdistill --logs [N]   # tail launchd's own log (default 50); -f follows
-chezdistill --remote     # where this corpus backs up, or that it is local only
+chez distill --stats      # the corpus: funnel, topics, hit spread, spend, runs
+chez distill --runs [N]   # the last N nights, one row each (default 14)
+chez distill --logs [N]   # tail launchd's own log (default 50); -f follows
+chez distill --remote     # where this corpus backs up, or that it is local only
 ```
 
 And one that changes where it backs up. It is confirm-gated, and `-n` stops
 before the first write:
 
 ```sh
-chezdistill --remote <url>   # attach: restore, or join a corpus two Macs share
-chezdistill --remote none    # detach: everything stays here, nothing is deleted
+chez distill --remote <url>   # attach: restore, or join a corpus two Macs share
+chez distill --remote none    # detach: everything stays here, nothing is deleted
 ```
 
 `-n` first is the cheap habit: it prints the sessions that would be read and the
@@ -163,7 +163,7 @@ came from: no persona, no tool guidance, just the rubric.
 
 ### Editing it
 
-Edit the source under `src/`, `chezapply`, and the next run picks it up. To see
+Edit the source under `src/`, `chez apply`, and the next run picks it up. To see
 the effect you have to pay for a run — rendering is free, extraction is not.
 
 Two things that look like prompt problems and are not:
@@ -272,7 +272,7 @@ failure a backup cannot afford to hide. It now compares `HEAD` against the
 remote-tracking ref and says which way they differ: `N commit(s) not yet on
 <url>` when the push is not getting through, `never pushed` when nothing tracks
 the remote at all, `stuck mid-operation` when a half-finished rebase or merge has
-left the repo unable to commit anywhere useful. `chezdoctor` renders the same
+left the repo unable to commit anywhere useful. `chez doctor` renders the same
 verdict from the same function, so the two cannot drift apart. Both stay offline
 — the freshness comes from the nightly run's own fetch.
 
@@ -283,7 +283,7 @@ recorded `ok`, and showed every other tick above in green for its entire life.
 Nothing in the engine noticed, because every precondition it had guarded an
 *output* — can memory be written, can state, is the corpus pointed at the right
 remote — and none guarded an input. Now a run with nowhere to read from fails
-loudly instead of passing as a quiet night, and both `--status` and `chezdoctor`
+loudly instead of passing as a quiet night, and both `--status` and `chez doctor`
 count the transcripts first.
 
 ### `--runs` — what has it been doing?
@@ -300,7 +300,7 @@ rather than after opening a file by hand:
   •  2 run(s) · 12 item(s) · $1.01
 ```
 
-Defaults to 14 rows; `chezdistill --runs 60` for more. If nothing seen a session
+Defaults to 14 rows; `chez distill --runs 60` for more. If nothing seen a session
 all window, it says so — that is the failure this whole section was added for.
 
 ### `--stats` — what is in the corpus?
@@ -330,7 +330,7 @@ as presence would be a lie in exactly the case where the number matters.
 and gitignored, so nothing else can show it to you. `-f` follows. Under `-n` it
 prints the tail and says why it is not following: a preview has to return.
 
-### `chezdoctor` — is it still alive?
+### `chez doctor` — is it still alive?
 
 `--status` answers only when you think to ask, and a job with no human-facing
 output is a job you stop thinking about. So the health check you already run for
@@ -362,8 +362,8 @@ from the corpus. Use these instead:
 | Situation | What to do |
 |---|---|
 | A rule is wrong or badly worded | Write the correct one in `~/.local/state/chezdistill/Pinned.md`. It is prepended into `MAIN.md` verbatim, never demoted, never rewritten. |
-| Last night's run made a mess | `chezdistill --undo` reverts the state repo's last commit and re-renders the memory from it. |
-| You edited the corpus or `Pinned.md` | `chezdistill --render` rebuilds the memory tier. No API calls. |
+| Last night's run made a mess | `chez distill --undo` reverts the state repo's last commit and re-renders the memory from it. |
+| You edited the corpus or `Pinned.md` | `chez distill --render` rebuilds the memory tier. No API calls. |
 | An entry should be gone entirely | Delete its sightings from `extracts/<date>.<host>.json` — every shard of that date, if more than one Mac contributed. Everything about an entry is derived from the corpus, so that is the only place it exists. |
 
 `--undo` reverts the corpus rather than the rendered files, because
@@ -412,7 +412,7 @@ bought a cheap gate with an expensive round trip. One call per session now retur
 `items: []` when there's nothing worth keeping, which is the same verdict for free.
 
 On a subscription, `claude -p` draws from the same quota as interactive work.
-Watch `chezdistill --status` for the first week.
+Watch `chez distill --status` for the first week.
 
 ## Offline
 
@@ -424,11 +424,11 @@ rebooted.
 ## Troubleshooting
 
 ```sh
-chezdoctor                                 # is the agent registered, did it run
-chezdistill --status                       # paths, MAIN vs cap, spend, last run
-chezdistill -n --since 7d                  # what would be read, no API calls
-chezdistill --runs                         # the last fortnight, one row a night
-chezdistill --logs 50                      # launchd's log (~/.local/state/…)
+chez doctor                                 # is the agent registered, did it run
+chez distill --status                       # paths, MAIN vs cap, spend, last run
+chez distill -n --since 7d                 # what would be read, no API calls
+chez distill --runs                         # the last fortnight, one row a night
+chez distill --logs 50                      # launchd's log (~/.local/state/…)
 launchctl print gui/$(id -u)/no.mlz.chezdistill.nightly
 launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 ```
@@ -441,13 +441,13 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | Ran at 09:00, not 01:00 | The Mac was asleep. launchd fired on wake; the cursor means nothing was lost. |
 | "7-day spend has reached the ceiling" | Raise `maxSpendUsd7d`, or find out what got expensive in `spend.jsonl`. |
 | "spend ceiling reached — stopping after N session(s)" | A backfill hit the ceiling part-way. What it read is saved and the cursor is held; raise the ceiling or wait for the 7-day window to roll, then run again. |
-| Agent not in `launchctl list` | Hook 06 didn't run. `chezapply`, then check its output. |
-| Did it run at all last night? | `chezdistill --status` — `last run`. |
+| Agent not in `launchctl list` | Hook 06 didn't run. `chez apply`, then check its output. |
+| Did it run at all last night? | `chez distill --status` — `last run`. |
 | Green every night, but nothing distilled | Look at `sources` in `--status`: if a configured `transcriptRoot` does not exist there is nothing to read, and the run now fails rather than recording `ok`. `--runs` shows the whole streak. |
 | "no transcripts to read — configured root(s) do not exist" | `transcriptRoots` in `src/.chezmoidata/distill.toml` is wrong for this machine. Claude Code writes to `~/.claude/projects`; `CLAUDE_CONFIG_DIR` moves settings, skills and the persona, not transcripts. |
 | It ran but distilled nothing | The per-session lines under `last run` give the reason for each. |
 | "N seen, 0 kept" most nights | Usually `minTurns`: a turn counts only if you *typed* it, and plenty of real sessions are one or two prompts long. This is the filter working, not a fault. Lower `minTurns` in `src/.chezmoidata/distill.toml` if you want the short ones too. |
-| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chezdistill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash features/distill/cli.sh`. |
+| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chez distill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash features/distill/cli.sh`. |
 | A root shows as "not present on this Mac" | Expected. `transcriptRoots` is a candidate list and only one entry is ever real; it is only a problem when *no* root has transcripts, which fails the run outright. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 
@@ -472,7 +472,7 @@ Corpus backup repo for the distiller (blank for local only)
 
 **Blank is a real, permanent answer**, not "not yet decided": the corpus lives
 happily on one machine, `--status` says `local only`, and everything else works
-unchanged. Attach one whenever you like with `chezdistill --remote <url>` — no
+unchanged. Attach one whenever you like with `chez distill --remote <url>` — no
 re-running setup.
 
 There are three layers and only one of them is authoritative:
@@ -507,12 +507,12 @@ That is what the `profile` in `corpus.json` guards, and it is checked from the
 ```
 ✗ the corpus at ~/.local/state/chezdistill was stamped personal but this is a work Mac
   nothing will be distilled until that is settled. Either attach this Mac to its own corpus:
-    chezdistill --remote <work corpus url>
+    chez distill --remote <work corpus url>
   or start a fresh one here, keeping what is already backed up:
-    chezdistill --remote none
+    chez distill --remote none
 ```
 
-`chezdoctor` fails on the same condition, and attaching refuses before a single
+`chez doctor` fails on the same condition, and attaching refuses before a single
 byte is sent. Without a check of some kind both reported a cheerful `✓ corpus
 backed up` at it, because it *is* backed up — to the wrong place, one push past
 undoing.
@@ -571,7 +571,7 @@ happening — the opposite of what a backup is for. The state repo therefore pin
 its own push URL to whatever it was cloned from, when that is HTTPS and no push
 URL is already set; an SSH remote is left exactly as you configured it.
 
-On the new Mac: run `install.sh` for the dotfiles, then `chezdistill --render`.
+On the new Mac: run `install.sh` for the dotfiles, then `chez distill --render`.
 The first time the state repo is created it now **fetches the corpus its profile
 points at and checks it out**, so the machine inherits everything rather than
 starting empty. `--render` then rebuilds `MAIN.md`, `Topics/` and `Candidates.md`
@@ -621,9 +621,9 @@ permanently. While it is open nothing can check it for you, which is why
 ### Attaching, moving and detaching
 
 ```sh
-chezdistill --remote                       # where does this back up?
-chezdistill --remote https://github.com/…  # attach, restore, or join
-chezdistill --remote none                  # local only
+chez distill --remote                       # where does this back up?
+chez distill --remote https://github.com/…  # attach, restore, or join
+chez distill --remote none                  # local only
 ```
 
 Four shapes, decided by what is at each end rather than by a flag: an empty
@@ -685,7 +685,7 @@ All in [`src/.chezmoidata/distill.toml`](../src/.chezmoidata/distill.toml).
 | `extractRetentionDays` | `90` | After this, an extract's `evidence` quote and `cwd` are stripped. The rule itself is kept. |
 | `runRetentionDays` | `90` | How long run records are kept. |
 
-Change a value, then `chezup` and `chezdistill --render` to see the effect without
+Change a value, then `chez up` and `chez distill --render` to see the effect without
 spending anything.
 
 ## Secrets and retention
@@ -708,7 +708,7 @@ reproducing tokens, keys and `.env` values.
 
 ## Turning it off
 
-`chezsetup`, untick *claudeDistiller*, `chezup`. That stops future applies from
+`chez setup`, untick *claudeDistiller*, `chez up`. That stops future applies from
 deploying the agent, but launchd keeps what it already loaded — unload it by hand:
 
 
@@ -719,6 +719,6 @@ launchctl bootout gui/$(id -u)/no.mlz.chezdistill.nightly
 The memory dir and the state dir are yours; nothing removes them. Drop the
 `@`-import by removing the module, and the persona stops loading `MAIN.md`.
 
-Unticking it stays unticked: `chezup`'s new-module gate only offers modules this
+Unticking it stays unticked: `chez up`'s new-module gate only offers modules this
 Mac has *never been asked about*, and the module is recorded as offered whether
 you said yes or no.

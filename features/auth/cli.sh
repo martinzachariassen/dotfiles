@@ -192,7 +192,7 @@ if [ "${SKIP_SIGNTEST:-0}" != "1" ]; then
         warn "no git signing key configured yet"
         info "Set it by re-running the wizard, then applying:"
         dim "    chezmoi init --prompt      # choose signingMode, paste the public key"
-        dim "    chezapply"
+        dim "    chez apply"
     fi
 fi
 
@@ -238,7 +238,7 @@ printf "%s\n" "${CYAN}${BOX_BOTTOM}${RESET}"
 echo
 say "${BOLD}Next${RESET}"
 say "exec zsh       reload your shell"
-say "chezdoctor     run the full health check"
+say "chez doctor     run the full health check"
 say "Restart macOS  finish any system defaults that need a reboot"
 echo
 dim "Re-run this script anytime; it skips steps already done."

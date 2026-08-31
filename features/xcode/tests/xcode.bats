@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# features/xcode/cli.sh (`chezxcode`) — the consent gates around a ~40 GB download.
+# features/xcode/cli.sh (`chez xcode`) — the consent gates around a ~40 GB download.
 #
 # The safety property under test is one sentence: **`xcodes install` never runs
 # without a person saying yes.** Two bugs violated it during development, both
@@ -110,7 +110,7 @@ assert_no_download() {
     run bash "$SCRIPT" --help </dev/null
     assert_no_download
     [ "$status" -eq 0 ]
-    [[ "$output" == *"usage: chezxcode"* ]] || return 1
+    [[ "$output" == *"usage: chez xcode"* ]] || return 1
 }
 
 @test "an unknown flag is rejected and downloads nothing" {
@@ -190,7 +190,7 @@ EOF
 }
 
 # ─── The real run: a stateful fake of the whole Xcode layer ─────────────────────
-# Everything above proves chezxcode does NOT act. These prove it acts correctly
+# Everything above proves chez xcode does NOT act. These prove it acts correctly
 # when it should. The stubs below are a small state machine — `xcodes install`
 # creates the app, `-license accept` clears the licence gate, `-downloadPlatform`
 # registers a runtime — so a second run genuinely observes the first run's
