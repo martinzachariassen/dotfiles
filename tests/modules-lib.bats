@@ -132,6 +132,26 @@ no_match_in() {
     [ ! -e "$CFG.modules.tmp" ]
 }
 
+# That config is written 0600 by chezmoi and holds the signing key, an email and
+# corpusRemote. The rewrite goes via a temp file, which `>` creates 0644 under
+# the default umask — so without the mode carry every `chez up` that touches a
+# module list would quietly widen it, once, silently, and never narrow it again.
+@test "modules_write_list keeps the config's mode" {
+    chmod 0600 "$CFG"
+    lib "modules_write_list '$CFG' modules macApps"
+    [ "$status" -eq 0 ]
+    [ "$(stat -f '%Lp' "$CFG" 2>/dev/null || stat -c '%a' "$CFG")" = "600" ]
+}
+
+@test "modules_write_list keeps the mode when it inserts a new key too" {
+    chmod 0600 "$CFG"
+    grep -v modulesSeen "$CFG" >"$CFG.trimmed" && mv "$CFG.trimmed" "$CFG"
+    chmod 0600 "$CFG"
+    lib "modules_write_list '$CFG' modulesSeen macApps"
+    [ "$status" -eq 0 ]
+    [ "$(stat -f '%Lp' "$CFG" 2>/dev/null || stat -c '%a' "$CFG")" = "600" ]
+}
+
 @test "modules_write_list inserts a missing key after the modules line" {
     # The upgrade path: a config generated before modulesSeen existed.
     grep -v modulesSeen "$CFG" >"$CFG.trimmed" && mv "$CFG.trimmed" "$CFG"

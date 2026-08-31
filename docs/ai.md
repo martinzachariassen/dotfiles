@@ -48,10 +48,10 @@ nothing else.
 
 There is no human-facing output. Nothing is written into an Obsidian vault or
 anywhere else you would browse — the audience is Claude, and what it knows you
-read with `chez distill --status`, `MAIN.md` or a note in `Topics/`. Because a job
-with no output is a job you stop thinking about, `chez doctor` carries a
-chezdistill section: agent registered, last run recent and successful, `MAIN.md`
-present and under its cap, corpus backed up — to its own scope's repo.
+read with `chez distill --status`, `MAIN.md` or a note in `Topics/`. Because
+a job with no output is a job you stop thinking about, `chez doctor` carries
+a chezdistill section: agent registered, last run recent and successful,
+`MAIN.md` present and under its cap, corpus backed up — to its own scope's repo.
 
 Its guiding rule is that **the model extracts while bash decides and writes**:
 every judgement is computed in

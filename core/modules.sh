@@ -85,6 +85,19 @@ modules_toml_array() {
     printf '[%s]' "$out"
 }
 
+# _modules_mv CFG TMP — move TMP over CFG, keeping CFG's mode.
+#
+# chezmoi writes that config 0600 and it holds the signing key, an email and
+# corpusRemote. A temp file created with `>` lands at 0644 under the default
+# umask, so without this every `chez up` that touches a module list quietly
+# widens it.
+_modules_mv() {
+    local mode
+    mode="$(stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null)"
+    [ -n "$mode" ] && chmod "$mode" "$2" 2>/dev/null
+    mv "$2" "$1"
+}
+
 # modules_write_list CFG KEY VALUE… — rewrite `KEY = [...]` in the chezmoi
 # config, touching exactly that one line. When KEY is absent it is inserted
 # after the `modules` line, which is the case on any Mac whose config was
@@ -107,7 +120,7 @@ modules_write_list() {
         prefix="${prefix%%=*}"
         new="$prefix= $array"
         awk -v n="$n" -v repl="$new" 'NR == n { print repl; next } { print }' \
-            "$cfg" >"$tmp" && mv "$tmp" "$cfg" && return 0
+            "$cfg" >"$tmp" && _modules_mv "$cfg" "$tmp" && return 0
         rm -f "$tmp"
         return 1
     fi
@@ -119,7 +132,7 @@ modules_write_list() {
     indent="${indent%%[![:space:]]*}"
     new="$indent$key = $array"
     awk -v n="$n" -v repl="$new" 'NR == n { print; print repl; next } { print }' \
-        "$cfg" >"$tmp" && mv "$tmp" "$cfg" && return 0
+        "$cfg" >"$tmp" && _modules_mv "$cfg" "$tmp" && return 0
     rm -f "$tmp"
     return 1
 }

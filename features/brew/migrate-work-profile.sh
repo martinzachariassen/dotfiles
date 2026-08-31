@@ -9,6 +9,15 @@
 # moves the declaration from a tier the repo no longer has to the one place a
 # machine is allowed to keep its own answer, ~/.config/chez/Brewfile.local.
 #
+# The key carries a second passenger. The distiller falls back to `.profile` for
+# its corpus scope, so this script copies the value into `memoryScope` before
+# deleting the line it came from — see carry_scope_forward.
+#
+# Every step runs before the key is dropped, and the drop is conditional on all
+# of them: the key is the marker the resolver fail-closes on and the hook's own
+# render gate, so removing it after a failed move would lift the guard and
+# consume the retry in the same breath.
+#
 # Called by src/.chezmoiscripts/run_once_before_00b-retire-work-profile.sh.tmpl,
 # which renders a body only on a config that still carries the key. Idempotent
 # anyway: entries already present are skipped and a config with no profile line
@@ -86,6 +95,14 @@ seed_overlay() {
         fail "could not create $overlay — not migrating the work packages"
         return 1
     fi
+    # Checked before a single append, because `set -e` is deliberately off here:
+    # an unchecked `>>` to a read-only overlay prints a permission error per
+    # line and then falls through to "moved 15 work package(s)" and exit 0,
+    # which is the one report that must never be wrong.
+    if [ ! -w "$overlay" ]; then
+        fail "$overlay is not writable — not migrating the work packages"
+        return 1
+    fi
     existing=$'\n'"$(_entry_keys <"$overlay" 2>/dev/null)"$'\n'
 
     while IFS= read -r line; do
@@ -98,9 +115,14 @@ seed_overlay() {
             continue
         fi
         case "$existing" in *$'\n'"$key"$'\n'*) continue ;; esac
-        printf '%s' "$buf" >>"$overlay"
+        # One redirect for both writes, and its status checked: the open covers
+        # a file that turned unwritable since the guard above, the printfs cover
+        # a disk that filled underneath us. `added` must count lines that landed.
+        if ! { printf '%s' "$buf" && printf '%s\n' "$line"; } >>"$overlay"; then
+            fail "could not write to $overlay — the work packages are not all moved"
+            return 1
+        fi
         buf=""
-        printf '%s\n' "$line" >>"$overlay"
         existing="$existing$key"$'\n'
         added=$((added + 1))
     done <<<"$WORK_TIER"
@@ -116,6 +138,89 @@ seed_overlay() {
     return 0
 }
 
+# _data_key_line KEY — the line number of `KEY = …` inside the config's [data]
+# table, or nothing. Scoped to the table on purpose: chezmoi's own config schema
+# has an `awsSecretsManager.profile`, so a file-wide `grep '^ *profile *='`
+# can match — and this script would then delete — a key that has nothing to do
+# with the migration.
+_data_key_line() {
+    awk -v key="$1" '
+        /^[[:space:]]*\[/ { in_data = ($0 ~ /^[[:space:]]*\[data\][[:space:]]*$/); next }
+        in_data && $0 ~ "^[[:space:]]*" key "[[:space:]]*=" { print NR; exit }
+    ' "$CONFIG"
+}
+
+# _config_rewrite TMP — move TMP over the config, keeping the config's mode.
+#
+# chezmoi creates that file 0600 and it holds corpusRemote, the signing key and
+# an email. A plain `>` gives the temp file 0644 under the default umask, so
+# without this the migration is the step that makes them world-readable.
+_config_rewrite() {
+    local tmp="$1" mode
+    mode="$(stat -f '%Lp' "$CONFIG" 2>/dev/null || stat -c '%a' "$CONFIG" 2>/dev/null)"
+    [ -n "$mode" ] && chmod "$mode" "$tmp" 2>/dev/null
+    mv "$tmp" "$CONFIG"
+}
+
+# carry_scope_forward — copy the profile into `memoryScope` before the key that
+# holds it is deleted.
+#
+# The distiller keys its corpus identity on `memoryScope` and falls back to
+# `.profile` when that key is absent. Only `chezmoi init` ever writes
+# memoryScope, and `chez up` never inits — so on the upgrade path this script is
+# the last moment the old value exists anywhere at all.
+#
+# Deleting the profile without this does not fail; it disarms. Every leak
+# boundary is written `[ -n "$mine" ] && …`, so an empty scope turns all of them
+# into unconditional passes at once, and a corpus created afterwards is stamped
+# `""` permanently — corpus.json is written once and never rewritten. Silent,
+# and the exact outcome features/distill/lib/config.sh exists to prevent.
+carry_scope_forward() {
+    local n line value prefix indent tmp
+    [ -n "$PROFILE" ] || return 0
+    [ -n "$CONFIG" ] && [ -f "$CONFIG" ] || return 0
+    # No profile line means nothing to carry and nothing to drop — the two are
+    # the same edit seen from either end.
+    n="$(_data_key_line profile)"
+    [ -n "$n" ] || return 0
+    if [ ! -w "$CONFIG" ]; then
+        warn "${CONFIG/#$HOME/\~} is not writable — the profile key stays"
+        explain "Make it writable and re-run, or remove the \`profile = …\` line by hand."
+        return 1
+    fi
+
+    tmp="$CONFIG.carry-scope.tmp"
+    local m
+    m="$(_data_key_line memoryScope)"
+    if [ -n "$m" ]; then
+        line="$(awk -v n="$m" 'NR == n { print; exit }' "$CONFIG")"
+        value="$(printf '%s' "${line#*=}" | tr -d '[:space:]"')"
+        # A scope that is already answered wins. An EMPTY one is not an answer:
+        # distill_scope skips empty strings, so leaving it would be the same
+        # silent disarm as writing nothing at all.
+        [ -n "$value" ] && return 0
+        prefix="${line%%=*}"
+        if awk -v n="$m" -v repl="$prefix= \"$PROFILE\"" \
+            'NR == n { print repl; next } { print }' "$CONFIG" >"$tmp" &&
+            _config_rewrite "$tmp"; then
+            ok "kept this Mac's memory scope as \"$PROFILE\""
+            return 0
+        fi
+    else
+        line="$(awk -v n="$n" 'NR == n { print; exit }' "$CONFIG")"
+        indent="${line%%[![:space:]]*}"
+        if awk -v n="$n" -v repl="${indent}memoryScope = \"$PROFILE\"" \
+            'NR == n { print; print repl; next } { print }' "$CONFIG" >"$tmp" &&
+            _config_rewrite "$tmp"; then
+            ok "kept this Mac's memory scope as \"$PROFILE\""
+            return 0
+        fi
+    fi
+    rm -f "$tmp"
+    fail "could not write the memory scope into ${CONFIG/#$HOME/\~}"
+    return 1
+}
+
 # drop_profile_key — remove `profile = "…"` from the generated chezmoi config.
 #
 # Line surgery for the same reason core/modules.sh does it: `chezmoi init` would
@@ -123,19 +228,20 @@ seed_overlay() {
 # is gone the resolver in features/brew/lib/tiers.sh stops refusing, which is
 # what makes this the last step rather than the first.
 drop_profile_key() {
-    local tmp
+    local tmp n
     [ -n "$CONFIG" ] && [ -f "$CONFIG" ] || {
         warn "no chezmoi config at ${CONFIG:-<unset>} — leaving the profile key alone"
         return 0
     }
-    grep -qE '^[[:space:]]*profile[[:space:]]*=' "$CONFIG" || return 0
+    n="$(_data_key_line profile)"
+    [ -n "$n" ] || return 0
     if [ ! -w "$CONFIG" ]; then
         warn "${CONFIG/#$HOME/\~} is not writable — the profile key stays"
         explain "Remove the \`profile = …\` line by hand, or run \`chez setup\`."
         return 1
     fi
     tmp="$CONFIG.retire-profile.tmp"
-    if grep -vE '^[[:space:]]*profile[[:space:]]*=' "$CONFIG" >"$tmp" && mv "$tmp" "$CONFIG"; then
+    if awk -v n="$n" 'NR != n' "$CONFIG" >"$tmp" && _config_rewrite "$tmp"; then
         ok "removed the retired profile key from ${CONFIG/#$HOME/\~}"
         return 0
     fi
@@ -154,5 +260,22 @@ if [ "$PROFILE" = "work" ]; then
 else
     ok "nothing to move — this Mac was set up as \"${PROFILE:-none}\""
 fi
-drop_profile_key || status=1
-exit "$status"
+carry_scope_forward || status=1
+
+# Dropping the key is the LAST step and it is conditional on every step above,
+# because the key is also the marker. features/brew/lib/tiers.sh refuses to
+# resolve a tier set while it is present, and the hook that calls this renders
+# down to a bare `exit 0` once it is gone — so removing it after a failed move
+# would both lift the guard and consume the only retry, permanently, leaving
+# fifteen installed packages declared by nothing.
+if [ "$status" -ne 0 ]; then
+    echo
+    fail "not migrated — the profile key stays, so nothing can be offered for removal"
+    explain \
+        "Nothing was uninstalled and nothing was lost. Fix the error above" \
+        "and run \`chez up\` again; this step will retry from the start."
+    exit 1
+fi
+
+drop_profile_key || exit 1
+exit 0

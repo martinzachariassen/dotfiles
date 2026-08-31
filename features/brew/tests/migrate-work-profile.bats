@@ -215,6 +215,113 @@ assert_all_declared() {
     [[ "$output" == *"by hand"* ]] || return 1
 }
 
+@test "the config keeps its mode across the rewrite" {
+    # chezmoi writes this file 0600 and it holds corpusRemote, the signing key
+    # and an email. A temp file created with `>` lands at 0644, so the mode has
+    # to be carried across the mv or the migration is what leaks them.
+    chmod 600 "$CONFIG"
+    migrate work
+    [ "$status" -eq 0 ]
+    [ "$(stat -f '%Lp' "$CONFIG" 2>/dev/null || stat -c '%a' "$CONFIG")" = "600" ]
+}
+
+@test "a profile key outside [data] is not touched" {
+    # chezmoi's own config schema has an awsSecretsManager.profile. A file-wide
+    # grep would delete it, silently, and report only "removed the retired
+    # profile key".
+    cat >"$CONFIG" <<'EOF'
+sourceDir = "/somewhere/src"
+
+[awsSecretsManager]
+    profile = "prod"
+
+[data]
+    name    = "Test"
+    profile = "work"
+EOF
+    migrate work
+    [ "$status" -eq 0 ]
+    grep -qF 'profile = "prod"' "$CONFIG"
+    no_match 'profile = "work"' "$CONFIG"
+}
+
+# ─── The corpus scope the key was also carrying ──────────────────────────────
+
+@test "the profile is carried over as the memory scope" {
+    # distill_scope falls back to `.profile`, and only `chezmoi init` writes
+    # memoryScope — which `chez up` never runs. Delete the key without this and
+    # the scope goes empty, which does not fail: every leak boundary is written
+    # `[ -n "$mine" ] && …`, so an empty scope disarms all of them silently.
+    migrate work
+    [ "$status" -eq 0 ]
+    grep -qE '^[[:space:]]*memoryScope[[:space:]]*=[[:space:]]*"work"' "$CONFIG"
+    no_match '^[[:space:]]*profile[[:space:]]*=' "$CONFIG"
+}
+
+@test "a scope already answered is left alone" {
+    printf '    memoryScope = "chosen"\n' >>"$CONFIG"
+    migrate work
+    [ "$status" -eq 0 ]
+    grep -qF 'memoryScope = "chosen"' "$CONFIG"
+    [ "$(grep -c 'memoryScope' "$CONFIG")" -eq 1 ]
+}
+
+@test "an empty scope is filled in, not treated as an answer" {
+    # jq's `//` would call "" present; distill_scope deliberately skips empty
+    # strings, so an empty memoryScope is exactly as disarming as a missing one.
+    printf '    memoryScope = ""\n' >>"$CONFIG"
+    migrate work
+    [ "$status" -eq 0 ]
+    grep -qE '^[[:space:]]*memoryScope[[:space:]]*=[[:space:]]*"work"' "$CONFIG"
+    [ "$(grep -c 'memoryScope' "$CONFIG")" -eq 1 ]
+}
+
+@test "a personal Mac carries its scope over too" {
+    sed 's/"work"/"personal"/' "$CONFIG" >"$CONFIG.p" && mv "$CONFIG.p" "$CONFIG"
+    migrate personal
+    [ "$status" -eq 0 ]
+    grep -qE '^[[:space:]]*memoryScope[[:space:]]*=[[:space:]]*"personal"' "$CONFIG"
+}
+
+@test "no scope temp file is left behind" {
+    migrate work
+    [ ! -e "$CONFIG.carry-scope.tmp" ]
+}
+
+# ─── The failure edge: a failed move must never drop the key ─────────────────
+
+@test "a failed overlay seed leaves the key in place so the migration retries" {
+    # The destructive asymmetry. Dropping the key both lifts the resolver's
+    # fail-closed guard and renders the hook down to `exit 0` forever — so a
+    # drop after a failed move is unrecoverable and silent, and the fifteen
+    # packages line up for uninstall on the next `chez mirror`.
+    [ "$(id -u)" -ne 0 ] || skip "running as root; every file is writable"
+    mkdir -p "$CHEZ_CONFIG_DIR"
+    printf '# mine\n' >"$OVERLAY"
+    chmod 444 "$OVERLAY"
+    migrate work
+    chmod 644 "$OVERLAY"
+
+    [ "$status" -eq 1 ]
+    grep -qE '^[[:space:]]*profile[[:space:]]*=' "$CONFIG"
+    [[ "$output" == *"not migrated"* ]] || return 1
+    # And it really did write nothing, rather than reporting a move it did not make.
+    [ "$(cat "$OVERLAY")" = "# mine" ]
+    no_match_in "$output" 'moved [0-9]+ work package'
+}
+
+@test "an uncreatable overlay leaves the key in place too" {
+    [ "$(id -u)" -ne 0 ] || skip "running as root; every file is writable"
+    # ~/.config/chez occupied by something that is not a directory.
+    rm -rf "$CHEZ_CONFIG_DIR"
+    printf 'not a directory\n' >"$CHEZ_CONFIG_DIR"
+    migrate work
+    rm -f "$CHEZ_CONFIG_DIR"
+
+    [ "$status" -eq 1 ]
+    grep -qE '^[[:space:]]*profile[[:space:]]*=' "$CONFIG"
+}
+
 # ─── The point of the whole exercise ─────────────────────────────────────────
 
 @test "after migrating, the resolver stops refusing and counts the overlay" {
