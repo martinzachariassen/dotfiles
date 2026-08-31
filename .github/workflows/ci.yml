@@ -243,3 +243,46 @@ jobs:
           USE_ONE_PASSWORD: "true"
           LEGACY_PROFILE: ${{ matrix.legacy_profile }}
         run: bash scripts/ci/render-check.sh "$PWD"
+
+  # The one required status check on main. Everything above is advisory to the
+  # ruleset; this job is what it gates on.
+  #
+  # Branch protection pins required checks BY NAME, and a matrix job's name
+  # embeds its matrix values — so changing the render matrix silently retires a
+  # required context and leaves the ruleset waiting forever for a name that can
+  # never report again. Not hypothetical: retiring the profile axis stranded
+  # four `chezmoi render (personal, …)` contexts and blocked its own PR with
+  # every check green. One stable name, depending on everything, is the fix.
+  #
+  # `needs` must name every job above it — tests/lint-coverage.bats enforces
+  # that, because a job missing from the list is a check that stops gating
+  # without anything going red.
+  gate:
+    name: all checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs:
+      - shell
+      - render
+      - test
+      - config
+      - typos
+      - secrets
+      - actionlint
+      - zizmor
+      - pr-title
+      - brew
+      - render-macos
+    steps:
+      # `skipped` is deliberately not a failure: render-macos is gated to the
+      # weekly schedule and pr-title to pull requests, so on any given event one
+      # of them is skipped by design.
+      - name: Require every job to have passed or skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          printf 'dependency results: %s\n' "$RESULTS"
+          case " $RESULTS " in
+              *' failure '* | *' cancelled '*) exit 1 ;;
+          esac
