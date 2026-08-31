@@ -41,7 +41,7 @@ terminal you asked at; they write nothing and nobody has to read them.
 One command, from a checkout of this repo:
 
 ```sh
-bash ~/Developer/personal/dotfiles/scripts/bin/distill.sh --setup
+bash ~/Developer/personal/dotfiles/features/distill/cli.sh --setup
 ```
 
 It goes through the full path — add `claudeDistiller` to the module list, apply,
@@ -139,7 +139,7 @@ worth keeping last night" stay distinguishable.
 
 **The model extracts; bash decides and writes.** Every judgement — hit counts,
 what enters MAIN, what gets demoted — is computed in
-[`scripts/lib/distill.sh`](../scripts/lib/distill.sh). No model call has write
+[`features/distill/lib/`](../features/distill/lib). No model call has write
 access: each runs `--tools ""`, takes its payload on stdin, returns
 schema-validated JSON. Keeping the decisions in bash is what makes a re-run of an
 already-distilled day produce a byte-identical file and therefore no commit.
@@ -170,7 +170,7 @@ Two things that look like prompt problems and are not:
 
 - **A length limit belongs in the JSON schema, not the prompt.** Asking for 200
   characters is ignored often enough to matter; `maxLength` is not. That is why
-  the rule cap lives in [`distill_schema_map`](../scripts/lib/distill.sh) rather
+  the rule cap lives in [`distill_schema_map`](../features/distill/lib/model.sh) rather
   than in the rubric.
 - **A horizon in the rubric silently filters whole categories.** "Worth knowing a
   month from now" is right for a rule and wrong for an open thread, which matters
@@ -447,7 +447,7 @@ launchctl kickstart -k gui/$(id -u)/no.mlz.chezdistill.nightly
 | "no transcripts to read — configured root(s) do not exist" | `transcriptRoots` in `src/.chezmoidata/distill.toml` is wrong for this machine. Claude Code writes to `~/.claude/projects`; `CLAUDE_CONFIG_DIR` moves settings, skills and the persona, not transcripts. |
 | It ran but distilled nothing | The per-session lines under `last run` give the reason for each. |
 | "N seen, 0 kept" most nights | Usually `minTurns`: a turn counts only if you *typed* it, and plenty of real sessions are one or two prompts long. This is the filter working, not a fault. Lower `minTurns` in `src/.chezmoidata/distill.toml` if you want the short ones too. |
-| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chezdistill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash scripts/bin/distill.sh`. |
+| "every model call failed — treating this as an outage" | launchd does not read your shell config, so anything exported from `~/.zshenv` — a Vertex or Bedrock provider, a proxy, a custom endpoint — is **absent at 01:00** even though it works when you run `chezdistill` by hand. The job then falls back to first-party auth. `--logs 40` shows the underlying error. Reproduce the launchd environment with `env -i HOME="$HOME" PATH=/opt/homebrew/bin:/usr/bin:/bin CLAUDE_CONFIG_DIR="$HOME/.config/claude" bash features/distill/cli.sh`. |
 | A root shows as "not present on this Mac" | Expected. `transcriptRoots` is a candidate list and only one entry is ever real; it is only a problem when *no* root has transcripts, which fails the run outright. |
 | `--undo` says there is no state repo | Nothing has run yet. The first run creates it. |
 

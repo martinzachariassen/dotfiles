@@ -118,7 +118,7 @@ dotfiles setup. Read this before proposing changes; deeper topic guides live in
   calls. Both directories are ordinary local ones and are simply created.
   Its guiding rule is *the model extracts, bash decides and writes*: every
   judgement (hit counts, what enters `MAIN.md`, what is demoted) is computed in
-  `scripts/lib/distill.sh`, and every `claude -p` call runs `--tools ""` with no
+  `features/distill/lib/`, and every `claude -p` call runs `--tools ""` with no
   write access. `hits` is **derived** from the extract corpus, never incremented —
   that is what makes `--render`, `--since 7d` and a repeated nightly run idempotent.
   Don't move a decision into a prompt, and don't make `--undo` revert the rendered

@@ -3,9 +3,15 @@
 # changes. Re-registering is how an edited plist takes effect at all — launchd
 # caches the loaded copy, so a rewritten file alone changes nothing.
 #
-# scripts/bin/distill.sh  hash: {{ include "../scripts/bin/distill.sh" | sha256sum }}
-# scripts/lib/distill.sh  hash: {{ include "../scripts/lib/distill.sh" | sha256sum }}
-# nightly plist           hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.nightly.plist.tmpl" | sha256sum }}
+# What re-registering depends on, and nothing else: the plist launchd loads, and
+# the entry point it names. It used to hash the whole engine as well, so every
+# edit to any of its 2,600 lines booted the agent out and back in for no reason —
+# launchd invokes cli.sh by path each night, so an engine change takes effect
+# without re-registration. The engine is fifteen files now, and listing them all
+# here would be fifteen chances to forget one.
+#
+# entry point   hash: {{ include "../features/distill/cli.sh" | sha256sum }}
+# nightly plist hash: {{ include "Library/LaunchAgents/no.mlz.chezdistill.nightly.plist.tmpl" | sha256sum }}
 
 set -euo pipefail
 

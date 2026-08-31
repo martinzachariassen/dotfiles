@@ -20,8 +20,8 @@ ui_init_logging
 ui_init_status
 # shellcheck source=../../core/dry-run.sh
 . "$_DIR/../../core/dry-run.sh"
-# shellcheck source=../lib/distill.sh
-. "$_DIR/../lib/distill.sh"
+# shellcheck source=lib.sh
+. "$_DIR/lib.sh"
 # shellcheck source=../../core/chezmoi-data.sh
 . "$_DIR/../../core/chezmoi-data.sh"
 # shellcheck source=../../core/modules.sh
@@ -63,7 +63,7 @@ Looking at it, rather than running it — all read-only, none cost anything:
 
 Before the module is enabled the `chezdistill` shell verb does not exist yet, so
 the very first run goes through the script:
-  bash ~/Developer/personal/dotfiles/scripts/bin/distill.sh --setup
+  bash ~/Developer/personal/dotfiles/features/distill/cli.sh --setup
 EOF
 }
 

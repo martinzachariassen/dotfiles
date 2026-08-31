@@ -55,7 +55,7 @@ present and under its cap, corpus backed up — to its own profile's repo.
 
 Its guiding rule is that **the model extracts while bash decides and writes**:
 every judgement is computed in
-[`scripts/lib/distill.sh`](../scripts/lib/distill.sh), and no model call has
+[`features/distill/lib/`](../features/distill/lib), and no model call has
 write access. Nothing reaches `MAIN.md` until it has been seen in two distinct
 sessions, so a single misreading can't become a rule applied to every session.
 

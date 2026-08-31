@@ -53,7 +53,7 @@ for _lib in \
     features/vscode/lib.sh \
     features/sign/lib.sh \
     features/xcode/probe.sh \
-    scripts/lib/distill.sh; do
+    features/distill/lib.sh; do
     if [ ! -r "$ROOT/$_lib" ]; then
         printf 'doctor: missing %s — this checkout is incomplete\n' "$ROOT/$_lib" >&2
         exit 1
