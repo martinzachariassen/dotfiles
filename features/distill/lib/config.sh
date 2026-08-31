@@ -12,10 +12,10 @@
 
 _DISTILL_CFG=""
 _DISTILL_DATA=""
-_DISTILL_PROFILE=""
+_DISTILL_SCOPE=""
 
 # _distill_data — all of `chezmoi data`, fetched once. Two callers want different
-# parts of it (`.distill` and `.profile`) and it costs a subprocess each time.
+# parts of it (`.distill` and `.memoryScope`) and it costs a subprocess each time.
 _distill_data() {
     if [ -z "$_DISTILL_DATA" ]; then
         _DISTILL_DATA="$(chezmoi data --format=json 2>/dev/null)"
@@ -58,21 +58,41 @@ distill_config() {
     printf '%s\n' "$_DISTILL_CFG"
 }
 
-# distill_profile — which profile this Mac was set up as: "personal" or "work".
+# distill_scope — which memory scope this Mac belongs to. A free-text label:
+# two Macs that share a scope share a corpus, two Macs that don't must never
+# merge theirs. It replaced `.profile`, which forced the same decision through a
+# three-valued enum that the rest of the repo no longer has.
 #
 # The only thing in this file that reads outside the `.distill` table, and it
 # earns it: the corpus a machine pushes to is a property of the machine, not of
 # the config. Empty when chezmoi is not on PATH, which every caller treats as
 # "no opinion" rather than as an error.
-distill_profile() {
-    if [ -z "$_DISTILL_PROFILE" ]; then
-        if [ -n "${DISTILL_PROFILE:-}" ]; then
-            _DISTILL_PROFILE="$DISTILL_PROFILE"
+#
+# `.profile` is read as a fallback so a Mac set up before the rename keeps the
+# scope it already had — otherwise its corpus, stamped `personal`, would stop
+# matching a machine that suddenly claims no scope at all.
+#
+# An EMPTY memoryScope falls through to `.profile` rather than winning, which
+# `//` alone would not do: jq's alternative operator only skips null and false,
+# so a saved `memoryScope = ""` — which promptStringOnce treats as a real answer
+# — would shadow the profile and leave every leak-boundary check comparing "" to
+# "". That passes, silently, which is the one outcome this whole file exists to
+# prevent.
+distill_scope() {
+    if [ -z "$_DISTILL_SCOPE" ]; then
+        if [ -n "${DISTILL_SCOPE:-}" ]; then
+            _DISTILL_SCOPE="$DISTILL_SCOPE"
+        elif [ -n "${DISTILL_PROFILE:-}" ]; then
+            # Retired env name, honoured for one release.
+            _DISTILL_SCOPE="$DISTILL_PROFILE"
         else
-            _DISTILL_PROFILE="$(_distill_data | jq -r '.profile // empty' 2>/dev/null)"
+            _DISTILL_SCOPE="$(_distill_data | jq -r '
+                [.memoryScope, .profile]
+                | map(select(type == "string" and . != ""))
+                | first // empty' 2>/dev/null)"
         fi
     fi
-    printf '%s\n' "$_DISTILL_PROFILE"
+    printf '%s\n' "$_DISTILL_SCOPE"
 }
 
 # distill_cfg KEY [DEFAULT] — one scalar.

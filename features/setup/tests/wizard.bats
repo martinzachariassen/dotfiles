@@ -32,6 +32,8 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [ "$output" = "Optional modules" ]
     run wiz 'prompt_msg corpusRemote'
     [ "$output" = "Corpus backup repo for the distiller (blank for local only)" ]
+    run wiz 'prompt_msg memoryScope'
+    [ "$output" = "Memory scope for the distiller (Macs sharing a scope share one corpus)" ]
 }
 
 # Every prompted key must be replayed on every non-interactive path, whether or
@@ -46,11 +48,34 @@ wiz() { bash -c "WIZARD_LIB_ONLY=1 source '$WIZ'; $1"; }
     [[ "$output" == *"prompt_msg corpusRemote"* ]] || return 1
 }
 
+# Same rule, and it bites harder here: memoryScope is the corpus leak boundary.
+# Dropping the flag lets chezmoi re-derive the answer, and a re-derivation that
+# lands on "" makes every scope comparison empty-vs-empty — which PASSES. The
+# guard would not error, it would wave a foreign corpus through.
+@test "memoryScope is replayed by both wizard and signing, unconditionally" {
+    grep -q 'prompt_msg memoryScope' "$REPO_ROOT/features/setup/cli.sh"
+    grep -q 'prompt_msg memoryScope' "$REPO_ROOT/features/sign/cli.sh"
+    run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/features/setup/cli.sh"
+    [[ "$output" == *"prompt_msg memoryScope"* ]] || return 1
+    run sed -n '/^init_flags=(/,/^)/p' "$REPO_ROOT/features/sign/cli.sh"
+    [[ "$output" == *"prompt_msg memoryScope"* ]] || return 1
+}
+
+# ...and neither caller may replay it as "". `chez sign` reads the key straight
+# out of the saved config, and on a Mac that predates it that read returns
+# empty — so both must fall back to the profile rather than pass "" through.
+@test "an absent memoryScope is replayed as the profile, not as empty" {
+    grep -q '\[ -n "\$memory_scope" \] || memory_scope="\$profile"' \
+        "$REPO_ROOT/features/sign/cli.sh"
+    grep -q '\[ -n "\$def_scope" \] || def_scope="\$def_profile"' \
+        "$REPO_ROOT/features/setup/cli.sh"
+}
+
 # The prompt message doubles as a chezmoi --prompt* flag KEY, and a comma in a
 # key would be misread by cobra's stringToString. None may contain one.
 @test "no prompt message contains a comma" {
     local k
-    for k in name email profile signingMode signingKey modules corpusRemote; do
+    for k in name email profile signingMode signingKey modules corpusRemote memoryScope; do
         run wiz "prompt_msg $k"
         [ "$status" -eq 0 ]
         [ -n "$output" ]

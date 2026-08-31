@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # A corpus states its own identity, and a URL is not one. Attaching, adopting a
-# corpus that merely moved, refusing another profile's, and reporting what the
+# corpus that merely moved, refusing another scope's, and reporting what the
 # remote actually HAS rather than what it is called.
 #
 # Harness in core/testing/distill.bash; engine in features/distill/lib/.
@@ -13,9 +13,9 @@ setup() {
 
 # ─── One corpus per Mac ───────────────────────────────────────────────────────
 #
-# `hits` is counted over the WHOLE corpus, so two profiles sharing a remote is
-# not untidy — a work rule seen in two work sessions is promoted into a personal
-# Mac's MAIN.md the moment the histories meet, and a push cannot be taken back.
+# `hits` is counted over the WHOLE corpus, so two scopes sharing a remote is not
+# untidy — a rule seen twice in one scope is promoted into the other scope's
+# MAIN.md the moment the histories meet, and a push cannot be taken back.
 #
 # What guards that is no longer a table of URLs in this repo. It is the stamp the
 # corpus carries, checked offline from the local copy, plus a prompted seed that
@@ -25,12 +25,26 @@ setup() {
 PERSONAL_URL="https://github.com/me/claude-memory-personal.git"
 WORK_URL="https://github.com/me/claude-memory-work.git"
 
-# seed_setup PROFILE [SEED-URL] — the engine as if setup had been answered so.
+# seed_setup SCOPE [SEED-URL] — the engine as if setup had been answered so.
 seed_setup() {
-    DISTILL_PROFILE="$1"
+    DISTILL_SCOPE="$1"
     DISTILL_CORPUS_REMOTE="${2:-}"
-    export DISTILL_PROFILE DISTILL_CORPUS_REMOTE
+    export DISTILL_SCOPE DISTILL_CORPUS_REMOTE
     load_lib
+}
+
+# stamp SCOPE [SCHEMA] — write this Mac's corpus.json. Schema 2 spells the stamp
+# `scope`; schema 1, still in the wild, spelled it `profile`.
+stamp() {
+    if [ "${2:-2}" = "1" ]; then
+        jq -n --arg s "$1" \
+            '{schema:1, id:"c-x", profile:$s, created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+            >"$(distill_corpus_file)"
+    else
+        jq -n --arg s "$1" \
+            '{schema:2, id:"c-x", scope:$s, created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
+            >"$(distill_corpus_file)"
+    fi
 }
 
 origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
@@ -84,23 +98,37 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     [ "$status" -eq 1 ]
 }
 
-@test "a corpus stamped for another profile is refused, by name" {
+@test "a corpus stamped for another scope is refused, by name" {
     seed_setup work
     distill_state_repo_init
-    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
-        >"$(distill_corpus_file)"
+    stamp personal
 
     run distill_corpus_check_local
     [ "$status" -eq 1 ]
     [[ "$output" == *"personal"* ]] || return 1
 }
 
-@test "nothing is committed while the corpus is stamped for another profile" {
+# The stamp outlives the rename. A Mac that has been running since before schema
+# 2 has a corpus.json spelling the scope `profile`, and reading only `scope`
+# would make every one of them look unstamped — which is the ONE reading that
+# waves a foreign corpus through, because the guard cannot fire on an empty
+# stamp. Backward compatibility here is a security property, not a courtesy.
+@test "a schema-1 corpus is still read, and still refused" {
     seed_setup work
     distill_state_repo_init
-    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
-        >"$(distill_corpus_file)"
-    extract 2026-08-22 "[$(item 'a work rule' s1)]"
+    stamp personal 1
+
+    [ "$(distill_corpus_scope)" = "personal" ]
+    run distill_corpus_check_local
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"personal"* ]] || return 1
+}
+
+@test "nothing is committed while the corpus is stamped for another scope" {
+    seed_setup work
+    distill_state_repo_init
+    stamp personal
+    extract 2026-08-22 "[$(item 'a scoped rule' s1)]"
 
     run distill_commit_local "chore(distill): test"
     [ "$status" -eq 0 ]
@@ -108,11 +136,10 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
     [ "$status" -ne 0 ]
 }
 
-@test "preflight refuses to run against another profile's corpus" {
+@test "preflight refuses to run against another scope's corpus" {
     seed_setup work
     distill_state_repo_init
-    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
-        >"$(distill_corpus_file)"
+    stamp personal
     run distill_preflight
     [ "$status" -eq 1 ]
     [[ "$output" == *"personal"* ]] || return 1
@@ -121,8 +148,7 @@ origin_of() { git -C "$STATE" remote get-url origin 2>/dev/null; }
 @test "--status still reports when the corpus is what is wrong" {
     seed_setup work
     distill_state_repo_init
-    jq -n '{schema:1, id:"c-x", profile:"personal", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
-        >"$(distill_corpus_file)"
+    stamp personal
     run distill_status
     [ "$status" -eq 0 ]
     [[ "$output" != *"paths    unusable"* ]] || return 1
@@ -331,10 +357,10 @@ attach_state() {
 # That fails in the direction that actually happened here: the repo was renamed,
 # the URL changed, and every string comparison still passed while the push had
 # been failing for two days. A corpus now says who it is, in a tracked file that
-# travels with it, so a rename is recognised and a cross-profile mix-up is not.
+# travels with it, so a rename is recognised and a cross-scope mix-up is not.
 
-# seed_corpus BARE BRANCH PROFILE ID SHARD… — a corpus that already exists, with
-# an identity. PROFILE empty means a legacy corpus that predates corpus.json.
+# seed_corpus BARE BRANCH SCOPE ID SHARD… — a corpus that already exists, with
+# an identity. SCOPE empty means a legacy corpus that predates corpus.json.
 seed_corpus() {
     local bare="$1" branch="$2" prof="$3" id="$4" work shard
     shift 4
@@ -342,7 +368,7 @@ seed_corpus() {
     git init -q -b "$branch" "$work"
     mkdir -p "$work/extracts"
     [ -n "$prof" ] && jq -n --arg i "$id" --arg p "$prof" \
-        '{schema:1, id:$i, profile:$p, created:"2026-01-01T00:00:00Z", createdBy:"seed"}' \
+        '{schema:2, id:$i, scope:$p, created:"2026-01-01T00:00:00Z", createdBy:"seed"}' \
         >"$work/corpus.json"
     for shard in "$@"; do
         jq -n --argjson i "[$(item 'a shared rule' "s-$shard")]" '{items:$i}' \
@@ -366,7 +392,7 @@ local_shard() {
     distill_state_repo_init
     first="$(distill_corpus_id)"
     [ -n "$first" ]
-    [ "$(distill_corpus_profile)" = "$(distill_profile)" ]
+    [ "$(distill_corpus_scope)" = "$(distill_scope)" ]
 
     distill_state_repo_init
     [ "$(distill_corpus_id)" = "$first" ]
@@ -401,7 +427,7 @@ local_shard() {
     bare="$(bare_remote main)"
     seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
 
-    DISTILL_PROFILE=personal
+    DISTILL_SCOPE=personal
     run distill_remote_attach "$bare"
     [ "$status" -eq 0 ]
     [ -f "$STATE/extracts/2026-07-01.other-mac.json" ]
@@ -422,7 +448,7 @@ local_shard() {
     bare="$(bare_remote main)"
     # The remote knows the rule from its own session, s-2026-07-01.other-mac.
     seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
-    DISTILL_PROFILE=personal
+    DISTILL_SCOPE=personal
 
     mkdir -p "$STATE/extracts"
     # This Mac wrote the SAME shard name, from a different session.
@@ -450,7 +476,7 @@ local_shard() {
     isolate_git
     bare="$(bare_remote main)"
     seed_corpus "$bare" main personal c-known 2026-07-01.shared
-    DISTILL_PROFILE=personal
+    DISTILL_SCOPE=personal
     mkdir -p "$STATE/extracts"
     jq -n --argjson i "[$(item 'mine only' s-mine)]" '{items:$i}' \
         >"$STATE/extracts/2026-07-01.shared.json"
@@ -460,14 +486,14 @@ local_shard() {
     [ "$output" = "s-2026-07-01.shared,s-mine" ]
 }
 
-@test "another profile's corpus is refused before anything is pushed" {
+@test "another scope's corpus is refused before anything is pushed" {
     load_lib
     isolate_git
     bare="$(bare_remote main)"
     seed_corpus "$bare" main personal c-personal 2026-07-01.their-mac
     before="$(git -C "$bare" rev-parse main)"
 
-    DISTILL_PROFILE=work
+    DISTILL_SCOPE=work
     local_shard 2026-08-20.work-mac
     run distill_remote_attach "$bare"
 
@@ -483,7 +509,7 @@ local_shard() {
     isolate_git
     bare="$(bare_remote main)"
     seed_corpus "$bare" main personal c-known 2026-07-01.other-mac
-    DISTILL_PROFILE=personal
+    DISTILL_SCOPE=personal
     distill_remote_attach "$bare"
 
     moved="$BATS_TEST_TMPDIR/moved.git"
@@ -505,7 +531,7 @@ local_shard() {
     [ "$status" -eq 0 ]
     [ -f "$STATE/extracts/2026-07-01.old-mac.json" ]
     [ -n "$(distill_corpus_id)" ]
-    [ "$(distill_corpus_profile)" = "$(distill_profile)" ]
+    [ "$(distill_corpus_scope)" = "$(distill_scope)" ]
 }
 
 @test "detaching is a decision the next run does not undo" {
@@ -522,18 +548,17 @@ local_shard() {
     # A configured remote is exactly what would re-attach it, unguarded.
     DISTILL_CONFIG_JSON="$(cfg "$(jq -nc --arg p "$bare" '{remotes:{personal:$p}}')")"
     _DISTILL_CFG=""
-    DISTILL_PROFILE=personal
+    DISTILL_SCOPE=personal
     distill_state_repo_init
     [ -z "$(origin_of)" ]
 }
 
-@test "a corpus stamped for another profile stops the run, offline" {
+@test "a corpus stamped for another scope stops the run, offline" {
     load_lib
     isolate_git
     distill_state_repo_init
-    jq -n '{schema:1, id:"c-x", profile:"work", created:"2026-01-01T00:00:00Z", createdBy:"other"}' \
-        >"$(distill_corpus_file)"
-    DISTILL_PROFILE=personal
+    stamp work
+    DISTILL_SCOPE=personal
 
     run distill_corpus_check_local
     [ "$status" -eq 1 ]
@@ -541,6 +566,71 @@ local_shard() {
 
     run distill_preflight
     [ "$status" -eq 1 ]
+}
+
+# ─── Where the scope comes from ───────────────────────────────────────────────
+#
+# distill_scope is the left-hand side of every comparison above, so anything that
+# makes it return empty disarms all of them at once — [ -n "$mine" ] is how each
+# guard declines to judge, and it cannot tell "no opinion" from "read it wrong".
+
+# as_data JSON — the answers chezmoi would hand back, without running chezmoi.
+# Pokes the memo directly, the way the detach test above pokes _DISTILL_CFG:
+# _distill_data's only other input is `chezmoi data`, and a test that shelled out
+# to it would read the author's real config.
+as_data() {
+    load_lib
+    _DISTILL_DATA="$1"
+    _DISTILL_SCOPE=""
+    unset DISTILL_SCOPE DISTILL_PROFILE
+}
+
+# A Mac set up before memoryScope existed has only `profile` saved, and its
+# corpus is already stamped with that value. Ignoring it would not merely lose a
+# label: the machine would claim no scope, the guard would abstain, and the first
+# `--remote` typo would merge two corpora that have spent a year apart.
+@test "a Mac with only the retired profile key keeps its scope" {
+    as_data '{"profile":"work"}'
+    [ "$(distill_scope)" = "work" ]
+}
+
+@test "memoryScope wins over the retired profile key" {
+    as_data '{"profile":"work","memoryScope":"lab"}'
+    [ "$(distill_scope)" = "lab" ]
+}
+
+# jq's `//` only skips null and false, so a saved empty string would win here and
+# hand back "" — the one value that turns every guard above into a no-op.
+# promptStringOnce treats a saved "" as a real answer, so this is reachable by
+# anyone who pressed Enter at the wrong prompt, not just by a corrupt file.
+@test "an empty memoryScope falls through to the profile, not to nothing" {
+    as_data '{"profile":"work","memoryScope":""}'
+    [ "$(distill_scope)" = "work" ]
+}
+
+@test "neither key set means no opinion, not an error" {
+    as_data '{}'
+    run distill_scope
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# Honoured for one release so a shell, a launchd plist or a half-applied Mac that
+# still exports the old name does not silently fall back to no scope at all.
+@test "the retired DISTILL_PROFILE env name still sets the scope" {
+    as_data '{}'
+    DISTILL_PROFILE=work
+    [ "$(distill_scope)" = "work" ]
+}
+
+@test "a corpus this Mac starts is stamped with its scope, under schema 2" {
+    as_data '{"memoryScope":"lab"}'
+    isolate_git
+    distill_state_repo_init
+
+    [ "$(jq -r .schema "$(distill_corpus_file)")" = "2" ]
+    [ "$(jq -r .scope "$(distill_corpus_file)")" = "lab" ]
+    [ "$(distill_corpus_scope)" = "lab" ]
 }
 
 @test "unioning a shard twice changes nothing the second time" {

@@ -82,17 +82,22 @@ authority thereafter. A seed that disagrees with origin is surfaced by
 
 ## A corpus states its own identity, and a URL is not one
 
-Every corpus carries a tracked `corpus.json` — `id` + `profile`, never a URL or
+Every corpus carries a tracked `corpus.json` — `id` + `scope`, never a URL or
 anything derived from one — written once at creation and never rewritten.
 
-`profile` is the leak boundary and is checked from the **local** copy, so the
+`scope` is the leak boundary and is checked from the **local** copy, so the
 nightly guard stays offline; the remote's copy is read only at attach time. A
 matching `id` at a different URL means the repo moved, so adopt it. A different
-`profile` is a hard stop. A corpus with no stamp predates the file: adopt it,
+`scope` is a hard stop. A corpus with no stamp predates the file: adopt it,
 stamp it, and say that nothing could check it.
 
+The scope is a free-text label, prompted as `memoryScope` and read by
+`distill_scope`. Schema 1 spelled it `profile`, back when the repo had a profile
+enum to borrow it from; schema 2 writes `scope` and both are read, so an existing
+corpus keeps its identity and no Mac has to re-clone.
+
 The corpus is sharded per host (`extracts/<date>.<host>.json`) so two Macs in the
-*same* profile can share a remote. Across profiles they must not, since `hits`
+*same* scope can share a remote. Across scopes they must not, since `hits`
 counts sightings over the whole corpus — one private repo each. Read the date
 with `distill_extract_date`, never by stripping `.json`, so pre-sharding files
 still work.

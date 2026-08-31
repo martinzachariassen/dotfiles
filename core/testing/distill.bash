@@ -50,6 +50,17 @@ load_lib() {
     . "$LIB"
     DISTILL_MEMORY="$MEM"
     DISTILL_STATE="$STATE"
+
+    # No test reads the answers this Mac actually gave. DISTILL_CONFIG_JSON only
+    # pins the `.distill` table; distill_scope and distill_remote_seed read
+    # top-level keys, which took them straight to the real `chezmoi data` — so
+    # the suite's verdict depended on whose laptop it ran on. It passed on CI,
+    # where there is no config and every scope comparison is empty-vs-empty, and
+    # failed on a machine that had answered the profile question, which is the
+    # wrong way round for a guard whose whole job is to fire on a mismatch.
+    #
+    # Tests that want an identity set DISTILL_SCOPE, or override _DISTILL_DATA.
+    _DISTILL_DATA='{}'
 }
 
 # A bare `! grep …` in a test body is exempt from set -e (POSIX: the return

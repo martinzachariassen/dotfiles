@@ -2,7 +2,7 @@
 # Attaching a corpus to this Mac.
 #
 # --remote: pointing a state repo at a backup, adopting one that already exists,
-# and refusing one whose profile does not match.
+# and refusing one whose scope does not match.
 #
 # Part of the chezdistill engine; sourced by features/distill/lib.sh, never
 # on its own. See features/distill/README.md.
@@ -10,7 +10,11 @@
 # ─── Attaching a corpus ───────────────────────────────────────────────────────
 
 # distill_remote_survey URL — what is at the other end, before anything is
-# changed. Prints "<populated> <branch> <profile> <id>"; populated is 0 or 1.
+# changed. Prints "<populated> <branch> <scope> <id>"; populated is 0 or 1.
+#
+# The scope is read from either schema — a corpus written before the rename
+# stamps it as `profile`, and surveying one as unstamped would wave it straight
+# past the leak boundary below.
 distill_remote_survey() {
     local url="$1" branch json scratch
 
@@ -34,7 +38,8 @@ distill_remote_survey() {
         json="$(git -C "$scratch" show FETCH_HEAD:corpus.json 2>/dev/null)"
         rm -rf "$scratch"
         printf '1 %s %s %s\n' "$branch" \
-            "$(printf '%s' "$json" | jq -r '.profile // empty' 2>/dev/null)" \
+            "$(printf '%s' "$json" | jq -r '[.scope, .profile]
+                | map(select(type == "string" and . != "")) | first // empty' 2>/dev/null)" \
             "$(printf '%s' "$json" | jq -r '.id // empty' 2>/dev/null)"
         return 0
     fi
@@ -72,10 +77,10 @@ distill_remote_detach() {
 # machine's extracts land on top as one commit. No unrelated-histories merge, no
 # conflict markers, and nothing that can leave a rebase half-finished.
 distill_remote_attach() {
-    local url="$1" repo branch populated rprofile rid mine tmp f base shard moved=0
+    local url="$1" repo branch populated rscope rid mine tmp f base shard moved=0
     local local_populated=0
     repo="$(distill_state_dir)"
-    mine="$(distill_profile)"
+    mine="$(distill_scope)"
 
     distill_state_repo_init || return 1
     if distill_state_wedged >/dev/null; then
@@ -83,14 +88,14 @@ distill_remote_attach() {
         return 1
     fi
 
-    read -r populated branch rprofile rid <<<"$(distill_remote_survey "$url")"
+    read -r populated branch rscope rid <<<"$(distill_remote_survey "$url")"
     branch="$(distill_state_branch "$branch")"
 
     # The leak boundary, checked before a single byte is sent.
-    if [ -n "$rprofile" ] && [ -n "$mine" ] && [ "$rprofile" != "$mine" ]; then
-        fail "that corpus is stamped $rprofile and this is a $mine Mac — refusing"
+    if [ -n "$rscope" ] && [ -n "$mine" ] && [ "$rscope" != "$mine" ]; then
+        fail "that corpus is stamped $rscope and this is a $mine Mac — refusing"
         explain \
-            "hits are counted over the whole corpus, so a rule seen twice in $rprofile" \
+            "hits are counted over the whole corpus, so a rule seen twice in $rscope" \
             "sessions would be promoted into this Mac's MAIN.md. Keep one repo each."
         return 1
     fi

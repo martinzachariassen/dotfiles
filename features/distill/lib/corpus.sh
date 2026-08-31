@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # A corpus states its own identity.
 #
-# corpus.json — id and profile, never a URL. The profile is the leak boundary
-# and is checked from the local copy, so the nightly guard stays offline.
+# corpus.json — id and scope, never a URL. The scope is the leak boundary and is
+# checked from the local copy, so the nightly guard stays offline.
 #
 # Part of the chezdistill engine; sourced by features/distill/lib.sh, never
 # on its own. See features/distill/README.md.
@@ -17,10 +17,14 @@
 # been failing for two days. A URL is a location, not an identity — so this file
 # holds neither one nor anything derived from one.
 #
-# `profile` is the leak boundary: work extracts distilled into personal memory
+# `scope` is the leak boundary: work extracts distilled into personal memory
 # cannot be un-pushed, so a mismatch is a hard stop. `id` is the weaker question
 # — "is this the same corpus I was attached to?" — which is what tells a rename
 # (adopt it) from a different repo (refuse to merge without being asked).
+#
+# Schema 1 spelled the scope `profile`, back when the repo had a profile enum to
+# borrow it from. Schema 2 writes `scope`; both are read, so an existing corpus
+# keeps its identity and no Mac has to re-clone.
 
 distill_corpus_file() {
     printf '%s/corpus.json\n' "$(distill_state_dir)"
@@ -43,7 +47,14 @@ distill_corpus_field() {
 }
 
 distill_corpus_id() { distill_corpus_field id; }
-distill_corpus_profile() { distill_corpus_field profile; }
+
+# distill_corpus_scope — the stamp, from either schema. Schema 1 wrote `profile`.
+distill_corpus_scope() {
+    local v
+    v="$(distill_corpus_field scope)"
+    [ -n "$v" ] || v="$(distill_corpus_field profile)"
+    printf '%s\n' "$v"
+}
 
 # distill_corpus_seed — stamp a corpus that has none. Written once, at creation,
 # and never rewritten: two machines that both edited it would be the only way to
@@ -54,10 +65,10 @@ distill_corpus_seed() {
     [ -e "$f" ] && return 0
     mkdir -p "$(dirname "$f")" || return 0
     jq -n --arg id "$(distill_corpus_new_id)" \
-        --arg p "$(distill_profile)" \
+        --arg s "$(distill_scope)" \
         --arg c "$(distill_iso_now)" \
         --arg by "$(distill_host)" \
-        '{schema: 1, id: $id, profile: $p, created: $c, createdBy: $by}' \
+        '{schema: 2, id: $id, scope: $s, created: $c, createdBy: $by}' \
         >"$f" 2>/dev/null || true
 }
 
@@ -72,13 +83,13 @@ distill_corpus_read_ref() {
 # nothing and works at 01:00 with no network. 1 = do not proceed.
 #
 # It fires when a state dir came from somewhere else — restored from another
-# Mac's backup, copied between profiles — and when `.profile` itself changed
-# under an existing corpus, which is a real thing to do and needs both exits
-# spelled out rather than a nightly refusal with no way forward.
+# Mac's backup, copied between scopes — and when the scope itself changed under
+# an existing corpus, which is a real thing to do and needs both exits spelled
+# out rather than a nightly refusal with no way forward.
 distill_corpus_check_local() {
     local mine theirs
-    mine="$(distill_profile)"
-    theirs="$(distill_corpus_profile)"
+    mine="$(distill_scope)"
+    theirs="$(distill_corpus_scope)"
     [ -n "$mine" ] && [ -n "$theirs" ] || return 0
     [ "$mine" = "$theirs" ] && return 0
 
