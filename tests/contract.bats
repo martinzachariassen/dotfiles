@@ -168,7 +168,7 @@ teardown() { teardown_sandbox; }
   # kind: linked into $HOME and read by a tool that fails quietly. zsh.bats and
   # ssh.bats do this for their own files; doing it generically here is what
   # stops the next module from shipping an unparseable one.
-  local f bad=()
+  local f fm bad=()
   while IFS= read -r f; do
     case $f in
       *.json) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
@@ -181,6 +181,20 @@ teardown() { teardown_sandbox; }
       *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
       # Every line is an argument to `go install`: module path, then @version.
       */go-tools.txt) awk '/^[[:space:]]*(#|$)/ { next } !/^[a-z0-9._\/-]+@[a-zA-Z0-9._-]+$/ { exit 1 }' "$f" || bad+=("$f -- not one go module path per line") ;;
+      # Every git command on the machine reads this file, and a malformed line
+      # makes all of them fail. doctor.sh checks the GENERATED config.local and
+      # never the tracked one next to it, which is the bigger of the two.
+      */git/config) git config --file "$f" --list >/dev/null 2>&1 || bad+=("$f -- git cannot parse it") ;;
+      # A skill whose frontmatter does not parse is not an error anywhere: it
+      # simply never appears, which is the quiet failure this test is for.
+      */skills/*/SKILL.md)
+        fm=$(awk 'NR==1 && $0=="---"{f=1;next} f && $0=="---"{exit} f' "$f")
+        if ! printf '%s\n' "$fm" | dasel -i yaml -o json '' >/dev/null 2>&1; then
+          bad+=("$f -- frontmatter is not YAML")
+        elif ! printf '%s\n' "$fm" | dasel -i yaml -o json 'keys()' 2>/dev/null | grep -q '"description"'; then
+          bad+=("$f -- frontmatter has no description; the skill will not load")
+        fi
+        ;;
       *.sh) shellcheck "$f" >/dev/null 2>&1 || bad+=("$f -- shellcheck") ;;
       *.zsh | */.zshrc | */.zshenv | */.zprofile) zsh -n "$f" 2>/dev/null || bad+=("$f -- zsh -n") ;;
     esac
@@ -324,6 +338,10 @@ teardown() { teardown_sandbox; }
   # apply never installed to.
   local dir="$DOT_ROOT/modules/dev-cli"
   [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/doctor.sh")" ]
+  # And they must SKIP the same lines. doctor.sh once tested `#`* inline, which
+  # let an indented comment -- legal in the file -- become a tool it hunted for.
+  [ "$(grep -c "grep -vE '\^\[\[:space:\]\]\*(#|\$)'" "$dir/apply.sh")" -eq 1 ]
+  [ "$(grep -c "grep -vE '\^\[\[:space:\]\]\*(#|\$)'" "$dir/doctor.sh")" -eq 1 ]
   # mise does not expose its default data dir for scripting, so both hooks
   # rebuild it. One of them drifting is a check looking where nothing lands.
   [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
@@ -377,4 +395,206 @@ EOF
   [ "$(grep -c 'HOME/\.colima/default' "$dir/doctor.sh")" -ge 1 ]
   [ "$(grep -c 'HOME/\.colima/default' "$dir/remove.sh")" -ge 1 ]
   [ -z "$(grep -oE 'HOME/\.colima[a-z/._-]*' "$dir/remove.sh" | grep -v 'HOME/\.colima/default' || true)" ]
+}
+
+# --- invariants that span files (root CLAUDE.md) -----------------------------
+#
+# Each of these is a rule whose whole content is "these files must agree", and
+# each was on the honour system until one of them had already drifted: the
+# bash-5 list said four places while uninstall.sh had quietly become a fifth.
+
+@test "bash 5: every place that guards it is named by all the others" {
+  # install.sh installs it, core/Brewfile keeps brew from cleaning it up, and
+  # three scripts refuse to run without it. A new guard that no comment mentions
+  # is the drift this catches; so is a comment that still says "four".
+  local -a places=(install.sh uninstall.sh bin/dot lib/dot.sh core/Brewfile)
+  local f found
+
+  # Every file in the list really does guard bash 5.
+  for f in "${places[@]}"; do
+    case $f in
+      core/Brewfile) grep -q '^brew "bash"' "$DOT_ROOT/$f" ;;
+      install.sh) grep -q 'brew install bash' "$DOT_ROOT/$f" ;;
+      *) grep -q 'BASH_VERSINFO\[0\] < 5' "$DOT_ROOT/$f" ;;
+    esac || {
+      echo "$f is named as a bash-5 place but no longer guards bash 5"
+      return 1
+    }
+  done
+
+  # And no OTHER shipped file has grown a guard without joining the list.
+  found=$(grep -rl 'BASH_VERSINFO\[0\] < 5' \
+    "$DOT_ROOT"/install.sh "$DOT_ROOT"/uninstall.sh "$DOT_ROOT"/bin/dot \
+    "$DOT_ROOT"/lib "$DOT_ROOT"/core "$DOT_ROOT"/modules 2>/dev/null |
+    while IFS= read -r f; do
+      case ${f#"$DOT_ROOT"/} in
+        install.sh | uninstall.sh | bin/dot | lib/dot.sh) ;;
+        *) echo "${f#"$DOT_ROOT"/}" ;;
+      esac
+    done || true)
+  [ -z "$found" ] || {
+    echo "a bash-5 guard nothing names: $found"
+    echo "add it to the list in CLAUDE.md and to this test, or remove it"
+    return 1
+  }
+
+  # The prose count must match the list. A stale number reads as a check.
+  grep -q 'Bash 5 in five places' "$DOT_ROOT/CLAUDE.md" || {
+    echo "root CLAUDE.md does not say five places; ${#places[@]} guard it"
+    return 1
+  }
+}
+
+@test "install.sh shares nothing: it runs before the repo has a library" {
+  # Phase 0 is fetched by curl and runs before the clone exists. A `source` of
+  # anything under lib/ would work on the developer's machine and fail on every
+  # fresh one -- the single case CI cannot reproduce.
+  # Comments stripped: they are allowed to NAME the library, and one of them
+  # has to -- the bash-5 sibling list above is written in exactly these files.
+  local code
+  code=$(grep -vE '^[[:space:]]*#' "$DOT_ROOT/install.sh")
+
+  run grep -nE '^[[:space:]]*(\.|source)[[:space:]]' <<<"$code"
+  [ "$status" -ne 0 ] || {
+    echo "install.sh sources a file; it runs before the repo exists:"
+    echo "$output"
+    return 1
+  }
+  run grep -n 'lib/dot\.sh\|DOT_ROOT' <<<"$code"
+  [ "$status" -ne 0 ] || {
+    echo "install.sh reaches into the library:"
+    echo "$output"
+    return 1
+  }
+}
+
+@test "CI installs every quality gate, and nothing this repo does not declare" {
+  # modules/dotfiles-dev/Brewfile says it must stay in step with ci.yml. This is
+  # the check that comment promises: a gate CI omits is a suite that only runs
+  # where someone happened to have the tool.
+  local ci="$DOT_ROOT/.github/workflows/ci.yml" f missing=() undeclared=()
+  local -a installed declared
+
+  mapfile -t installed < <(sed -n 's/^[[:space:]]*run: brew install //p' "$ci" | tr ' ' '\n' | sort -u)
+  [ "${#installed[@]}" -gt 0 ] || {
+    echo "no 'brew install' line found in ci.yml"
+    return 1
+  }
+
+  mapfile -t declared < <(sed -n 's/^brew "\([^"]*\)".*/\1/p' \
+    "$DOT_ROOT"/core/Brewfile "$DOT_ROOT"/modules/*/Brewfile | sort -u)
+
+  while IFS= read -r f; do
+    printf '%s\n' "${installed[@]}" | grep -qxF "$f" || missing+=("$f")
+  done < <(sed -n 's/^brew "\([^"]*\)".*/\1/p' "$DOT_ROOT/modules/dotfiles-dev/Brewfile")
+
+  for f in "${installed[@]}"; do
+    printf '%s\n' "${declared[@]}" | grep -qxF "$f" || undeclared+=("$f")
+  done
+
+  [ ${#missing[@]} -eq 0 ] || {
+    echo "ci.yml does not install: ${missing[*]}"
+    return 1
+  }
+  [ ${#undeclared[@]} -eq 0 ] || {
+    echo "ci.yml installs what no Brewfile here declares: ${undeclared[*]}"
+    return 1
+  }
+}
+
+@test "the Makefile is the only copy of the check commands" {
+  # CI, the README and CLAUDE.md all say `make check`. A workflow that inlined
+  # `shellcheck ...` would be a second copy, free to disagree with the first.
+  local found
+  found=$(grep -rnE '^[[:space:]-]*(run:)?[[:space:]]*(shellcheck|shfmt|bats)[[:space:]]' \
+    "$DOT_ROOT/.github/workflows" || true)
+  [ -z "$found" ] || {
+    echo "a workflow runs a check command directly; call make instead:"
+    echo "$found"
+    return 1
+  }
+}
+
+@test "the README names every module" {
+  # Two hand-maintained tables enumerate the modules, and nothing kept them in
+  # step with the directory listing: adding modules/dotfiles-dev left both
+  # stale, and only a reader would ever have noticed. The registry is the
+  # filesystem; this is the one place that has to be told about it.
+  local name missing=()
+  while IFS= read -r name; do
+    grep -qF "\`$name\`" "$DOT_ROOT/README.md" || missing+=("$name")
+  done < <(modules_all)
+
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'the README does not mention: %s\n' "${missing[*]}"
+    printf 'add it to the tool-module or package-set table under "## Modules"\n'
+    return 1
+  }
+}
+
+@test "no apply.sh changes anything in \$HOME under --dry-run" {
+  # The counterpart to the remove.sh snapshot above, and the more important
+  # half: apply.sh is the hook that WRITES. Every one of them gates on
+  # DOT_DRY_RUN or delegates to fs_link, which does -- but "or a preview
+  # becomes a run" (modules/CLAUDE.md) was a rule only remove.sh had a
+  # generic test for.
+  local name before after
+  before=$(home_snapshot)
+  while IFS= read -r name; do
+    [ -f "$DOT_ROOT/modules/$name/apply.sh" ] || continue
+    run env DOT_DRY_RUN=1 DOT_MODULE="$name" DOT_MODULE_DIR="$DOT_ROOT/modules/$name" \
+      bash "$DOT_ROOT/modules/$name/apply.sh"
+  done < <(modules_all)
+  run env DOT_DRY_RUN=1 bash "$DOT_ROOT/core/apply.sh"
+  after=$(home_snapshot)
+
+  [ "$before" = "$after" ] || {
+    echo "an apply.sh wrote to \$HOME during a dry run:"
+    diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+    return 1
+  }
+}
+
+@test "dry run: a hook that MERGES into an existing file still writes nothing" {
+  # The generic snapshots above run against an empty sandbox $HOME, so every
+  # hook that starts with `[[ -f $dest ]] || exit 0` returns before it reaches
+  # the code that writes. claude-code is the one that rewrites a file already
+  # there -- the case the dry-run rule exists for -- so it gets the file.
+  command -v jq >/dev/null 2>&1 || skip 'no jq on this machine'
+
+  local dest="$HOME/.claude/settings.json"
+  mkdir -p "$HOME/.claude"
+  printf '{"theme":"mine","permissions":{"defaultMode":"auto"}}\n' >"$dest"
+
+  local before after hook
+  before=$(home_snapshot)
+  for hook in apply.sh remove.sh; do
+    run env DOT_DRY_RUN=1 DOT_MODULE=claude-code \
+      DOT_MODULE_DIR="$DOT_ROOT/modules/claude-code" \
+      bash "$DOT_ROOT/modules/claude-code/$hook"
+  done
+  after=$(home_snapshot)
+
+  [ "$before" = "$after" ] || {
+    echo "a claude-code hook rewrote settings.json during a dry run:"
+    diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+    return 1
+  }
+}
+
+@test "home_snapshot sees an in-place rewrite, not just a new path" {
+  # The guard on the guard. Every dry-run and read-only test above is only as
+  # strong as this: a path listing alone called an overwritten settings.json
+  # unchanged, which is how the rewrite it was written to catch got through.
+  local before after
+  mkdir -p "$HOME/.claude"
+  printf '{"a":1}\n' >"$HOME/.claude/settings.json"
+  before=$(home_snapshot)
+  printf '{"a":2}\n' >"$HOME/.claude/settings.json"
+  after=$(home_snapshot)
+
+  [ "$before" != "$after" ] || {
+    echo "home_snapshot cannot see a file's contents change"
+    return 1
+  }
 }

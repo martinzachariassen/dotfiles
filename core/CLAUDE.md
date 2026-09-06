@@ -8,8 +8,11 @@ collect special cases.
 
 - `core/Brewfile` installs `dasel` and `fzf`. **Nothing that runs before
   `brew bundle --file core/Brewfile` may use a tool listed in it.**
-- A package belongs in `core/Brewfile` only if the machinery needs it or every
-  machine must have it. It lists `bash`: one of the four bash-5 places.
+- A package belongs in `core/Brewfile` only if the **machinery** runs it --
+  name the file that does, in a comment beside it -- or every machine must have
+  it. It lists `bash`: one of the five bash-5 places. The gates `make check`
+  runs are not machinery: they are `modules/dotfiles-dev/Brewfile`, so a machine
+  that only *uses* the dotfiles does not carry a linter.
 - **The shim `~/.local/bin/dot` is generated, not symlinked.** Through a symlink
   `BASH_SOURCE` would point at `~/.local/bin`. `core/doctor.sh` and
   `uninstall.sh` both `grep -F` its exact `DOT_ROOT="<path>"` line.

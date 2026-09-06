@@ -1,0 +1,20 @@
+# The quality gates. NOT in core/Brewfile: nothing in lib/, bin/ or core/ runs
+# any of these, so a machine that only uses the dotfiles must not carry them.
+# core/Brewfile is machinery only -- see core/CLAUDE.md.
+#
+# Must stay in step with the install list in .github/workflows/ci.yml: a tool
+# `make check` needs and CI omits is a suite that only runs where someone
+# happened to have it. tests/contract.bats compares the two lists.
+#
+# Not enabling this module is fine; the Brewfile stands on its own:
+#   brew bundle --file modules/dotfiles-dev/Brewfile
+
+brew "bats-core"  # make test
+brew "shellcheck" # make lint
+brew "shfmt"      # make fmt, make fmt-check
+
+# jq: tests/helper.bash parses every shipped .json with it, and contract.bats
+# has no skip guard for it the way it does for zsh and brew. macOS ships
+# /usr/bin/jq from 15 on, which hid this -- MACOS_FLOOR (install.sh) is 14.
+# The modules that need jq at RUNTIME name it themselves (claude-code, dev-cli).
+brew "jq"

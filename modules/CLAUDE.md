@@ -21,8 +21,8 @@ directory.** Modules run alphabetically and cannot depend on each other.
 ## Two shapes, one contract
 
 - **Tool modules** manage a tool's config: `home/`, hooks, or both.
-- **Package sets** are a Brewfile and nothing else (`apps`, `work-apps`). Their
-  `description` starts with `Packages:`.
+- **Package sets** are a Brewfile and nothing else (`apps`, `work-apps`,
+  `dotfiles-dev`). Their `description` starts with `Packages:`.
 
 The split is a reading aid, not a flag the driver knows about, so it is only
 true while the directory says so. `dev-cli` was listed here until it grew a
@@ -55,8 +55,19 @@ nothing checks: `macos-defaults/remove.sh` named six domains by hand for an
 a line. Cut from the file instead, the list cannot go stale and the sample
 becomes the whole table.
 
-`remove.sh` exists for what the uninstall sweep cannot see: links whose target
-is outside `$DOT_ROOT` (`containers`) and generated real files (`git`).
+`remove.sh` exists for what the uninstall sweep cannot see. Three kinds, and
+the third is the one to be careful with:
+
+1. Links whose target is outside `$DOT_ROOT` (`containers`).
+2. Real files this repo generated, proven by a header it greps for (`git`).
+3. **A real file the USER owns that a module merged into** (`claude-code`, into
+   `~/.claude/settings.json`). Take back only the leaves still holding exactly
+   what apply wrote, deepest first, and prune only the objects this module
+   itself emptied. Anything changed since stands. Never rewrite the file
+   wholesale, and never delete it -- see the root `CLAUDE.md` invariant.
+
+`macos-defaults` is the fourth case and has no undo at all: it reports what it
+changed irreversibly, cut from `data/defaults.tsv` so the list cannot go stale.
 
 ## Writing a hook
 
@@ -68,11 +79,16 @@ set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 ```
 
-- Read settings through `module_setting` only.
+- Read a module's OWN settings through `module_setting` only -- it is what
+  gets the bracket syntax right. The shared `[user]` table is not a module
+  setting; `git/apply.sh` reads it with `cfg_get`, and that is the exception.
 - **Validate values yourself.** `defaults`, dasel and git config accept
   anything and exit 0.
 - `fail` over `die` for one bad setting, so the rest still runs.
-- Honour `DOT_DRY_RUN`, or a preview becomes a run.
+- Honour `DOT_DRY_RUN`, or a preview becomes a run: gate on it and `exit 0`
+  before the first write, or do the writing through a helper that gates for you
+  (`fs_link`, `fs_unlink`, `fs_discard`). `contract.bats` snapshots `$HOME`
+  around every `apply.sh` and every `remove.sh` to hold this.
 - Warn-only hooks exit `DOT_STATUS_WARN`. Never `|| true`.
 - **`doctor.sh` never writes.** `contract.bats` snapshots `$HOME` around every
   one. `colima status` creates `~/.colima` just by being asked, and `mise ls`
@@ -81,8 +97,10 @@ source "${DOT_ROOT:?}/lib/dot.sh"
   exists; `dev-cli` never asks, and reads the install tree instead. The generic
   snapshot only fires on a machine that HAS the tool -- CI has neither -- so
   each hook also has a named test pinning its own way out.
-- **`remove.sh` uses `fs_unlink` and `fs_discard`, never `rm`.** Report what
-  cannot be reversed (`macos-defaults`).
+- **`remove.sh` reaches a path in `$HOME` through `fs_unlink` or `fs_discard`,
+  never `rm`.** The guard lives in the helper. A file the hook itself just
+  created outside that tree is its own (`claude-code` cleans up its `mktemp`).
+  Report what cannot be reversed (`macos-defaults`).
 - A literal duplicated across hooks needs a test that the copies agree
   (`containers`' plugin list, `git`'s ownership header) -- or, when it is data
   rather than one word, a file under `data/` that all of them read.

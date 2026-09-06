@@ -14,7 +14,12 @@ make check     # shellcheck, shfmt, bats, size budget
 
 `make brew-audit` is separate on purpose: it asks Homebrew whether the
 Brewfiles still resolve, so it needs the network and its verdict changes when
-Homebrew does. CI runs it weekly and files an issue; it never blocks a PR.
+Homebrew does -- it must never fail a pull request about something else. CI
+runs it weekly and files an issue, and on the pull requests that touch a
+Brewfile, where the answer is the thing under review.
+
+The tools `make check` runs are not in `core/Brewfile`; they are the
+`dotfiles-dev` module, or `brew bundle --file modules/dotfiles-dev/Brewfile`.
 
 The `Makefile` is the only copy of those commands. Never inline them elsewhere.
 
@@ -40,10 +45,16 @@ deliberately.
 
 - **Nothing deletes a real file.** Symlinks and provably-generated files only.
   The backup tree is never removed.
+- **A file the user owns is edited only key-by-key, and given back the same
+  way.** `claude-code` merges into `~/.claude/settings.json` and takes back only
+  the leaves still holding exactly what it wrote; anything changed since stands.
+  Never rewrite such a file wholesale, and never delete one -- ownership is the
+  user's, and the only proof you have is a value that still matches.
 - **Derive, never record.** No state file. Uninstall is the orphan scan with
   nothing enabled; `fs_repo_links` is the one walk both verbs share.
-- **Bash 5 in four places that must agree:** `install.sh`, `core/Brewfile`,
-  `bin/dot` (re-exec), `lib/dot.sh` (refuses below 5).
+- **Bash 5 in five places that must agree:** `install.sh` (installs it),
+  `core/Brewfile` (keeps it managed), `bin/dot` and `uninstall.sh` (re-exec),
+  `lib/dot.sh` (refuses below 5). `contract.bats` holds the five together.
 - **`install.sh` shares nothing.** Plain `echo`, no library: it runs before the
   repo exists.
 - **Casks before Homebrew** in `uninstall.sh`, and a failed cask aborts before

@@ -11,7 +11,7 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles-v2/main
 | Phase | What runs | What it does |
 |---|---|---|
 | 0 | `install.sh` | Xcode Command Line Tools → Homebrew → bash 5 → clone → hand off |
-| 1 | `core/Brewfile` | Packages every machine gets, including `dasel` and `fzf` |
+| 1 | `core/Brewfile` | Packages every machine gets: the machinery, `dasel` and `fzf` among them |
 | 2 | modules | Only what you pick: packages, config files, system settings |
 
 The order is load-bearing. Phase 1 installs the tools phase 2 needs, which is
@@ -145,6 +145,12 @@ and takes its Brewfile line with it.
 |---|---|
 | `apps` | GUI casks and fonts: 1Password, Raycast, VS Code, … |
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
+| `dotfiles-dev` | the toolchain `make check` runs, for a machine you develop *this repo* on |
+
+`dotfiles-dev` is the odd one: the other two are software you use, and it is
+software the repo's own tests need. It is a package set all the same, and it is
+here rather than in `core/Brewfile` because a machine that merely *uses* the
+dotfiles should not carry a linter.
 
 The split is descriptive, not enforced -- there is no flag and no second
 registry, because the shapes are the same to the driver and only differ to the
@@ -254,6 +260,11 @@ Three things it will not do, and the reasons are the interesting part:
   `~/.local/state/dotfiles/logs/`. Nothing else. The two directories are then
   removed with `rmdir`, not `rm -rf`, so a file some other tool left in either
   keeps it alive and gets reported instead of swept up.
+
+  One file is *edited* rather than deleted, and it is worth naming because it
+  is yours: `~/.claude/settings.json`. `apply` merged this repo's keys into it,
+  so the uninstall takes back only the leaves still holding exactly what was
+  written and leaves anything you changed since. The file itself always stays.
 - **It cannot undo macOS defaults.** `apply` never read the old values, so they
   exist nowhere; `defaults delete` would give you Apple's factory setting, not
   what you had. Making that reversible means recording state at apply time,
@@ -270,8 +281,10 @@ to type `remove`.
 Most of the work is derived rather than recorded: an uninstall is the orphan
 scan `dot doctor` already does, with nothing enabled, so every link into the
 repo is unclaimed by definition. A module only needs a `remove.sh` for what
-that scan structurally cannot see — `containers` links Homebrew's docker
-plugins, whose targets are outside the repo, and `git` writes a real file.
+that scan structurally cannot see: `containers` links Homebrew's docker
+plugins, whose targets are outside the repo; `git` writes a real file it can
+prove it generated; `claude-code` merged its keys into a file that was already
+yours; and `macos-defaults` changed settings that were never files at all.
 
 ## Templating
 
@@ -293,6 +306,21 @@ make check     # shellcheck, shfmt, bats, and the size budget
 That is the whole list, and it is exactly what CI runs -- the commands live in
 the `Makefile` and nowhere else. Individually: `make lint`, `make fmt` (rewrites
 files), `make test`, `make size`.
+
+The tools it needs are deliberately **not** in `core/Brewfile`, which is
+machinery only: a machine that merely uses the dotfiles should not carry a
+linter. They are the `dotfiles-dev` module, and the Brewfile stands alone if
+you would rather not enable it:
+
+```sh
+brew bundle --file modules/dotfiles-dev/Brewfile
+```
+
+`make brew-audit` is separate again: it asks Homebrew whether the Brewfiles
+still resolve, so it needs the network and its verdict changes when Homebrew
+does. It runs weekly and files an issue, and on pull requests that touch a
+Brewfile -- but never on one that does not, where a red build would be about
+something the change did not cause.
 
 Shell code is capped, and CI enforces it:
 
@@ -326,7 +354,9 @@ bash -x modules/git/apply.sh
 The repo targets bash **5**. macOS still ships 3.2.57 from 2007 as `/bin/bash`
 and never updates it, so `install.sh` runs `brew install bash` before anything
 else in the repo starts, `core/Brewfile` keeps it managed afterwards, and
-`bin/dot` re-execs itself into it if it somehow started under the old one.
+`bin/dot` and `uninstall.sh` re-exec themselves into it if they somehow started
+under the old one. `lib/dot.sh` refuses outright, for a hook run by hand. Five
+places, held together by `tests/contract.bats`.
 
 That is one Homebrew package in exchange for associative arrays, `mapfile`, and
 -- the reason it was worth doing -- correct line numbers in the crash report

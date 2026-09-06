@@ -24,6 +24,12 @@ module is exempt, and it enforces every hard limit in the root `CLAUDE.md`.
 Adding a manifest field, a hook name, a `lib/` file or a verb means editing this
 file. That friction is the point.
 
+It also holds the **cross-file invariants**: the ones whose whole content is
+"these files must agree" and which nothing else can catch. The bash-5 list had
+already drifted to five places while every comment still said four, which is
+what an unenforced agreement rule is worth. A rule of that shape either gets a
+test here or it is not a rule.
+
 ## bats notes
 
 - bats installs its own ERR trap; `lib/dot.sh` checks before installing one.

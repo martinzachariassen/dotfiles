@@ -44,14 +44,16 @@ fi
 # glob spans a go upgrade without naming a version. compgen, not ls: a builtin,
 # and an unmatched glob is a status rather than a subprocess and an error line.
 absent=()
+# Same filter line as apply.sh (tests/contract.bats). An inline `#`* test here
+# missed an INDENTED comment, which the data file's own contract allows -- and
+# doctor would then hunt forever for a binary named "# ...".
 while IFS= read -r pkg; do
-  if [[ -z $pkg || $pkg == '#'* ]]; then continue; fi
   bin=${pkg%@*}
   bin=${bin##*/}
   if ! compgen -G "$mise_data/installs/go/*/bin/$bin" >/dev/null; then
     absent+=("$bin")
   fi
-done <"$data"
+done < <(grep -vE '^[[:space:]]*(#|$)' "$data")
 
 if ((${#absent[@]} == 0)); then
   ok 'go tools     every tool in data/go-tools.txt is installed'

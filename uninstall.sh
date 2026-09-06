@@ -9,6 +9,9 @@
 # Left alone on purpose: Xcode CLT, the backup tree under $DOT_STATE, real
 # files in $HOME, and macOS defaults (see modules/macos-defaults/remove.sh).
 
+# One of five places that must agree on bash 5 (install.sh, core/Brewfile,
+# bin/dot, lib/dot.sh). Re-exec rather than refuse: the shell that reaches for
+# the uninstaller is the least likely to have sourced Homebrew's shellenv.
 if ((BASH_VERSINFO[0] < 5)); then
   if [[ -x /opt/homebrew/bin/bash ]]; then
     exec /opt/homebrew/bin/bash "$0" "$@"

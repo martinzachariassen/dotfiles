@@ -40,6 +40,10 @@
 	unstage = restore --staged
 	amend = commit --amend --no-edit
 
-# Last, so it wins. A missing file is not an error.
+# Last, so it wins. A missing file is not an error. The path is relative to
+# THIS file as git found it -- ~/.config/git/config, the symlink -- not to the
+# repo it resolves to. Make it absolute and it stops following the checkout;
+# leave it relative and identity and signing load. modules/ssh does the reverse
+# (Include FIRST) because ssh takes the first value, not the last.
 [include]
 	path = config.local

@@ -47,10 +47,28 @@ teardown_sandbox() {
   return 0
 }
 
-# home_snapshot -- sorted listing of $HOME; diff before/after to prove nothing
-# was written. ~/Library is pruned: brew and macOS write there on their own.
+# home_snapshot -- sorted listing of $HOME with the CONTENT of every file, so
+# diffing before/after proves nothing was written. ~/Library is pruned: brew
+# and macOS write there on their own.
+#
+# The hash is the point. A path listing alone cannot see an in-place rewrite,
+# which is exactly the bug the contract tests using this were written for:
+# claude-code/remove.sh rewriting ~/.claude/settings.json during a dry run
+# leaves every path where it was. Symlinks report their target instead, so a
+# hook that quietly re-points one is caught too, and a dangling link does not
+# become a read error.
 home_snapshot() {
-  find "$HOME" -path "$HOME/Library" -prune -o -print | sort
+  local p
+  find "$HOME" -path "$HOME/Library" -prune -o -print0 | sort -z |
+    while IFS= read -r -d '' p; do
+      if [[ -L $p ]]; then
+        printf 'link %s -> %s\n' "$p" "$(readlink "$p")"
+      elif [[ -f $p ]]; then
+        printf 'file %s %s\n' "$p" "$(shasum -a 256 <"$p" | cut -d' ' -f1)"
+      else
+        printf 'node %s\n' "$p"
+      fi
+    done
 }
 
 # fixture_module NAME -- a module directory outside the repo.

@@ -10,3 +10,5 @@
 
 # Nothing generated lives in the repo: config goes to ~/.config/dotfiles, state
 # to ~/.local/state/dotfiles. Something needing ignoring here is in the wrong place.
+
+.vscode/

@@ -26,6 +26,8 @@ One file, `bin/dot`. Engine budget. **Three verbs, hardcoded `case`:** `apply`,
   nothing but the editor's output; no doctor hook may write inside `$HOME`.
   Never under `--dry-run`. `uninstall.sh` removes `logs/` and must keep
   agreeing it is ours.
+- **Twenty logs, and the `touch` comes before the `tee`.** This run has to be
+  one of the twenty by construction rather than by racing the async redirect.
 - Match every option exactly; anything unknown is fatal. `dot apply --dry`
   must not apply for real.
 - Phase 1 first. `brew_bundle` failure becomes a `die` here so the error names

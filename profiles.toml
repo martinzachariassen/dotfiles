@@ -11,6 +11,6 @@ email = "10747123+martinzachariassen@users.noreply.github.com"
 signingkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDFG+XYhuxIpAr2LB8Y1AkOocZ+N/YpeDqNYUn/F68OR"
 
 [profiles]
-personal = ["git", "ssh", "zsh", "dev-cli", "apps", "cmux", "containers", "macos-defaults", "claude-code"]
-work = ["git", "ssh", "zsh", "dev-cli", "apps", "cmux", "containers", "macos-defaults", "work-apps"]
+personal = ["git", "ssh", "zsh", "dev-cli", "apps", "cmux", "containers", "macos-defaults", "claude-code", "dotfiles-dev"]
+work = ["git", "ssh", "zsh", "dev-cli", "apps", "cmux", "containers", "macos-defaults", "work-apps", "dotfiles-dev"]
 minimal = ["git", "ssh", "zsh"]

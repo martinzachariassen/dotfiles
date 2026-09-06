@@ -107,8 +107,9 @@ fi
 echo "    Homebrew at $(brew --prefix)"
 
 # --- 3. bash 5 ---------------------------------------------------------------
-# One of four places that must agree on bash 5 (core/Brewfile, bin/dot,
-# lib/dot.sh). Installed here because step 5 needs it before core/Brewfile runs.
+# One of five places that must agree on bash 5 (core/Brewfile, bin/dot,
+# uninstall.sh, lib/dot.sh). Installed here because step 5 needs it before
+# core/Brewfile runs; tests/contract.bats holds the five together.
 if brew list --versions bash >/dev/null 2>&1; then
   step 3 "bash 5 already installed"
 else
