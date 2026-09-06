@@ -300,6 +300,24 @@ teardown() { teardown_sandbox; }
   }
 }
 
+@test "macos-defaults: doctor.sh and remove.sh read a bool row alike" {
+  # The TSV writes true/false; `defaults read` prints 1/0. Two hooks compare
+  # against that column now, and one of them drifting is either a doctor that
+  # reports drift on a clean Mac or a remove.sh that stays silent about a
+  # machine it did change irreversibly.
+  local dir="$DOT_ROOT/modules/macos-defaults" f
+  for f in doctor.sh remove.sh; do
+    grep -qE 'bool:true\)[^;]*=1 ;;' "$dir/$f" || {
+      echo "$f does not map a bool true to 1"
+      return 1
+    }
+    grep -qE 'bool:false\)[^;]*=0 ;;' "$dir/$f" || {
+      echo "$f does not map a bool false to 0"
+      return 1
+    }
+  done
+}
+
 @test "dev-cli: the hooks read data/go-tools.txt and mise's data dir alike" {
   # apply installs every line, doctor looks for the binary each line names.
   # Pointing one of them elsewhere would let doctor call a machine clean that

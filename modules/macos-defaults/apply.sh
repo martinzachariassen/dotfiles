@@ -2,11 +2,10 @@
 #
 # macOS preferences. Imperative and idempotent; nothing needs root.
 #
-# The writes are data/defaults.tsv, not shell literals: doctor.sh compares
-# against the same rows and remove.sh names the same domains, so no hook can
-# claim something the others do not. All three find the file with the same two
-# lines (tests/contract.bats). A value that needs a config setting or has to be
-# validated stays here -- the file holds only what a reader could not refuse.
+# The writes are data/defaults.tsv, not shell literals: doctor.sh compares the
+# same rows, remove.sh names the same domains, and all three find the file with
+# the same two lines (tests/contract.bats). A value needing a config setting or
+# validation stays here -- the file holds only what a reader could not refuse.
 #
 # Overrides live under [settings.macos-defaults].
 
@@ -15,8 +14,15 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
 
+# One string, said by both branches, so a dry run and a real run print the same
+# words. `dim`, not `warn`: true of every run that gets here, and as a warning
+# it exited DOT_STATUS_WARN every time, so `dot apply` could never reach "Done"
+# (core/CLAUDE.md -- permanently yellow is the same bug as permanently green).
+relogin='log out and back in for keyboard and text-substitution changes to fully apply'
+
 if [[ $DOT_DRY_RUN == 1 ]]; then
   info 'write macOS defaults (Dock, Finder, keyboard) and restart those apps'
+  dim "$relogin"
   exit 0
 fi
 
@@ -28,11 +34,8 @@ done <"$data"
 
 # --- values that come from config.toml ---------------------------------------
 # Normalised to a literal true/false; doctor.sh reads the setting the same way.
-if module_setting_bool macos-defaults dock_autohide true; then
-  dock_autohide=true
-else
-  dock_autohide=false
-fi
+dock_autohide=false
+if module_setting_bool macos-defaults dock_autohide true; then dock_autohide=true; fi
 defaults write com.apple.dock autohide -bool "$dock_autohide"
 
 # `defaults -int` stores non-numeric as 0, and tilesize 0 is a Dock with no
@@ -58,4 +61,4 @@ for app in Dock Finder SystemUIServer WindowManager; do
 done
 
 ok 'macOS defaults written'
-warn 'log out and back in for keyboard and text-substitution changes to fully apply'
+dim "$relogin"

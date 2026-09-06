@@ -116,11 +116,11 @@ claim_one() {
   [[ $output == *going.conf* ]]
 }
 
-@test "orphans: the scan cannot see a directory no module declares any more" {
-  # THE BOUNDARY OF THE DERIVED APPROACH, pinned on purpose. Scan roots come
-  # from files modules currently ship; emptying a directory drops it from the
-  # scan, for doctor AND the uninstall sweep. Walking all of $HOME was rejected
-  # on cost. If that trade is revisited, this test should fail loudly.
+@test "orphans: emptying a directory does not hide the link it held" {
+  # Renaming a skill, or dropping a module's only file in some directory, takes
+  # that directory out of the declared set. The scan roots include the ancestors
+  # too, and reach one level past each, so ~/.config -- still declared by a
+  # sibling -- is what finds this.
   claim_one
   mkdir -p "$MODULE/home/.config/solo"
   printf 'x\n' >"$MODULE/home/.config/solo/only.conf"
@@ -131,6 +131,35 @@ claim_one() {
 
   run fs_orphans
   [ "$status" -eq 0 ]
-  [[ $output != *only.conf* ]]
-  [ -L "$HOME/.config/solo/only.conf" ]
+  [[ $output == *only.conf* ]]
+}
+
+@test "orphans: every link is reported once, however many roots reach it" {
+  # The ancestor roots overlap: ~/.config/demo is scanned in its own right and
+  # again as a child of ~/.config. An uninstall that saw kept.conf twice would
+  # print "unlink" twice for one file.
+  claim_one
+  modules_enabled_dirs() { :; }
+
+  run fs_orphans
+  [ "$status" -eq 0 ]
+  [ "$(grep -c 'kept.conf' <<<"$output")" -eq 1 ]
+}
+
+@test "orphans: the boundary of the derived approach, pinned on purpose" {
+  # Two levels below the nearest surviving root, and a top-level directory the
+  # repo names nowhere any more. Both need a walk of all of $HOME, which stays
+  # rejected on cost. If that trade is revisited, this test should fail loudly.
+  claim_one
+  mkdir -p "$MODULE/home/.config/a/b" "$MODULE/home/.gone"
+  printf 'x\n' >"$MODULE/home/.config/a/b/deep.conf"
+  printf 'x\n' >"$MODULE/home/.gone/lost.conf"
+  fs_link_tree "$MODULE"
+
+  rm -r "${MODULE:?}/home/.config/a" "${MODULE:?}/home/.gone"
+
+  run fs_orphans
+  [ "$status" -eq 0 ]
+  [[ $output != *deep.conf* ]]
+  [[ $output != *lost.conf* ]]
 }

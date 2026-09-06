@@ -68,11 +68,25 @@ cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 # while keys above it still answer -- and with nothing enabled, doctor reports
 # every link as orphaned and tells you to delete your dotfiles.
 #
-# Two checks, because there is no real TOML parser here. Residual: a typo in
-# the LAST table drops only that table's remaining scalars, unnoticed.
+# taplo answers it outright; the two heuristics below are what is left on a
+# machine where phase 1 has not installed it yet -- which is exactly when
+# core/doctor.sh still has to say something. Their residual is why taplo runs
+# first: a typo in the LAST table drops only that table's remaining scalars,
+# so `signingkey` reads as empty and commit signing goes off in silence.
 cfg_parse_problems() {
   local -A seen=()
   local name
+
+  # core/Brewfile's taplo, the same binary contract.bats uses. The name is an
+  # INPUT, like DOT_BREW_BIN: without one the "not installed yet" branch is
+  # unreachable on any machine that has it, and that is the branch the two
+  # heuristics below exist for.
+  local taplo=${DOT_TAPLO_BIN:-taplo}
+  if command -v "$taplo" >/dev/null 2>&1 &&
+    ! "$taplo" check "$DOT_CONFIG" >/dev/null 2>&1; then
+    printf 'is not valid TOML -- see:  %s check %s\n' "$taplo" "$DOT_CONFIG"
+    return 0
+  fi
 
   while IFS= read -r name; do
     seen[$name]=1

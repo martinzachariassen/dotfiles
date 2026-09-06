@@ -18,7 +18,9 @@ Sourced, never executed. **7 files, no subdirectories.**
   comments; nothing may rewrite it.
 - **dasel does not validate.** It stops at a malformed line, keeps what it read,
   exits 0. `cfg_parse_problems` is the guard; `apply` refuses, `doctor` reports.
-  `taplo` (core/Brewfile) is the real parser, used by `contract.bats`.
+  It asks `taplo` (core/Brewfile) first -- a real parser -- and falls back to
+  two heuristics only where phase 1 has not run yet. `DOT_TAPLO_BIN` is the
+  input that makes that fallback reachable on a machine that has taplo.
 - **`schema` is checked, not just written.** `DOT_CONFIG_SCHEMA` is the one this
   checkout speaks; `cfg_parse_problems` refuses anything else. A version marker
   that guarantees nothing is worse than none -- it looks like a check.
@@ -34,6 +36,10 @@ Sourced, never executed. **7 files, no subdirectories.**
 - **Directories are never symlinked**, only traversed.
 - **The orphan scan reads all modules; only enabled ones claim.** Narrow the
   scan and you hide the disabled-module links it exists to find.
+- **Its roots are the ancestors too, and it reaches one level past each.** A
+  file deleted from the repo takes its directory out of the declared set, and
+  the link it left would sit where nothing looks. `$HOME` stays at one level:
+  its children belong to every tool on the machine.
 - `fs_unlink` tests `-L`, `fs_discard` tests `-f`. The guard is in the helper,
   never the caller.
 - **Nothing can memoise.** `modules_enabled` is read in subshells; hooks are

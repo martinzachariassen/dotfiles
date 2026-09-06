@@ -3,8 +3,6 @@
     "defaultMode": "auto"
   },
   "cleanupPeriodDays": 7,
-  "model": "claude-sonnet-5",
-  "effortLevel": "high",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",

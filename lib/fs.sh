@@ -5,9 +5,11 @@
 #   1. Directories are never symlinked, only traversed.
 #   2. A real file is never destroyed; it is moved to the backup tree.
 
-# Apply-side tallies only. Removal keeps none: a driver-side counter would miss
-# what remove.sh hooks (separate processes) did, and an undercount is worse
-# than the per-line narration those helpers already print.
+# The driver's own tallies, and only those. A hook is a separate process, so
+# neither an apply.sh calling fs_link (containers, the docker plugins) nor a
+# remove.sh reaches these: fs_report undercounts by whatever the hooks did.
+# The alternative is a file to add up across processes, which is the state this
+# repo derives instead -- and the per-line narration is already there.
 DOT_N_LINKED=0
 DOT_N_RELINKED=0
 DOT_N_BACKED_UP=0
@@ -194,13 +196,21 @@ fs_report() {
 # to find. Filtering on "points into $DOT_ROOT" is what makes it safe to
 # delete from; links elsewhere (containers' docker plugins) need a remove.sh.
 fs_repo_links() {
-  local -A roots=()
-  local dir src dst link target
+  local -A roots=() seen=()
+  local dir src dst link target depth
   local -a scan
 
+  # Every directory ON THE PATH to a declared file, not just the leaf's own.
+  # A file deleted from the repo takes its directory out of the declared set
+  # with it, and the link it left would then sit in a directory nothing scans.
   while IFS= read -r dir; do
     while IFS=$'\t' read -r src dst; do
-      roots[$(dirname "$dst")]=1
+      dst=${dst%/*}
+      while [[ $dst == "$HOME"/* ]]; do
+        roots[$dst]=1
+        dst=${dst%/*}
+      done
+      roots[$HOME]=1
     done < <(fs_pairs "$dir")
   done < <(
     modules_all_dirs
@@ -211,14 +221,24 @@ fs_repo_links() {
 
   mapfile -t scan < <(printf '%s\n' "${!roots[@]}" | sort)
 
-  # -maxdepth 1: bounded to declared directories, never the whole of $HOME.
+  # -maxdepth 2, so a directory that STOPPED being declared is still reached
+  # from the parent an ancestor keeps in the set. $HOME is the exception at 1:
+  # its children belong to every tool on the machine, not to this repo.
+  # Residual, pinned in tests/orphans.bats: a link deeper than one level below
+  # the nearest surviving root, or under a top-level directory the repo names
+  # nowhere any more. Walking all of $HOME stays rejected, on cost.
   for dir in "${scan[@]}"; do
     [[ -d $dir ]] || continue
+    if [[ $dir == "$HOME" ]]; then depth=1; else depth=2; fi
     while IFS= read -r -d '' link; do
       target=$(readlink "$link") || continue
       [[ $target == "$DOT_ROOT"/* ]] || continue
+      # Overlapping scans: a link is reached from its own directory and again
+      # from that directory's parent.
+      [[ -z ${seen[$link]:-} ]] || continue
+      seen[$link]=1
       printf '%s\n' "$link"
-    done < <(find "$dir" -maxdepth 1 -type l -print0 2>/dev/null)
+    done < <(find "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null)
   done
 }
 

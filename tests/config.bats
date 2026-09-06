@@ -90,6 +90,11 @@ teardown() { teardown_sandbox; }
 
 # --- a config that does not parse whole --------------------------------------
 # dasel stops at the first malformed line, keeps what it read, and exits 0.
+# cfg_parse_problems asks taplo first and falls back to two heuristics, so both
+# paths need exercising: the binary is named away the way DOT_BREW_BIN is, or
+# the fallback is unreachable on any machine that has phase 1 installed.
+
+without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 
 @test "parse: dasel really does truncate silently -- rc 0, half a document" {
   # If a future dasel rejects this outright, cfg_parse_problems is dead weight.
@@ -108,6 +113,8 @@ teardown() { teardown_sandbox; }
 @test "parse: a missing comma in enabled is caught, not waved through" {
   printf 'schema = 1\n[modules]\nenabled = [ "git" "zsh" ]\n\n[settings.git]\nsigningkey = "k"\n' \
     >"$DOT_CONFIG"
+
+  without_taplo
 
   # Nothing else in the engine objects to this file.
   run modules_require_known
@@ -132,6 +139,7 @@ teardown() { teardown_sandbox; }
 @test "parse: a [modules] table whose enabled key was eaten is caught" {
   # [modules] itself parsed and is in keys(); only the list below it was lost.
   printf 'schema = 1\n[modules]\nenabled = [ "git"\n' >"$DOT_CONFIG"
+  without_taplo
   run cfg_parse_problems
   [ "$status" -eq 0 ]
   [[ $output == *"no readable"* ]]
@@ -140,6 +148,7 @@ teardown() { teardown_sandbox; }
 @test "parse: a dropped table is reported once, by name, with the cause" {
   printf 'schema = 1\n[modules]\nenabled = ["git"]\nstray line\n\n[settings.git]\nk = "v"\n' \
     >"$DOT_CONFIG"
+  without_taplo
   run cfg_parse_problems
   [ "${#lines[@]}" -eq 1 ]
   [[ $output == *"[settings]"* ]]
@@ -159,9 +168,33 @@ teardown() { teardown_sandbox; }
   printf 'schema = 1\n[modules]\nenabled = [ "git" "zsh" ]\n\n[settings.git]\nk = "v"\n' \
     >"$DOT_CONFIG"
 
+  without_taplo
   run bash "$DOT_ROOT/core/doctor.sh"
   [ "$status" -ne 0 ]
   [[ $output == *"cannot see it"* ]]
+}
+
+@test "parse: taplo catches the typo the heuristics structurally cannot" {
+  # A broken LAST table. [settings] is still in dasel's keys(), so check 1 says
+  # nothing and check 2 only ever looks at [modules] -- while `signingkey`
+  # quietly reads as empty and commit signing goes off with no line saying why.
+  printf 'schema = 1\n[modules]\nenabled = ["git"]\n\n[settings.git]\nsigningkey = "ssh-ed25519 AAAA\nextra = "x"\n' \
+    >"$DOT_CONFIG"
+
+  without_taplo
+  run cfg_parse_problems
+  [ -z "$output" ] # everything the heuristics alone have to say about it
+  run module_setting git signingkey ''
+  [ -z "$output" ]
+
+  unset DOT_TAPLO_BIN
+  run cfg_parse_problems
+  [[ $output == *"not valid TOML"* ]]
+
+  # And it has to stop the run, not just be printed somewhere.
+  run "$DOT_ROOT/bin/dot" apply --dry-run
+  [ "$status" -ne 0 ]
+  [[ $output == *"did not parse"* ]]
 }
 
 # --- the generator ----------------------------------------------------------

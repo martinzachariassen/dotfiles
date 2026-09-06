@@ -217,12 +217,34 @@ no_jq() {
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
 
   local tmp="$HOME/.claude/x"
-  jq '.model = "something-else"' "$HOME/.claude/settings.json" >"$tmp"
+  jq '.outputStyle = "something-else"' "$HOME/.claude/settings.json" >"$tmp"
   mv "$tmp" "$HOME/.claude/settings.json"
 
   run_hook "$DOT_ROOT/modules/claude-code" doctor.sh
   [ "$status" -ne 0 ]
-  [[ $output == *".model differs"* ]]
+  [[ $output == *".outputStyle differs"* ]]
+}
+
+@test "claude-code manages no key Claude Code writes back itself" {
+  # `/model` and the effort picker land in this same settings.json. Managed,
+  # they turned doctor red the moment you switched and made the next apply
+  # revert the switch, so a machine that switched has to still read as clean.
+  mkdir -p "$HOME/.claude"
+  printf '{}\n' >"$HOME/.claude/settings.json"
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+
+  local tmp="$HOME/.claude/x"
+  jq '.model = "opus" | .effortLevel = "low"' "$HOME/.claude/settings.json" >"$tmp"
+  mv "$tmp" "$HOME/.claude/settings.json"
+
+  run_hook "$DOT_ROOT/modules/claude-code" doctor.sh
+  [ "$status" -eq 0 ]
+
+  # And the next apply leaves the switch standing.
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  run jq -r '.model, .effortLevel' "$HOME/.claude/settings.json"
+  [ "$output" = "opus
+low" ]
 }
 
 @test "claude-code apply refuses a settings.json that is not JSON" {

@@ -184,6 +184,14 @@ Two rules matter:
 orphaned links left behind by a disabled module. It reports them; it never
 deletes anything in your home directory on its own.
 
+The scan that finds those is bounded rather than a walk of your whole home
+directory: it visits every directory on the path to a file some module ships,
+and one level past each. That one extra level is what catches a directory the
+repo *stopped* shipping into -- rename a skill, or drop a module's only file in
+some directory, and the link left behind is still found. Deeper than that, or
+under a top-level directory the repo names nowhere any more, it is not; that
+boundary is pinned in `tests/orphans.bats` rather than left to be discovered.
+
 ## Uninstalling
 
 ```sh
@@ -249,7 +257,10 @@ Three things it will not do, and the reasons are the interesting part:
 - **It cannot undo macOS defaults.** `apply` never read the old values, so they
   exist nowhere; `defaults delete` would give you Apple's factory setting, not
   what you had. Making that reversible means recording state at apply time,
-  which is a trade this repo has not made. It reports the domains instead.
+  which is a trade this repo has not made. It reports the domains instead --
+  and only when at least one row of that table is still in force, because the
+  uninstall runs every module's `remove.sh`, enabled or not, and a machine that
+  never turned this one on must not be told its preferences were changed.
 
 The preview is not a summary written by hand — `--dry-run` is the real code
 path with every mutating helper turned into a `printf`, so it cannot disagree
@@ -338,8 +349,12 @@ not something per-user -- which is why it can be a tracked file rather than
 something generated.
 
 Commit signing rides on the same agent. `modules/git` writes `gpg.format = ssh`,
-`commit.gpgsign = true` and your `signingkey` into `config.local` whenever the
-key is set, so signing needs no second credential.
+`commit.gpgsign = true` and your `signingkey` into `config.local` when the key is
+set **and 1Password's signer is on disk**, so signing needs no second credential.
+All three or none: `gpgsign = true` with no reachable signer aborts every commit,
+so on a fresh Mac — where 1Password is a cask installing in the same run — the
+module leaves signing off and warns. `modules/git/doctor.sh` keeps saying so
+after that warning has scrolled past; a second `dot apply` turns it on.
 
 One step cannot be automated: **1Password -> Settings -> Developer -> "Use the
 SSH agent"**. Until it is ticked the socket does not exist, and the failure

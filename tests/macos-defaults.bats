@@ -79,7 +79,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "tilesize: a number is passed through" {
   with_settings 'dock_tilesize = 64'
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
   wrote 'com.apple.dock tilesize -int 64'
 }
 
@@ -114,7 +114,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "screenshots: a relative path is taken from \$HOME" {
   with_settings 'screenshot_dir = "Pictures/Shots"'
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
   wrote "com.apple.screencapture location -string $HOME/Pictures/Shots"
   [ -d "$HOME/Pictures/Shots" ]
 }
@@ -122,7 +122,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "screenshots: an absolute path is used as given, not nested under \$HOME" {
   with_settings "screenshot_dir = \"$DOT_TMP/shots\""
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
   wrote "com.apple.screencapture location -string $DOT_TMP/shots"
   [ ! -d "$HOME$DOT_TMP" ]
 }
@@ -131,7 +131,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
   # A tilde in a TOML string is just a character.
   with_settings 'screenshot_dir = "~/Shots"'
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
   wrote "com.apple.screencapture location -string $HOME/Shots"
   [ ! -e "$HOME/~" ]
 }
@@ -139,11 +139,28 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "screenshots: the default lands in Pictures/Screenshots" {
   with_settings '# nothing set'
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
   wrote "com.apple.screencapture location -string $HOME/Pictures/Screenshots"
 }
 
 # --- dry run --------------------------------------------------------------------
+
+@test "apply: the logout note is a note, and both runs close on it" {
+  # As a `warn` it exited DOT_STATUS_WARN on every run, so `dot apply` could
+  # never reach "Done" on a machine with this module enabled -- a summary that
+  # is always yellow says as little as one that is always green. The dry run
+  # stopped before it, so a preview and a real run closed on different words.
+  # One string in apply.sh is what keeps the two from drifting apart again.
+  with_settings '# nothing set'
+  apply 1
+  [ "$status" -eq 0 ]
+  [[ $output == *"log out and back in"* ]]
+
+  apply
+  [ "$status" -eq 0 ]
+  [[ $output == *"log out and back in"* ]]
+  [ "$(grep -c 'log out and back in' "$DOT_ROOT/modules/macos-defaults/apply.sh")" -eq 1 ]
+}
 
 @test "dry run: describes the writes and makes none" {
   with_settings 'dock_tilesize = 64'
@@ -164,7 +181,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
   # read but not written would be a promise doctor.sh then reports as drift.
   with_settings '# nothing set'
   apply
-  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
 
   local domain key type value
   while IFS=$'\t' read -r domain key type value _; do
@@ -247,9 +264,19 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "remove: warns about exactly the domains the table names" {
   # The list is the user's only record of an irreversible change, so it is cut
   # from the table rather than typed. Proving it covers every domain is what
-  # stops apply.sh from gaining one this warning never mentions.
+  # stops apply.sh from gaining one this warning never mentions. apply first:
+  # the warning is now conditional on the table actually being in force.
+  with_store
+  with_settings '# nothing set'
+  apply
   remove
   [ "$status" -eq "$DOT_STATUS_WARN" ]
+  # As many listed lines as the table has domains, so neither a blank line nor
+  # a repeat can slip in: both read as a change to something never touched.
+  local want listed
+  want=$(rows | cut -f1 | sort -u | wc -l | tr -d ' ')
+  listed=$(grep -c '^    [^ ]' <<<"$output" || true)
+  [ "$listed" -eq "$want" ]
 
   local domain
   while IFS= read -r domain; do
@@ -258,6 +285,18 @@ wrote() { grep -qF "$1" "$CALLS"; }
       return 1
     }
   done < <(rows | cut -f1 | sort -u)
+}
+
+@test "remove: says nothing on a machine that never ran this module" {
+  # uninstall.sh calls every module's remove.sh, enabled or not. With no row of
+  # the table in force there is nothing irreversible to report, and the warning
+  # would be a lie about a change that never happened -- the same silence
+  # dev-cli/remove.sh keeps. An empty store: every `defaults read` misses.
+  with_store
+  with_settings '# nothing set'
+  remove
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 @test "remove: changes nothing under a dry run" {

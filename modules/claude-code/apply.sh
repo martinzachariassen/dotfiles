@@ -2,9 +2,8 @@
 #
 # Merge this module's settings into ~/.claude/settings.json.
 #
-# The settings are data/settings.json, not a shell literal (modules/CLAUDE.md).
-# All three hooks derive $want from it with the same two lines, and
-# contract.bats asserts the copies agree.
+# The settings are data/settings.json, not a shell literal (modules/CLAUDE.md);
+# all three hooks derive $want from it alike, and contract.bats proves it.
 #
 # Merged, never written whole: settings.json is the user's file. `. * $want`
 # is a recursive merge, so every key this module does not name survives --
@@ -12,6 +11,10 @@
 #
 # statusLine.command has to be absolute, so the data file carries `~/` and each
 # hook expands it against $HOME. That keeps the file readable and machine-free.
+#
+# A managed key must be one only this repo sets. `/model` and the effort picker
+# write back into this same file, so managing `model` or `effortLevel` turned
+# doctor red the moment you switched and made the next apply revert it.
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
