@@ -10,7 +10,7 @@ curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles-v2/main
 
 | Phase | What runs | What it does |
 |---|---|---|
-| 0 | `install.sh` | Xcode Command Line Tools → Homebrew → clone → hand off |
+| 0 | `install.sh` | Xcode Command Line Tools → Homebrew → bash 5 → clone → hand off |
 | 1 | `core/Brewfile` | Packages every machine gets, including `dasel` and `fzf` |
 | 2 | modules | Only what you pick: packages, config files, system settings |
 
@@ -96,11 +96,22 @@ modules/<name>/
 ├── module.toml     required   description (the only field)
 ├── Brewfile        optional   packages for this module
 ├── home/           optional   mirrors $HOME literally; leaf files are symlinked
+├── data/           optional   module-private; its own hooks read it, nothing links it
 ├── apply.sh        optional   imperative, idempotent, run in its own process
 ├── doctor.sh       optional   read-only checks
 ├── remove.sh       optional   cleanup the uninstaller cannot derive
 └── README.md       optional
 ```
+
+Those names are the whole vocabulary — `contract.bats` fails on anything else,
+because a config file sitting one level too high looks installed and is inert.
+
+`data/` is the answer to a literal that three hooks would otherwise each spell
+out: the macOS defaults table is written by `apply.sh`, compared key-for-key by
+`doctor.sh`, and cut into the domain list `remove.sh` warns about. One file,
+every reader — so the content cannot go stale in one hook and not another, and
+the only thing left to test is that they all still look in the same place. It
+is never linked into `$HOME`; that is what `home/` is for.
 
 Within a module the order is fixed: **Brewfile → links → apply.sh**, so
 `apply.sh` can always assume its packages and config files are in place.
@@ -121,6 +132,7 @@ never split across two modules, so a module is never half-enabled.
 | `cmux` | the terminal, plus the Ghostty config it reads: Option stays native for AA/AE/OE |
 | `claude-code` | the CLI, plus the status line it renders |
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
+| `dev-cli` | CLI tools, plus the mise runtimes and go tooling they assume |
 | `macos-defaults` | Dock, Finder, keyboard, screenshots -- imperative, no files at all |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this
@@ -131,7 +143,6 @@ and takes its Brewfile line with it.
 
 | Package set | What it installs |
 |---|---|
-| `dev-cli` | tools that are not baseline: gitleaks, lazygit, mise, zoxide |
 | `apps` | GUI casks and fonts: 1Password, Raycast, VS Code, … |
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
 
@@ -140,6 +151,12 @@ registry, because the shapes are the same to the driver and only differ to the
 reader. `modules/git` (config plus a generator), `modules/zsh` (packages plus
 config), `modules/macos-defaults` (imperative, no files) and `modules/apps`
 (Brewfile only) between them show every shape the contract allows.
+
+Being descriptive, it is only true while the directory still says so, and a
+module can cross the line by growing. `dev-cli` sat in the table above until it
+gained a `mise` config to link and hooks to install runtimes with; the honest
+move was to relabel it, because the alternative is a "changes no settings" row
+pointing at a module that links a file.
 
 ### Adding one
 
@@ -221,12 +238,14 @@ Three things it will not do, and the reasons are the interesting part:
   holds real files an earlier `apply` moved aside because they were in the way.
   Nothing else has a copy. "An apply never deletes" would be a promise good
   only until the next command if an uninstall threw them away.
-- **It never deletes a real file** — only symlinks pointing into the repo, plus
-  the two generated files it can prove it wrote (`~/.local/bin/dot` and
-  `~/.config/git/config.local`, both of which carry the repo path or a
-  generated-by header). `~/.local/state/dotfiles` itself is removed with
-  `rmdir`, not `rm -rf`, so a file some other tool left there keeps the
-  directory alive and gets reported instead of swept up.
+- **It never deletes a real file it did not put there.** Symlinks pointing into
+  the repo, the two generated files it can prove it wrote (`~/.local/bin/dot`
+  and `~/.config/git/config.local`, which carry the repo path and a generated-by
+  header respectively), and the files at paths that are the repo's own by
+  definition: `~/.config/dotfiles/config.toml` and the transcripts under
+  `~/.local/state/dotfiles/logs/`. Nothing else. The two directories are then
+  removed with `rmdir`, not `rm -rf`, so a file some other tool left in either
+  keeps it alive and gets reported instead of swept up.
 - **It cannot undo macOS defaults.** `apply` never read the old values, so they
   exist nowhere; `defaults delete` would give you Apple's factory setting, not
   what you had. Making that reversible means recording state at apply time,
