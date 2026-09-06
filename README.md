@@ -36,6 +36,12 @@ Re-running `dot apply` is safe and expected. It is also the update path:
 git -C ~/Developer/personal/dotfiles-v2 pull && dot apply
 ```
 
+It updates the *configuration*, not the packages. `apply` runs `brew bundle
+--no-upgrade`: a package a Brewfile gained arrives, a newer version of one you
+already have does not. Upgrading is `brew upgrade`, on your schedule rather
+than on the schedule of whoever last edited a Brewfile — a `dot apply` you ran
+to relink one file should not also move your toolchain underneath you.
+
 ## Configuration
 
 `~/.config/dotfiles/config.toml` is the only source of truth. It is generated

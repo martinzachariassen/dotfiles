@@ -1,0 +1,7 @@
+# apply.sh points gpg.ssh.program at 1Password's op-ssh-sign, and modules run
+# alphabetically -- git before ssh -- so naming the cask HERE is what makes
+# module_apply's one promise true: the signer exists by the time apply.sh
+# decides whether commit signing can be switched on. Named in modules/ssh too,
+# for its agent; brew installs it once.
+
+cask "1password"

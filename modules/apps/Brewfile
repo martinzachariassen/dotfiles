@@ -1,9 +1,12 @@
 # GUI apps and fonts. Things with a window or menu bar item; CLIs go in
-# dev-cli. A tool whose config this repo manages ships its cask from its own
-# module instead (cmux, claude-code).
+# dev-cli.
+#
+# A cask whose absence would BREAK another module's shipped config ships from
+# that module instead (cmux, claude-code, ssh, git, zsh): enabling `apps` must
+# never be the undeclared requirement that makes a different module work, and
+# module.toml has no field to say so. A cask a module merely prefers stays
+# here -- git and zsh both fall back in the open when VS Code is absent.
 
-cask "1password"     # SSH agent and git commit signing
-cask "1password-cli" # op; the SSH agent needs the app, not just this
 cask "raycast"
 cask "claude"
 cask "bruno" # API client; local files, no account
@@ -14,7 +17,6 @@ cask "visual-studio-code" # $EDITOR (modules/zsh/home/.zshenv) and git's editor
 cask "thaw"  # menu bar manager
 cask "stats" # resource monitor in the menu bar
 
-# Both builds: the Nerd Font has the glyphs the terminal and starship draw
-# with; the plain one keeps editors on stock metrics.
+# The plain build only: it keeps editors on stock metrics. The Nerd Font that
+# starship and ghostty draw with ships from the modules that name its glyphs.
 cask "font-jetbrains-mono"
-cask "font-jetbrains-mono-nerd-font"

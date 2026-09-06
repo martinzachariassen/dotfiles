@@ -144,7 +144,10 @@ elif [ -e "$REPO_DIR" ]; then
 else
   step 4 "Cloning"
   mkdir -p "$(dirname "$REPO_DIR")"
-  git clone --depth=1 "$REPO_URL" "$REPO_DIR"
+  # Full history, not --depth=1: both profiles enable dotfiles-dev, so this is
+  # a checkout you edit and commit from. A shallow one has no log to bisect,
+  # and it unshallows itself on the first push anyway.
+  git clone "$REPO_URL" "$REPO_DIR"
 fi
 
 # --- 5. Hand off ------------------------------------------------------------
