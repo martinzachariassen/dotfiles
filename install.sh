@@ -120,7 +120,12 @@ if brew list --versions bash >/dev/null 2>&1; then
   step 3 "bash 5 already installed"
 else
   step 3 "Installing bash 5 (macOS ships 3.2, from 2007)"
-  brew install bash
+  # HOMEBREW_NO_ASK: from Homebrew 6, `brew install` asks before proceeding
+  # when it would pull in a dependency. A bootstrap has nobody to answer, and
+  # under `curl | bash` there is no stdin left to answer with -- it just exits.
+  # `brew bundle` sets this for itself, which is why only this bare call needs
+  # it. Found by the install-smoke workflow on its first real run.
+  HOMEBREW_NO_ASK=1 brew install bash
 fi
 
 # --- 4. The repo ------------------------------------------------------------

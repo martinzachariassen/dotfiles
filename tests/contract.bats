@@ -474,9 +474,11 @@ EOF
 }
 
 @test "CI installs every quality gate, and nothing this repo does not declare" {
-  # modules/dotfiles-dev/Brewfile says it must stay in step with ci.yml. This is
-  # the check that comment promises: a gate CI omits is a suite that only runs
-  # where someone happened to have the tool.
+  # Two sets have to be there. modules/dotfiles-dev/Brewfile says it must stay
+  # in step with ci.yml -- a gate CI omits is a suite that only runs where
+  # someone happened to have the tool. And core/Brewfile, because the suite
+  # runs `dot doctor`, which checks core's packages: CI was red for weeks over
+  # a missing fzf, and nothing here said which package or why.
   local ci="$DOT_ROOT/.github/workflows/ci.yml" f missing=() undeclared=()
   local -a installed declared
 
@@ -491,7 +493,8 @@ EOF
 
   while IFS= read -r f; do
     printf '%s\n' "${installed[@]}" | grep -qxF "$f" || missing+=("$f")
-  done < <(sed -n 's/^brew "\([^"]*\)".*/\1/p' "$DOT_ROOT/modules/dotfiles-dev/Brewfile")
+  done < <(sed -n 's/^brew "\([^"]*\)".*/\1/p' \
+    "$DOT_ROOT/modules/dotfiles-dev/Brewfile" "$DOT_ROOT/core/Brewfile" | sort -u)
 
   for f in "${installed[@]}"; do
     printf '%s\n' "${declared[@]}" | grep -qxF "$f" || undeclared+=("$f")
