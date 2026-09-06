@@ -6,6 +6,7 @@ brew "gh"
 brew "gitleaks"
 cask "gcloud-cli"
 brew "jq"
+brew "just-lsp"
 brew "lazydocker"
 brew "lazygit"
 brew "mise"         # language runtimes (brew owns CLIs, mise owns runtimes)
