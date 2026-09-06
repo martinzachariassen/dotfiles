@@ -77,7 +77,7 @@ pass_core_checks() {
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
 
-  local log="$DOT_STATE/logs/$DOT_RUN_ID.log"
+  local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
   [[ $(cat "$log") == *"Core packages"* ]]
   [[ $(cat "$log") == *"Summary"* ]]
@@ -112,7 +112,7 @@ pass_core_checks() {
   kept=$(find "$DOT_STATE/logs" -name '*.log' | wc -l | tr -d ' ')
   [ "$kept" -eq 20 ]
   # This run's own log survives its own prune.
-  [ -f "$DOT_STATE/logs/$DOT_RUN_ID.log" ]
+  [ -f "$DOT_STATE/logs/$DOT_RUN_ID-apply.log" ]
 }
 
 @test "doctor: an unlinked module fails the whole run" {
@@ -481,4 +481,66 @@ staged_git() {
   run "$DOT_ROOT/bin/dot" remove git
   [ "$status" -ne 0 ]
   [[ $output == *"did not parse"* ]]
+}
+
+# --- The transcript ---------------------------------------------------------
+
+@test "logs: every verb that changes the machine writes one, named for it" {
+  # The name is the point: twenty bare timestamps cannot tell you which one was
+  # the apply that broke something.
+  listing zsh
+  pass_core_checks
+  staged_git
+
+  "$DOT_ROOT/bin/dot" add git >/dev/null 2>&1
+  "$DOT_ROOT/bin/dot" remove git >/dev/null 2>&1
+
+  [ -f "$DOT_STATE/logs/$DOT_RUN_ID-add.log" ]
+  [ -f "$DOT_STATE/logs/$DOT_RUN_ID-remove.log" ]
+  # And it holds the run, not just its name.
+  [[ $(cat "$DOT_STATE/logs/$DOT_RUN_ID-remove.log") == *"Module: git"* ]]
+}
+
+@test "logs: the two read-only verbs write none" {
+  # Not style. `config` hands the terminal to \$EDITOR and a tee in the way
+  # makes vi unusable; `doctor` is advertised read-only and also runs as the
+  # tail of `apply`, where a second transcript would nest inside the first.
+  listing zsh
+  pass_core_checks
+
+  run "$DOT_ROOT/bin/dot" doctor
+  [ ! -d "$DOT_STATE/logs" ]
+
+  EDITOR=true run "$DOT_ROOT/bin/dot" config
+  [ ! -d "$DOT_STATE/logs" ]
+}
+
+@test "logs: a dry run of any verb writes none" {
+  listing git
+  pass_core_checks
+  staged_git
+
+  "$DOT_ROOT/bin/dot" add zsh --dry-run >/dev/null 2>&1
+  "$DOT_ROOT/bin/dot" remove git --dry-run >/dev/null 2>&1
+
+  [ ! -d "$DOT_STATE/logs" ]
+}
+
+@test "logs: the twenty kept are counted across verbs, not per verb" {
+  # One budget for the directory. A burst of `dot add` evicting the apply log
+  # is the trade; twenty runs of anything is the policy.
+  listing zsh
+  pass_core_checks
+  mkdir -p "$DOT_STATE/logs"
+  local i
+  for i in $(seq -w 1 25); do
+    printf 'old\n' >"$DOT_STATE/logs/00000000-0000$i-apply.log"
+  done
+
+  "$DOT_ROOT/bin/dot" add git >/dev/null 2>&1
+
+  local kept
+  kept=$(find "$DOT_STATE/logs" -name '*.log' | wc -l | tr -d ' ')
+  [ "$kept" -eq 20 ]
+  [ -f "$DOT_STATE/logs/$DOT_RUN_ID-add.log" ]
 }

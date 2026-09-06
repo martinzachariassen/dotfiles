@@ -603,3 +603,76 @@ EOF
     return 1
   }
 }
+
+@test "every verb is named in the usage text and in the README" {
+  # bin/dot's dispatch is the one truth; the usage heredoc and the README only
+  # describe it, and nothing stopped them drifting from it. When `add` and
+  # `remove` arrived, five places still said "three verbs" and every one of
+  # them had to be found by hand. This is the guard that would have found them.
+  local -a verbs no_usage=() no_readme=()
+  mapfile -t verbs < <(sed -n 's/^cmd_\([a-z][a-z]*\)() {$/\1/p' "$DOT_ROOT/bin/dot")
+
+  # Non-empty first, or a rename makes this pass over nothing forever.
+  [ "${#verbs[@]}" -gt 0 ] || {
+    echo 'no cmd_* functions found in bin/dot'
+    return 1
+  }
+
+  # The heredoc alone, not the whole file: `cmd_add`'s own comments say "add",
+  # and matching those would let a verb usage never lists slip through.
+  local usage verb
+  usage=$(sed -n '/^usage() {$/,/^}$/p' "$DOT_ROOT/bin/dot")
+
+  for verb in "${verbs[@]}"; do
+    grep -qE "^  $verb " <<<"$usage" || no_usage+=("$verb")
+    grep -qE "^dot $verb( |$)" "$DOT_ROOT/README.md" || no_readme+=("$verb")
+  done
+
+  if ((${#no_usage[@]} || ${#no_readme[@]})); then
+    printf 'dispatch has: %s\n' "${verbs[*]}"
+    ((${#no_usage[@]} == 0)) || printf 'usage() never lists: %s\n' "${no_usage[*]}"
+    ((${#no_readme[@]} == 0)) || printf 'the README never shows: %s\n' "${no_readme[*]}"
+    return 1
+  fi
+}
+
+@test "the verb count in the docs is the count bin/dot actually has" {
+  # The other half of the same drift: prose that names a NUMBER. Five files say
+  # it one way or another, and a fifth verb made four of them wrong at once.
+  #
+  # The map runs word -> number, never the reverse: asked to find the word for
+  # a count it does not know, this would have to skip, and a guard that skips
+  # on the very change it exists to catch is not one.
+  local n
+  n=$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")
+
+  local -a stale=()
+  local file claim num
+  for file in bin/dot bin/CLAUDE.md CLAUDE.md README.md uninstall.sh; do
+    while IFS= read -r claim; do
+      case ${claim,,} in
+        one) num=1 ;;
+        two) num=2 ;;
+        three) num=3 ;;
+        four) num=4 ;;
+        five) num=5 ;;
+        six) num=6 ;;
+        seven) num=7 ;;
+        *) num=0 ;;
+      esac
+      ((num == n)) || stale+=("$file says '$claim verbs'")
+    done < <(grep -oiE '(one|two|three|four|five|six|seven) verbs' "$DOT_ROOT/$file" |
+      awk '{print $1}')
+
+    # And the digit in the limits table.
+    while IFS= read -r claim; do
+      ((claim == n)) || stale+=("$file says 'bin/dot | $claim verbs'")
+    done < <(sed -n 's/.*| `bin\/dot` | \([0-9][0-9]*\) verbs.*/\1/p' "$DOT_ROOT/$file")
+  done
+
+  if ((${#stale[@]})); then
+    printf 'bin/dot has %s verbs, but:\n' "$n"
+    printf '  %s\n' "${stale[@]}"
+    return 1
+  fi
+}

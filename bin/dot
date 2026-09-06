@@ -20,6 +20,56 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/dot.sh"
 # Top level, not a hook: `dot doctor && ...` must survive an orphaned link.
 __DOT_EXIT_WARN=0
 
+# --- The transcript ----------------------------------------------------------
+#
+# Every verb that CHANGES the machine writes one: apply, add, remove. The other
+# two do not, and neither is style. `config` hands the terminal to $EDITOR, and
+# a tee in the way makes vi unusable. `doctor` is advertised read-only, and it
+# also runs as the tail of `apply`, where a second transcript would nest inside
+# the first. uninstall.sh removes logs/ and must keep agreeing they are ours.
+#
+# One file per run, not one per day appended: the run prints "Full output:
+# <path>" when it ends, and that is only a useful sentence if the path holds
+# this run and nothing else. Twenty are kept.
+#
+# Named <timestamp>-<verb>.log. The timestamp is fixed width and comes first,
+# so the sort that rotates them is unchanged -- but a directory of twenty bare
+# timestamps cannot tell you which one was the apply that broke something.
+__DOT_LOG=''
+
+__transcript_start() {
+  local verb=$1 old
+  if [[ $DOT_DRY_RUN == 1 ]]; then
+    return 0
+  fi
+
+  __DOT_LOG="$DOT_STATE/logs/$DOT_RUN_ID-$verb.log"
+  mkdir -p "$DOT_STATE/logs"
+
+  # touch BEFORE the tee, so this run is one of the twenty by construction
+  # rather than racing the async redirect.
+  touch "$__DOT_LOG"
+  while IFS= read -r old; do
+    rm -f "$old"
+  done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort -r | tail -n +21)
+
+  # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap,
+  # which restores them and waits for the drain. Without that wait bash exits
+  # without reaping the tee, and the last lines -- the ones naming the
+  # failure -- go missing from the log that exists to record them.
+  # 2>&1 on purpose: a transcript without the warnings is not one.
+  exec 3>&1 4>&2
+  exec > >(tee -a "$__DOT_LOG") 2>&1
+  __DOT_TEE_PID=$!
+}
+
+# The closing line, for every verb that opened one.
+__transcript_end() {
+  if [[ -n $__DOT_LOG ]]; then
+    dim "Full output: ${__DOT_LOG/#$HOME/\~}"
+  fi
+}
+
 usage() {
   cat <<'EOF'
 usage: dot <command> [options]
@@ -50,37 +100,12 @@ cmd_apply() {
     shift
   done
 
-  # Transcript. Here and not at the top of the file: `dot config` must print
-  # only the editor's output, and no doctor hook may write inside $HOME. Never
-  # under --dry-run. uninstall.sh removes logs/ and must keep agreeing it is
-  # ours. 2>&1 on purpose: a transcript without the warnings is not one.
-  local log=''
-  if [[ $DOT_DRY_RUN != 1 ]]; then
-    log="$DOT_STATE/logs/$DOT_RUN_ID.log"
-    mkdir -p "$DOT_STATE/logs"
-
-    # touch BEFORE the tee, so this run is one of the twenty by construction
-    # rather than racing the async redirect. Sorted by name: DOT_RUN_ID is a
-    # fixed-width timestamp.
-    local old
-    touch "$log"
-    while IFS= read -r old; do
-      rm -f "$old"
-    done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort -r | tail -n +21)
-
-    # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap,
-    # which restores them and waits for the drain. Without that wait bash exits
-    # without reaping the tee, and the last lines -- the ones naming the
-    # failure -- go missing from the log that exists to record them.
-    exec 3>&1 4>&2
-    exec > >(tee -a "$log") 2>&1
-    __DOT_TEE_PID=$!
-  fi
+  __transcript_start apply
 
   heading 'dot apply'
   dim "repo    ${DOT_ROOT/#$HOME/\~}"
   dim "config  ${DOT_CONFIG/#$HOME/\~}"
-  if [[ -n $log ]]; then dim "log     ${log/#$HOME/\~}"; fi
+  if [[ -n $__DOT_LOG ]]; then dim "log     ${__DOT_LOG/#$HOME/\~}"; fi
   if [[ $DOT_DRY_RUN == 1 ]]; then dim 'dry run -- nothing will be changed'; fi
 
   # Phase 1 installs dasel and fzf; nothing below may run before it.
@@ -159,7 +184,7 @@ cmd_apply() {
   else
     ok 'Done.'
   fi
-  if [[ -n $log ]]; then dim "Full output: ${log/#$HOME/\~}"; fi
+  __transcript_end
   [[ $DOT_DRY_RUN == 1 ]] && dim 'Dry run: nothing was changed.'
   return 0
 }
@@ -226,9 +251,16 @@ __module_gate() {
 
 cmd_add() {
   local name
+  # After the parse, never before: --dry-run is settled there, and a dry run
+  # opens no transcript.
   __module_arg add "$@"
   name=$__MODULE_NAME
+  __transcript_start add
   __module_gate add "$name"
+
+  heading "dot add $name"
+  dim "config  ${DOT_CONFIG/#$HOME/\~}"
+  if [[ -n $__DOT_LOG ]]; then dim "log     ${__DOT_LOG/#$HOME/\~}"; fi
 
   # Phase 1 first, exactly as cmd_apply orders it: this installs dasel and the
   # rest of the machinery, and `brew_load` alone was not that.
@@ -264,6 +296,7 @@ cmd_add() {
   else
     ok 'Done.'
   fi
+  __transcript_end
   [[ $DOT_DRY_RUN == 1 ]] && dim 'Dry run: nothing was changed.'
   return 0
 }
@@ -272,7 +305,12 @@ cmd_remove() {
   local name enabled_now=0
   __module_arg remove "$@"
   name=$__MODULE_NAME
+  __transcript_start remove
   __module_gate remove "$name"
+
+  heading "dot remove $name"
+  dim "config  ${DOT_CONFIG/#$HOME/\~}"
+  if [[ -n $__DOT_LOG ]]; then dim "log     ${__DOT_LOG/#$HOME/\~}"; fi
 
   # A module already out of the list still gets the sweep: that is the state
   # this verb exists to clean up, and it is what a hand-edited config leaves.
@@ -320,6 +358,7 @@ cmd_remove() {
   else
     ok 'Done.'
   fi
+  __transcript_end
   [[ $DOT_DRY_RUN == 1 ]] && dim 'Dry run: nothing was changed.'
   return 0
 }

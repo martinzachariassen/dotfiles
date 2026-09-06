@@ -33,6 +33,19 @@ dot doctor             Check this machine; read-only
 to a config file you already own, and they write one line of one array — see
 [Disabling a module](#disabling-a-module).
 
+Every command that *changes* the machine keeps a transcript, and says where at
+the end:
+
+```
+~/.local/state/dotfiles/logs/20260906-143022-remove.log
+```
+
+One file per run, named for the verb, twenty kept — one budget for the
+directory, not twenty each. Per run rather than one file a day appended, so
+that `Full output:` line points at something holding this run and nothing else.
+`config` and `doctor` write none: `config` hands the terminal to your editor,
+and `doctor` changes nothing to have a record of.
+
 Removing it *all* again is `uninstall.sh`, not a verb of its own — see
 [Uninstalling](#uninstalling). `dot remove` undoes one module and `dot add`
 puts it back; that one is not reversible by anything.
