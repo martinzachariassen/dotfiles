@@ -34,6 +34,28 @@ step() {
   exit 1
 }
 
+# Homebrew ships bottles for the three newest macOS releases. Below that every
+# formula compiles from source: hours, and it often fails outright. A warning,
+# not a refusal -- the machine is the user's call, and they should hear it
+# before the two long steps rather than an hour into them.
+# Not a guard: a version this cannot read says nothing, and says it silently.
+# Guessing "0" here once turned an unreadable sw_vers into a scary warning.
+MACOS_FLOOR=14
+if macos=$(sw_vers -productVersion 2>/dev/null); then
+  case "${macos%%.*}" in
+    '' | *[!0-9]*) ;;
+    *)
+      if [ "${macos%%.*}" -lt "$MACOS_FLOOR" ]; then
+        echo "Warning: macOS $macos is older than $MACOS_FLOOR." >&2
+        echo "  Homebrew has no prebuilt bottles for it, so every package compiles" >&2
+        echo "  from source. Expect hours, and expect some of it to fail." >&2
+        echo "  Ctrl-C now to stop; continuing in 10 seconds." >&2
+        sleep 10
+      fi
+      ;;
+  esac
+fi
+
 # --- 1. Xcode Command Line Tools --------------------------------------------
 # The GUI installer is asynchronous: trigger it, then poll.
 if xcode-select -p >/dev/null 2>&1; then
@@ -97,7 +119,24 @@ fi
 # --- 4. The repo ------------------------------------------------------------
 if [ -d "$REPO_DIR/.git" ]; then
   step 4 "Updating existing checkout"
-  git -C "$REPO_DIR" pull --ff-only
+
+  # Both branches below used to be git's own error and nothing else. Neither
+  # is fatal to the install: the checkout on disk is already usable, so say so.
+  if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
+    echo "$REPO_DIR has uncommitted changes, so it cannot be updated." >&2
+    echo "  See them:      git -C $REPO_DIR status" >&2
+    echo "  Then re-run this, or install from what you have:" >&2
+    echo "    $REPO_DIR/bin/dot apply" >&2
+    exit 1
+  fi
+  if ! git -C "$REPO_DIR" pull --ff-only; then
+    echo "Could not fast-forward $REPO_DIR -- it has local commits, or the" >&2
+    echo "branch has diverged from the remote." >&2
+    echo "  Inspect:       git -C $REPO_DIR log --oneline --graph -20" >&2
+    echo "  Or install from what you have:" >&2
+    echo "    $REPO_DIR/bin/dot apply" >&2
+    exit 1
+  fi
 elif [ -e "$REPO_DIR" ]; then
   echo "$REPO_DIR exists and is not a git checkout. Move it aside first." >&2
   exit 1

@@ -453,3 +453,22 @@ EOF
   run fs_report
   [[ $output == *"No files to link."* ]]
 }
+
+@test "pairs: Finder's metadata is not a file this repo links" {
+  # .DS_Store is gitignored, so CI never sees one; Finder writes it into any
+  # module home/ you open. Without the filter `dot apply` linked it into $HOME.
+  local dir
+  dir=$(fixture_module one)
+  fixture_file "$dir" '.config/real.conf'
+  fixture_file "$dir" '.config/.DS_Store' 'finder'
+  fixture_file "$dir" '.config/._real.conf' 'appledouble'
+
+  run fs_pairs "$dir"
+  [ "${#lines[@]}" -eq 1 ]
+  [[ ${lines[0]} == *"/.config/real.conf" ]]
+
+  fs_link_tree "$dir"
+  [ -L "$HOME/.config/real.conf" ]
+  [ ! -e "$HOME/.config/.DS_Store" ]
+  [ ! -e "$HOME/.config/._real.conf" ]
+}

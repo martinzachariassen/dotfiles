@@ -75,6 +75,16 @@ fi
 # warning must not break `dot doctor && ...`.
 __dot_on_exit() {
   local status=$?
+
+  # bin/dot's transcript is a `tee` in the background. Bash exits without
+  # reaping it, so the last lines -- the ones naming the failure -- can be lost
+  # from the log that exists to record them. fd 3/4 and __DOT_TEE_PID are set
+  # up by cmd_apply; draining here rather than there covers the `die` path too.
+  if [[ -n ${__DOT_TEE_PID:-} ]]; then
+    exec 1>&3 2>&4
+    wait "$__DOT_TEE_PID" 2>/dev/null || true
+  fi
+
   if [[ ${DOT_FAILURES:-0} -gt 0 ]]; then
     exit 1
   fi

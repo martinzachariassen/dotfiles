@@ -1,45 +1,42 @@
 #!/usr/bin/env bash
 #
-# Wire the statusLine and merge a permissions floor into settings.json.
+# Merge this module's settings into ~/.claude/settings.json.
 #
-# Merged with jq, never written whole: settings.json is the user's file. The
-# allow/deny arrays are unioned so an "Always allow" click survives the next
-# apply. $allow/$deny are duplicated in doctor.sh and remove.sh -- a sibling
-# data file is not allowed by the module contract -- and tests/contract.bats
-# asserts the three copies agree.
+# The settings are data/settings.json, not a shell literal: it is the file you
+# read to know what this module asserts, jq consumes it directly, and
+# contract.bats validates it as JSON like every other shipped data file. All
+# three hooks derive $want from it with the same two lines -- contract.bats
+# asserts the copies agree, so there is one statement of the truth.
 #
-# Every Read deny rule is anchored to one directory or one file. An any-depth
-# filename glob (Read(**/*.pem)) makes every recursive grep a possible hit, so
-# auto mode escalates each one to the user -- and it still misses the same file
-# outside cwd, and any subprocess that opens it directly. Wildcard secrets
-# belong in sandbox.filesystem.denyRead, which the OS enforces.
+# Merged, never written whole: settings.json is the user's file. `. * $want`
+# is a recursive merge, so every key this module does not name survives --
+# including .permissions.allow, where an "Always allow" click lands.
 #
-# spinnerTipsEnabled uses //=, not =: unlike statusLine there is no unique
-# value that proves the module set it, so remove.sh leaves it alone and apply.sh
-# only sets the default once -- a user who re-enables tips stays re-enabled.
+# statusLine.command has to be absolute, so the data file carries `~/` and each
+# hook expands it against $HOME. That keeps the file readable and machine-free.
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
 dest="$HOME/.claude/settings.json"
-script="$HOME/.claude/statusline.sh"
-allow='["Bash(git status)","Bash(git diff*)","Bash(git log*)","Bash(git show*)","Bash(git branch*)","Bash(ls*)","Bash(pwd)"]'
-deny='["Bash(rm -rf *)","Bash(git push --force*)","Bash(git reset --hard*)","Bash(curl * | sh*)","Bash(curl * | bash*)","Read(~/.ssh/**)","Read(~/.aws/**)","Read(~/.gnupg/**)","Read(~/.config/gh/**)","Read(./.env)","Read(./.env.*)"]'
+data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
+want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline.sh"' "$data")
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info "write   ~/.claude/settings.json (.statusLine, .permissions, .spinnerTipsEnabled)"
+  info "write   ~/.claude/settings.json ($(jq -r 'keys_unsorted | join(", ")' <<<"$want"))"
   exit 0
 fi
 
 mkdir -p "$(dirname "$dest")"
-[[ -f $dest ]] || printf '{}' >"$dest"
+[[ -f $dest ]] || printf '{}\n' >"$dest"
+
+# jq would exit non-zero and leave the file as it was -- correct, but the
+# reason never reaches the summary. Name it, and say what to do about it.
+if ! jq -e . "$dest" >/dev/null 2>&1; then
+  fail "${dest/#$HOME/\~} is not valid JSON -- fix it or move it aside, then: dot apply"
+  exit 1
+fi
 
 tmp="$(mktemp "${dest}.XXXXXX")"
-jq --arg cmd "$script" --argjson allow "$allow" --argjson deny "$deny" '
-  .statusLine = {type: "command", command: $cmd, padding: 0}
-  | .permissions.defaultMode //= "auto"
-  | .permissions.allow = ((.permissions.allow // []) + $allow | unique)
-  | .permissions.deny  = ((.permissions.deny  // []) + $deny  | unique)
-  | .spinnerTipsEnabled //= false
-' "$dest" >"$tmp" && mv "$tmp" "$dest"
+jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"
 
-ok "Claude Code status line wired to $script, permissions floor applied, tips disabled"
+ok "Claude Code settings: $(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"

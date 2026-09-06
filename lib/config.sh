@@ -8,6 +8,12 @@
 
 cfg_exists() { [[ -f $DOT_CONFIG ]]; }
 
+# The schema config_generate writes and cfg_parse_problems demands. Bump it
+# only when the file's shape changes enough that an older `dot` would misread a
+# newer config, or the reverse. It is checked, not just written: a version
+# marker that guarantees nothing is worse than none, because it looks like one.
+DOT_CONFIG_SCHEMA=1
+
 # Only "" and ': ' need undoing. YAML's other escapes are deliberately absent:
 # no setting here can contain a tab or newline, and a \t rule would corrupt the
 # literal backslashes config_generate now supports.
@@ -86,6 +92,17 @@ cfg_parse_problems() {
     ! dasel -i toml -o yaml 'modules.enabled' <"$DOT_CONFIG" >/dev/null 2>&1; then
     printf 'has a [modules] table with no readable `enabled` list\n'
   fi
+
+  # 3. The schema must be one this checkout speaks. Reported rather than
+  #    migrated: config.toml is the user's file and nothing here rewrites it.
+  local schema
+  schema=$(toml_get "$DOT_CONFIG" 'schema' '')
+  if [[ -z $schema ]]; then
+    printf 'has no `schema` key -- it predates this checkout; regenerate it with `dot config --init`\n'
+  elif [[ $schema != "$DOT_CONFIG_SCHEMA" ]]; then
+    printf 'is schema %s but this checkout speaks schema %s -- pull the repo, or regenerate the config\n' \
+      "$schema" "$DOT_CONFIG_SCHEMA"
+  fi
 }
 
 # __cfg_quote VALUE -- a TOML basic string. Every user-supplied value goes
@@ -123,9 +140,8 @@ config_generate() {
 # Apply changes with:  dot apply
 # Check the machine:   dot doctor
 
-schema = 1
-
 HEADER
+    printf 'schema = %s\n\n' "$DOT_CONFIG_SCHEMA"
 
     printf '[user]\nname  = %s\nemail = %s\n\n' \
       "$(__cfg_quote "$name")" "$(__cfg_quote "$email")"

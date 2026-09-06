@@ -12,3 +12,4 @@ brew "git"
 brew "bats-core"
 brew "shellcheck"
 brew "shfmt"
+brew "taplo" # a real TOML parser; dasel truncates a bad file and exits 0

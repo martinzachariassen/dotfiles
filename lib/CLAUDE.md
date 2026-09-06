@@ -9,7 +9,7 @@ Sourced, never executed. **7 files, no subdirectories.**
 | `config.sh` | reading and generating `config.toml` |
 | `fs.sh` | linking, backups, orphan scan |
 | `modules.sh` | discovery, enablement, hook running |
-| `brew.sh` | `brew bundle` |
+| `brew.sh` | `brew bundle`, and the read-only `brew_check` doctor uses |
 | `wizard.sh` | first-run picker -- **60 lines of code** |
 
 ## Rules
@@ -18,6 +18,14 @@ Sourced, never executed. **7 files, no subdirectories.**
   comments; nothing may rewrite it.
 - **dasel does not validate.** It stops at a malformed line, keeps what it read,
   exits 0. `cfg_parse_problems` is the guard; `apply` refuses, `doctor` reports.
+  `taplo` (core/Brewfile) is the real parser, used by `contract.bats`.
+- **`schema` is checked, not just written.** `DOT_CONFIG_SCHEMA` is the one this
+  checkout speaks; `cfg_parse_problems` refuses anything else. A version marker
+  that guarantees nothing is worse than none -- it looks like a check.
+- **`brew_missing` has three answers**, not two: satisfied, missing, and *could
+  not be checked*. The third must never render as green.
+- **`modules_preflight` parses every hook before `$HOME` is touched.** A syntax
+  error used to surface halfway through an apply that had already relinked.
 - **dasel reads `-` as subtraction.** Only bracket syntax: `settings["x-y"].key`.
   Always go through `module_setting`. Never build a selector from a table name.
 - **Everything is read as `-o yaml`**; `__cfg_unquote` undoes exactly `""` and

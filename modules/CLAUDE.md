@@ -8,6 +8,7 @@ modules/<name>/
   module.toml      required -- exactly one field: description
   Brewfile         optional -- phase 2 packages
   home/            optional -- mirrored into $HOME, leaves linked
+  data/            optional -- module-private, read by its own hooks, never linked
   apply.sh         optional hook
   doctor.sh        optional hook
   remove.sh        optional hook
@@ -26,6 +27,19 @@ directory.** Modules run alphabetically and cannot depend on each other.
 **A module that owns a tool's config owns its Brewfile line.** Repeating a
 `brew` line across modules is fine (`brew bundle` is idempotent) and is the only
 way to say "I need this too".
+
+## `data/`
+
+For what a module's **own hooks** read and the user never edits in place --
+`claude-code/data/settings.json`, the settings merged into the user's
+`~/.claude/settings.json` with `jq`. Never reaches `fs_pairs`, so nothing links
+it (`contract.bats` proves this). A file the USER should own goes under `home/`
+at its path in `$HOME`; a file that is an argument to a hook goes here.
+
+It exists to kill the alternative: the same literal pasted into `apply.sh`,
+`doctor.sh` and `remove.sh` with a test to keep the three copies honest. One
+file, three readers. Every shipped file under `data/` and `home/` is parsed by
+`contract.bats` according to its extension, so an unparseable one cannot ship.
 
 `remove.sh` exists for what the uninstall sweep cannot see: links whose target
 is outside `$DOT_ROOT` (`containers`) and generated real files (`git`).

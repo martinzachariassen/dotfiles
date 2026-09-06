@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "cleanupPeriodDays": 7,
+  "model": "claude-sonnet-5",
+  "effortLevel": "high",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0
+  },
+  "outputStyle": "concise",
+  "spinnerTipsEnabled": false,
+  "theme": "custom:catppuccin-latte",
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": true
+}

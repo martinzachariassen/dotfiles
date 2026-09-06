@@ -73,6 +73,31 @@ modules_all_dirs() {
   done < <(modules_all)
 }
 
+# modules_preflight -- parse every hook this run may execute, before anything
+# in $HOME is touched. A syntax error in modules/x/apply.sh used to surface
+# when module x ran, halfway through an apply that had already relinked $HOME.
+# `bash -n` is exactly the parse the driver is about to do. Core is included
+# for the same reason fs_orphans includes it: it runs like a module.
+modules_preflight() {
+  local dir hook script
+  local -a bad=()
+  while IFS= read -r dir; do
+    for hook in apply.sh doctor.sh remove.sh; do
+      script="$dir/$hook"
+      [[ -f $script ]] || continue
+      "$BASH" -n "$script" || bad+=("${script#"$DOT_ROOT"/}")
+    done
+  done < <(
+    printf '%s\n' "$DOT_ROOT/core"
+    modules_enabled_dirs
+  )
+
+  ((${#bad[@]} == 0)) && return 0
+  die "hook(s) will not parse -- nothing was changed:
+    ${bad[*]}
+    reproduce with:  bash -n $DOT_ROOT/${bad[0]}"
+}
+
 # Hooks are EXECUTED, never sourced: nothing leaks back but an exit status,
 # and `bash modules/git/doctor.sh` reproduces exactly what the driver does.
 module_run_hook() {
@@ -117,8 +142,13 @@ module_doctor() {
     tracked=$(find "$dir/home" -type f -print -quit)
   fi
 
+  # Packages first, matching module_apply's order. A package-set module used
+  # to report "packages only -- nothing to check": its entire content was the
+  # one thing doctor never looked at.
+  brew_check "$dir/Brewfile" "$name"
+
   if [[ -z $tracked && ! -f $dir/doctor.sh ]]; then
-    dim 'packages only -- nothing to check'
+    [[ -f $dir/Brewfile ]] || dim 'nothing to check'
     return 0
   fi
 

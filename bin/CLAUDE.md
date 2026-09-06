@@ -6,6 +6,16 @@ One file, `bin/dot`. Engine budget. **Three verbs, hardcoded `case`:** `apply`,
 
 ## Rules
 
+- **`run_checks` is shared by `doctor` and the tail of `apply`.** Not a fourth
+  verb: `apply` must end by observing the machine, not by reporting what it
+  attempted. Safe because `contract.bats` proves no `doctor.sh` writes to
+  `$HOME`. Skipped under `--dry-run`, where every check would report drift the
+  run deliberately did not fix.
+- **`modules_preflight` runs after validation and before the first link.**
+  Everything above it only reads.
+- **The transcript `tee` must be drained.** `cmd_apply` sets fds 3/4 and
+  `__DOT_TEE_PID`; `lib/dot.sh`'s EXIT trap restores and `wait`s. Without it
+  bash exits unreaped and the log loses the lines naming the failure.
 - **Once-per-run work lives here.** Nothing inside `modules_enabled` can
   memoise, so validation (`cfg_parse_problems`, then `modules_require_known`)
   runs here, once, before anything is touched. `doctor` reports both instead.

@@ -7,6 +7,12 @@
 # `go install` binaries VS Code's Go extension needs for IntelliSense,
 # debugging, format-on-save and linting. `go install` recompiles from
 # module cache each run, so this stays cheap on a re-apply.
+#
+# Everything goes through `mise exec`: activation is a zsh hook (modules/zsh
+# .zshrc), and hooks run under bash with no shell rc. A bare `command -v go`
+# here is false on the machine this matters on -- the fresh one, installed by
+# `curl | bash` -- so the tools were silently skipped until the second apply
+# from an interactive shell.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
@@ -24,14 +30,26 @@ if [[ $DOT_DRY_RUN == 1 ]]; then
   exit 0
 fi
 
+# Guarded like the go step below it: brew_bundle failing leaves no mise, and
+# module_apply only skips apply.sh when the Brewfile itself reported failure.
+if ! command -v mise >/dev/null 2>&1; then
+  fail 'mise is not installed -- its Brewfile line did not apply. Run: dot apply'
+  exit 1
+fi
+
 mise install --yes
 ok 'mise: runtimes installed'
 
-if command -v go >/dev/null 2>&1; then
+# `mise exec -- go` rather than `go`: mise owns the toolchain and sets GOBIN
+# into its own install dir, so the binaries land where an activated shell
+# already looks.
+if mise exec -- go version >/dev/null 2>&1; then
   for pkg in "${go_tools[@]}"; do
-    go install "$pkg"
+    if ! mise exec -- go install "$pkg"; then
+      fail "go install $pkg failed -- re-run \`dot apply\` once the network is back"
+    fi
   done
   ok 'go: gopls, dlv, goimports, staticcheck installed'
 else
-  warn 'go is not on PATH -- skipping gopls/dlv/goimports/staticcheck'
+  fail 'go is not installed by mise -- check the [tools] table in ~/.config/mise/config.toml'
 fi

@@ -1,21 +1,37 @@
 #!/usr/bin/env bash
 #
-# A broken statusLine renders nothing; a missing deny entry is a floor gone
-# with no error. A missing allow entry just costs a prompt, so it is not checked.
+# Drift here is invisible: Claude Code just behaves differently. A broken
+# statusLine renders nothing, but a changed model or effortLevel says nothing
+# at all -- so every managed leaf is compared, not sampled.
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-command -v jq >/dev/null 2>&1 || fail 'jq is not installed -- statusline.sh depends on it (run: dot apply)'
+command -v jq >/dev/null 2>&1 || {
+  fail 'jq is not installed -- statusline.sh and this module depend on it (run: dot apply)'
+  exit 1
+}
 
 dest="$HOME/.claude/settings.json"
-script="$HOME/.claude/statusline.sh"
-# Must match apply.sh (tests/contract.bats).
-deny='["Bash(rm -rf *)","Bash(git push --force*)","Bash(git reset --hard*)","Bash(curl * | sh*)","Bash(curl * | bash*)","Read(~/.ssh/**)","Read(~/.aws/**)","Read(~/.gnupg/**)","Read(~/.config/gh/**)","Read(./.env)","Read(./.env.*)"]'
+data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
+want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline.sh"' "$data")
 
-if [[ -f $dest ]]; then
-  configured="$(jq -r '.statusLine.command // empty' "$dest" 2>/dev/null || true)"
-  [[ $configured == "$script" ]] || fail "$dest .statusLine is not wired to $script"
+if [[ ! -f $dest ]]; then
+  fail 'settings     ~/.claude/settings.json does not exist -- run: dot apply'
+elif ! jq -e . "$dest" >/dev/null 2>&1; then
+  fail 'settings     ~/.claude/settings.json is not valid JSON -- fix it, then run: dot apply'
+else
+  # Leaves, not top-level keys: .permissions.defaultMode is ours, .permissions
+  # as a whole is not. Must match remove.sh (tests/contract.bats).
+  drift=$(jq -r --argjson want "$want" '
+    def leaves($p): to_entries[] | ($p + [.key]) as $q | if (.value|type) == "object" then (.value|leaves($q)) else $q end;
+    . as $have | $want | leaves([]) | . as $p
+    | select(($have|getpath($p)) != ($want|getpath($p))) | $p | join(".")' "$dest")
 
-  missing=$(jq --argjson deny "$deny" '($deny - (.permissions.deny // [])) | length' "$dest" 2>/dev/null || echo 0)
-  [[ $missing == 0 ]] || fail "$dest is missing $missing of this module's permissions.deny entries -- run: dot apply"
+  if [[ -z $drift ]]; then
+    ok 'settings     every managed key matches data/settings.json'
+  else
+    while IFS= read -r key; do
+      fail "settings     .$key differs from data/settings.json -- run: dot apply"
+    done <<<"$drift"
+  fi
 fi

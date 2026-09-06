@@ -66,13 +66,15 @@ pass_core_checks() {
 }
 
 @test "apply: a real run leaves a transcript and names it" {
-  # brew is stubbed: this is about the transcript, not packages.
+  # brew is stubbed: this is about the transcript, not packages. ~/.local/bin
+  # is on PATH because apply now ends by running the doctor checks, and
+  # core/doctor.sh rightly fails a machine that cannot reach its own shim.
   config_generate "A" "a@b.c" ""
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
   chmod +x "$DOT_TMP/stub/brew"
 
-  run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" apply
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
 
   local log="$DOT_STATE/logs/$DOT_RUN_ID.log"
@@ -103,7 +105,7 @@ pass_core_checks() {
     printf 'old\n' >"$DOT_STATE/logs/00000000-0000$i.log"
   done
 
-  run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" apply
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
 
   local kept
@@ -237,4 +239,40 @@ pass_core_checks() {
   [ "$status" -ne 0 ]
   [[ $output == *"dot config --init"* ]]
   [[ $output != *dasel* ]]
+}
+
+@test "apply: ends by running the doctor checks against what it produced" {
+  # The whole point of the pass: "Done." must mean "I looked", not "nothing
+  # threw while I worked".
+  config_generate "A" "a@b.c" ""
+  mkdir -p "$DOT_TMP/stub"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/brew"
+
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
+  [ "$status" -eq 0 ]
+  [[ $output == *"Orphaned links"* ]]
+  [[ $output == *"dot         installed"* ]]
+}
+
+@test "apply: a machine the checks reject does not report success" {
+  # Same run, with the shim unreachable. The work all succeeded; the machine
+  # is still wrong, and the exit status has to say so.
+  config_generate "A" "a@b.c" ""
+  mkdir -p "$DOT_TMP/stub"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/brew"
+
+  run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" apply
+  [ "$status" -ne 0 ]
+  [[ $output == *"Finished with problems"* ]]
+}
+
+@test "apply: a dry run does not run the checks" {
+  # They would report the drift the run deliberately did not fix.
+  config_generate "A" "a@b.c" ""
+
+  dot apply --dry-run
+  [ "$status" -eq 0 ]
+  [[ $output != *"Orphaned links"* ]]
 }

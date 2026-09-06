@@ -17,7 +17,7 @@ jobs:
 
       - name: Install tooling
         # bash: the runner's /bin/bash is 3.2, and the suite must run under 5.
-        run: brew install bash bats-core dasel shellcheck shfmt
+        run: brew install bash bats-core dasel jq shellcheck shfmt taplo
 
       - name: make check
         run: make check

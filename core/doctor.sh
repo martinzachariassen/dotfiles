@@ -24,9 +24,20 @@ else
   fail 'dot         ~/.local/bin/dot points at a different checkout'
 fi
 
+# `apply` runs these checks too, and on a fresh machine it runs from the
+# bootstrap shell -- which predates the zsh module and can never have the right
+# PATH. Once ~/.zshenv is linked the mechanism is in place, and the statement
+# is about the next shell, not this one. A permanently red summary is the same
+# bug as a permanently green one.
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ok 'PATH        includes ~/.local/bin' ;;
-  *) fail 'PATH        missing ~/.local/bin (enable the zsh module, or add it)' ;;
+  *)
+    if [[ -L $HOME/.zshenv ]]; then
+      dim 'PATH        ~/.local/bin arrives with your next shell'
+    else
+      fail 'PATH        missing ~/.local/bin (enable the zsh module, or add it)'
+    fi
+    ;;
 esac
 
 if cfg_exists; then

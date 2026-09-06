@@ -29,13 +29,19 @@ fs_backup_used() {
 
 # fs_pairs DIR -- "src<TAB>dst" for every leaf file under DIR/home. The single
 # place that maps a module's home/ onto $HOME.
+#
+# Finder's metadata is excluded because Finder writes it into the checkout
+# behind your back and .gitignore hides it from CI: a stray .DS_Store under a
+# module's home/ made `dot apply` offer to symlink ~/.config/.DS_Store into the
+# repo. The filter belongs here, not in a test -- a guard that fires whenever
+# someone opens the repo in Finder is noise, and the engine has to be immune.
 fs_pairs() {
   local dir=$1 home="$1/home" src rel
   [[ -d $home ]] || return 0
   while IFS= read -r -d '' src; do
     rel=${src#"$home"/}
     printf '%s\t%s\n' "$src" "$HOME/$rel"
-  done < <(find "$home" -type f -print0 | sort -z)
+  done < <(find "$home" -type f ! -name '.DS_Store' ! -name '._*' -print0 | sort -z)
 }
 
 # fs_classify SRC DST -- ok | missing | wrong-target | clobbered | broken.

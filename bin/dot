@@ -65,7 +65,13 @@ cmd_apply() {
       rm -f "$old"
     done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort -r | tail -n +21)
 
+    # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap,
+    # which restores them and waits for the drain. Without that wait bash exits
+    # without reaping the tee, and the last lines -- the ones naming the
+    # failure -- go missing from the log that exists to record them.
+    exec 3>&1 4>&2
     exec > >(tee -a "$log") 2>&1
+    __DOT_TEE_PID=$!
   fi
 
   heading 'dot apply'
@@ -106,6 +112,9 @@ cmd_apply() {
   # Once, here: modules_enabled is read in subshells and cannot report this.
   modules_require_known
 
+  # Last gate before anything in $HOME moves. Everything above only read.
+  modules_preflight
+
   heading 'Core files'
   fs_link_tree "$DOT_ROOT/core"
   fold_status 'core apply.sh failed' "$BASH" "$DOT_ROOT/core/apply.sh"
@@ -129,6 +138,13 @@ cmd_apply() {
     dim "$(module_desc "$name")"
     module_apply "$name"
   done
+
+  # A run that only reports what it attempted is not evidence the machine is
+  # right. Skipped under --dry-run, where nothing was applied and every check
+  # would report the drift the run deliberately did not fix.
+  if [[ $DOT_DRY_RUN != 1 ]]; then
+    run_checks
+  fi
 
   heading 'Summary'
   if ((${#names[@]} > 0)); then say "${#names[@]} modules"; fi
@@ -164,10 +180,11 @@ cmd_config() {
   ${EDITOR:-vi} "$DOT_CONFIG"
 }
 
-# --- doctor ----------------------------------------------------------------
-cmd_doctor() {
-  cfg_exists || die "No config at $DOT_CONFIG. Run: dot config --init"
-
+# --- checks ----------------------------------------------------------------
+# The whole read-only pass, shared by `doctor` and the tail of `apply`. Not a
+# fourth verb and not a hook: contract.bats proves no doctor.sh writes to $HOME,
+# which is what makes it safe to run at the end of a real apply.
+run_checks() {
   heading 'Core'
   # `fail`: this is exactly what will stop the next apply.
   local unknown
@@ -175,6 +192,7 @@ cmd_doctor() {
     fail "config lists unknown module '$unknown' -- dot apply will refuse"
   done < <(modules_unknown)
 
+  brew_check "$DOT_ROOT/core/Brewfile" core
   fold_status 'core checks failed' "$BASH" "$DOT_ROOT/core/doctor.sh"
   fs_check_tree "$DOT_ROOT/core" || fail 'core files are not linked -- run: dot apply'
 
@@ -200,6 +218,13 @@ cmd_doctor() {
   else
     ok 'none'
   fi
+}
+
+# --- doctor ----------------------------------------------------------------
+cmd_doctor() {
+  cfg_exists || die "No config at $DOT_CONFIG. Run: dot config --init"
+
+  run_checks
 
   # Three branches; a summary may not contradict the lines above it. No count:
   # a hook's three problems arrive as one rolled-up failure.

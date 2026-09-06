@@ -12,6 +12,10 @@ English everywhere: code, comments, commits, docs.
 make check     # shellcheck, shfmt, bats, size budget
 ```
 
+`make brew-audit` is separate on purpose: it asks Homebrew whether the
+Brewfiles still resolve, so it needs the network and its verdict changes when
+Homebrew does. CI runs it weekly and files an issue; it never blocks a PR.
+
 The `Makefile` is the only copy of those commands. Never inline them elsewhere.
 
 ## Limits
@@ -29,6 +33,7 @@ deliberately.
 | `bin/dot` | 3 verbs, hardcoded `case` |
 | `module.toml` | 1 field: `description` |
 | Module hooks | `apply.sh`, `doctor.sh`, `remove.sh` -- closed set |
+| Module dirs | `home/` (linked), `data/` (hook-private) -- closed set |
 | Tests | uncapped, excluded from the budget |
 
 ## Invariants

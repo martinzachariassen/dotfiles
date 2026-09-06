@@ -66,3 +66,14 @@ fixture_file() {
   mkdir -p "$(dirname "$dir/home/$rel")"
   printf '%s\n' "$content" >"$dir/home/$rel"
 }
+
+# json_parses FILE -- strict JSON, or JSONC: `//` line comments and trailing
+# commas, which is what cmux ships and what the VS Code family reads. The
+# comment strip is anchored to the start of the line on purpose, so a "https://"
+# inside a string value survives it.
+json_parses() {
+  jq -e . "$1" >/dev/null 2>&1 && return 0
+  sed 's|^[[:space:]]*//.*$||' "$1" |
+    perl -0pe 's/,(\s*[}\]])/$1/g' |
+    jq -e . >/dev/null 2>&1
+}

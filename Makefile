@@ -1,8 +1,9 @@
 # Every check this repo runs. CI, README and CLAUDE.md all say `make check`;
 # the commands live here and nowhere else. Logic belongs in lib/, not here.
 #
-#   make check   lint, fmt-check, test, size (what CI runs)
-#   make fmt     rewrite files to the project's formatting
+#   make check       lint, fmt-check, test, size (what CI runs)
+#   make fmt         rewrite files to the project's formatting
+#   make brew-audit  ask Homebrew whether the Brewfiles still resolve
 
 SHIPPED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh \
 	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh
@@ -19,7 +20,7 @@ MODULE_BUDGET := 150
 # Listed, not found: adding an engine file is a decision made here in the open.
 ENGINE := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh
 
-.PHONY: check lint fmt fmt-check test size
+.PHONY: check lint fmt fmt-check test size brew-audit
 
 check: lint fmt-check test size
 
@@ -38,6 +39,13 @@ fmt-check:
 test:
 	@echo "==> bats"
 	@bats tests/
+
+# Deliberately NOT part of `check`: it needs the network and its verdict
+# changes when Homebrew changes, so it must not fail a pull request about
+# something else. CI runs it on a schedule instead.
+brew-audit:
+	@echo "==> brew audit"
+	@DOT_BREW_AUDIT=1 bats tests/brewfiles.bats
 
 size:
 	@echo "==> size"
