@@ -3,10 +3,10 @@
 # `mise activate` never installs a runtime; linking config.toml alone leaves it
 # unread until someone runs `mise install` by hand.
 #
-# gopls/dlv/goimports/staticcheck aren't runtimes mise tracks -- they're
-# `go install` binaries VS Code's Go extension needs for IntelliSense,
-# debugging, format-on-save and linting. `go install` recompiles from
-# module cache each run, so this stays cheap on a re-apply.
+# The go tools are data/go-tools.txt, not a shell array: doctor.sh looks for
+# the binary each line names, so a tool added here and nowhere else would be
+# one nothing ever checks. Both hooks find the file with the same line
+# (tests/contract.bats).
 #
 # Everything goes through `mise exec`: activation is a zsh hook (modules/zsh
 # .zshrc), and hooks run under bash with no shell rc. A bare `command -v go`
@@ -17,16 +17,13 @@
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-go_tools=(
-  golang.org/x/tools/gopls@latest
-  github.com/go-delve/delve/cmd/dlv@latest
-  golang.org/x/tools/cmd/goimports@latest
-  honnef.co/go/tools/cmd/staticcheck@latest
-)
+data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/go-tools.txt"
+
+mapfile -t go_tools < <(grep -vE '^[[:space:]]*(#|$)' "$data")
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
   info 'mise install (runtimes pinned in ~/.config/mise/config.toml)'
-  info 'go install: gopls, dlv, goimports, staticcheck'
+  info "go install: ${#go_tools[@]} tools from data/go-tools.txt"
   exit 0
 fi
 
@@ -49,7 +46,7 @@ if mise exec -- go version >/dev/null 2>&1; then
       fail "go install $pkg failed -- re-run \`dot apply\` once the network is back"
     fi
   done
-  ok 'go: gopls, dlv, goimports, staticcheck installed'
+  ok "go: ${#go_tools[@]} tools installed"
 else
   fail 'go is not installed by mise -- check the [tools] table in ~/.config/mise/config.toml'
 fi

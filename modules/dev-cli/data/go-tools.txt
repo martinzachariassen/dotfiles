@@ -1,0 +1,14 @@
+# The go tools VS Code's Go extension shells out to: IntelliSense, debugging,
+# format-on-save, linting. Not runtimes mise tracks -- `go install` binaries,
+# one module path per line.
+#
+# Two readers, one truth: apply.sh installs every line, doctor.sh checks that
+# the binary named by the last path segment landed under mise's go install
+# dir. Typed out in both, a tool added to one would be a tool the other never
+# looks for, and the gap is silent by construction -- a missing gopls is a VS
+# Code with no IntelliSense and no error anywhere.
+
+golang.org/x/tools/gopls@latest
+github.com/go-delve/delve/cmd/dlv@latest
+golang.org/x/tools/cmd/goimports@latest
+honnef.co/go/tools/cmd/staticcheck@latest

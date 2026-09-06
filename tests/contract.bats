@@ -179,6 +179,8 @@ teardown() { teardown_sandbox; }
       # A row that lost its tabs reads as a domain with no key: `defaults write`
       # would then be called with too few arguments, or the wrong ones.
       *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
+      # Every line is an argument to `go install`: module path, then @version.
+      */go-tools.txt) awk '/^[[:space:]]*(#|$)/ { next } !/^[a-z0-9._\/-]+@[a-zA-Z0-9._-]+$/ { exit 1 }' "$f" || bad+=("$f -- not one go module path per line") ;;
       *.sh) shellcheck "$f" >/dev/null 2>&1 || bad+=("$f -- shellcheck") ;;
       *.zsh | */.zshrc | */.zshenv | */.zprofile) zsh -n "$f" 2>/dev/null || bad+=("$f -- zsh -n") ;;
     esac
@@ -294,6 +296,47 @@ teardown() { teardown_sandbox; }
   [ "$status" -ne 0 ] || {
     echo "remove.sh hardcodes a domain; cut it from data/defaults.tsv instead:"
     echo "$output"
+    return 1
+  }
+}
+
+@test "dev-cli: the hooks read data/go-tools.txt and mise's data dir alike" {
+  # apply installs every line, doctor looks for the binary each line names.
+  # Pointing one of them elsewhere would let doctor call a machine clean that
+  # apply never installed to.
+  local dir="$DOT_ROOT/modules/dev-cli"
+  [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/doctor.sh")" ]
+  # mise does not expose its default data dir for scripting, so both hooks
+  # rebuild it. One of them drifting is a check looking where nothing lands.
+  [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
+}
+
+@test "dev-cli: doctor.sh never invokes mise" {
+  # `mise ls` CREATES ~/.local/share/mise and ~/.local/state/mise on a machine
+  # that has neither -- the check would write to the $HOME it is checking, the
+  # same trap `colima status` set in modules/containers. The generic doctor.sh
+  # snapshot above only catches this on a machine that HAS mise, and CI has none.
+  #
+  # A stub rather than a grep: the question is whether the hook RUNS mise, and
+  # a grep also hits the word inside its own output strings. `command -v` only
+  # resolves the file, so a passing hook never executes this.
+  # The stub records to a FILE, not stderr: `mise ls >/dev/null 2>&1` would
+  # swallow anything it printed, and that is exactly the call being guarded.
+  local stub="$DOT_TMP/bin" ran="$DOT_TMP/mise_ran"
+  mkdir -p "$stub"
+  cat >"$stub/mise" <<EOF
+#!/bin/sh
+echo "mise \$*" >>"$ran"
+exit 1
+EOF
+  chmod +x "$stub/mise"
+
+  PATH="$stub:$PATH" run env DOT_ROOT="$DOT_ROOT" DOT_MODULE=dev-cli \
+    DOT_MODULE_DIR="$DOT_ROOT/modules/dev-cli" bash "$DOT_ROOT/modules/dev-cli/doctor.sh"
+
+  [ ! -f "$ran" ] || {
+    echo "doctor.sh invoked mise; read the install tree instead:"
+    cat "$ran"
     return 1
   }
 }
