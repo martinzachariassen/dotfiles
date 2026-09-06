@@ -3,10 +3,9 @@
 # Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
 # The fallback path is an INPUT, like DOT_CODE_BIN in modules/git: without one,
-# "Homebrew could not be loaded" is unreachable on any machine that has it, and
-# that is the branch where containers/remove.sh decides it cannot prove a link
-# is ours. install.sh keeps its own copy of the default, and its own name for
-# the input (DOTFILES_BREW_PREFIX) -- it shares nothing, including this.
+# "Homebrew could not be loaded" is unreachable on any machine that has it --
+# the branch where containers/remove.sh cannot prove a link is ours. install.sh
+# keeps its own copy and its own name for it: it shares nothing, including this.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
@@ -17,13 +16,12 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is
-# not installed. Returns 0 satisfied, 1 something is missing, 2 the check
-# itself could not run (no brew, unreadable Brewfile, a failed tap fetch).
+# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is not
+# installed. Returns 0 satisfied, 1 missing, 2 the check itself could not run.
 #
 # 2 is distinct on purpose: a check that could not run must never read as "all
-# installed". `brew bundle check` rather than parsing the Brewfile here -- it
-# is the only reader that agrees with `brew bundle` about what installed means.
+# installed". `brew bundle check` rather than parsing the Brewfile here -- it is
+# the only reader that agrees with `brew bundle` about what installed means.
 # HOMEBREW_NO_AUTO_UPDATE because a check may not mutate the machine.
 brew_missing() {
   local file=$1 out status=0
@@ -79,9 +77,9 @@ brew_bundle() {
   return 1
 }
 
-# brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle. A
-# module whose packages half-installed used to report green, because doctor
-# never looked at anything but symlinks.
+# brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle.
+# Without it a half-installed module reports green: doctor would be looking at
+# nothing but symlinks.
 brew_check() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}

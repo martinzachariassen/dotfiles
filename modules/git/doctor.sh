@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # config.local is generated, so fs_check_tree cannot see it, and apply.sh
-# degrades silently by design: with a signingkey configured but 1Password not
-# installed yet it writes no signing block, warns once, and that warning
-# scrolls past. Every commit is then unsigned with nothing to notice.
+# degrades silently by design: with a signingkey set but 1Password not installed
+# yet it writes no signing block and warns once. That warning scrolls past, and
+# every commit is then unsigned with nothing to notice.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"

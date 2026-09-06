@@ -10,7 +10,7 @@ Sourced, never executed. **7 files, no subdirectories.**
 | `fs.sh` | linking, backups, orphan scan |
 | `modules.sh` | discovery, enablement, hook running |
 | `brew.sh` | `brew bundle`, and the read-only `brew_check` doctor uses |
-| `wizard.sh` | first-run picker -- **60 lines of code** |
+| `wizard.sh` | the first-run picker |
 
 ## Rules
 
@@ -37,8 +37,7 @@ Sourced, never executed. **7 files, no subdirectories.**
   that guarantees nothing is worse than none -- it looks like a check.
 - **`brew_missing` has three answers**, not two: satisfied, missing, and *could
   not be checked*. The third must never render as green.
-- **`modules_preflight` parses every hook before `$HOME` is touched.** A syntax
-  error used to surface halfway through an apply that had already relinked.
+- **`modules_preflight` parses every hook before `$HOME` is touched.**
 - **dasel reads `-` as subtraction.** Only bracket syntax: `settings["x-y"].key`.
   Always go through `module_setting`. Never build a selector from a table name.
 - **Everything is read as `-o yaml`**; `__cfg_unquote` undoes exactly `""` and
@@ -57,7 +56,8 @@ Sourced, never executed. **7 files, no subdirectories.**
   separate processes. Once-per-run work lives in `bin/dot`. Cross-process state
   is an exported input (`DOT_RUN_ID`), not a remembered value.
 - `lib/dot.sh` refuses a checkout path containing `"`, backtick, `$` or `\`.
-  Three places bake it into generated script; two `grep -F` for it.
+  Three places bake it into generated script or `grep -F` for it: `core/apply.sh`
+  and the `uninstall.sh` handoff bake, `core/doctor.sh` and `uninstall.sh` grep.
 
 ## Status
 

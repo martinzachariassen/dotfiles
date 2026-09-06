@@ -3,16 +3,9 @@
 # `mise activate` never installs a runtime; linking config.toml alone leaves it
 # unread until someone runs `mise install` by hand.
 #
-# The go tools are data/go-tools.txt, not a shell array: doctor.sh looks for
-# the binary each line names, so a tool added here and nowhere else would be
-# one nothing ever checks. Both hooks find the file with the same line
-# (tests/contract.bats).
-#
 # Everything goes through `mise exec`: activation is a zsh hook (modules/zsh
-# .zshrc), and hooks run under bash with no shell rc. A bare `command -v go`
-# here is false on the machine this matters on -- the fresh one, installed by
-# `curl | bash` -- so the tools were silently skipped until the second apply
-# from an interactive shell.
+# .zshrc) and hooks run under bash with no shell rc, so a bare `command -v go`
+# is false on the machine this matters on -- the fresh one.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"

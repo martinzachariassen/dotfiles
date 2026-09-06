@@ -6,10 +6,9 @@
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-# `colima status` is NOT read-only: it creates ~/.colima/_lima on a machine
-# that never started a VM. Only asked once ~/.colima/default exists (not
-# ~/.colima -- this module links a template into it). remove.sh tests the
-# same path and the two must agree.
+# `colima status` is NOT read-only: it creates ~/.colima/_lima on a machine that
+# never started a VM. Only asked once the profile directory exists -- not
+# ~/.colima, which this module's template link makes exist. remove.sh agrees.
 if ! command -v colima >/dev/null 2>&1; then
   fail 'colima       not installed (run: dot apply)'
 elif [[ ! -d $HOME/.colima/default ]]; then

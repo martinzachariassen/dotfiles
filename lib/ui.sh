@@ -18,10 +18,8 @@ fi
 DOT_FAILURES=0
 DOT_WARNINGS=0
 
-# The exit status of a hook that only warned. 3, not 2: bash exits 2 on a
-# syntax error, so a hook that never ran must not read as "finished with a
-# note" -- uninstall.sh's guard only looks at failures. tests/modules.bats
-# asserts the property, not the number.
+# The exit status of a hook that only warned. 3, not 2: bash owns 2 for syntax
+# errors, so a hook that never ran must not read as "finished with a note".
 DOT_STATUS_WARN=3
 
 heading() { printf '\n%s%s%s\n' "$__C_BOLD" "$*" "$__C_RESET"; }

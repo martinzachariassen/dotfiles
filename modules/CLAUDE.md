@@ -15,8 +15,8 @@ modules/<name>/
   README.md        optional
 ```
 
-Nothing else. Lowercase names matching the directory. **150 lines of shell per
-directory.** Modules run alphabetically and cannot depend on each other.
+Nothing else. Lowercase names matching the directory. Modules run
+alphabetically and cannot depend on each other.
 
 ## Two shapes, one contract
 
@@ -25,9 +25,9 @@ directory.** Modules run alphabetically and cannot depend on each other.
   `dotfiles-dev`). Their `description` starts with `Packages:`.
 
 The split is a reading aid, not a flag the driver knows about, so it is only
-true while the directory says so. `dev-cli` was listed here until it grew a
-`home/` and two hooks; a `Packages:` description on a module that links a file
-is a label contradicting the listing next to it.
+true while the directory says so. `dev-cli` was listed as a package set until
+it grew a `home/` and three hooks; a `Packages:` description on a module that
+links a file is a label contradicting the listing next to it.
 
 **A module that owns a tool's config owns its Brewfile line.** Repeating a
 `brew` line across modules is fine (`brew bundle` is idempotent) and is the only
@@ -50,13 +50,14 @@ every reader. Every shipped file under `data/` and `home/` is parsed by
 `contract.bats` according to its extension, so an unparseable one cannot ship.
 
 What it buys is more than fewer lines. A list a hook types out is a claim
-nothing checks: `macos-defaults/remove.sh` named six domains by hand for an
-**irreversible** change, and `doctor.sh` sampled six keys because each one cost
-a line. Cut from the file instead, the list cannot go stale and the sample
-becomes the whole table.
+nothing checks, and the cost per line is what makes a hook sample instead of
+check: cut from the file, the list cannot go stale and the sample becomes the
+whole table.
 
-`remove.sh` exists for what the uninstall sweep cannot see. Three kinds, and
-the third is the one to be careful with:
+## `remove.sh`
+
+It exists for what the uninstall sweep cannot see. Four kinds, and the third is
+the one to be careful with:
 
 1. Links whose target is outside `$DOT_ROOT` (`containers`).
 2. Real files this repo generated, proven by a header it greps for (`git`).
@@ -65,9 +66,12 @@ the third is the one to be careful with:
    what apply wrote, deepest first, and prune only the objects this module
    itself emptied. Anything changed since stands. Never rewrite the file
    wholesale, and never delete it -- see the root `CLAUDE.md` invariant.
-
-`macos-defaults` is the fourth case and has no undo at all: it reports what it
-changed irreversibly, cut from `data/defaults.tsv` so the list cannot go stale.
+4. **Nothing to delete, so the report is the deliverable.** `macos-defaults`
+   changed settings that were never files and cannot be put back, and `dev-cli`
+   downloaded into directories full of other projects' toolchains. Both name
+   what is left rather than guessing which of it was theirs, and both derive
+   that list rather than typing it out. Both stay silent on a machine that
+   never ran them -- `uninstall.sh` calls every `remove.sh`, enabled or not.
 
 ## Writing a hook
 

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# Drift here is invisible: Claude Code just behaves differently. A broken
-# statusLine renders nothing; a changed theme or outputStyle says nothing at
-# all -- so every managed leaf is compared, not sampled. Which is only fair
-# because apply.sh manages no key Claude Code writes back (see its header).
+# Drift here is invisible -- a broken statusLine renders nothing, a changed
+# theme says nothing at all -- so every managed leaf is compared, not sampled.
+# Fair only because apply.sh manages no key Claude Code writes back.
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 

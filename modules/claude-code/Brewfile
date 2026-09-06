@@ -1,6 +1,6 @@
-# jq is also in core/Brewfile and dev-cli, on purpose: a module names what it
-# needs rather than inheriting it, since modules cannot depend on each other and
-# core's list is free to change. `brew bundle` is idempotent.
+# jq is named by dev-cli and dotfiles-dev too, on purpose: a module names what it
+# needs rather than inheriting it, since modules cannot depend on each other.
+# `brew bundle` is idempotent.
 
 cask "claude-code@latest"
 brew "jq" # statusline.sh parses its stdin with it

@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 #
-# apply.sh downloads on every run, and a half-finished download leaves a
-# working shell: a missing runtime surfaces as "command not found" for a
-# language you thought you had, a missing gopls as a VS Code with no
-# IntelliSense and no error anywhere. Nothing else looks at either.
+# A half-finished download leaves a working shell: a missing runtime is "command
+# not found" for a language you thought you had, a missing gopls a VS Code with
+# no IntelliSense. Nothing else looks at either.
 #
-# Read-only, and it has to get there WITHOUT asking mise. `mise ls` creates
-# ~/.local/share/mise and ~/.local/state/mise on a machine that has neither --
-# the same trap `colima status` set in modules/containers, and contract.bats
-# snapshots $HOME around every doctor.sh. The install tree is the evidence.
+# Read-only WITHOUT asking mise: `mise ls` creates ~/.local/share/mise and
+# ~/.local/state/mise on a machine that has neither. The install tree is the
+# evidence instead.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
@@ -44,9 +42,8 @@ fi
 # glob spans a go upgrade without naming a version. compgen, not ls: a builtin,
 # and an unmatched glob is a status rather than a subprocess and an error line.
 absent=()
-# Same filter line as apply.sh (tests/contract.bats). An inline `#`* test here
-# missed an INDENTED comment, which the data file's own contract allows -- and
-# doctor would then hunt forever for a binary named "# ...".
+# Same filter expression as apply.sh (tests/contract.bats): an inline `#`* test
+# misses an INDENTED comment, which the data file's own contract allows.
 while IFS= read -r pkg; do
   bin=${pkg%@*}
   bin=${bin##*/}

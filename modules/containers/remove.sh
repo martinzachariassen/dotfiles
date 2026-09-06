@@ -7,9 +7,8 @@ set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
 # Not `die` without Homebrew: by now it may already be gone. But without the
-# prefix no link can be PROVED ours, and these point outside $DOT_ROOT -- so
-# silence here is the one outcome that leaves them with nothing left to find
-# them. Name them instead.
+# prefix no link can be PROVED ours, and these point outside $DOT_ROOT, so
+# silence would leave them with nothing left to find them. Name them instead.
 plugin_dir=''
 if brew_load; then plugin_dir="$(brew --prefix)/lib/docker/cli-plugins"; fi
 
@@ -24,9 +23,9 @@ for plugin in docker-compose docker-buildx; do
   fi
 done
 
-# Tested BEFORE anything invokes colima: `colima status` creates ~/.colima on
-# a machine that never had a VM. ~/.colima/default, not ~/.colima, which this
-# module's template link makes exist. doctor.sh tests the same path.
+# Tested BEFORE anything invokes colima: `colima status` creates ~/.colima on a
+# machine that never had a VM. The profile directory, not ~/.colima itself,
+# which this module's template link makes exist. doctor.sh tests the same path.
 vm_on_disk=0
 if [[ -d $HOME/.colima/default ]]; then vm_on_disk=1; fi
 

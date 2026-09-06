@@ -22,19 +22,11 @@ __DOT_EXIT_WARN=0
 
 # --- The transcript ----------------------------------------------------------
 #
-# Every verb that CHANGES the machine writes one: apply, add, remove. The other
-# two do not, and neither is style. `config` hands the terminal to $EDITOR, and
-# a tee in the way makes vi unusable. `doctor` is advertised read-only, and it
-# also runs as the tail of `apply`, where a second transcript would nest inside
-# the first. uninstall.sh removes logs/ and must keep agreeing they are ours.
-#
-# One file per run, not one per day appended: the run prints "Full output:
-# <path>" when it ends, and that is only a useful sentence if the path holds
-# this run and nothing else. Twenty are kept.
-#
-# Named <timestamp>-<verb>.log. The timestamp is fixed width and comes first,
-# so the sort that rotates them is unchanged -- but a directory of twenty bare
-# timestamps cannot tell you which one was the apply that broke something.
+# Only the verbs that CHANGE the machine: apply, add, remove. A tee makes vi
+# unusable under `config`, and `doctor` runs as the tail of `apply`, where a
+# second transcript would nest. uninstall.sh removes logs/ and must keep
+# agreeing they are ours. One file per run, <timestamp>-<verb>.log, twenty kept;
+# the timestamp leads and is fixed width, so the rotating sort ignores the verb.
 __DOT_LOG=''
 
 __transcript_start() {
@@ -53,17 +45,14 @@ __transcript_start() {
     rm -f "$old"
   done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort -r | tail -n +21)
 
-  # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap,
-  # which restores them and waits for the drain. Without that wait bash exits
-  # without reaping the tee, and the last lines -- the ones naming the
-  # failure -- go missing from the log that exists to record them.
-  # 2>&1 on purpose: a transcript without the warnings is not one.
+  # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap: it
+  # restores them and waits, or bash exits unreaped and the log loses the lines
+  # naming the failure. 2>&1, because a transcript without the warnings is none.
   exec 3>&1 4>&2
   exec > >(tee -a "$__DOT_LOG") 2>&1
   __DOT_TEE_PID=$!
 }
 
-# The closing line, for every verb that opened one.
 __transcript_end() {
   if [[ -n $__DOT_LOG ]]; then
     dim "Full output: ${__DOT_LOG/#$HOME/\~}"
@@ -84,6 +73,7 @@ usage: dot <command> [options]
   doctor    Check this machine. Read-only; never changes anything.
 
 EOF
+  # Overridable paths are printed, never baked into the heredoc.
   printf 'Config:  %s\n' "${DOT_CONFIG/#$HOME/\~}"
   printf 'Repo:    %s\n' "${DOT_ROOT/#$HOME/\~}"
   printf 'Remove:  bash uninstall.sh --dry-run   (in the repo; not a verb, on purpose)\n'
@@ -100,6 +90,7 @@ cmd_apply() {
     shift
   done
 
+  # After the parse, never before: --dry-run opens no transcript.
   __transcript_start apply
 
   heading 'dot apply'
@@ -117,8 +108,8 @@ cmd_apply() {
     die 'Core packages did not install. Fix the brew errors above, then re-run.'
 
   if ! cfg_exists; then
-    # Not under --dry-run: config_generate would not write, so the wizard
-    # would ask and discard.
+    # Not under --dry-run: config_generate would not write, so the wizard would
+    # ask and discard.
     if [[ $DOT_DRY_RUN == 1 ]]; then
       die "No config at $DOT_CONFIG yet. Create it first: dot config --init"
     fi
@@ -167,9 +158,8 @@ cmd_apply() {
     module_apply "$name"
   done
 
-  # A run that only reports what it attempted is not evidence the machine is
-  # right. Skipped under --dry-run, where nothing was applied and every check
-  # would report the drift the run deliberately did not fix.
+  # A run that only reports what it attempted is not evidence. Skipped under
+  # --dry-run, where every check would report drift the run did not fix.
   if [[ $DOT_DRY_RUN != 1 ]]; then
     run_checks
   fi
@@ -191,20 +181,14 @@ cmd_apply() {
 
 # --- add / remove ------------------------------------------------------------
 #
-# Five verbs, not three. The cap existed to stop the CLI growing one per idea;
-# these two are here because switching a module OFF had no path at all. `apply`
-# walks only the enabled list, `doctor` never reaches a disabled module, and
-# `uninstall.sh` is all-or-nothing -- so a module you stopped wanting kept its
-# defaults, its generated files and its links outside the repo forever.
-#
-# They are the only commands that write to an existing config.toml, and they
-# write one array (lib/config.sh). Editing that file by hand stays supported,
-# so an array reformatted by hand makes them refuse and say so.
+# Five verbs, not three: switching a module OFF had no path at all, since
+# `apply` walks only the enabled list and `uninstall.sh` is all-or-nothing.
+# The only commands that write to an existing config.toml, and they write one
+# array (lib/config.sh) -- one reformatted by hand makes them refuse.
 
-# __module_arg VERB ARGS... -- the shared parse. Sets __MODULE_NAME, and
-# DOT_DRY_RUN when asked. It must NOT print its answer: `name=$(__module_arg
-# ...)` runs in a subshell, so the --dry-run export would be lost there and the
-# verb would go on to act for real. Anything unknown is fatal, as for `apply`.
+# __module_arg VERB ARGS... -- sets __MODULE_NAME, and DOT_DRY_RUN when asked.
+# It must NOT print its answer: read through `$(...)` the --dry-run export would
+# be lost in the subshell and the verb would go on to act for real.
 __module_arg() {
   local verb=$1
   shift
@@ -231,9 +215,8 @@ __module_gate() {
   local verb=$1 name=$2 available problems
   cfg_exists || die "No config at $DOT_CONFIG. Run: dot config --init"
 
-  # Same refusal cmd_apply makes, and for the same reason: dasel stops at a
-  # malformed line and exits 0, so `enabled` can read empty on a file that is
-  # merely truncated. Splicing a line into that is how you lose the rest of it.
+  # dasel stops at a malformed line and exits 0, so `enabled` can read empty on
+  # a file that is merely truncated. Splicing a line into that loses the rest.
   problems=$(cfg_parse_problems)
   [[ -z $problems ]] || die "$DOT_CONFIG did not parse:
     $problems
@@ -251,8 +234,6 @@ __module_gate() {
 
 cmd_add() {
   local name
-  # After the parse, never before: --dry-run is settled there, and a dry run
-  # opens no transcript.
   __module_arg add "$@"
   name=$__MODULE_NAME
   __transcript_start add
@@ -262,8 +243,7 @@ cmd_add() {
   dim "config  ${DOT_CONFIG/#$HOME/\~}"
   if [[ -n $__DOT_LOG ]]; then dim "log     ${__DOT_LOG/#$HOME/\~}"; fi
 
-  # Phase 1 first, exactly as cmd_apply orders it: this installs dasel and the
-  # rest of the machinery, and `brew_load` alone was not that.
+  # Phase 1 first, as cmd_apply orders it: `brew_load` alone is not that.
   heading 'Core packages'
   if ! brew_load; then
     die 'Homebrew is not installed. Run install.sh first.'
@@ -327,7 +307,6 @@ cmd_remove() {
   # the symlink sweep cannot see, and may look at the module while it is whole.
   module_remove "$name"
 
-  # `_` for the source: macos-defaults/apply.sh reads its table the same way.
   local dst
   while IFS=$'\t' read -r _ dst; do
     fs_unlink "$dst"
@@ -348,8 +327,8 @@ cmd_remove() {
   fi
 
   heading 'Summary'
-  # Said every time, because it is the one thing this verb deliberately does
-  # not do, and "removed" reads as if it had.
+  # Said every time: the one thing this verb does not do, and "removed" reads
+  # as if it had.
   dim 'Packages stay installed. Removing those is `brew uninstall`, yours to run.'
   if ((DOT_FAILURES > 0)); then
     fail 'Finished with problems -- see the ✗ marks above.'
@@ -383,9 +362,8 @@ cmd_config() {
 }
 
 # --- checks ----------------------------------------------------------------
-# The whole read-only pass, shared by `doctor` and the tail of `apply`. Not a
-# verb of its own and not a hook: contract.bats proves no doctor.sh writes to $HOME,
-# which is what makes it safe to run at the end of a real apply.
+# Shared by `doctor` and the tail of `apply`. Safe there because contract.bats
+# proves no doctor.sh writes to $HOME.
 run_checks() {
   heading 'Core'
   # `fail`: this is exactly what will stop the next apply.
@@ -408,14 +386,10 @@ run_checks() {
     module_doctor "$name"
   done
 
-  # Reported, never deleted: doctor does not remove things from $HOME.
-  #
-  # Grouped by the module that ships them, because the two causes need opposite
-  # advice. For a path the repo no longer ships, `rm` is the whole fix. For a
-  # module switched off it is a false all-clear: nothing runs a disabled
-  # module's remove.sh -- apply skips it, doctor never reaches it -- so its
-  # defaults, generated files and links outside $DOT_ROOT stay, with these
-  # links the only thing left that mentions the module at all.
+  # Reported, never deleted. Grouped by module because the two causes need
+  # opposite advice: for a path the repo no longer ships `rm` is the whole fix;
+  # for a module switched off it is a false all-clear, since nothing runs a
+  # disabled module's remove.sh and its defaults and generated files stay.
   heading 'Orphaned links'
   local mod path found=0 unowned='' repo=${DOT_ROOT/#$HOME/\~}
   local -A bymod=()
@@ -436,10 +410,8 @@ run_checks() {
     return 0
   fi
 
-  # Whether the module HAS a remove.sh decides the advice. Naming one that does
-  # not exist would send you to a file that is not there; saying nothing where
-  # one does exist is the false all-clear this section was rewritten to stop.
-  # The same test uninstall.sh makes before it calls module_remove.
+  # Whether the module HAS a remove.sh decides the advice. The same test
+  # uninstall.sh makes before module_remove.
   local hooks=0
   for mod in "${order[@]}"; do
     warn "$mod is not enabled, and left these links:"
@@ -459,8 +431,6 @@ run_checks() {
     dim '  rm them; there is nothing else to undo.'
   fi
 
-  # Once, not per module: the same culture as uninstall.sh, where the preview
-  # is the script itself rather than a hand-written summary of it.
   if ((hooks)); then
     dim 'Add DOT_DRY_RUN=1 to any of those to see what it would do first.'
   fi
@@ -472,8 +442,8 @@ cmd_doctor() {
 
   run_checks
 
-  # Three branches; a summary may not contradict the lines above it. No count:
-  # a hook's three problems arrive as one rolled-up failure.
+  # No count: a hook's three problems arrive as one rolled-up failure, and a
+  # summary may not contradict the lines above it.
   heading 'Result'
   if ((DOT_FAILURES > 0)); then
     fail 'Problems found -- see the ✗ marks above.'

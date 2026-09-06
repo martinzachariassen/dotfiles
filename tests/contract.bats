@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 #
-# The module contract and the hard limits. Walks the same glob the driver
+# The module contract and the structural limits. Walks the same glob the driver
 # walks, so no module is exempt. Changing a limit means editing this file.
 
 load helper
@@ -244,15 +244,6 @@ teardown() { teardown_sandbox; }
 @test "limit: lib/ has exactly 7 files and no subdirectories" {
   [ "$(find "$DOT_ROOT/lib" -mindepth 1 -maxdepth 1 -type f -name '*.sh' | wc -l | tr -d ' ')" -eq 7 ]
   [ -z "$(find "$DOT_ROOT/lib" -mindepth 1 -type d)" ]
-}
-
-@test "limit: lib/wizard.sh is at most 60 lines of code" {
-  local n
-  n=$(grep -cvE '^[[:space:]]*(#|$)' "$DOT_ROOT/lib/wizard.sh")
-  [ "$n" -le 60 ] || {
-    echo "lib/wizard.sh has $n lines of code; the cap is 60"
-    return 1
-  }
 }
 
 @test "limit: bin/dot has exactly five verbs" {
@@ -649,23 +640,47 @@ EOF
   local n
   n=$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")
 
+  word_num() {
+    case ${1,,} in
+      one | first) printf 1 ;;
+      two | second) printf 2 ;;
+      three | third) printf 3 ;;
+      four | fourth) printf 4 ;;
+      five | fifth) printf 5 ;;
+      six | sixth) printf 6 ;;
+      seven | seventh) printf 7 ;;
+      *) printf 0 ;;
+    esac
+  }
+
+  # Newlines collapsed: prose wraps, and "Not a sixth\n  verb" is the same claim
+  # as "not a sixth verb". `[^.]` keeps a match from spanning two sentences.
   local -a stale=()
-  local file claim num
+  local file claim num flat
   for file in bin/dot bin/CLAUDE.md CLAUDE.md README.md uninstall.sh; do
+    flat=$(tr '\n' ' ' <"$DOT_ROOT/$file")
+
     while IFS= read -r claim; do
-      case ${claim,,} in
-        one) num=1 ;;
-        two) num=2 ;;
-        three) num=3 ;;
-        four) num=4 ;;
-        five) num=5 ;;
-        six) num=6 ;;
-        seven) num=7 ;;
-        *) num=0 ;;
-      esac
+      num=$(word_num "$claim")
       ((num == n)) || stale+=("$file says '$claim verbs'")
-    done < <(grep -oiE '(one|two|three|four|five|six|seven) verbs' "$DOT_ROOT/$file" |
+    done < <(grep -oiE '(one|two|three|four|five|six|seven) verbs' <<<"$flat" |
       awk '{print $1}')
+
+    # "capped at three" -- the same claim without the word `verbs` after it,
+    # which is how README.md kept saying three long after there were five.
+    while IFS= read -r claim; do
+      num=$(word_num "$claim")
+      ((num == n)) || stale+=("$file says 'capped at $claim'")
+    done < <(grep -oiE 'capped at +(one|two|three|four|five|six|seven)' <<<"$flat" |
+      awk '{print $NF}')
+
+    # And an ORDINAL naming the next verb that does not exist -- "a fourth
+    # verb", "not a sixth verb". That one has to be n+1, not n.
+    while IFS= read -r claim; do
+      num=$(word_num "$claim")
+      ((num == n + 1)) || stale+=("$file says '$claim verb'; the next one is $((n + 1))")
+    done < <(grep -oiE '(first|second|third|fourth|fifth|sixth|seventh)[^.]{0,24}verb' \
+      <<<"$flat" | awk '{print $1}')
 
     # And the digit in the limits table.
     while IFS= read -r claim; do

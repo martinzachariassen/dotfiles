@@ -9,7 +9,7 @@ English everywhere: code, comments, commits, docs.
 ## Before committing
 
 ```sh
-make check     # shellcheck, shfmt, bats, size budget
+make check     # shellcheck, shfmt, bats
 ```
 
 `make brew-audit` is separate on purpose: it asks Homebrew whether the
@@ -20,9 +20,10 @@ Brewfile, where the answer is the thing under review.
 
 `install-smoke` is separate for the same reason, and covers what no bats test
 can: it runs `install.sh` for real on a fresh runner, on the same clock plus
-the pull requests that touch the bootstrap. It cannot cover steps 1 and 2 --
-a hosted runner already has the Command Line Tools and Homebrew, so both take
-their "already installed" branch. **Those two stay a hand test on a clean Mac.**
+main and the pull requests that touch the bootstrap. It cannot cover steps 1
+and 2 -- a hosted runner already has the Command Line Tools and Homebrew, so
+both take their "already installed" branch. **Those two stay a hand test on a
+clean Mac.**
 
 The tools `make check` runs are not in `core/Brewfile`; they are the
 `dotfiles-dev` module, or `brew bundle --file modules/dotfiles-dev/Brewfile`.
@@ -31,21 +32,23 @@ The `Makefile` is the only copy of those commands. Never inline them elsewhere.
 
 ## Limits
 
-Enforced by `make size` and `tests/contract.bats`. **Over a limit means cutting
-something, never raising the number.** Changing a limit means editing the test,
-deliberately.
+Structural, not size. There is **no line budget** -- not on the engine, not on
+a module, not anywhere. A file that has grown too big is a judgement call at
+review time, and a number was only ever a proxy for it that went stale.
+
+What *is* enforced, by `tests/contract.bats`:
 
 | What | Limit |
 |---|---|
-| Engine (`install.sh`, `uninstall.sh`, `bin/dot`, `lib/`, `core/`) | 2500 lines |
-| Each module directory's shell | 150 lines (sum uncapped) |
 | `lib/` | 7 files, no subdirectories |
-| `lib/wizard.sh` | 60 lines of code |
 | `bin/dot` | 5 verbs, hardcoded `case` |
 | `module.toml` | 1 field: `description` |
 | Module hooks | `apply.sh`, `doctor.sh`, `remove.sh` -- closed set |
 | Module dirs | `home/` (linked), `data/` (hook-private) -- closed set |
-| Tests | uncapped, excluded from the budget |
+
+These are shape, not weight: each one is a thing the driver reads, so widening
+it changes what the repo *is*. Changing one means editing `contract.bats`,
+deliberately. That friction is the point.
 
 ## Invariants
 
@@ -73,11 +76,21 @@ deliberately.
 
 ## Comments
 
-Explain **why this decision**, never what bash does. Three things earn one:
+The bar is high and the default is **no comment**. Code that needs prose to be
+readable should be rewritten instead. Three things earn one:
 
 1. A landmine that looks fine.
 2. An invariant a future edit would break -- name the other place that must agree.
 3. A road not taken.
 
-One to three lines. No history ("used to", "the old version did"). No file
-header essays. No separate docs file.
+One to three lines, and never more than a short paragraph at the top of a file.
+Explain **why this decision**, never what bash does.
+
+Cut on sight:
+
+- **History.** No "used to", "the old version did", "once", "was found by".
+  Git has it. A rule stands on its reason, not on the bug that produced it.
+- **Restating the code.** A comment that paraphrases the line under it.
+- **Section banners** that only name what is obviously below.
+- **A promise no test keeps.** If a comment says two files must agree, either
+  `contract.bats` holds them together or the comment is decoration.

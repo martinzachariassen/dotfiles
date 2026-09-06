@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Generate ~/.config/git/config.local: a few values printf'd into a file git's
-# own include mechanism reads. No template engine. A conditional belongs in
+# own include mechanism reads. No template engine -- a conditional belongs in
 # git's config language, not here.
 
 set -euo pipefail

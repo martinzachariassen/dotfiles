@@ -1,7 +1,7 @@
 # `tests/`
 
-bats, one file per unit. **Uncapped and excluded from the size budget**, so
-"it would need a test" is never an argument against a change.
+bats, one file per unit. Nothing here is capped, so "it would need a test" is
+never an argument against a change.
 
 ## Rules
 
@@ -16,19 +16,22 @@ bats, one file per unit. **Uncapped and excluded from the size budget**, so
 - Hostile input to anything reaching TOML, git config or `defaults`.
 - Paths inside `.app` bundles are inputs (`DOT_OP_SSH_SIGN`, `DOT_CODE_BIN`),
   so both branches run on a machine without the app.
+- **The root `CLAUDE.md` ban on history does not apply here.** In shipped code
+  the bug that produced a rule is noise; in a test it is the specification --
+  a guard whose reason is not written down is one the next person deletes.
 
 ## `contract.bats`
 
 What makes the registry-free design safe. It walks the driver's glob, so no
-module is exempt, and it enforces every hard limit in the root `CLAUDE.md`.
-Adding a manifest field, a hook name, a `lib/` file or a verb means editing this
-file. That friction is the point.
+module is exempt, and it enforces every structural limit in the root
+`CLAUDE.md`. Adding a manifest field, a hook name, a `lib/` file or a verb
+means editing this file. That friction is the point.
 
 It also holds the **cross-file invariants**: the ones whose whole content is
-"these files must agree" and which nothing else can catch. The bash-5 list had
-already drifted to five places while every comment still said four, which is
-what an unenforced agreement rule is worth. A rule of that shape either gets a
-test here or it is not a rule.
+"these files must agree" and which nothing else can catch. A rule of that shape
+either gets a test here or it is not a rule -- an unenforced agreement rule is
+worth exactly nothing, which is why the prose guards (verb count, bash-5 list)
+live here too.
 
 ## bats notes
 

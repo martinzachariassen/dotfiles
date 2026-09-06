@@ -73,10 +73,9 @@ modules_all_dirs() {
   done < <(modules_all)
 }
 
-# modules_preflight -- parse every hook this run may execute, before anything
-# in $HOME is touched. A syntax error in modules/x/apply.sh used to surface
-# when module x ran, halfway through an apply that had already relinked $HOME.
-# `bash -n` is exactly the parse the driver is about to do. Core is included
+# modules_preflight -- `bash -n` on every hook this run may execute, before
+# anything in $HOME is touched: otherwise a syntax error in modules/x/apply.sh
+# surfaces halfway through an apply that has already relinked. Core is included
 # for the same reason fs_orphans includes it: it runs like a module.
 modules_preflight() {
   local dir hook script
@@ -133,7 +132,7 @@ module_apply() {
 }
 
 # module_doctor NAME -- read-only. Tallies its own failures rather than
-# returning a status; a `|| true` at the call site once hid an unlinked module.
+# returning a status, which a `|| true` at the call site could swallow.
 module_doctor() {
   local name=$1 dir tracked=''
   dir=$(modules_dir "$name")
@@ -142,9 +141,8 @@ module_doctor() {
     tracked=$(find "$dir/home" -type f -print -quit)
   fi
 
-  # Packages first, matching module_apply's order. A package-set module used
-  # to report "packages only -- nothing to check": its entire content was the
-  # one thing doctor never looked at.
+  # Packages first, matching module_apply's order. Without this a package-set
+  # module's entire content is the one thing doctor never looks at.
   brew_check "$dir/Brewfile" "$name"
 
   if [[ -z $tracked && ! -f $dir/doctor.sh ]]; then

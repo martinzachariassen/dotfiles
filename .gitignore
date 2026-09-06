@@ -9,6 +9,6 @@
 .storecode/
 
 # Nothing generated lives in the repo: config goes to ~/.config/dotfiles, state
-# to ~/.local/state/dotfiles. Something needing ignoring here is in the wrong place.
-
-.vscode/
+# to ~/.local/state/dotfiles. Something needing ignoring here is in the wrong
+# place. .vscode/settings.json is tracked on purpose -- it is repo knowledge,
+# like .editorconfig, not scratch.

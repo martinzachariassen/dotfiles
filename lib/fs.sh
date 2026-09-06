@@ -5,11 +5,9 @@
 #   1. Directories are never symlinked, only traversed.
 #   2. A real file is never destroyed; it is moved to the backup tree.
 
-# The driver's own tallies, and only those. A hook is a separate process, so
-# neither an apply.sh calling fs_link (containers, the docker plugins) nor a
-# remove.sh reaches these: fs_report undercounts by whatever the hooks did.
-# The alternative is a file to add up across processes, which is the state this
-# repo derives instead -- and the per-line narration is already there.
+# The driver's own tallies, and only those: a hook is a separate process, so
+# fs_report undercounts by whatever the hooks did. Adding up across processes
+# would need a state file, which this repo derives instead.
 DOT_N_LINKED=0
 DOT_N_RELINKED=0
 DOT_N_BACKED_UP=0
@@ -30,13 +28,9 @@ fs_backup_used() {
 }
 
 # fs_pairs DIR -- "src<TAB>dst" for every leaf file under DIR/home. The single
-# place that maps a module's home/ onto $HOME.
-#
-# Finder's metadata is excluded because Finder writes it into the checkout
-# behind your back and .gitignore hides it from CI: a stray .DS_Store under a
-# module's home/ made `dot apply` offer to symlink ~/.config/.DS_Store into the
-# repo. The filter belongs here, not in a test -- a guard that fires whenever
-# someone opens the repo in Finder is noise, and the engine has to be immune.
+# place that maps a module's home/ onto $HOME. Finder's metadata is filtered
+# here rather than by a test: Finder writes it into the checkout behind your
+# back, and the engine has to be immune.
 fs_pairs() {
   local dir=$1 home="$1/home" src rel
   [[ -d $home ]] || return 0
@@ -77,8 +71,8 @@ fs_link() {
     return 0
   fi
 
-  # Intent is announced before acting, so a dry run and a real run use the
-  # same words (tests/fs.bats pins this).
+  # Intent is announced before acting, so a dry run and a real run use the same
+  # words (tests/fs.bats pins this).
   case $state in
     missing) info "link    ~/$rel" ;;
     wrong-target | broken) info "relink  ~/$rel" ;;
@@ -124,8 +118,7 @@ fs_link_tree() {
 # --- Removal ----------------------------------------------------------------
 #
 # Two helpers, not one "delete this path": a link is recognised by where it
-# points, a generated file by name and header. The guard lives here, never in
-# the caller.
+# points, a generated file by its header. The guard lives here, not the caller.
 
 # fs_unlink DST -- symlinks only. A real file at a path we once owned stays.
 fs_unlink() {
@@ -188,21 +181,19 @@ fs_report() {
   fi
 }
 
-# fs_repo_links -- every symlink under $HOME that points into this repo.
-#
-# The shared walk for doctor (fs_orphans) and uninstall.sh: neither verb gets
-# its own idea of which links are ours. Scans the directories of EVERY module,
-# not just enabled ones -- a link left by a disabled module is the main thing
-# to find. Filtering on "points into $DOT_ROOT" is what makes it safe to
-# delete from; links elsewhere (containers' docker plugins) need a remove.sh.
+# fs_repo_links -- every symlink under $HOME that points into this repo. The
+# shared walk for doctor (fs_orphans) and uninstall.sh, so neither gets its own
+# idea of which links are ours. EVERY module, not just enabled ones: a link left
+# by a disabled module is the main thing to find. "Points into $DOT_ROOT" is
+# what makes it safe to delete from; links elsewhere need a remove.sh.
 fs_repo_links() {
   local -A roots=() seen=()
   local dir src dst link target depth
   local -a scan
 
-  # Every directory ON THE PATH to a declared file, not just the leaf's own.
-  # A file deleted from the repo takes its directory out of the declared set
-  # with it, and the link it left would then sit in a directory nothing scans.
+  # Every directory ON THE PATH to a declared file, not just the leaf's own. A
+  # file deleted from the repo takes its directory out of the declared set with
+  # it, and the link it left would then sit where nothing scans.
   while IFS= read -r dir; do
     while IFS=$'\t' read -r src dst; do
       dst=${dst%/*}
@@ -223,10 +214,8 @@ fs_repo_links() {
 
   # -maxdepth 2, so a directory that STOPPED being declared is still reached
   # from the parent an ancestor keeps in the set. $HOME is the exception at 1:
-  # its children belong to every tool on the machine, not to this repo.
-  # Residual, pinned in tests/orphans.bats: a link deeper than one level below
-  # the nearest surviving root, or under a top-level directory the repo names
-  # nowhere any more. Walking all of $HOME stays rejected, on cost.
+  # its children belong to every tool on the machine. The residual is pinned in
+  # tests/orphans.bats; walking all of $HOME stays rejected, on cost.
   for dir in "${scan[@]}"; do
     [[ -d $dir ]] || continue
     if [[ $dir == "$HOME" ]]; then depth=1; else depth=2; fi
@@ -243,19 +232,14 @@ fs_repo_links() {
 }
 
 # fs_orphans -- repo links no ENABLED module claims, as "path<TAB>module". The
-# claim must stay narrow: letting a disabled module claim its files would hide
-# every orphan the wide scan above exists to expose.
+# claim stays narrow: letting a disabled module claim its files would hide every
+# orphan the wide scan exists to expose. The name is attribution, not a claim --
+# which module SHIPS the path, so the caller can name its remove.sh -- and is
+# empty when none does, where removing the link is the whole fix.
 #
-# The module name is attribution, never a claim: it says which module SHIPS the
-# path, so the caller can name the remove.sh that knows what ELSE that module
-# left behind. Empty when no module ships it any more -- renamed or deleted in
-# the repo -- where removing the link is the whole fix. The two need opposite
-# advice, which is the entire reason the field exists.
-#
-# The empty field goes LAST, unlike fs_pairs, and that ordering is load-bearing:
-# tab counts as IFS whitespace, so `read -r a b` on "<TAB>path" skips the empty
-# leading field and puts the path in $a. Trailing, it is read as the empty
-# string it is.
+# The empty field goes LAST, and that is load-bearing: tab is IFS whitespace, so
+# `read -r a b` on "<TAB>path" would skip a leading empty field and put the path
+# in $a. Trailing, it reads as the empty string it is.
 fs_orphans() {
   local -A claimed=() owner=()
   local dir src dst link
@@ -269,9 +253,9 @@ fs_orphans() {
     printf '%s\n' "$DOT_ROOT/core"
   )
 
-  # A second pass over the same enabled directories, not one map doing both
-  # jobs: with two modules shipping one path, a disabled one would overwrite
-  # the enabled one's claim and the file would read as an orphan.
+  # A second pass, over ALL modules this time, not one map doing both jobs: with
+  # two modules shipping one path, a disabled one would overwrite the enabled
+  # one's claim and the file would read as an orphan.
   while IFS= read -r dir; do
     while IFS=$'\t' read -r src dst; do
       owner[$dst]=${dir##*/}

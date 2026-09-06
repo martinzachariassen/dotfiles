@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
-# Nothing to delete, and that is the point. apply.sh downloads runtimes and
-# four go binaries into directories full of real content -- other projects'
-# toolchains live in the same tree -- so this reports what is left rather than
-# guessing which of it was ours. Same trade as macos-defaults: no state file,
+# Nothing to delete, and that is the point: apply.sh downloads into directories
+# full of other projects' toolchains, so this reports what is left rather than
+# guessing which of it was ours. Same trade as macos-defaults -- no state file,
 # so the warning is the deliverable.
 #
 # Silent when neither directory exists: uninstall.sh runs every module's
@@ -14,7 +13,7 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 
 # mise's own default resolution, which it does not expose for scripting and
 # which has to keep working once mise itself is gone. `mise exec -- go install`
-# puts the four tools under installs/, so this one path covers both halves.
+# puts the go tools under installs/ too, so this one path covers both halves.
 mise_data=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}
 
 if [[ -d $mise_data ]]; then

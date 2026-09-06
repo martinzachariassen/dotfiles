@@ -8,15 +8,14 @@
 
 cfg_exists() { [[ -f $DOT_CONFIG ]]; }
 
-# The schema config_generate writes and cfg_parse_problems demands. Bump it
-# only when the file's shape changes enough that an older `dot` would misread a
-# newer config, or the reverse. It is checked, not just written: a version
+# Bump only when the file's shape changes enough that an older `dot` would
+# misread a newer config, or the reverse. Checked, not just written: a version
 # marker that guarantees nothing is worse than none, because it looks like one.
 DOT_CONFIG_SCHEMA=1
 
-# Only "" and ': ' need undoing. YAML's other escapes are deliberately absent:
-# no setting here can contain a tab or newline, and a \t rule would corrupt the
-# literal backslashes config_generate now supports.
+# Only "" and '' need undoing. YAML's other escapes are deliberately absent: no
+# setting here can contain a tab or newline, and a \t rule would corrupt the
+# literal backslashes config_generate supports.
 __cfg_unquote() {
   local v=$1
   case $v in
@@ -63,23 +62,17 @@ cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 
 # cfg_parse_problems -- one line per sign the config did not parse whole.
 #
-# dasel does not validate: on a malformed line it stops, keeps what it read,
-# and exits 0. A missing comma in `enabled` drops the whole [modules] table
-# while keys above it still answer -- and with nothing enabled, doctor reports
-# every link as orphaned and tells you to delete your dotfiles.
-#
-# taplo answers it outright; the two heuristics below are what is left on a
-# machine where phase 1 has not installed it yet -- which is exactly when
-# core/doctor.sh still has to say something. Their residual is why taplo runs
-# first: a typo in the LAST table drops only that table's remaining scalars,
-# so `signingkey` reads as empty and commit signing goes off in silence.
+# dasel does not validate: on a malformed line it stops, keeps what it read and
+# exits 0. A missing comma in `enabled` drops the whole [modules] table, and
+# with nothing enabled doctor calls every link orphaned. taplo answers outright
+# and so runs first; the two heuristics below are what is left before phase 1
+# has installed it, and they miss a typo in the LAST table.
 cfg_parse_problems() {
   local -A seen=()
   local name
 
-  # core/Brewfile's taplo, the same binary contract.bats uses. The name is an
-  # INPUT, like DOT_BREW_BIN: without one the "not installed yet" branch is
-  # unreachable on any machine that has it, and that is the branch the two
+  # An INPUT, like DOT_BREW_BIN: without one the "not installed yet" branch is
+  # unreachable on any machine that has taplo, and that is the branch the two
   # heuristics below exist for.
   local taplo=${DOT_TAPLO_BIN:-taplo}
   if command -v "$taplo" >/dev/null 2>&1 &&
@@ -186,14 +179,10 @@ FOOTER
 
 # --- Editing `enabled` ------------------------------------------------------
 #
-# The one exception to "config.toml is written once", and it is deliberately
-# the narrowest one available: a single array, edited a line at a time, with
-# every other byte of the file copied through. Same trade the claude-code
-# module makes with ~/.claude/settings.json -- the file is the user's, so the
-# only thing that may be touched is what this repo demonstrably wrote itself.
-#
-# Hand-editing the file stays supported, which is exactly why an array that no
-# longer has the generated shape makes these REFUSE rather than reformat.
+# The one exception to "config.toml is written once", and the narrowest one
+# available: a single array, a line at a time, every other byte copied through.
+# Same trade claude-code makes with ~/.claude/settings.json. Hand-editing stays
+# supported, so an array that lost the generated shape makes these REFUSE.
 
 # __cfg_enabled_span -- "first last" line indices of the array body: the line
 # after `enabled = [` and the line holding `]`. Fails when the array was
@@ -217,9 +206,8 @@ __cfg_enabled_span() {
       end=$i
       break
     }
-    # An entry, or something the user added between them. A comment and a blank
-    # line are kept where they are; anything else means the array is no longer
-    # the shape this code knows how to edit without losing part of it.
+    # An entry, or a comment or blank the user put between them. Anything else
+    # and the array is no longer a shape this can edit without losing part of it.
     [[ ${lines[i]} =~ ^\ \ \"[^\"]+\",$ || ${lines[i]} =~ ^[[:space:]]*(#.*)?$ ]] ||
       return 1
   done
@@ -230,11 +218,10 @@ __cfg_enabled_span() {
 
 cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
 
-# __cfg_write_lines -- give the user's file back the way it came. mktemp is
-# 0600 and `mv` carries that onto the destination, so a config kept at 0644
-# would come back private (claude-code's hooks guard the same way). Validated
-# before the swap: a surgical edit that somehow produced invalid TOML must not
-# become the config, and after `mv` there is nothing to roll back to.
+# __cfg_write_lines -- give the user's file back the way it came. mktemp is 0600
+# and `mv` carries that onto the destination, so a config kept at 0644 would come
+# back private (claude-code's hooks guard the same way). Validated before the
+# swap: after `mv` there is nothing to roll back to.
 __cfg_write_lines() {
   local tmp taplo=${DOT_TAPLO_BIN:-taplo}
   tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")
@@ -256,9 +243,8 @@ __cfg_write_lines() {
   return 1
 }
 
-# cfg_module_add NAME -- alphabetical among the entries, which is the order
-# config_generate wrote and the order every report prints. Comments keep their
-# place; a name already there is the caller's problem, not this function's.
+# cfg_module_add NAME -- alphabetical, the order config_generate wrote and every
+# report prints. Comments keep their place; a duplicate is the caller's problem.
 cfg_module_add() {
   local name=$1 start end i at
   local -a lines

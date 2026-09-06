@@ -64,7 +64,7 @@ __dot_on_err() {
   return 0
 }
 
-# bats installs its own ERR trap; stomping on it hid the failing assertion.
+# bats installs its own ERR trap; stomping on it hides the failing assertion.
 if [[ -z $(trap -p ERR) ]]; then
   set -o errtrace
   trap __dot_on_err ERR
@@ -76,10 +76,10 @@ fi
 __dot_on_exit() {
   local status=$?
 
-  # bin/dot's transcript is a `tee` in the background. Bash exits without
-  # reaping it, so the last lines -- the ones naming the failure -- can be lost
-  # from the log that exists to record them. fd 3/4 and __DOT_TEE_PID are set
-  # up by cmd_apply; draining here rather than there covers the `die` path too.
+  # bin/dot's transcript is a `tee` in the background, and bash exits without
+  # reaping it -- the last lines, the ones naming the failure, can be lost from
+  # the log that exists to record them. fd 3/4 and __DOT_TEE_PID are set up by
+  # __transcript_start; draining here rather than there covers the `die` path.
   if [[ -n ${__DOT_TEE_PID:-} ]]; then
     exec 1>&3 2>&4
     wait "$__DOT_TEE_PID" 2>/dev/null || true

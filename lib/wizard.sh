@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 #
 # First-run config generation. Runs after phase 1 has installed fzf, which is
-# why the picker is one call. Hard cap: 60 lines of code (tests/contract.bats).
+# why the picker is one call rather than a hand-rolled menu.
 
 DOT_PROFILES="$DOT_ROOT/profiles.toml"
 

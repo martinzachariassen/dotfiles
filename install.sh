@@ -9,9 +9,8 @@ set -euo pipefail
 REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles-v2.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles-v2}"
 
-# An INPUT, for the reason lib/brew.sh has DOT_BREW_BIN: without one, step 2's
-# "not installed yet" branch is unreachable on every machine anyone could test
-# from -- and that branch, with its sudo keep-alive, is the whole of step 2.
+# An INPUT, like lib/brew.sh's DOT_BREW_BIN: without one, step 2's "not
+# installed yet" branch is unreachable on every machine anyone could test from.
 # Its own name and its own default; install.sh still shares nothing.
 BREW_PREFIX="${DOTFILES_BREW_PREFIX:-/opt/homebrew}"
 
@@ -40,12 +39,9 @@ step() {
   exit 1
 }
 
-# Homebrew ships bottles for the three newest macOS releases. Below that every
-# formula compiles from source: hours, and it often fails outright. A warning,
-# not a refusal -- the machine is the user's call, and they should hear it
-# before the two long steps rather than an hour into them.
+# Below the bottle floor every formula compiles from source: hours, often
+# failing outright. A warning, not a refusal -- the machine is the user's call.
 # Not a guard: a version this cannot read says nothing, and says it silently.
-# Guessing "0" here once turned an unreadable sw_vers into a scary warning.
 MACOS_FLOOR=14
 if macos=$(sw_vers -productVersion 2>/dev/null); then
   case "${macos%%.*}" in
@@ -114,17 +110,15 @@ echo "    Homebrew at $(brew --prefix)"
 
 # --- 3. bash 5 ---------------------------------------------------------------
 # One of five places that must agree on bash 5 (core/Brewfile, bin/dot,
-# uninstall.sh, lib/dot.sh). Installed here because step 5 needs it before
-# core/Brewfile runs; tests/contract.bats holds the five together.
+# uninstall.sh, lib/dot.sh). Here because step 5 needs it before core/Brewfile
+# runs; tests/contract.bats holds the five together.
 if brew list --versions bash >/dev/null 2>&1; then
   step 3 "bash 5 already installed"
 else
   step 3 "Installing bash 5 (macOS ships 3.2, from 2007)"
-  # HOMEBREW_NO_ASK: from Homebrew 6, `brew install` asks before proceeding
-  # when it would pull in a dependency. A bootstrap has nobody to answer, and
-  # under `curl | bash` there is no stdin left to answer with -- it just exits.
-  # `brew bundle` sets this for itself, which is why only this bare call needs
-  # it. Found by the install-smoke workflow on its first real run.
+  # HOMEBREW_NO_ASK: from Homebrew 6, `brew install` asks before pulling in a
+  # dependency, and under `curl | bash` there is no stdin left to answer with.
+  # `brew bundle` sets this itself, so only this bare call needs it.
   HOMEBREW_NO_ASK=1 brew install bash
 fi
 
@@ -132,8 +126,8 @@ fi
 if [ -d "$REPO_DIR/.git" ]; then
   step 4 "Updating existing checkout"
 
-  # Both branches below used to be git's own error and nothing else. Neither
-  # is fatal to the install: the checkout on disk is already usable, so say so.
+  # Neither branch is fatal to the install: the checkout on disk is already
+  # usable, so say so rather than passing git's error through.
   if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
     echo "$REPO_DIR has uncommitted changes, so it cannot be updated." >&2
     echo "  See them:      git -C $REPO_DIR status" >&2
@@ -156,8 +150,7 @@ else
   step 4 "Cloning"
   mkdir -p "$(dirname "$REPO_DIR")"
   # Full history, not --depth=1: both profiles enable dotfiles-dev, so this is
-  # a checkout you edit and commit from. A shallow one has no log to bisect,
-  # and it unshallows itself on the first push anyway.
+  # a checkout you edit and commit from.
   git clone "$REPO_URL" "$REPO_DIR"
 fi
 

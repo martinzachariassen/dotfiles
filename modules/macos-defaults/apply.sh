@@ -3,9 +3,9 @@
 # macOS preferences. Imperative and idempotent; nothing needs root.
 #
 # The writes are data/defaults.tsv, not shell literals: doctor.sh compares the
-# same rows, remove.sh names the same domains, and all three find the file with
-# the same two lines (tests/contract.bats). A value needing a config setting or
-# validation stays here -- the file holds only what a reader could not refuse.
+# same rows and remove.sh cuts the same domains, and all three find the file with
+# the same `data=` line (tests/contract.bats). A value needing a config setting
+# or validation stays here -- the file holds only what a reader could not refuse.
 #
 # Overrides live under [settings.macos-defaults].
 
@@ -15,9 +15,8 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
 
 # One string, said by both branches, so a dry run and a real run print the same
-# words. `dim`, not `warn`: true of every run that gets here, and as a warning
-# it exited DOT_STATUS_WARN every time, so `dot apply` could never reach "Done"
-# (core/CLAUDE.md -- permanently yellow is the same bug as permanently green).
+# words. `dim`, not `warn`: true of every run that gets here, and as a warning it
+# would exit DOT_STATUS_WARN every time and `dot apply` could never reach "Done".
 relogin='log out and back in for keyboard and text-substitution changes to fully apply'
 
 if [[ $DOT_DRY_RUN == 1 ]]; then

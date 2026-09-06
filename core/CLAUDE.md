@@ -1,8 +1,7 @@
 # `core/`
 
-Phase 1. Same contract as a module, just first. Counts against the **engine**
-budget. Keep `apply.sh` near-empty: core marks the phase boundary, it does not
-collect special cases.
+Phase 1. Same contract as a module, just first. Keep `apply.sh` near-empty:
+core marks the phase boundary, it does not collect special cases.
 
 ## Rules
 

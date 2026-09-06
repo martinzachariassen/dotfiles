@@ -9,8 +9,7 @@ brew "eza"     # ls
 brew "bat"     # cat
 brew "ripgrep" # grep
 
-# Not a preference: home/.config/starship.toml draws the prompt out of Nerd
-# Font glyphs, and without the face every one of them renders as a tofu box.
-# modules/cmux names the same cask for the same reason -- a module names what
-# it needs and brew installs it once, exactly as jq is named twice.
+# Not a preference: home/.config/starship.toml draws the prompt out of Nerd Font
+# glyphs, and without the face every one of them renders as a tofu box.
+# modules/cmux names the same cask for the same reason; brew installs it once.
 cask "font-jetbrains-mono-nerd-font"

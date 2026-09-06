@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 #
-# Phase 0 in reverse. Not `dot uninstall`, even though `dot remove` exists: that
-# one undoes a module and is reversible by `dot add`. This is not reversible by
-# anything, and the most destructive thing here must not sit behind the command
-# typed every day.
+# Phase 0 in reverse. Not a `dot` command: `dot remove` undoes a module and
+# `dot add` puts it back, and this is reversible by nothing.
 #
 #   bash uninstall.sh --dry-run    print every intended change, make none
 #   bash uninstall.sh              do it
@@ -129,9 +127,9 @@ if [[ -n $(find "$DOT_STATE/backups" -mindepth 1 -print -quit 2>/dev/null) ]]; t
   dim 'Delete them yourself once you have looked.'
 else
   say 'None to keep.'
-  # rmdir, never rm -rf: a file nothing in this repo created keeps the
-  # directory alive. Tested up front so a dry run prints the real run's words;
-  # logs/ is excluded because a dry run has not removed it yet.
+  # rmdir, never rm -rf: a file nothing in this repo created keeps the directory
+  # alive. Tested up front so a dry run prints the real run's words; logs/ is
+  # excluded because a dry run has not removed it yet.
   if [[ -d $DOT_STATE ]]; then
     if [[ -n $(find "$DOT_STATE" -mindepth 1 -not -path "$DOT_STATE/backups" -not -path "$DOT_STATE/logs*" -print -quit 2>/dev/null) ]]; then
       warn "left alone  ${DOT_STATE/#$HOME/\~} holds files this repo did not create"
@@ -143,14 +141,13 @@ else
 fi
 
 # --- Applications ---------------------------------------------------------------
-# Homebrew MOVES a cask's .app into /Applications, and its own uninstaller
-# deletes only the prefix -- so casks must go by name while brew still works,
-# or every GUI app is stranded with no tool left to remove it. Same for
-# `brew services` and its launchd plists.
+# Homebrew MOVES a cask's .app into /Applications and its uninstaller deletes
+# only the prefix, so casks must go by name while brew still works or every GUI
+# app is stranded. Same for `brew services` and its launchd plists.
 heading 'Applications'
 
-# brew_load first. Run from a shell that never sourced shellenv, a bare `brew`
-# once listed no casks and the run destroyed Homebrew regardless. `fail`, not
+# brew_load first: run from a shell that never sourced shellenv, a bare `brew`
+# lists no casks and the run would destroy Homebrew regardless. `fail`, not
 # `die`: it flows into the guard before the handoff like every other problem.
 have_brew=0
 if brew_load; then
@@ -193,10 +190,9 @@ else
   say 'Homebrew is not installed; nothing to remove.'
 fi
 
-# brew_headcount -- "<formulae installed> <formulae no Brewfile here names>".
-# A count, because "every package it installed" reads as "this repo's
-# packages" and the truth is every package on the machine. Formulae only: the
-# casks were itemised above.
+# brew_headcount -- "<formulae installed> <formulae no Brewfile here names>". A
+# count, because "every package it installed" reads as "this repo's packages"
+# when the truth is every package on the machine. Formulae only; casks above.
 brew_headcount() {
   local installed repo bundle rc=0
   command -v brew >/dev/null 2>&1 || return 1
@@ -247,9 +243,9 @@ if [[ $DOT_DRY_RUN == 1 ]]; then
   exit 0
 fi
 
-# The last two steps remove Homebrew (which owns this bash) and $DOT_ROOT
-# (which holds this file), so they run from a throwaway script under
-# /bin/bash -- the one shell still there once Homebrew is gone.
+# The last two steps remove Homebrew (which owns this bash) and $DOT_ROOT (which
+# holds this file), so they run from a throwaway script under /bin/bash -- the
+# one shell still there once Homebrew is gone.
 handoff=$(mktemp -t dotfiles-uninstall)
 cat >"$handoff" <<EOF
 #!/bin/bash

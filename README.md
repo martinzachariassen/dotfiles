@@ -300,8 +300,8 @@ bash uninstall.sh --dry-run    # print every intended change, make none
 bash uninstall.sh              # do it
 ```
 
-It is the counterpart to `install.sh` rather than a fourth `dot` verb: `bin/dot`
-is capped at three, and the most destructive thing the repo can do does not
+It is the counterpart to `install.sh` rather than a sixth `dot` verb: `bin/dot`
+is capped at five, and the most destructive thing the repo can do does not
 belong behind the command you type every day.
 
 A full reset — links, generated files, config, Homebrew, and finally the
@@ -379,7 +379,9 @@ repo is unclaimed by definition. A module only needs a `remove.sh` for what
 that scan structurally cannot see: `containers` links Homebrew's docker
 plugins, whose targets are outside the repo; `git` writes a real file it can
 prove it generated; `claude-code` merged its keys into a file that was already
-yours; and `macos-defaults` changed settings that were never files at all.
+yours; `macos-defaults` changed settings that were never files at all; and
+`dev-cli` downloaded runtimes into a tree other projects also resolve from, so
+it names what is left rather than guessing which of it was ours.
 
 ## Templating
 
@@ -395,12 +397,12 @@ own config language, not in bash.
 ## Development
 
 ```sh
-make check     # shellcheck, shfmt, bats, and the size budget
+make check     # shellcheck, shfmt, bats
 ```
 
 That is the whole list, and it is exactly what CI runs -- the commands live in
 the `Makefile` and nowhere else. Individually: `make lint`, `make fmt` (rewrites
-files), `make test`, `make size`.
+files), `make test`.
 
 The tools it needs are deliberately **not** in `core/Brewfile`, which is
 machinery only: a machine that merely uses the dotfiles should not carry a
@@ -417,17 +419,11 @@ does. It runs weekly and files an issue, and on pull requests that touch a
 Brewfile -- but never on one that does not, where a red build would be about
 something the change did not cause.
 
-Shell code is capped, and CI enforces it:
-
-| What | Cap | Why that shape |
-|---|---|---|
-| The engine: `install.sh`, `uninstall.sh`, `bin/dot`, `lib/`, `core/` | **2500 lines** | The part v1 rotted in. The number tracks what the engine is *for*, never what it happens to weigh this week. |
-| Each module's shell scripts | **150 lines** | Enough for a module, not enough for a subsystem. |
-| The number of modules, and their sum | uncapped | This is the axis the repo is supposed to grow along. |
-| Tests | uncapped | `lib/fs.sh` moves files in `$HOME`, so it earns every test it has. |
-
-Going over is a signal to cut something or move it, not to raise the number.
-`make size` prints all of it.
+There is no line budget. What CI does enforce is *shape*, in
+`tests/contract.bats`: `lib/` is 7 files, `bin/dot` has 5 verbs, `module.toml`
+has one field, and a module directory holds only the names the driver reads.
+Each of those is a thing the driver looks at, so widening one changes what the
+repo is -- and each means editing `contract.bats` to do it.
 
 ### When something breaks
 
