@@ -163,3 +163,45 @@ claim_one() {
   [[ $output != *deep.conf* ]]
   [[ $output != *lost.conf* ]]
 }
+
+# --- attribution ------------------------------------------------------------
+#
+# The second field exists so doctor can point at the remove.sh that knows what
+# ELSE a disabled module left behind. Its two values need opposite advice.
+
+@test "orphans: the module that ships an orphan is named alongside it" {
+  claim_one
+  modules_enabled_dirs() { :; } # demo is now switched off in the config
+
+  run fs_orphans
+  [ "$status" -eq 0 ]
+  [[ $output == *"kept.conf"$'\t'"demo" ]]
+}
+
+@test "orphans: a path no module ships any more is named with no module" {
+  # Renamed or deleted in the repo: there is no hook to send anyone to, and
+  # removing the link really is the whole fix.
+  claim_one
+  printf 'x\n' >"$MODULE/home/.config/demo/going.conf"
+  fs_link_tree "$MODULE"
+  rm "$MODULE/home/.config/demo/going.conf"
+
+  run fs_orphans
+  [ "$status" -eq 0 ]
+  [[ $output == *"going.conf"$'\t' ]]
+}
+
+@test "orphans: the empty module field is trailing, so read gets the path" {
+  # Tab is IFS whitespace, so `read -r a b` SKIPS a leading empty field and the
+  # path lands in $a. Emitted the other way round, doctor named the module
+  # "/Users/you/.config/..." and pointed at a remove.sh under it.
+  claim_one
+  printf 'x\n' >"$MODULE/home/.config/demo/going.conf"
+  fs_link_tree "$MODULE"
+  rm "$MODULE/home/.config/demo/going.conf"
+
+  local path mod
+  IFS=$'\t' read -r path mod < <(fs_orphans)
+  [[ $path == *going.conf ]]
+  [ -z "$mod" ]
+}

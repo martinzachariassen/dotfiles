@@ -22,13 +22,20 @@ why the module picker can be one `fzf` call instead of a hand-rolled menu.
 ```
 dot apply              Install packages, link configs, run module hooks
 dot apply --dry-run    Show every intended change, make none
+dot add <module>       Enable one module and apply it
+dot remove <module>    Undo one module and disable it
 dot config             Open the config file in $EDITOR
 dot config --init      Create it for the first time (runs the picker)
 dot doctor             Check this machine; read-only
 ```
 
-Removing it all again is `uninstall.sh`, not a fourth verb — see
-[Uninstalling](#uninstalling).
+`add` and `remove` take `--dry-run` too. They are the only commands that write
+to a config file you already own, and they write one line of one array — see
+[Disabling a module](#disabling-a-module).
+
+Removing it *all* again is `uninstall.sh`, not a verb of its own — see
+[Uninstalling](#uninstalling). `dot remove` undoes one module and `dot add`
+puts it back; that one is not reversible by anything.
 
 Re-running `dot apply` is safe and expected. It is also the update path:
 
@@ -45,9 +52,10 @@ to relink one file should not also move your toolchain underneath you.
 ## Configuration
 
 `~/.config/dotfiles/config.toml` is the only source of truth. It is generated
-**once**, by `dot config --init`, and belongs to you from that moment on --
-nothing in the tool ever rewrites it. That is what keeps your comments intact,
-and it is why turning a module on later is an edit rather than a wizard re-run:
+**once**, by `dot config --init`, and belongs to you from that moment on. Only
+`dot add` and `dot remove` ever write to it again, and only one line of the
+`enabled` array -- nothing here reformats the file or drops a comment. So
+turning a module on is an edit, never a wizard re-run:
 
 ```toml
 [modules]
@@ -64,6 +72,65 @@ matching module stops the run and prints the list of real ones. Editing this
 file by hand is a supported workflow, so a typo has to be an error -- the
 alternative is a run that reports success having installed three modules out
 of four.
+
+### Disabling a module
+
+```sh
+dot remove containers --dry-run    # the whole plan, nothing changed
+dot remove containers              # do it
+```
+
+Three steps, in the order `uninstall.sh` uses: run the module's `remove.sh`,
+unlink every file it ships, then take its name out of `enabled`. The config
+write comes last on purpose — it is the commit point, so anything that failed
+above it leaves the module still listed and re-running is the fix.
+
+`dot add <module>` is the same in reverse: into the list, then packages, links
+and `apply.sh` for that one module.
+
+**Packages stay.** `remove` says so on every run, because "removed" reads as if
+they went too. Uninstalling them is `brew uninstall`, and it stays yours —
+nothing here can tell which of them you also wanted for something else.
+
+**These two are the only commands that write to a config file you already
+own,** and they write one line of one array. Everything else in the file —
+comments, spacing, every other table, even a note you left *between* two
+entries — is copied through byte for byte. It is the same trade the
+`claude-code` module makes with `~/.claude/settings.json`: the file is yours,
+so the only thing either may touch is what this repo demonstrably wrote itself.
+
+The proof is the array's shape. `dot config --init` writes one `"name",` per
+line, and that is the only shape these will edit. Reformat it by hand —
+
+```toml
+enabled = ["git", "zsh"]
+```
+
+— and they refuse and tell you to edit it yourself, rather than rewrite a file
+they can no longer claim to understand. Hand-editing is a supported workflow;
+being reformatted behind your back is not.
+
+#### If you edit the list by hand instead
+
+Still supported, and still leaves things behind, because nothing then runs the
+module's `remove.sh`. That is what `dot doctor`'s orphan report is for: it
+groups the leftover links under the module that shipped them and prints the
+command to finish the job.
+
+```sh
+cd ~/Developer/personal/dotfiles-v2
+DOT_ROOT=$PWD DOT_DRY_RUN=1 bash modules/containers/remove.sh   # preview
+DOT_ROOT=$PWD bash modules/containers/remove.sh                 # do it
+```
+
+`DOT_ROOT` has to be set: every hook sources the library through it. Or just
+run `dot remove containers`, which does this and the unlinking and the list.
+
+One thing no route can undo: **`macos-defaults` cannot be put back.** `apply`
+never read the old values, so `remove.sh` has nothing to restore, and `defaults
+delete` would give you Apple's factory setting rather than yours. It says so
+and lists the domains it wrote. Reversing it needs a record of what was there
+before, which is the one thing this repo does not keep.
 
 ### Profiles
 
@@ -195,6 +262,15 @@ Two rules matter:
 `wrong target`, `real file`, `real directory`, `broken link` -- plus any
 orphaned links left behind by a disabled module. It reports them; it never
 deletes anything in your home directory on its own.
+
+Those orphans are grouped by the module that ships them, because the two causes
+need opposite advice. A path the repo no longer ships -- a renamed skill, a
+deleted file -- is finished by the `rm`. A module you switched off is not:
+`rm` would leave you believing the machine was clean while its `defaults`,
+generated files and links outside the repo are all still there. So the report
+names the module and the `remove.sh` that knows the rest, or says outright that
+the module leaves nothing else behind. See
+[Disabling a module](#disabling-a-module).
 
 The scan that finds those is bounded rather than a walk of your whole home
 directory: it visits every directory on the path to a file some module ships,

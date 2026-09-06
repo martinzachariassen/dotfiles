@@ -255,10 +255,15 @@ teardown() { teardown_sandbox; }
   }
 }
 
-@test "limit: bin/dot has exactly three verbs" {
-  [ "$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")" -eq 3 ]
+@test "limit: bin/dot has exactly five verbs" {
+  # Raised from three, deliberately and once: `add` and `remove` are the only
+  # path that switches a module OFF. `apply` walks only the enabled list and
+  # `uninstall.sh` is all-or-nothing, so without them a module you stopped
+  # wanting kept its defaults and generated files forever. A sixth needs the
+  # same argument -- a capability no existing verb can reach.
+  [ "$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")" -eq 5 ]
   local verb
-  for verb in apply config doctor; do
+  for verb in apply add remove config doctor; do
     grep -q "^  $verb)" "$DOT_ROOT/bin/dot"
   done
 }

@@ -242,11 +242,22 @@ fs_repo_links() {
   done
 }
 
-# fs_orphans -- repo links no ENABLED module claims. The claim must stay
-# narrow: letting a disabled module claim its files would hide every orphan
-# the wide scan above exists to expose.
+# fs_orphans -- repo links no ENABLED module claims, as "path<TAB>module". The
+# claim must stay narrow: letting a disabled module claim its files would hide
+# every orphan the wide scan above exists to expose.
+#
+# The module name is attribution, never a claim: it says which module SHIPS the
+# path, so the caller can name the remove.sh that knows what ELSE that module
+# left behind. Empty when no module ships it any more -- renamed or deleted in
+# the repo -- where removing the link is the whole fix. The two need opposite
+# advice, which is the entire reason the field exists.
+#
+# The empty field goes LAST, unlike fs_pairs, and that ordering is load-bearing:
+# tab counts as IFS whitespace, so `read -r a b` on "<TAB>path" skips the empty
+# leading field and puts the path in $a. Trailing, it is read as the empty
+# string it is.
 fs_orphans() {
-  local -A claimed=()
+  local -A claimed=() owner=()
   local dir src dst link
 
   while IFS= read -r dir; do
@@ -258,7 +269,17 @@ fs_orphans() {
     printf '%s\n' "$DOT_ROOT/core"
   )
 
+  # A second pass over the same enabled directories, not one map doing both
+  # jobs: with two modules shipping one path, a disabled one would overwrite
+  # the enabled one's claim and the file would read as an orphan.
+  while IFS= read -r dir; do
+    while IFS=$'\t' read -r src dst; do
+      owner[$dst]=${dir##*/}
+    done < <(fs_pairs "$dir")
+  done < <(modules_all_dirs)
+
   while IFS= read -r link; do
-    [[ -n ${claimed[$link]:-} ]] || printf '%s\n' "$link"
+    [[ -n ${claimed[$link]:-} ]] ||
+      printf '%s\t%s\n' "$link" "${owner[$link]:-}"
   done < <(fs_repo_links)
 }

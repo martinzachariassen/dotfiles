@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# `dot` -- the dotfiles CLI. Three verbs, hardcoded; removal is uninstall.sh.
+# `dot` -- the dotfiles CLI. Five verbs, hardcoded; full removal is uninstall.sh.
 
 # macOS ships bash 3.2 as /bin/bash; a shell that never sourced Homebrew's
 # shellenv would start this under it.
@@ -26,6 +26,9 @@ usage: dot <command> [options]
 
   apply     Install packages, link config files, run module hooks.
               --dry-run   Show every intended change, make none.
+  add       Enable one module and apply it.        [<module>] [--dry-run]
+  remove    Undo one module and disable it.        [<module>] [--dry-run]
+              Packages stay; that is `brew uninstall`.
   config    Open the config file in $EDITOR.
               --init      Create it for the first time (runs the wizard).
   doctor    Check this machine. Read-only; never changes anything.
@@ -161,6 +164,166 @@ cmd_apply() {
   return 0
 }
 
+# --- add / remove ------------------------------------------------------------
+#
+# Five verbs, not three. The cap existed to stop the CLI growing one per idea;
+# these two are here because switching a module OFF had no path at all. `apply`
+# walks only the enabled list, `doctor` never reaches a disabled module, and
+# `uninstall.sh` is all-or-nothing -- so a module you stopped wanting kept its
+# defaults, its generated files and its links outside the repo forever.
+#
+# They are the only commands that write to an existing config.toml, and they
+# write one array (lib/config.sh). Editing that file by hand stays supported,
+# so an array reformatted by hand makes them refuse and say so.
+
+# __module_arg VERB ARGS... -- the shared parse. Sets __MODULE_NAME, and
+# DOT_DRY_RUN when asked. It must NOT print its answer: `name=$(__module_arg
+# ...)` runs in a subshell, so the --dry-run export would be lost there and the
+# verb would go on to act for real. Anything unknown is fatal, as for `apply`.
+__module_arg() {
+  local verb=$1
+  shift
+  __MODULE_NAME=''
+  while (($#)); do
+    case $1 in
+      --dry-run) export DOT_DRY_RUN=1 ;;
+      -*) die "$verb: unknown option '$1'. Try: dot $verb <module> [--dry-run]" ;;
+      *)
+        [[ -z $__MODULE_NAME ]] ||
+          die "$verb: one module at a time -- got '$__MODULE_NAME' and '$1'."
+        __MODULE_NAME=$1
+        ;;
+    esac
+    shift
+  done
+  [[ -n $__MODULE_NAME ]] || die "$verb: which module? Try: dot $verb <module>"
+}
+
+# Every gate both verbs share, before either touches anything. The config check
+# comes first: unlinking a module and then finding the list cannot be edited
+# would leave the machine and the file disagreeing.
+__module_gate() {
+  local verb=$1 name=$2 available problems
+  cfg_exists || die "No config at $DOT_CONFIG. Run: dot config --init"
+
+  # Same refusal cmd_apply makes, and for the same reason: dasel stops at a
+  # malformed line and exits 0, so `enabled` can read empty on a file that is
+  # merely truncated. Splicing a line into that is how you lose the rest of it.
+  problems=$(cfg_parse_problems)
+  [[ -z $problems ]] || die "$DOT_CONFIG did not parse:
+    $problems
+    edit:       $DOT_CONFIG"
+
+  if ! module_exists "$name"; then
+    available=$(modules_all | tr '\n' ' ')
+    die "$verb: no module '$name'.
+    available:  ${available% }"
+  fi
+  cfg_enabled_editable || die "$verb: the \`enabled\` list in $DOT_CONFIG is not
+    in the shape this can edit safely -- one \"name\", per line. Edit it by hand
+    instead, then run: dot apply"
+}
+
+cmd_add() {
+  local name
+  __module_arg add "$@"
+  name=$__MODULE_NAME
+  __module_gate add "$name"
+
+  # Phase 1 first, exactly as cmd_apply orders it: this installs dasel and the
+  # rest of the machinery, and `brew_load` alone was not that.
+  heading 'Core packages'
+  if ! brew_load; then
+    die 'Homebrew is not installed. Run install.sh first.'
+  fi
+  brew_bundle "$DOT_ROOT/core/Brewfile" core ||
+    die 'Core packages did not install. Fix the brew errors above, then re-run.'
+
+  if modules_enabled | grep -qxF -- "$name"; then
+    say "'$name' is already enabled. Applying it anyway."
+  elif [[ $DOT_DRY_RUN == 1 ]]; then
+    info "add '$name' to ${DOT_CONFIG/#$HOME/\~}"
+  elif cfg_module_add "$name"; then
+    ok "added '$name' to ${DOT_CONFIG/#$HOME/\~}"
+  else
+    die "add: could not write $DOT_CONFIG -- it was left as it was"
+  fi
+
+  # After the config write, so the module being added is one of the hooks this
+  # parses -- a syntax error in it must stop before anything in $HOME moves.
+  modules_preflight
+
+  heading "Module: $name"
+  dim "$(module_desc "$name")"
+  module_apply "$name"
+
+  heading 'Summary'
+  fs_report
+  if ((DOT_FAILURES > 0)); then
+    fail 'Finished with problems -- see the ✗ marks above.'
+  else
+    ok 'Done.'
+  fi
+  [[ $DOT_DRY_RUN == 1 ]] && dim 'Dry run: nothing was changed.'
+  return 0
+}
+
+cmd_remove() {
+  local name enabled_now=0
+  __module_arg remove "$@"
+  name=$__MODULE_NAME
+  __module_gate remove "$name"
+
+  # A module already out of the list still gets the sweep: that is the state
+  # this verb exists to clean up, and it is what a hand-edited config leaves.
+  if modules_enabled | grep -qxF -- "$name"; then
+    enabled_now=1
+  else
+    say "'$name' is not in the list; removing what it left anyway."
+  fi
+
+  heading "Module: $name"
+  dim "$(module_desc "$name")"
+
+  # Hooks before links, the order uninstall.sh uses: remove.sh exists for what
+  # the symlink sweep cannot see, and may look at the module while it is whole.
+  module_remove "$name"
+
+  # `_` for the source: macos-defaults/apply.sh reads its table the same way.
+  local dst
+  while IFS=$'\t' read -r _ dst; do
+    fs_unlink "$dst"
+  done < <(fs_pairs "$(modules_dir "$name")")
+
+  # The config last, so it is the commit point: anything above that failed
+  # leaves the module still listed, and re-running is the fix.
+  if ((enabled_now)); then
+    if [[ $DOT_DRY_RUN == 1 ]]; then
+      info "remove '$name' from ${DOT_CONFIG/#$HOME/\~}"
+    elif ((DOT_FAILURES > 0)); then
+      fail "left '$name' in $DOT_CONFIG -- fix the ✗ above, then re-run"
+    elif cfg_module_remove "$name"; then
+      ok "removed '$name' from ${DOT_CONFIG/#$HOME/\~}"
+    else
+      fail "could not write $DOT_CONFIG -- '$name' is still listed"
+    fi
+  fi
+
+  heading 'Summary'
+  # Said every time, because it is the one thing this verb deliberately does
+  # not do, and "removed" reads as if it had.
+  dim 'Packages stay installed. Removing those is `brew uninstall`, yours to run.'
+  if ((DOT_FAILURES > 0)); then
+    fail 'Finished with problems -- see the ✗ marks above.'
+  elif ((DOT_WARNINGS > 0)); then
+    warn 'Finished. There are warnings above worth a look.'
+  else
+    ok 'Done.'
+  fi
+  [[ $DOT_DRY_RUN == 1 ]] && dim 'Dry run: nothing was changed.'
+  return 0
+}
+
 # --- config ----------------------------------------------------------------
 cmd_config() {
   case ${1:-} in
@@ -182,7 +345,7 @@ cmd_config() {
 
 # --- checks ----------------------------------------------------------------
 # The whole read-only pass, shared by `doctor` and the tail of `apply`. Not a
-# fourth verb and not a hook: contract.bats proves no doctor.sh writes to $HOME,
+# verb of its own and not a hook: contract.bats proves no doctor.sh writes to $HOME,
 # which is what makes it safe to run at the end of a real apply.
 run_checks() {
   heading 'Core'
@@ -207,16 +370,60 @@ run_checks() {
   done
 
   # Reported, never deleted: doctor does not remove things from $HOME.
+  #
+  # Grouped by the module that ships them, because the two causes need opposite
+  # advice. For a path the repo no longer ships, `rm` is the whole fix. For a
+  # module switched off it is a false all-clear: nothing runs a disabled
+  # module's remove.sh -- apply skips it, doctor never reaches it -- so its
+  # defaults, generated files and links outside $DOT_ROOT stay, with these
+  # links the only thing left that mentions the module at all.
   heading 'Orphaned links'
-  local orphan found=0
-  while IFS= read -r orphan; do
+  local mod path found=0 unowned='' repo=${DOT_ROOT/#$HOME/\~}
+  local -A bymod=()
+  local -a order=()
+  while IFS=$'\t' read -r path mod; do
     found=1
-    warn "unclaimed  ${orphan/#$HOME/\~}"
+    path=${path/#$HOME/\~}
+    if [[ -z $mod ]]; then
+      unowned+=$path$'\n'
+    else
+      [[ -n ${bymod[$mod]:-} ]] || order+=("$mod")
+      bymod[$mod]+=$path$'\n'
+    fi
   done < <(fs_orphans)
-  if ((found)); then
-    dim 'Remove with: rm <path>'
-  else
+
+  if ((found == 0)); then
     ok 'none'
+    return 0
+  fi
+
+  # Whether the module HAS a remove.sh decides the advice. Naming one that does
+  # not exist would send you to a file that is not there; saying nothing where
+  # one does exist is the false all-clear this section was rewritten to stop.
+  # The same test uninstall.sh makes before it calls module_remove.
+  local hooks=0
+  for mod in "${order[@]}"; do
+    warn "$mod is not enabled, and left these links:"
+    while IFS= read -r path; do say "    $path"; done <<<"${bymod[$mod]%$'\n'}"
+    if [[ -f $(modules_dir "$mod")/remove.sh ]]; then
+      hooks=$((hooks + 1))
+      dim '  rm them -- then undo the rest, which no verb does for you:'
+      dim "  DOT_ROOT=$repo bash $repo/modules/$mod/remove.sh"
+    else
+      dim "  rm them; $mod leaves nothing else behind."
+    fi
+  done
+
+  if [[ -n $unowned ]]; then
+    warn 'unclaimed -- no module ships these any more:'
+    while IFS= read -r path; do say "    $path"; done <<<"${unowned%$'\n'}"
+    dim '  rm them; there is nothing else to undo.'
+  fi
+
+  # Once, not per module: the same culture as uninstall.sh, where the preview
+  # is the script itself rather than a hand-written summary of it.
+  if ((hooks)); then
+    dim 'Add DOT_DRY_RUN=1 to any of those to see what it would do first.'
   fi
 }
 
@@ -243,6 +450,14 @@ case "${1:-}" in
   apply)
     shift
     cmd_apply "$@"
+    ;;
+  add)
+    shift
+    cmd_add "$@"
+    ;;
+  remove)
+    shift
+    cmd_remove "$@"
     ;;
   config)
     shift

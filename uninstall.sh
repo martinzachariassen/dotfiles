@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# Phase 0 in reverse. Not `dot uninstall`: bin/dot is capped at three verbs,
-# and the most destructive thing here should not sit behind the daily command.
+# Phase 0 in reverse. Not `dot uninstall`, even though `dot remove` exists: that
+# one undoes a module and is reversible by `dot add`. This is not reversible by
+# anything, and the most destructive thing here must not sit behind the command
+# typed every day.
 #
 #   bash uninstall.sh --dry-run    print every intended change, make none
 #   bash uninstall.sh              do it

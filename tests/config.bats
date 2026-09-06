@@ -256,3 +256,128 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
   config_generate "A" "a@b.c" "git"
   [ ! -f "$DOT_CONFIG" ]
 }
+
+# --- Editing `enabled` ------------------------------------------------------
+#
+# The one exception to "written once". Every test here is about what must NOT
+# change: the file is the user's, and only the array is this code's business.
+
+# The generated shape, which is what `dot add`/`dot remove` will edit.
+generated_config() {
+  cat >"$DOT_CONFIG" <<'EOF'
+# A comment above everything. It must survive.
+schema = 1
+
+[user]
+name  = "Martin Zachariassen"
+email = "m@example.com"
+
+[modules]
+# Add or remove names, then run `dot apply`.
+enabled = [
+  "git",
+  # a note the user left between entries
+  "zsh",
+]
+
+[settings.git]
+signingkey = "ssh-ed25519 AAAA"
+EOF
+}
+
+@test "enabled: adding a module keeps every other byte of the file" {
+  generated_config
+  local before after
+  before=$(grep -v '^  "' "$DOT_CONFIG")
+
+  cfg_module_add cmux
+  after=$(grep -v '^  "' "$DOT_CONFIG")
+
+  # Comments, tables, spacing, the user's note inside the array: all of it.
+  [ "$before" = "$after" ]
+  [[ $(cat "$DOT_CONFIG") == *'# a note the user left between entries'* ]]
+}
+
+@test "enabled: a module is added in alphabetical order" {
+  generated_config
+  cfg_module_add cmux
+
+  # cmux sorts before git, so it must land first, not appended at the end.
+  run cfg_list 'modules.enabled'
+  [ "${lines[0]}" = "cmux" ]
+  [ "${lines[1]}" = "git" ]
+  [ "${lines[2]}" = "zsh" ]
+}
+
+@test "enabled: a name sorting last goes before the bracket, not after it" {
+  generated_config
+  cfg_module_add zzz
+
+  run cfg_list 'modules.enabled'
+  [ "${lines[2]}" = "zzz" ]
+  # Still parseable: an entry written outside the array would not be.
+  [ -z "$(cfg_parse_problems)" ]
+}
+
+@test "enabled: removing a module drops its line and nothing else" {
+  generated_config
+  cfg_module_remove git
+
+  run cfg_list 'modules.enabled'
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "zsh" ]
+  [[ $(cat "$DOT_CONFIG") == *'# a note the user left between entries'* ]]
+  [[ $(cat "$DOT_CONFIG") == *'signingkey'* ]]
+}
+
+@test "enabled: a hand-formatted array is refused, not reformatted" {
+  # setup's config has `enabled = ["git", "zsh"]` on one line -- legal TOML and
+  # a supported way to write it. Rewriting it would be this code deciding it
+  # knows better about a file it does not own.
+  local before
+  before=$(cat "$DOT_CONFIG")
+
+  run cfg_enabled_editable
+  [ "$status" -ne 0 ]
+
+  run cfg_module_add cmux
+  [ "$status" -ne 0 ]
+  [ "$(cat "$DOT_CONFIG")" = "$before" ]
+}
+
+@test "enabled: an entry without its trailing comma is not the shape we wrote" {
+  # config_generate writes a comma on every entry, the last one included.
+  # Without it this is a file someone reformatted, and guessing is how you
+  # lose the line below.
+  printf 'schema = 1\n\n[modules]\nenabled = [\n  "git",\n  "zsh"\n]\n' >"$DOT_CONFIG"
+
+  run cfg_enabled_editable
+  [ "$status" -ne 0 ]
+}
+
+@test "enabled: the file keeps its mode, not mktemp's 0600" {
+  generated_config
+  chmod 644 "$DOT_CONFIG"
+
+  cfg_module_add cmux
+
+  [ "$(stat -f '%Lp' "$DOT_CONFIG")" = "644" ]
+}
+
+@test "enabled: an edit that would not parse never replaces the file" {
+  # taplo is asked BEFORE the mv, because after it there is nothing to roll
+  # back to. A stub that always refuses is what makes that branch reachable.
+  generated_config
+  local before
+  before=$(cat "$DOT_CONFIG")
+
+  printf '#!/bin/sh\nexit 1\n' >"$DOT_TMP/taplo-no"
+  chmod +x "$DOT_TMP/taplo-no"
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-no"
+
+  run cfg_module_add cmux
+  [ "$status" -ne 0 ]
+  [ "$(cat "$DOT_CONFIG")" = "$before" ]
+  # And no debris beside it.
+  [ -z "$(find "$(dirname "$DOT_CONFIG")" -name 'config.toml.*' -print -quit)" ]
+}

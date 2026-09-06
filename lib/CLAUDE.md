@@ -16,6 +16,17 @@ Sourced, never executed. **7 files, no subdirectories.**
 
 - **`config.toml` is written once** (`config_generate`). Every TOML writer drops
   comments; nothing may rewrite it.
+- **One exception, and it is the narrowest available:** `cfg_module_add` and
+  `cfg_module_remove` splice a single line into the `enabled` array and copy
+  every other byte through. Same trade as `claude-code` with
+  `~/.claude/settings.json` -- the file is the user's, so the only thing that
+  may be touched is what this repo demonstrably wrote itself.
+  `cfg_enabled_editable` is the proof: an array not in the generated shape
+  (`  "name",` per line) makes them **refuse**, never reformat. Hand-editing
+  stays supported, which is the whole reason refusing is the answer.
+- **The replacement is validated before the `mv`.** After it there is nothing
+  to roll back to. `DOT_TAPLO_BIN` is the input that makes that branch
+  reachable in a test.
 - **dasel does not validate.** It stops at a malformed line, keeps what it read,
   exits 0. `cfg_parse_problems` is the guard; `apply` refuses, `doctor` reports.
   It asks `taplo` (core/Brewfile) first -- a real parser -- and falls back to

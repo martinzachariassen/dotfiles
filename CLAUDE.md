@@ -35,7 +35,7 @@ deliberately.
 | Each module directory's shell | 150 lines (sum uncapped) |
 | `lib/` | 7 files, no subdirectories |
 | `lib/wizard.sh` | 60 lines of code |
-| `bin/dot` | 3 verbs, hardcoded `case` |
+| `bin/dot` | 5 verbs, hardcoded `case` |
 | `module.toml` | 1 field: `description` |
 | Module hooks | `apply.sh`, `doctor.sh`, `remove.sh` -- closed set |
 | Module dirs | `home/` (linked), `data/` (hook-private) -- closed set |

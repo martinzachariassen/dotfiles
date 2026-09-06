@@ -183,3 +183,113 @@ FOOTER
 
   ok "wrote $DOT_CONFIG"
 }
+
+# --- Editing `enabled` ------------------------------------------------------
+#
+# The one exception to "config.toml is written once", and it is deliberately
+# the narrowest one available: a single array, edited a line at a time, with
+# every other byte of the file copied through. Same trade the claude-code
+# module makes with ~/.claude/settings.json -- the file is the user's, so the
+# only thing that may be touched is what this repo demonstrably wrote itself.
+#
+# Hand-editing the file stays supported, which is exactly why an array that no
+# longer has the generated shape makes these REFUSE rather than reformat.
+
+# __cfg_enabled_span -- "first last" line indices of the array body: the line
+# after `enabled = [` and the line holding `]`. Fails when the array was
+# reformatted by hand, and the caller must then say so rather than guess.
+__cfg_enabled_span() {
+  local -a lines
+  local i n start=0 end=0
+  mapfile -t lines <"$DOT_CONFIG"
+  n=${#lines[@]}
+
+  for ((i = 0; i < n; i++)); do
+    if [[ ${lines[i]} == 'enabled = [' ]]; then
+      start=$((i + 1))
+      break
+    fi
+  done
+  ((start)) || return 1
+
+  for ((i = start; i < n; i++)); do
+    [[ ${lines[i]} == ']' ]] && {
+      end=$i
+      break
+    }
+    # An entry, or something the user added between them. A comment and a blank
+    # line are kept where they are; anything else means the array is no longer
+    # the shape this code knows how to edit without losing part of it.
+    [[ ${lines[i]} =~ ^\ \ \"[^\"]+\",$ || ${lines[i]} =~ ^[[:space:]]*(#.*)?$ ]] ||
+      return 1
+  done
+  ((end)) || return 1
+
+  printf '%s %s\n' "$start" "$end"
+}
+
+cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
+
+# __cfg_write_lines -- give the user's file back the way it came. mktemp is
+# 0600 and `mv` carries that onto the destination, so a config kept at 0644
+# would come back private (claude-code's hooks guard the same way). Validated
+# before the swap: a surgical edit that somehow produced invalid TOML must not
+# become the config, and after `mv` there is nothing to roll back to.
+__cfg_write_lines() {
+  local tmp taplo=${DOT_TAPLO_BIN:-taplo}
+  tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")
+  chmod "$(stat -f '%Lp' "$DOT_CONFIG")" "$tmp"
+
+  if ! printf '%s\n' "$@" >"$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if command -v "$taplo" >/dev/null 2>&1 && ! "$taplo" check "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 1
+  fi
+  # `if`, never `... && mv`: set -e ignores a non-final member of an && list.
+  if mv "$tmp" "$DOT_CONFIG"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# cfg_module_add NAME -- alphabetical among the entries, which is the order
+# config_generate wrote and the order every report prints. Comments keep their
+# place; a name already there is the caller's problem, not this function's.
+cfg_module_add() {
+  local name=$1 start end i at
+  local -a lines
+  read -r start end < <(__cfg_enabled_span) || return 1
+  mapfile -t lines <"$DOT_CONFIG"
+
+  at=$end
+  for ((i = start; i < end; i++)); do
+    if [[ ${lines[i]} =~ ^\ \ \"([^\"]+)\",$ && ${BASH_REMATCH[1]} > $name ]]; then
+      at=$i
+      break
+    fi
+  done
+
+  __cfg_write_lines "${lines[@]:0:at}" "  \"$name\"," "${lines[@]:at}"
+}
+
+# cfg_module_remove NAME -- drops the one line, inside the array body only. A
+# string that looks like an entry anywhere else in the file is not one.
+cfg_module_remove() {
+  local name=$1 start end i
+  local -a lines out=()
+  read -r start end < <(__cfg_enabled_span) || return 1
+  mapfile -t lines <"$DOT_CONFIG"
+
+  for ((i = 0; i < ${#lines[@]}; i++)); do
+    if ((i >= start && i < end)) && [[ ${lines[i]} == "  \"$name\"," ]]; then
+      continue
+    fi
+    out+=("${lines[i]}")
+  done
+
+  __cfg_write_lines "${out[@]}"
+}
