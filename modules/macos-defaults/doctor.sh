@@ -1,31 +1,49 @@
 #!/usr/bin/env bash
 #
-# An OS update or a Settings pane can revert a value silently. A sample, not
-# an audit: one check per domain catches a wiped plist.
+# An OS update or a Settings pane reverts a value and says nothing; the only
+# symptom is a Mac that behaves slightly wrong. This used to check six keys
+# because each one cost a line. Reading the same file apply.sh writes from
+# makes the whole table one loop, so nothing is sampled any more.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-# `defaults read` prints booleans as 1/0.
+data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
+
+# check DOMAIN KEY TYPE VALUE -- `defaults read` prints booleans as 1/0 and
+# everything else as written. The reading half of the TSV's type column;
+# apply.sh is the writing half, with `-$type`.
+drift=()
 check() {
-  local domain=$1 key=$2 want=$3 label=$4 got
+  local domain=$1 key=$2 want=$4 got
+  case "$3:$4" in
+    bool:true) want=1 ;;
+    bool:false) want=0 ;;
+  esac
   got=$(defaults read "$domain" "$key" 2>/dev/null || echo '<unset>')
-  if [[ $got == "$want" ]]; then
-    ok "$label"
-  else
-    warn "$label (expected $want, found $got)"
-  fi
+  if [[ $got != "$want" ]]; then drift+=("$domain $key is $got, expected $want"); fi
 }
 
+while IFS=$'\t' read -r domain key type value _; do
+  if [[ -z $domain || $domain == '#'* ]]; then continue; fi
+  check "$domain" "$key" "$type" "$value"
+done <"$data"
+
+# Not in the table because it follows a setting; normalised exactly as apply.sh
+# normalises it before writing.
 if module_setting_bool macos-defaults dock_autohide true; then
-  want_autohide=1
+  check com.apple.dock autohide bool true
 else
-  want_autohide=0
+  check com.apple.dock autohide bool false
 fi
 
-check com.apple.dock autohide "$want_autohide" 'dock autohide'
-check com.apple.finder AppleShowAllFiles 1 'finder shows hidden files'
-check NSGlobalDomain AppleShowAllExtensions 1 'finder shows extensions'
-check NSGlobalDomain ApplePressAndHoldEnabled 0 'key repeat on hold'
-check NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled 0 'straight quotes'
-check com.apple.WindowManager EnableStandardClickToShowDesktop 0 'wallpaper click'
+# warn, not fail: an OS update reverting a key is not a broken install, and
+# `dot apply` puts it back.
+if ((${#drift[@]} == 0)); then
+  ok 'defaults     every managed key matches data/defaults.tsv'
+else
+  for row in "${drift[@]}"; do
+    warn "defaults     $row"
+  done
+  dim '             put them back with: dot apply'
+fi

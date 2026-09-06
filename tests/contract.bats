@@ -176,6 +176,9 @@ teardown() { teardown_sandbox; }
       # and exits 0 -- the exact reason cfg_parse_problems exists.
       *.toml) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
+      # A row that lost its tabs reads as a domain with no key: `defaults write`
+      # would then be called with too few arguments, or the wrong ones.
+      *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
       *.sh) shellcheck "$f" >/dev/null 2>&1 || bad+=("$f -- shellcheck") ;;
       *.zsh | */.zshrc | */.zshenv | */.zprofile) zsh -n "$f" 2>/dev/null || bad+=("$f -- zsh -n") ;;
     esac
@@ -256,4 +259,44 @@ teardown() { teardown_sandbox; }
   # doctor call a machine clean that remove would then not clean up.
   [ "$(grep 'def leaves' "$dir/doctor.sh" | tr -d ' ')" \
     = "$(grep 'def leaves' "$dir/remove.sh" | tr -d ' ')" ]
+}
+
+@test "macos-defaults: all three hooks read data/defaults.tsv alike" {
+  # apply writes every row, doctor compares every row, remove warns about the
+  # domains in column 1. Pointing one of them somewhere else would let doctor
+  # call a machine clean that apply never wrote to.
+  local dir="$DOT_ROOT/modules/macos-defaults"
+  [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/doctor.sh")" ]
+  [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/remove.sh")" ]
+}
+
+@test "macos-defaults: remove.sh names no domain by hand" {
+  # The list is what the user is told was changed irreversibly. Typed out, it
+  # goes stale the first time apply.sh gains a domain, and nothing says so.
+  run grep -nE '(com\.apple\.[a-zA-Z]+|NSGlobalDomain)' "$DOT_ROOT/modules/macos-defaults/remove.sh"
+  [ "$status" -ne 0 ] || {
+    echo "remove.sh hardcodes a domain; cut it from data/defaults.tsv instead:"
+    echo "$output"
+    return 1
+  }
+}
+
+@test "containers: apply.sh and remove.sh agree on the docker plugins" {
+  # remove.sh only unlinks what it names, so a plugin apply.sh gains and this
+  # list does not is a link left behind in a $HOME the sweep cannot see. The
+  # whole list, not a substring: appending a name has to be what fails.
+  local dir="$DOT_ROOT/modules/containers" list
+  list() { sed -n 's/.*for plugin in \(.*\); do.*/\1/p' "$1"; }
+  [ -n "$(list "$dir/apply.sh")" ]
+  [ "$(list "$dir/apply.sh")" = "$(list "$dir/remove.sh")" ]
+}
+
+@test "containers: doctor.sh and remove.sh agree on the colima VM path" {
+  # ~/.colima, not ~/.colima/default, and `colima status` creates the VM
+  # directory it was asked about. Both hooks say so in a comment; this is the
+  # check the comments promise.
+  local dir="$DOT_ROOT/modules/containers"
+  [ "$(grep -c 'HOME/\.colima/default' "$dir/doctor.sh")" -ge 1 ]
+  [ "$(grep -c 'HOME/\.colima/default' "$dir/remove.sh")" -ge 1 ]
+  [ -z "$(grep -oE 'HOME/\.colima[a-z/._-]*' "$dir/remove.sh" | grep -v 'HOME/\.colima/default' || true)" ]
 }

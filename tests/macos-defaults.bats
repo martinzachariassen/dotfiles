@@ -11,6 +11,7 @@ setup() {
 
   BIN="$DOT_TMP/bin"
   CALLS="$DOT_TMP/defaults-calls"
+  TSV="$DOT_ROOT/modules/macos-defaults/data/defaults.tsv"
   mkdir -p "$BIN"
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\n' "$CALLS" >"$BIN/defaults"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN/killall"
@@ -29,6 +30,46 @@ apply() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="${1:-0}" \
     "$BASH" "$DOT_ROOT/modules/macos-defaults/apply.sh"
+}
+
+doctor() {
+  run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    "$BASH" "$DOT_ROOT/modules/macos-defaults/doctor.sh"
+}
+
+remove() {
+  run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="${1:-0}" \
+    "$BASH" "$DOT_ROOT/modules/macos-defaults/remove.sh"
+}
+
+# rows -- the data rows of the table, comments and blanks dropped. The same
+# expression remove.sh uses; a test that re-derives it is not a second copy of
+# the DATA, which is the thing that must not be duplicated.
+rows() { grep -v '^[[:space:]]*\(#\|$\)' "$TSV"; }
+
+# A `defaults` that remembers, so apply.sh and doctor.sh can be pointed at one
+# machine. cfprefsd stores -bool as 1/0 and `read` prints it back that way --
+# the exact translation doctor.sh has to get right.
+with_store() {
+  export DEFAULTS_STORE="$DOT_TMP/defaults-store"
+  : >"$DEFAULTS_STORE"
+  cat >"$BIN/defaults" <<'STUB'
+#!/usr/bin/env bash
+case $1 in
+  write)
+    value=$5
+    case "$4:$5" in
+      -bool:true) value=1 ;;
+      -bool:false) value=0 ;;
+    esac
+    printf '%s %s\t%s\n' "$2" "$3" "$value" >>"$DEFAULTS_STORE"
+    ;;
+  read) awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE" ;;
+esac
+STUB
+  chmod +x "$BIN/defaults"
 }
 
 wrote() { grep -qF "$1" "$CALLS"; }
@@ -113,5 +154,115 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$status" -eq 0 ]
   [[ $output == *"write macOS defaults"* ]]
   [ ! -f "$CALLS" ]
+  [ "$(home_snapshot)" = "$before" ]
+}
+
+# --- data/defaults.tsv ---------------------------------------------------------
+
+@test "table: every row reaches defaults write, with its own type" {
+  # The file is the module's only statement of what it changes. A row that is
+  # read but not written would be a promise doctor.sh then reports as drift.
+  with_settings '# nothing set'
+  apply
+  [ "$status" -eq "$DOT_STATUS_WARN" ] # the logout reminder always warns
+
+  local domain key type value
+  while IFS=$'\t' read -r domain key type value _; do
+    wrote "$domain $key -$type $value" || {
+      echo "not written: $domain $key -$type $value"
+      return 1
+    }
+  done < <(rows)
+}
+
+@test "table: the type column is one defaults understands" {
+  # `defaults write x y -bogus 1` exits 1 and changes nothing, but apply.sh
+  # writes 25 keys and would carry on past it.
+  local type bad=()
+  while IFS=$'\t' read -r _ _ type _ _; do
+    case $type in
+      bool | int | float | string) ;;
+      *) bad+=("$type") ;;
+    esac
+  done < <(rows)
+  [ ${#bad[@]} -eq 0 ] || {
+    printf 'unknown defaults type: %s\n' "${bad[@]}"
+    return 1
+  }
+}
+
+# --- doctor.sh -----------------------------------------------------------------
+
+@test "doctor: a machine apply.sh just wrote to has no drift" {
+  # The round trip is what the shared file buys: apply writes -bool true,
+  # `defaults read` says 1, and doctor has to call that a match.
+  with_store
+  with_settings 'dock_tilesize = 64'
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output == *"every managed key matches"* ]]
+}
+
+@test "doctor: a reverted key is named, including one no sample would cover" {
+  # KeyRepeat was not among the six keys the old doctor checked. Full coverage
+  # of the table is the point of reading it instead of restating it.
+  with_store
+  with_settings '# nothing set'
+  apply
+  printf 'NSGlobalDomain KeyRepeat\t99\n' >>"$DEFAULTS_STORE"
+
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"NSGlobalDomain KeyRepeat is 99, expected 2"* ]]
+}
+
+@test "doctor: a key nothing ever wrote reads as unset, not as a match" {
+  with_store # empty: no apply
+  with_settings '# nothing set'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"<unset>"* ]]
+}
+
+@test "doctor: dock_autohide is compared as the setting asks, not as written" {
+  with_store
+  with_settings 'dock_autohide = false'
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+}
+
+@test "doctor: writes nothing, not even a preferences file" {
+  with_store
+  with_settings '# nothing set'
+  local before
+  before=$(home_snapshot)
+  doctor
+  [ "$(home_snapshot)" = "$before" ]
+}
+
+# --- remove.sh -----------------------------------------------------------------
+
+@test "remove: warns about exactly the domains the table names" {
+  # The list is the user's only record of an irreversible change, so it is cut
+  # from the table rather than typed. Proving it covers every domain is what
+  # stops apply.sh from gaining one this warning never mentions.
+  remove
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+
+  local domain
+  while IFS= read -r domain; do
+    [[ $output == *"$domain"* ]] || {
+      echo "remove.sh never named $domain"
+      return 1
+    }
+  done < <(rows | cut -f1 | sort -u)
+}
+
+@test "remove: changes nothing under a dry run" {
+  local before
+  before=$(home_snapshot)
+  remove 1
   [ "$(home_snapshot)" = "$before" ]
 }

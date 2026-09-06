@@ -165,3 +165,16 @@ gitcfg() { git config --file "$DEST" --get "$1"; }
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [ "$(git config --file "$DEST" --get user.name)" = 'Someone Else' ]
 }
+
+@test "remove: the ownership header it greps for is the one apply.sh writes" {
+  # The header is the entire proof that this repo wrote config.local. Reword it
+  # in apply.sh alone and remove.sh stops taking back its own file, silently.
+  # The literal is read out of remove.sh so this test is not a third copy.
+  local literal
+  literal=$(sed -n "s/.*grep -q '\(.*\)' \"\$dest\".*/\1/p" "$DOT_ROOT/modules/git/remove.sh")
+  [ -n "$literal" ]
+
+  with_config 'Ada' 'ada@example.com'
+  apply
+  grep -qF "$literal" "$DEST"
+}
