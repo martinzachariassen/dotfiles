@@ -9,6 +9,12 @@ set -euo pipefail
 REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles-v2.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles-v2}"
 
+# An INPUT, for the reason lib/brew.sh has DOT_BREW_BIN: without one, step 2's
+# "not installed yet" branch is unreachable on every machine anyone could test
+# from -- and that branch, with its sudo keep-alive, is the whole of step 2.
+# Its own name and its own default; install.sh still shares nothing.
+BREW_PREFIX="${DOTFILES_BREW_PREFIX:-/opt/homebrew}"
+
 echo "==> dotfiles bootstrap"
 echo "    repo: $REPO_URL"
 echo "    into: $REPO_DIR"
@@ -81,9 +87,9 @@ else
 fi
 
 # --- 2. Homebrew ------------------------------------------------------------
-if [ -x /opt/homebrew/bin/brew ]; then
+if [ -x "$BREW_PREFIX/bin/brew" ]; then
   step 2 "Homebrew already installed"
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+  eval "$("$BREW_PREFIX/bin/brew" shellenv)"
 else
   step 2 "Installing Homebrew (it will ask for your password)"
 
@@ -102,7 +108,7 @@ else
   kill "$keepalive" 2>/dev/null || true
   trap - EXIT
 
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+  eval "$("$BREW_PREFIX/bin/brew" shellenv)"
 fi
 echo "    Homebrew at $(brew --prefix)"
 

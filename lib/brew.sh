@@ -5,7 +5,8 @@
 # The fallback path is an INPUT, like DOT_CODE_BIN in modules/git: without one,
 # "Homebrew could not be loaded" is unreachable on any machine that has it, and
 # that is the branch where containers/remove.sh decides it cannot prove a link
-# is ours. install.sh hardcodes the same path on purpose -- it shares nothing.
+# is ours. install.sh keeps its own copy of the default, and its own name for
+# the input (DOTFILES_BREW_PREFIX) -- it shares nothing, including this.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
