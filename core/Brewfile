@@ -8,8 +8,15 @@ brew "dasel" # reads config.toml and every module.toml
 brew "fzf"   # the first-run module picker
 brew "git"
 
-# Quality gates -- pre-commit and CI run the same binaries.
+# Quality gates -- pre-commit and CI run the same binaries. Must stay in step
+# with the install list in .github/workflows/ci.yml: a tool `make check` needs
+# and this file omits is a suite that only runs where someone happened to have it.
 brew "bats-core"
 brew "shellcheck"
 brew "shfmt"
 brew "taplo" # a real TOML parser; dasel truncates a bad file and exits 0
+
+# jq: tests/helper.bash parses every shipped .json with it, and contract.bats
+# has no skip guard for it the way it does for zsh and brew. macOS ships
+# /usr/bin/jq from 15 on, which hid this -- MACOS_FLOOR (install.sh) is 14.
+brew "jq"
