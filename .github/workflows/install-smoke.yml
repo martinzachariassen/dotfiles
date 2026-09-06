@@ -1,0 +1,108 @@
+name: install-smoke
+
+# `install.sh` is the headline command in the README and the least covered path
+# in the repo: tests/install.bats stops at the three guards on purpose, and
+# every command past them is a tripwire that fails by design. This runs the
+# real thing, once, on a machine that is not the author's.
+#
+# Its own workflow, for the reason brew-audit has one: it needs the network and
+# Homebrew, so it must never fail a pull request about something else. It runs
+# on the pull requests that touch the bootstrap -- where it IS the thing under
+# review -- plus main and a weekly clock.
+#
+# What it CANNOT cover: steps 1 and 2. A hosted runner already has the Command
+# Line Tools and Homebrew, so both take their "already installed" branch. The
+# CLT polling loop and the Homebrew install with its sudo keep-alive need a
+# genuinely clean macOS, which no hosted runner is. Those stay a hand test.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'bin/dot'
+      - 'lib/**'
+      - 'core/**'
+      - '.github/workflows/install-smoke.yml'
+  schedule:
+    - cron: '43 6 * * 1' # Mondays, after brew-audit
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      # Full history: install.sh clones FROM this checkout, and git balks at
+      # some clones out of a shallow one.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The wizard is interactive by design and is not what this tests. A config
+      # already in place is also a real path -- it is what the second machine,
+      # or a reinstall, looks like. zsh is enabled rather than nothing: it links
+      # real files, installs a real Brewfile and runs a real doctor.sh, and
+      # without it `core/doctor.sh` rightly fails the run over a $PATH that
+      # cannot reach ~/.local/bin.
+      - name: Seed a config
+        run: |
+          mkdir -p ~/.config/dotfiles
+          cat > ~/.config/dotfiles/config.toml <<'EOF'
+          schema = 1
+
+          [user]
+          name  = "CI"
+          email = "ci@example.invalid"
+
+          [modules]
+          enabled = [
+            "zsh",
+          ]
+          EOF
+
+      # DOTFILES_REPO is this checkout, so a pull request tests its own
+      # install.sh rather than whatever happens to be on main.
+      #
+      # `script`: step 5 refuses without a readable /dev/tty, because the wizard
+      # must be able to ask. A runner has no terminal, so it gets a pty -- the
+      # check that protects a real `curl | bash` is not worth weakening for a
+      # test's convenience.
+      #
+      # `< /dev/null` explicitly: macOS `script` calls tcgetattr on its stdin
+      # and dies on anything it cannot ask about. A runner step already gets
+      # /dev/null, so this only pins what it is relying on.
+      # `shell: bash` for its `-o pipefail`: the default shell would let `tee`
+      # report success over a failed install.
+      - name: Run install.sh
+        shell: bash
+        env:
+          DOTFILES_REPO: ${{ github.workspace }}
+          DOTFILES_DIR: ${{ runner.temp }}/dotfiles
+        run: |
+          script -q /dev/null bash install.sh </dev/null 2>&1 |
+            tee "$RUNNER_TEMP/install.log"
+
+      # The step above already fails on a non-zero exit -- macOS `script` passes
+      # the command's status through. This asks the other question: not "did it
+      # return 0" but "is the machine it claimed to build actually there". The
+      # log is the proof `dot apply` ran; nothing else writes one.
+      - name: It reached the handoff, and the handoff worked
+        env:
+          DOTFILES_DIR: ${{ runner.temp }}/dotfiles
+        run: |
+          grep -q '5/5' "$RUNNER_TEMP/install.log"
+          [ -d "$DOTFILES_DIR/.git" ]
+          [ -x "$HOME/.local/bin/dot" ]
+          [ -L "$HOME/.zshenv" ]
+          ls "$HOME/.local/state/dotfiles/logs/"*-apply.log
+
+      # The real proof: the machine it built agrees it is right. Read-only, so
+      # it cannot paper over anything the step above missed.
+      - name: The machine it made passes its own checks
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          dot doctor

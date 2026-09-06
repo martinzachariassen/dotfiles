@@ -18,6 +18,12 @@ Homebrew does -- it must never fail a pull request about something else. CI
 runs it weekly and files an issue, and on the pull requests that touch a
 Brewfile, where the answer is the thing under review.
 
+`install-smoke` is separate for the same reason, and covers what no bats test
+can: it runs `install.sh` for real on a fresh runner, on the same clock plus
+the pull requests that touch the bootstrap. It cannot cover steps 1 and 2 --
+a hosted runner already has the Command Line Tools and Homebrew, so both take
+their "already installed" branch. **Those two stay a hand test on a clean Mac.**
+
 The tools `make check` runs are not in `core/Brewfile`; they are the
 `dotfiles-dev` module, or `brew bundle --file modules/dotfiles-dev/Brewfile`.
 
