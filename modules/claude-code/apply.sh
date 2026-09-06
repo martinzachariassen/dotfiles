@@ -2,11 +2,9 @@
 #
 # Merge this module's settings into ~/.claude/settings.json.
 #
-# The settings are data/settings.json, not a shell literal: it is the file you
-# read to know what this module asserts, jq consumes it directly, and
-# contract.bats validates it as JSON like every other shipped data file. All
-# three hooks derive $want from it with the same two lines -- contract.bats
-# asserts the copies agree, so there is one statement of the truth.
+# The settings are data/settings.json, not a shell literal (modules/CLAUDE.md).
+# All three hooks derive $want from it with the same two lines, and
+# contract.bats asserts the copies agree.
 #
 # Merged, never written whole: settings.json is the user's file. `. * $want`
 # is a recursive merge, so every key this module does not name survives --
@@ -29,14 +27,28 @@ fi
 mkdir -p "$(dirname "$dest")"
 [[ -f $dest ]] || printf '{}\n' >"$dest"
 
-# jq would exit non-zero and leave the file as it was -- correct, but the
-# reason never reaches the summary. Name it, and say what to do about it.
-if ! jq -e . "$dest" >/dev/null 2>&1; then
-  fail "${dest/#$HOME/\~} is not valid JSON -- fix it or move it aside, then: dot apply"
+# `jq -r type`, not `jq -e .`: -e reports `null` and `false` as unparseable,
+# which they are not, and object is the real requirement anyway -- every jq
+# program below indexes by key. All three hooks ask this same question.
+kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'
+if [[ $kind != object ]]; then
+  fail "${dest/#$HOME/\~}: expected a JSON object, found $kind -- fix it or move it aside, then: dot apply"
   exit 1
 fi
 
+# chmod: mktemp is 0600 and `mv` carries that onto the destination, so a
+# settings.json the user kept at 0644 came back private after every apply.
 tmp="$(mktemp "${dest}.XXXXXX")"
-jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"
+chmod "$(stat -f '%Lp' "$dest")" "$tmp"
 
-ok "Claude Code settings: $(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
+# `if`, never `jq ... && mv`: set -e ignores a non-final member of an && list,
+# so a jq that died mid-merge printed the success line and exited 0. remove.sh
+# guards the same way. The temp file is ours, so `rm` is right where a user's
+# file would need fs_discard.
+if jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"; then
+  ok "Claude Code settings: $(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
+else
+  rm -f "$tmp"
+  fail "jq could not rewrite ${dest/#$HOME/\~} -- it was left as it was"
+  exit 1
+fi

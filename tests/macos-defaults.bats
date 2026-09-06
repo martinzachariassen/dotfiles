@@ -266,3 +266,22 @@ wrote() { grep -qF "$1" "$CALLS"; }
   remove 1
   [ "$(home_snapshot)" = "$before" ]
 }
+
+@test "remove: an unreadable table is refused, never warned about emptily" {
+  # The warning IS the deliverable here -- apply.sh cannot be undone, so the
+  # domain list is all the user gets. A missing table used to print the
+  # "cannot be put back" line with nothing under it and still exit as a plain
+  # warning: the exact lie remove.sh's header comment forbids.
+  mkdir -p "$DOT_TMP/nodata"
+  cp "$DOT_ROOT/modules/macos-defaults/remove.sh" "$DOT_TMP/nodata/"
+
+  run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    DOT_MODULE=macos-defaults DOT_MODULE_DIR="$DOT_TMP/nodata" \
+    "$BASH" "$DOT_TMP/nodata/remove.sh"
+
+  [ "$status" -ne 0 ]
+  [ "$status" -ne "$DOT_STATUS_WARN" ]
+  [[ $output == *"cannot read"* ]]
+  [[ $output != *"cannot be put back"* ]]
+}

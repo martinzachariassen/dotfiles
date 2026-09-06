@@ -259,6 +259,23 @@ teardown() { teardown_sandbox; }
   # doctor call a machine clean that remove would then not clean up.
   [ "$(grep 'def leaves' "$dir/doctor.sh" | tr -d ' ')" \
     = "$(grep 'def leaves' "$dir/remove.sh" | tr -d ' ')" ]
+
+  # And all three agree on what an acceptable settings.json IS. One hook left
+  # on `jq -e .` would go back to calling `null` a syntax error, or would let
+  # apply merge into an array that remove then cannot take its keys back out of.
+  local hook
+  for hook in apply.sh doctor.sh remove.sh; do
+    if ! grep -q "jq -r 'type'" "$dir/$hook"; then
+      echo "$hook does not ask jq for the type of settings.json"
+      return 1
+    fi
+    # Comments stripped: apply.sh's own comment explains why `jq -e .` is wrong.
+    # `if`, not `grep && return`: a false last test is a failing test (tests/CLAUDE.md).
+    if grep -v '^[[:space:]]*#' "$dir/$hook" | grep -q 'jq -e \.'; then
+      echo "$hook still uses \`jq -e .\`, which rejects null and false"
+      return 1
+    fi
+  done
 }
 
 @test "macos-defaults: all three hooks read data/defaults.tsv alike" {

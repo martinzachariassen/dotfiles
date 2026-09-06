@@ -111,6 +111,106 @@ run_hook() {
   [ "$before" = "$(jq -S . "$HOME/.claude/settings.json")" ]
 }
 
+# no_jq -- a PATH with nothing on it at all. lib/dot.sh needs no external
+# command once DOT_ROOT and DOT_RUN_ID are given, so this is the honest shape
+# of a machine that never installed the module whose hook is running.
+no_jq() {
+  mkdir -p "$DOT_TMP/empty"
+  run env -i PATH="$DOT_TMP/empty" HOME="$HOME" DOT_ROOT="$DOT_ROOT" \
+    DOT_RUN_ID="$DOT_RUN_ID" DOT_DRY_RUN=0 DOT_MODULE=claude-code \
+    DOT_MODULE_DIR="$DOT_ROOT/modules/claude-code" \
+    "$BASH" "$DOT_ROOT/modules/claude-code/remove.sh"
+}
+
+@test "claude-code: remove.sh needs no jq when there is nothing of ours to remove" {
+  # uninstall.sh runs EVERY module's remove.sh, enabled or not, and jq comes
+  # from this module's own Brewfile. Deriving $want before the guards killed
+  # the hook on its twelfth line, which failed the preview, which aborted the
+  # whole uninstall -- on any machine that never enabled claude-code.
+  [ ! -e "$HOME/.claude/settings.json" ]
+  no_jq
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "claude-code: remove.sh without jq leaves settings.json alone and says why" {
+  # A warning, not a failure: uninstall.sh stops before Homebrew on a failure,
+  # and a few keys left in a file the user still owns is no reason for that.
+  mkdir -p "$HOME/.claude"
+  printf '{"model":"mine"}\n' >"$HOME/.claude/settings.json"
+
+  no_jq
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"jq is not installed"* ]]
+  [ "$(cat "$HOME/.claude/settings.json")" = '{"model":"mine"}' ]
+}
+
+@test "claude-code: settings.json that is valid JSON but not an object" {
+  # `jq -e .` accepted [], and every jq program after that guard died on it.
+  # `jq ... && mv` hid the death completely: set -e ignores a non-final member
+  # of an && list, so both hooks printed their success line, exited 0, and left
+  # a half-written temp file next to the file they had not touched.
+  mkdir -p "$HOME/.claude"
+  printf '[]\n' >"$HOME/.claude/settings.json"
+
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  [ "$status" -ne 0 ]
+  [[ $output == *"found array"* ]]
+  [ "$(cat "$HOME/.claude/settings.json")" = "[]" ]
+
+  run_hook "$DOT_ROOT/modules/claude-code" remove.sh
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [ "$(cat "$HOME/.claude/settings.json")" = "[]" ]
+
+  # The temp file is the tell: a hook that gave up must leave no litter behind.
+  [ "$(ls -A "$HOME/.claude")" = "settings.json" ]
+}
+
+@test "claude-code: the mode of the user's settings.json survives both hooks" {
+  # mktemp is 0600 and `mv` carries that onto the destination, so a file the
+  # user kept group- or world-readable came back private -- once per apply,
+  # silently, to a file this module only ever claimed to merge into.
+  mkdir -p "$HOME/.claude"
+  printf '{"theirs":1}\n' >"$HOME/.claude/settings.json"
+  chmod 644 "$HOME/.claude/settings.json"
+
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  [ "$status" -eq 0 ]
+  [ "$(stat -f '%Lp' "$HOME/.claude/settings.json")" = 644 ]
+
+  run_hook "$DOT_ROOT/modules/claude-code" remove.sh
+  [ "$status" -eq 0 ]
+  [ "$(stat -f '%Lp' "$HOME/.claude/settings.json")" = 644 ]
+}
+
+@test "claude-code: valid JSON of the wrong shape is never called invalid" {
+  # `jq -e .` exits non-zero on `null` and `false`, so all three hooks called
+  # them invalid JSON -- a diagnosis that sends the user hunting for a syntax
+  # error in a file whose syntax is fine. apply and remove name the type they
+  # found; doctor, whose whole advice is "run dot apply", only has to stop
+  # saying the wrong thing.
+  mkdir -p "$HOME/.claude"
+  local pair shape kind hook
+  for pair in 'null:null' 'false:boolean' '42:number'; do
+    shape=${pair%:*} kind=${pair#*:}
+    printf '%s\n' "$shape" >"$HOME/.claude/settings.json"
+
+    for hook in apply.sh remove.sh; do
+      run_hook "$DOT_ROOT/modules/claude-code" "$hook"
+      [ "$status" -ne 0 ]
+      [[ $output == *"$kind"* ]] || {
+        echo "$hook never said it found a $kind in a settings.json of \`$shape\`:"
+        echo "$output"
+        return 1
+      }
+    done
+
+    run_hook "$DOT_ROOT/modules/claude-code" doctor.sh
+    [ "$status" -ne 0 ]
+    [[ $output != *"valid JSON"* ]]
+  done
+}
+
 @test "claude-code doctor reports a managed key the user changed" {
   mkdir -p "$HOME/.claude"
   printf '{}\n' >"$HOME/.claude/settings.json"
@@ -131,7 +231,7 @@ run_hook() {
 
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
   [ "$status" -ne 0 ]
-  [[ $output == *"not valid JSON"* ]]
+  [[ $output == *"unparseable text"* ]]
   # The user's file is theirs; a hook that cannot parse it may not replace it.
   [ "$(cat "$HOME/.claude/settings.json")" = "this is not json" ]
 }

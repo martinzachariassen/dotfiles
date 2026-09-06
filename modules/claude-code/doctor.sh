@@ -17,8 +17,8 @@ want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline
 
 if [[ ! -f $dest ]]; then
   fail 'settings     ~/.claude/settings.json does not exist -- run: dot apply'
-elif ! jq -e . "$dest" >/dev/null 2>&1; then
-  fail 'settings     ~/.claude/settings.json is not valid JSON -- fix it, then run: dot apply'
+elif [[ $(jq -r 'type' "$dest" 2>/dev/null) != object ]]; then
+  fail 'settings     ~/.claude/settings.json is not a JSON object -- fix it, then run: dot apply'
 else
   # Leaves, not top-level keys: .permissions.defaultMode is ours, .permissions
   # as a whole is not. Must match remove.sh (tests/contract.bats).

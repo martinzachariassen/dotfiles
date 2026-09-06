@@ -2,10 +2,15 @@
 #
 # Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
+# The fallback path is an INPUT, like DOT_CODE_BIN in modules/git: without one,
+# "Homebrew could not be loaded" is unreachable on any machine that has it, and
+# that is the branch where containers/remove.sh decides it cannot prove a link
+# is ours. install.sh hardcodes the same path on purpose -- it shares nothing.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
-  if [[ -x /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+  local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
+  if [[ -x $brew_bin ]]; then
+    eval "$("$brew_bin" shellenv)"
     return 0
   fi
   return 1
