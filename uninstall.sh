@@ -229,7 +229,10 @@ if ((DOT_FAILURES > 0)); then
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  if ((! have_brew)); then
+  # `== 0`, not `!`: shfmt 3.13 and 3.14 disagree about the space after a `!`
+  # inside `(( ))` and reformat the line in opposite directions, so whichever
+  # version CI has fails `make fmt-check`. This spelling neither has a view on.
+  if ((have_brew == 0)); then
     dim 'Homebrew is not installed; nothing to uninstall.'
   elif read -r n_all n_foreign < <(brew_headcount); then
     info "uninstall Homebrew and all $n_all formulae it manages"
