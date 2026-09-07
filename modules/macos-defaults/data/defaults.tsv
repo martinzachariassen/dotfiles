@@ -11,6 +11,7 @@ com.apple.dock	autohide-delay	float	0	no reveal wait
 com.apple.dock	autohide-time-modifier	float	0	no slide-in
 com.apple.dock	show-recents	bool	false	recents are not a workflow
 com.apple.dock	mru-spaces	bool	false	ctrl-N is stable
+com.apple.dock	minimize-to-application	bool	true	minimized windows live in the app icon
 
 # --- Finder ---
 com.apple.finder	AppleShowAllFiles	bool	true	dotfiles are the point
@@ -20,9 +21,17 @@ com.apple.finder	_FXSortFoldersFirst	bool	true	folders above files
 com.apple.finder	FXPreferredViewStyle	string	Nlsv	list view
 com.apple.finder	FXDefaultSearchScope	string	SCcf	current folder
 com.apple.finder	FXEnableExtensionChangeWarning	bool	false	renaming is not dangerous
+com.apple.finder	WarnOnEmptyTrash	bool	false	emptying is not dangerous
+com.apple.finder	_FXShowPosixPathInTitle	bool	true	full path, next to the terminal
+com.apple.finder	QuitMenuItem	bool	true	Cmd-Q actually quits Finder
 NSGlobalDomain	AppleShowAllExtensions	bool	true	the extension is the file type
 com.apple.desktopservices	DSDontWriteNetworkStores	bool	true	no .DS_Store on shares
 com.apple.desktopservices	DSDontWriteUSBStores	bool	true	no .DS_Store on USB sticks
+
+# --- Trackpad ---
+com.apple.AppleMultitouchTrackpad	Clicking	bool	true	tap to click, built-in trackpad
+com.apple.driver.AppleBluetoothMultitouch.trackpad	Clicking	bool	true	tap to click, Bluetooth trackpad
+NSGlobalDomain	com.apple.mouse.tapBehavior	int	1	tap to click, including the login screen
 
 # --- Keyboard ---
 NSGlobalDomain	ApplePressAndHoldEnabled	bool	false	repeat, not accents

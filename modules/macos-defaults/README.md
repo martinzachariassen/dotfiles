@@ -1,7 +1,8 @@
 # macos-defaults
 
-macOS system preferences — Dock, Finder, keyboard, text substitution,
-screenshots. Imperative and idempotent; the only *tool* module that links no
+macOS system preferences — Dock, Finder, trackpad, keyboard, text
+substitution, screenshots. Imperative and idempotent; the only *tool* module
+that links no
 files at all, because none of this is a file — it has no `home/`, and no
 Brewfile either.
 
