@@ -99,6 +99,9 @@ cmd_apply() {
   if [[ -n $__DOT_LOG ]]; then dim "log     ${__DOT_LOG/#$HOME/\~}"; fi
   if [[ $DOT_DRY_RUN == 1 ]]; then dim 'dry run -- nothing will be changed'; fi
 
+  heading 'Applying'
+  dim 'Install packages, link files, run each module.'
+
   # Phase 1 installs dasel and fzf; nothing below may run before it.
   heading 'Core packages'
   if ! brew_load; then
@@ -161,6 +164,8 @@ cmd_apply() {
   # A run that only reports what it attempted is not evidence. Skipped under
   # --dry-run, where every check would report drift the run did not fix.
   if [[ $DOT_DRY_RUN != 1 ]]; then
+    heading 'Verifying'
+    dim 'Read-only recheck of the same modules -- same as: dot doctor.'
     run_checks
   fi
 
