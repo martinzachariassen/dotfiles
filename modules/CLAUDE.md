@@ -37,9 +37,8 @@ way to say "I need this too".
 
 For what a module's **own hooks** read and the user never edits in place --
 `claude-code/data/settings.json`, merged into the user's `~/.claude/settings.json`
-with `jq`; `macos-defaults/data/defaults.tsv`, the table apply writes, doctor
-compares and remove cuts its domain list from; and `dev-cli/data/go-tools.txt`,
-the packages apply installs and doctor looks for the binaries of. Never reaches
+with `jq`; and `macos-defaults/data/defaults.tsv`, the table apply writes, doctor
+compares and remove cuts its domain list from. Never reaches
 `fs_pairs`, so nothing links it (`contract.bats` proves this). A file the USER
 should own goes under `home/` at its path in `$HOME`; a file that is an argument
 to a hook goes here.

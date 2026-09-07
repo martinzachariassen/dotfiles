@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 #
-# modules/dev-cli/remove.sh. apply.sh downloads runtimes and four go binaries
-# into trees full of other projects' content, so nothing here is deletable --
-# the warning IS the deliverable, the same trade macos-defaults makes.
+# modules/dev-cli/remove.sh. apply.sh downloads runtimes into a tree full of
+# other projects' content, so nothing here is deletable -- the warning IS the
+# deliverable, the same trade macos-defaults makes.
 
 load helper
 
@@ -26,23 +26,14 @@ remove() {
 }
 
 @test "remove: names the mise tree, and refuses to delete it" {
-  mkdir -p "$HOME/.local/share/mise/installs/go/1.0.0/bin"
-  printf 'a real binary\n' >"$HOME/.local/share/mise/installs/go/1.0.0/bin/gopls"
+  mkdir -p "$HOME/.local/share/mise/installs/node/20.0.0/bin"
+  printf 'a real binary\n' >"$HOME/.local/share/mise/installs/node/20.0.0/bin/node"
 
   remove
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *".local/share/mise"* ]]
-  [ -f "$HOME/.local/share/mise/installs/go/1.0.0/bin/gopls" ]
-}
-
-@test "remove: names Go's module cache separately from the mise tree" {
-  # Two directories, two owners: ~/go predates this repo on most machines and
-  # `go clean -modcache` is a different instruction from `mise implode`.
-  mkdir -p "$HOME/go/pkg/mod"
-  remove
-  [[ $output == *"go/pkg/mod"* ]]
-  [[ $output == *"go clean -modcache"* ]]
-  [[ $output != *"mise implode"* ]]
+  [[ $output == *"mise implode"* ]]
+  [ -f "$HOME/.local/share/mise/installs/node/20.0.0/bin/node" ]
 }
 
 @test "remove: honours MISE_DATA_DIR, which is where mise would have put it" {
@@ -56,7 +47,7 @@ remove() {
 }
 
 @test "remove: a dry run prints the same words and writes nothing" {
-  mkdir -p "$HOME/.local/share/mise" "$HOME/go/pkg/mod"
+  mkdir -p "$HOME/.local/share/mise"
   local before real
   before=$(home_snapshot)
 

@@ -179,8 +179,6 @@ teardown() { teardown_sandbox; }
       # A row that lost its tabs reads as a domain with no key: `defaults write`
       # would then be called with too few arguments, or the wrong ones.
       *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
-      # Every line is an argument to `go install`: module path, then @version.
-      */go-tools.txt) awk '/^[[:space:]]*(#|$)/ { next } !/^[a-z0-9._\/-]+@[a-zA-Z0-9._-]+$/ { exit 1 }' "$f" || bad+=("$f -- not one go module path per line") ;;
       # Every git command on the machine reads this file, and a malformed line
       # makes all of them fail. doctor.sh checks the GENERATED config.local and
       # never the tracked one next to it, which is the bigger of the two.
@@ -328,18 +326,10 @@ teardown() { teardown_sandbox; }
   done
 }
 
-@test "dev-cli: the hooks read data/go-tools.txt and mise's data dir alike" {
-  # apply installs every line, doctor looks for the binary each line names.
-  # Pointing one of them elsewhere would let doctor call a machine clean that
-  # apply never installed to.
-  local dir="$DOT_ROOT/modules/dev-cli"
-  [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/doctor.sh")" ]
-  # And they must SKIP the same lines. doctor.sh once tested `#`* inline, which
-  # let an indented comment -- legal in the file -- become a tool it hunted for.
-  [ "$(grep -c "grep -vE '\^\[\[:space:\]\]\*(#|\$)'" "$dir/apply.sh")" -eq 1 ]
-  [ "$(grep -c "grep -vE '\^\[\[:space:\]\]\*(#|\$)'" "$dir/doctor.sh")" -eq 1 ]
+@test "dev-cli: doctor.sh and remove.sh resolve mise's data dir alike" {
   # mise does not expose its default data dir for scripting, so both hooks
   # rebuild it. One of them drifting is a check looking where nothing lands.
+  local dir="$DOT_ROOT/modules/dev-cli"
   [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
 }
 

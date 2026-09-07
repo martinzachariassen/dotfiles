@@ -7,7 +7,7 @@ format = """
 $username$hostname\
 $directory\
 $git_branch$git_state$git_status\
-$c$rust$golang$nodejs$bun$php$java$kotlin$haskell$python\
+$c$rust$nodejs$bun$php$java$kotlin$haskell$python\
 $docker_context\
 $conda\
 $line_break\
@@ -74,11 +74,6 @@ format = "via [$symbol($version )]($style)"
 [rust]
 symbol = " "
 style = "red"
-format = "via [$symbol($version )]($style)"
-
-[golang]
-symbol = " "
-style = "sapphire"
 format = "via [$symbol($version )]($style)"
 
 [nodejs]

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 #
 # A half-finished download leaves a working shell: a missing runtime is "command
-# not found" for a language you thought you had, a missing gopls a VS Code with
-# no IntelliSense. Nothing else looks at either.
+# not found" for a language you thought you had. Nothing else looks at this.
 #
 # Read-only WITHOUT asking mise: `mise ls` creates ~/.local/share/mise and
 # ~/.local/state/mise on a machine that has neither. The install tree is the
@@ -10,8 +9,6 @@
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
-
-data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/go-tools.txt"
 
 # mise's own default resolution, which it does not expose for scripting. Same
 # line as remove.sh (tests/contract.bats).
@@ -36,24 +33,4 @@ if ((${#missing[@]} == 0)); then
   ok 'runtimes     every tool in mise config.toml is installed'
 else
   fail "runtimes     not installed: ${missing[*]} -- run: dot apply"
-fi
-
-# `mise exec -- go install` puts these under installs/go/<version>/bin, so the
-# glob spans a go upgrade without naming a version. compgen, not ls: a builtin,
-# and an unmatched glob is a status rather than a subprocess and an error line.
-absent=()
-# Same filter expression as apply.sh (tests/contract.bats): an inline `#`* test
-# misses an INDENTED comment, which the data file's own contract allows.
-while IFS= read -r pkg; do
-  bin=${pkg%@*}
-  bin=${bin##*/}
-  if ! compgen -G "$mise_data/installs/go/*/bin/$bin" >/dev/null; then
-    absent+=("$bin")
-  fi
-done < <(grep -vE '^[[:space:]]*(#|$)' "$data")
-
-if ((${#absent[@]} == 0)); then
-  ok 'go tools     every tool in data/go-tools.txt is installed'
-else
-  fail "go tools     not installed: ${absent[*]} -- run: dot apply"
 fi

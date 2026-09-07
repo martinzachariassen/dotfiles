@@ -307,7 +307,7 @@ half-enabled.
 | `cmux` | the terminal, plus the Ghostty config it reads: Option stays native for Æ/Ø/Å |
 | `claude-code` | [the CLI, and keys merged into `~/.claude/settings.json`](modules/claude-code/README.md) |
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
-| `dev-cli` | [CLI tools, mise runtimes and go tooling](modules/dev-cli/README.md) |
+| `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
 | `macos-defaults` | [Dock, Finder, keyboard, screenshots](modules/macos-defaults/README.md) — imperative, no files at all |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this

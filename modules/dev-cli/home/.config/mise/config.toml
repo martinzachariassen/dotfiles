@@ -1,6 +1,5 @@
 [tools]
 java = "temurin-25"
-go = "latest"
 python = "latest"
 node = "latest"
 bun = "latest"
