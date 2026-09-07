@@ -2,10 +2,10 @@
 
 macOS setup: Homebrew, packages, and config files. One command on a fresh Mac.
 
-[![ci](https://github.com/martinzachariassen/dotfiles-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/dotfiles-v2/actions/workflows/ci.yml)
+[![ci](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/martinzachariassen/dotfiles/actions/workflows/ci.yml)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles-v2/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
 [How it works](#how-it-works) · [Commands](#commands) ·
@@ -56,7 +56,7 @@ dot doctor             Check this machine; read-only
 expected; it is also the update path:
 
 ```sh
-git -C ~/Developer/personal/dotfiles-v2 pull && dot apply
+git -C ~/Developer/personal/dotfiles pull && dot apply
 ```
 
 It updates the *configuration*, not the packages. `apply` runs `brew bundle
@@ -355,7 +355,7 @@ one misreading that matters:
 Homebrew and the repo
   → uninstall Homebrew and all 85 formulae it manages
   ! 59 of those are named by no Brewfile here -- they go too
-  → remove  /Users/you/Developer/personal/dotfiles-v2
+  → remove  /Users/you/Developer/personal/dotfiles
 ```
 
 **Casks are removed first, by name, while Homebrew still works.** Homebrew

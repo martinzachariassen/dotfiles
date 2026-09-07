@@ -16,4 +16,4 @@ alias ..='cd ..'
 alias ...='cd ../..'
 
 # install.sh's default checkout path; edit if you cloned elsewhere.
-alias dotup='git -C "$HOME/Developer/personal/dotfiles-v2" pull --ff-only && dot apply'
+alias dotup='git -C "$HOME/Developer/personal/dotfiles" pull --ff-only && dot apply'

@@ -2,12 +2,12 @@
 #
 # Phase 0 bootstrap. Runs before the repo exists, so: plain echo, no library.
 #
-#   curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles-v2/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 
 set -euo pipefail
 
-REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles-v2.git}"
-REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles-v2}"
+REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
+REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
 # An INPUT, like lib/brew.sh's DOT_BREW_BIN: without one, step 2's "not
 # installed yet" branch is unreachable on every machine anyone could test from.
