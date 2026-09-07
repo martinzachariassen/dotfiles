@@ -72,3 +72,94 @@ no_brew() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
+
+# --- doctor.sh: DOCKER_HOST / TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE ----------
+#
+# The values live in modules/zsh/home/.zshenv, not here -- .zshenv is the one
+# file sourced by every zsh process, interactive or not. These tests hold the
+# two files to the same literals (modules/CLAUDE.md's rule on a duplicated
+# literal) and check what doctor.sh reports about the current process's env.
+
+doctor() {
+  # `-u` flags in "$@" must precede every NAME=VALUE assignment, HOME and
+  # DOT_ROOT included -- env stops parsing options at the first one it sees.
+  run env "$@" HOME="$HOME" DOT_ROOT="$DOT_ROOT" \
+    "$BASH" "$DOT_ROOT/modules/containers/doctor.sh"
+}
+
+@test "the DOCKER_HOST doctor.sh wants is the one .zshenv exports" {
+  local from_zshenv from_doctor
+  from_zshenv=$(sed -n 's/^ *export DOCKER_HOST="\(.*\)"$/\1/p' \
+    "$DOT_ROOT/modules/zsh/home/.zshenv")
+  from_doctor=$(sed -n 's/^ *want_host="\(.*\)"$/\1/p' \
+    "$DOT_ROOT/modules/containers/doctor.sh")
+
+  [ -n "$from_zshenv" ] || {
+    echo 'no DOCKER_HOST export in modules/zsh/home/.zshenv'
+    return 1
+  }
+  [ -n "$from_doctor" ] || {
+    echo 'no want_host assignment in modules/containers/doctor.sh'
+    return 1
+  }
+  [ "$from_zshenv" = "$from_doctor" ] || {
+    echo "zshenv: $from_zshenv"
+    echo "doctor: $from_doctor"
+    return 1
+  }
+}
+
+@test "the socket override doctor.sh wants is the one .zshenv exports" {
+  local from_zshenv from_doctor
+  from_zshenv=$(sed -n 's/^ *export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=\(.*\)$/\1/p' \
+    "$DOT_ROOT/modules/zsh/home/.zshenv")
+  from_doctor=$(sed -n "s/^ *want_override='\\(.*\\)'\$/\\1/p" \
+    "$DOT_ROOT/modules/containers/doctor.sh")
+
+  [ -n "$from_zshenv" ] || {
+    echo 'no TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE export in modules/zsh/home/.zshenv'
+    return 1
+  }
+  [ -n "$from_doctor" ] || {
+    echo 'no want_override assignment in modules/containers/doctor.sh'
+    return 1
+  }
+  [ "$from_zshenv" = "$from_doctor" ] || {
+    echo "zshenv: $from_zshenv"
+    echo "doctor: $from_doctor"
+    return 1
+  }
+}
+
+@test "doctor: no VM yet says nothing about DOCKER_HOST" {
+  doctor -u DOCKER_HOST -u TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE
+  [[ $output != *"DOCKER_HOST"* ]]
+}
+
+@test "doctor: the right env passes once a VM exists" {
+  mkdir -p "$HOME/.colima/default"
+  doctor -u DOCKER_HOST -u TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE \
+    DOCKER_HOST="unix://$HOME/.colima/default/docker.sock" \
+    TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+  [[ $output == *"DOCKER_HOST"*"set for Testcontainers"* ]]
+}
+
+@test "doctor: missing env fails without a next shell to blame" {
+  mkdir -p "$HOME/.colima/default"
+  doctor -u DOCKER_HOST -u TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"not set"* ]]
+}
+
+@test "doctor: missing env is excused once .zshenv is linked" {
+  mkdir -p "$HOME/.colima/default"
+  mkdir -p "$(dirname "$HOME/.zshenv")"
+  ln -s "$DOT_ROOT/modules/zsh/home/.zshenv" "$HOME/.zshenv"
+
+  # Not a status assertion: the real `colima status`, run against this fake
+  # $HOME by the pre-existing check above, reports "not running" on its own
+  # and warns for an unrelated reason. Only the DOCKER_HOST line is ours here.
+  doctor -u DOCKER_HOST -u TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE
+  [[ $output == *"next shell"* ]]
+  [[ $output != *"not set"* ]]
+}

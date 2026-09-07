@@ -79,6 +79,31 @@ Three things about that file:
   buildkit step OOM-killed inside the VM, surfacing as a build error that never
   mentions memory. Raise or lower it per machine with the command above.
 
+## The socket JVM tooling needs
+
+`docker ps` works with nothing else set because colima registers a `docker
+context` and the `docker` CLI resolves it automatically. Testcontainers
+(Maven's `mvn verify`, any JUnit suite that spins up Postgres) does **not**
+read that context — it only looks at `DOCKER_HOST` or the default
+`unix:///var/run/docker.sock`, neither of which exists on this machine, and
+fails claiming Docker is unreachable even while `docker ps` works fine.
+
+`modules/zsh/home/.zshenv` exports two variables once `~/.colima/default`
+exists:
+
+- `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock` — points every
+  Docker client, Testcontainers included, at colima's socket.
+- `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock` — without it,
+  Testcontainers bind-mounts `DOCKER_HOST`'s macOS-side path into its Ryuk
+  reaper container, which fails: that path does not exist *inside* the colima
+  VM, where dockerd's own socket is the ordinary `/var/run/docker.sock`.
+
+They live in the zsh module, not here, because `.zshenv` is the one file
+sourced by every zsh process — interactive or not, exactly what a build tool
+invoked from a script needs. `doctor.sh` checks the values a shell actually
+has, and `tests/containers.bats` pins them to the literals in `.zshenv` so the
+two cannot quietly drift apart.
+
 ## What `doctor` checks, and what `remove` does
 
 `doctor.sh` asks `colima status` only once `~/.colima/default` proves a VM

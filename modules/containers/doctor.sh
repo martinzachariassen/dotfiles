@@ -27,3 +27,19 @@ if [[ -f $colima_yaml ]] && grep -qE '^[[:space:]]*sshConfig:[[:space:]]*true' "
   warn 'colima       sshConfig is on -- `colima start` edits ~/.ssh/config, which is a link into this repo'
   dim '             turn it off: colima stop && colima start --ssh-config=false'
 fi
+
+# DOCKER_HOST and TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE come from ~/.zshenv
+# (the zsh module), computed fresh on every shell start -- so a process that
+# predates the link just hasn't opened a new shell yet, the same reasoning as
+# core/doctor.sh's PATH check.
+if [[ -d $HOME/.colima/default ]]; then
+  want_host="unix://$HOME/.colima/default/docker.sock"
+  want_override='/var/run/docker.sock'
+  if [[ ${DOCKER_HOST:-} == "$want_host" && ${TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE:-} == "$want_override" ]]; then
+    ok 'DOCKER_HOST  set for Testcontainers'
+  elif [[ -L $HOME/.zshenv ]]; then
+    dim 'DOCKER_HOST  arrives with your next shell'
+  else
+    warn 'DOCKER_HOST  not set -- Testcontainers cannot find Docker (enable the zsh module)'
+  fi
+fi
