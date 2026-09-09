@@ -22,5 +22,3 @@ alias dotup='git -C "$HOME/Developer/personal/dotfiles" pull --ff-only && dot ap
 # .zshenv in $ZDOTDIR instead of ~/.zshenv -- finds none there, and silently
 # skips ~/.zshenv (and everything it exports, DOCKER_HOST included) entirely.
 alias reload='exec env -u ZDOTDIR zsh -l'
-
-alias claude='storecode'
