@@ -363,6 +363,36 @@ EOF
   [ "$two" -gt "$one" ]
 }
 
+@test "picker: the real fzf accepts every option the wizard passes it" {
+  # Every other test here stubs fzf out, so an option this fzf does not know
+  # would surface for the first time on a fresh machine, inside the one command
+  # that runs before anything else works. --filter parses the whole option list
+  # and then exits, which is the part worth checking.
+  command -v fzf >/dev/null 2>&1 || skip 'no fzf on this machine'
+  local -a opts
+  mapfile -t opts < <(__wizard_fzf_opts)
+
+  run bash -c 'printf "personal\nnone\n" | fzf "$@" --prompt="Profile > " \
+    --border-label=" step " --header="h" --filter=personal' _ "${opts[@]}"
+  [ "$status" -eq 0 ]
+
+  run bash -c 'printf "containers\tcontainers  desc\n" | fzf "$@" --multi \
+    --delimiter="\t" --with-nth=2 --border-label=" step " --header="h" \
+    --bind "load:pos(1)+toggle+first" --preview "true {1}" \
+    --preview-window="right,50%,border-left" --filter=containers' _ "${opts[@]}"
+  [ "$status" -eq 0 ]
+}
+
+@test "picker: the preview survives the quoting fzf runs it through" {
+  # fzf hands the preview command to a shell as one string, so the nesting of
+  # quotes around $DOT_ROOT is the thing that breaks. lib/dot.sh already refuses
+  # a checkout path holding a quote, a backtick, a $ or a backslash, which is
+  # what makes this safe rather than lucky.
+  run sh -c "$BASH -c 'source \"$DOT_ROOT/lib/dot.sh\"; wizard_preview containers'"
+  [ "$status" -eq 0 ]
+  [[ $output == *"$(module_desc containers)"* ]]
+}
+
 @test "review: nothing chosen totals nothing, rather than failing" {
   local packages files
   IFS=$'\t' read -r packages files < <(__wizard_totals '')

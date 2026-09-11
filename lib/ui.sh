@@ -272,6 +272,11 @@ ui_group() {
     rest=${entry#*"$__UI_FS"}
     label=${rest%%"$__UI_FS"*}
     msg=${rest#*"$__UI_FS"}
+
+    # The repeated line already carries the group's name, so a label that IS
+    # that name would say it twice ("zsh  zsh: ZDOTDIR is ...").
+    if [[ $label == "$name" ]]; then label=''; fi
+
     case $sev in
       fail)
         worst='fail'

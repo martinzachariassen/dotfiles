@@ -112,7 +112,7 @@ cmd_apply() {
   # After the parse, never before: --dry-run opens no transcript.
   __transcript_start apply
 
-  local mode='apply'
+  local mode=''
   if [[ $DOT_DRY_RUN == 1 ]]; then mode='dry run -- nothing will be changed'; fi
   heading 'dot apply' "$mode"
   say repo "${DOT_ROOT/#$HOME/\~}"
@@ -258,7 +258,7 @@ cmd_add() {
   __transcript_start add
   __module_gate add "$name"
 
-  local mode='add'
+  local mode=''
   if [[ $DOT_DRY_RUN == 1 ]]; then mode='dry run -- nothing will be changed'; fi
   heading "dot add $name" "$mode"
   say config "${DOT_CONFIG/#$HOME/\~}"
@@ -309,7 +309,7 @@ cmd_remove() {
   __transcript_start remove
   __module_gate remove "$name"
 
-  local mode='remove'
+  local mode=''
   if [[ $DOT_DRY_RUN == 1 ]]; then mode='dry run -- nothing will be changed'; fi
   heading "dot remove $name" "$mode"
   say config "${DOT_CONFIG/#$HOME/\~}"
@@ -458,7 +458,7 @@ run_checks() {
   done < <(fs_orphans)
 
   if ((found == 0)); then
-    ok orphans 'none'
+    __ui_render ok orphans 'none' "$__UI_GROUP_W"
     return 0
   fi
 
@@ -466,7 +466,7 @@ run_checks() {
   # uninstall.sh makes before module_remove.
   local hooks=0
   for mod in "${order[@]}"; do
-    warn orphans "$mod is not enabled, and left these links:"
+    __ui_render warn orphans "$mod is not enabled, and left these links:" "$__UI_GROUP_W"
     ui_nest
     ui_nest
     while IFS= read -r path; do say "$path"; done <<<"${bymod[$mod]%$'\n'}"
