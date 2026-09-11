@@ -21,7 +21,13 @@ jobs:
   audit:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      # persist-credentials: false -- this job runs tests/brewfiles.bats,
+      # which a pull request controls, under a token with issues: write.
+      # Nothing here pushes, so there is no reason for that token to sit in
+      # .git/config where PR-controlled code could read it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Install tooling
         run: brew install bash bats-core dasel jq

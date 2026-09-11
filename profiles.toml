@@ -5,6 +5,10 @@
 # Copied into config.toml, never asked: none of it varies by machine. The
 # signing key is the PUBLIC half (GitHub serves it at github.com/<user>.keys);
 # the private half never leaves 1Password. Empty means no signing.
+#
+# Forked this repo? Edit the three values below first -- the wizard writes
+# them as-is, so an unedited fork authors commits as Martin and turns on
+# signing with a key whose private half lives only in his 1Password vault.
 [user]
 name = "Martin Zachariassen"
 email = "10747123+martinzachariassen@users.noreply.github.com"
