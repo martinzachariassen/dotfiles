@@ -197,6 +197,62 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
   [[ $output == *"did not parse"* ]]
 }
 
+# --- the schema marker ------------------------------------------------------
+#
+# A version marker that guarantees nothing is worse than none, because it looks
+# like a check. These are what make it one. Written as properties of
+# DOT_CONFIG_SCHEMA rather than of the number 1, so a bump does not silently
+# turn them into tests of nothing.
+
+@test "schema: the generator writes the version this checkout speaks" {
+  rm -f "$DOT_CONFIG"
+  config_generate 'A' 'a@b.c' 'git' >/dev/null
+
+  run cfg_get 'schema'
+  [ "$output" = "$DOT_CONFIG_SCHEMA" ]
+  # And what it wrote is what the reader accepts -- the round trip is the point.
+  [ -z "$(cfg_parse_problems)" ]
+}
+
+@test "schema: a config from an older checkout is reported, not read anyway" {
+  printf 'schema = %s\n\n[modules]\nenabled = ["git"]\n' \
+    "$((DOT_CONFIG_SCHEMA - 1))" >"$DOT_CONFIG"
+
+  run cfg_parse_problems
+  [[ $output == *"schema $((DOT_CONFIG_SCHEMA - 1))"* ]]
+  [[ $output == *"schema $DOT_CONFIG_SCHEMA"* ]]
+}
+
+@test "schema: a config from a NEWER checkout is caught the same way" {
+  # The direction that would otherwise pass: a bigger number is still not one
+  # this checkout knows how to read.
+  printf 'schema = %s\n\n[modules]\nenabled = ["git"]\n' \
+    "$((DOT_CONFIG_SCHEMA + 1))" >"$DOT_CONFIG"
+
+  run cfg_parse_problems
+  [ -n "$output" ]
+  [[ $output == *"pull the repo"* ]]
+}
+
+@test "schema: a config with no marker at all says how to get one" {
+  printf '[modules]\nenabled = ["git"]\n' >"$DOT_CONFIG"
+
+  run cfg_parse_problems
+  [[ $output == *"no \`schema\` key"* ]]
+  [[ $output == *"dot config --init"* ]]
+}
+
+@test "schema: a mismatch stops apply, it is not merely printed" {
+  # The whole value of the marker is that it refuses. Reported-but-applied is
+  # the same as unchecked.
+  printf 'schema = %s\n\n[modules]\nenabled = ["git"]\n' \
+    "$((DOT_CONFIG_SCHEMA + 1))" >"$DOT_CONFIG"
+
+  run "$DOT_ROOT/bin/dot" apply --dry-run
+  [ "$status" -ne 0 ]
+  [[ $output == *"did not parse"* ]]
+}
+
 # --- the generator ----------------------------------------------------------
 
 @test "generate: refuses to overwrite an existing config" {
@@ -328,6 +384,62 @@ EOF
   [ "${lines[0]}" = "zsh" ]
   [[ $(cat "$DOT_CONFIG") == *'# a note the user left between entries'* ]]
   [[ $(cat "$DOT_CONFIG") == *'signingkey'* ]]
+}
+
+# A config where the exact text of an entry also appears in an array that is
+# none of this code's business, both before and after the one it may edit.
+# Every writer here is line-based, so "looks like an entry" is the whole risk.
+decoyed_config() {
+  cat >"$DOT_CONFIG" <<'EOF'
+schema = 1
+
+[before]
+list = [
+  "git",
+]
+
+[modules]
+enabled = [
+  "git",
+  "zsh",
+]
+
+[after]
+list = [
+  "git",
+]
+EOF
+}
+
+@test "enabled: remove drops the entry in the array, not its twin elsewhere" {
+  decoyed_config
+  cfg_module_remove git
+
+  run cfg_list 'modules.enabled'
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "zsh" ]
+
+  # Both decoys untouched: three "git" lines went in, two must remain.
+  [ "$(grep -c '^  "git",$' "$DOT_CONFIG")" -eq 2 ]
+  [ "$(cfg_list 'before.list')" = "git" ]
+  [ "$(cfg_list 'after.list')" = "git" ]
+}
+
+@test "enabled: add ignores a look-alike entry outside the array it may edit" {
+  # The insert point is chosen by scanning the span only. A decoy sorting
+  # around the new name must not be able to pull the line out of the array.
+  decoyed_config
+  cfg_module_add cmux
+
+  run cfg_list 'modules.enabled'
+  [ "${#lines[@]}" -eq 3 ]
+  [ "${lines[0]}" = "cmux" ]
+  [ "${lines[1]}" = "git" ]
+  [ "${lines[2]}" = "zsh" ]
+
+  [ "$(cfg_list 'before.list')" = "git" ]
+  [ "$(cfg_list 'after.list')" = "git" ]
+  [ -z "$(cfg_parse_problems)" ]
 }
 
 @test "enabled: a hand-formatted array is refused, not reformatted" {
