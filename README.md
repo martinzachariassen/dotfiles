@@ -13,7 +13,7 @@ repo to `~/Developer/personal/dotfiles`, and asks which parts of it this
 machine should have. From then on, one command applies the answer: `dot apply`.
 
 This is Martin's own machine setup, public so it can be read and forked, not a
-tool built for someone else's.
+tool built for someone else's. Fork it freely — pull requests aren't expected.
 
 > **Forking it?** Edit the `[user]` table in
 > [`profiles.toml`](profiles.toml) first. The first-run wizard copies that
