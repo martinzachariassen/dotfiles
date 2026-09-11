@@ -14,7 +14,7 @@ data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
 # Brewfile -- computing $want first made the whole uninstall unrunnable.
 [[ -f $dest ]] || exit 0
 command -v jq >/dev/null 2>&1 || {
-  warn 'left alone  ~/.claude/settings.json -- jq is not installed'
+  warn 'left alone' "${dest/#$HOME/\~} -- jq is not installed"
   exit "$DOT_STATUS_WARN"
 }
 
@@ -23,12 +23,12 @@ want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline
 # The same question apply.sh and doctor.sh ask, for the same reason.
 kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'
 if [[ $kind != object ]]; then
-  warn "left alone  ~/.claude/settings.json: expected a JSON object, found $kind"
+  warn 'left alone' "${dest/#$HOME/\~} is $kind, not a JSON object"
   exit "$DOT_STATUS_WARN"
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info "remove  this module's keys from ~/.claude/settings.json"
+  info remove "this module's keys from ~/.claude/settings.json"
   exit 0
 fi
 
@@ -47,9 +47,9 @@ if jq --argjson want "$want" '
   reduce ($want | leaves([])) as $p (.; if getpath($p) == ($want|getpath($p)) then delpaths([$p]) else . end)
   | reduce ([$want | objs([])] | sort_by(length) | reverse | .[]) as $p (.; if getpath($p) == {} then delpaths([$p]) else . end)
 ' "$dest" >"$tmp" && mv "$tmp" "$dest"; then
-  ok "removed this module's keys from ~/.claude/settings.json"
+  ok removed "this module's keys from ~/.claude/settings.json"
 else
   rm -f "$tmp"
-  warn 'left alone  ~/.claude/settings.json -- jq could not rewrite it'
+  warn 'left alone' "${dest/#$HOME/\~} -- jq could not rewrite it"
   exit "$DOT_STATUS_WARN"
 fi

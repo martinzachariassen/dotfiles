@@ -15,7 +15,7 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 mise_data=${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}
 
 if ! command -v mise >/dev/null 2>&1; then
-  fail 'mise         not installed (run: dot apply)'
+  fail mise 'not installed (run: dot apply)'
   exit 1
 fi
 
@@ -30,7 +30,7 @@ while IFS= read -r tool; do
 done < <(toml_list "$config" 'tools.keys()')
 
 if ((${#missing[@]} == 0)); then
-  ok 'runtimes     every tool in mise config.toml is installed'
+  ok runtimes 'every tool in mise config.toml is installed'
 else
-  fail "runtimes     not installed: ${missing[*]} -- run: dot apply"
+  fail runtimes "not installed: ${missing[*]} -- run: dot apply"
 fi

@@ -24,12 +24,12 @@ opsign=${DOT_OP_SSH_SIGN:-/Applications/1Password.app/Contents/MacOS/op-ssh-sign
 code=${DOT_CODE_BIN:-/opt/homebrew/bin/code}
 
 if [[ -z $name || -z $email ]]; then
-  warn 'user.name or user.email is empty in config.toml -- skipping config.local'
+  warn git 'user.name or user.email is empty in config.toml -- skipping config.local'
   exit 0
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info "write   ~/.config/git/config.local"
+  info write "${dest/#$HOME/\~}"
   exit 0
 fi
 
@@ -41,7 +41,7 @@ if [[ -n $signingkey ]]; then
   if [[ -x $opsign ]]; then
     sign=1
   else
-    warn 'commit signing off -- 1Password is not installed yet; re-run `dot apply`'
+    warn git 'commit signing off -- 1Password is not installed yet; re-run `dot apply`'
   fi
 fi
 
@@ -70,4 +70,4 @@ mkdir -p "$(dirname "$dest")"
   fi
 } >"$dest"
 
-ok "git identity: $name <$email>"
+ok git "identity: $name <$email>"

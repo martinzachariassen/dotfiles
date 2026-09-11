@@ -17,6 +17,11 @@ core marks the phase boundary, it does not collect special cases.
   `uninstall.sh` both `grep -F` its exact `DOT_ROOT="<path>"` line.
 - Doctor checks only what fails **silently**. "Is git installed" is not a check.
 - Everything found must reach `DOT_FAILURES`. Never `|| true` on a doctor call.
+- **A checker that could not run is a third answer**, never a verdict about the
+  file. `cfg_parse_problems` treats taplo's documented exit 1 as "invalid" and
+  anything else as "did not answer" (a rust panic exits 101), because refusing
+  to apply over a crashed taplo would lock the machine out of its own config.
+  `cfg_unchecked` is how doctor says so. Same shape as `brew_missing`.
 - `dim`, not `warn`, for things true on every machine (uncommitted changes). A
   permanently yellow summary is the same bug as a permanently green one.
 - Keep distinct causes distinct: shim missing vs. shim not executable.

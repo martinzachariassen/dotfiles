@@ -167,8 +167,16 @@ the status at the top level, so `dot doctor && …` survives an orphaned link.
 
 `apply`, `add` and `remove` each keep a transcript and say where at the end —
 `~/.local/state/dotfiles/logs/<timestamp>-<verb>.log`, one file per run, twenty
-kept for the directory. `config` hands the terminal to your editor and `doctor`
-changes nothing, so neither writes one. A dry run opens no transcript either.
+kept for the directory. Colour is stripped on the way into the file, so the log
+reads in an editor as well as in a pager. `config` hands the terminal to your
+editor and `doctor` changes nothing, so neither writes one. A dry run opens no
+transcript either.
+
+A module that reports nothing wrong collapses to a single line. One that does
+expands, showing only what needs attention, and the run ends by repeating those
+findings rather than telling you to scroll. `dot doctor --verbose` prints every
+check, passed ones included. `NO_COLOR` turns colour off; a locale that is not
+UTF-8 falls back to ASCII markers of the same width.
 
 ## Templating
 

@@ -20,7 +20,7 @@ data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
 relogin='log out and back in for keyboard and text-substitution changes to fully apply'
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info 'write macOS defaults (Dock, Finder, keyboard) and restart those apps'
+  info defaults 'write the Dock, Finder and keyboard keys, and restart those apps'
   dim "$relogin"
   exit 0
 fi
@@ -43,7 +43,7 @@ tilesize=$(module_setting macos-defaults dock_tilesize 48)
 if [[ $tilesize =~ ^[0-9]+$ ]] && ((tilesize > 0)); then
   defaults write com.apple.dock tilesize -int "$tilesize"
 else
-  fail "dock_tilesize '$tilesize' is not a positive number -- left as it was"
+  fail defaults "dock_tilesize '$tilesize' is not a positive number -- left as it was"
 fi
 
 # Relative to $HOME unless absolute; a leading ~ is expanded, not taken literally.
@@ -59,5 +59,5 @@ for app in Dock Finder SystemUIServer WindowManager; do
   killall "$app" >/dev/null 2>&1 || true
 done
 
-ok 'macOS defaults written'
+ok defaults 'written'
 dim "$relogin"

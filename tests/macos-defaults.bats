@@ -169,7 +169,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 
   apply 1
   [ "$status" -eq 0 ]
-  [[ $output == *"write macOS defaults"* ]]
+  says defaults "write the Dock, Finder and keyboard keys, and restart those apps"
   [ ! -f "$CALLS" ]
   [ "$(home_snapshot)" = "$before" ]
 }
@@ -275,7 +275,9 @@ wrote() { grep -qF "$1" "$CALLS"; }
   # a repeat can slip in: both read as a change to something never touched.
   local want listed
   want=$(rows | cut -f1 | sort -u | wc -l | tr -d ' ')
-  listed=$(grep -c '^    [^ ]' <<<"$output" || true)
+  # A domain is the only thing here that is one bare token on its own line, so
+  # counting those pins the list without pinning how far in ui.sh indents it.
+  listed=$(grep -cE '^[[:space:]]+[^[:space:]]+$' <<<"$output" || true)
   [ "$listed" -eq "$want" ]
 
   local domain

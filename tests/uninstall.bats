@@ -29,7 +29,7 @@ link_one() {
   link_one
   run fs_unlink "$HOME/.config/demo/kept.conf"
   [ ! -e "$HOME/.config/demo/kept.conf" ]
-  [[ $output == *"unlink  ~/.config/demo/kept.conf"* ]]
+  says unlink "~/.config/demo/kept.conf"
 }
 
 @test "unlink: leaves a real file alone, and does not claim otherwise" {
@@ -117,7 +117,8 @@ link_one() {
   [ "$status" -eq 0 ]
   [[ $output == *"Nothing was changed"* ]]
   [ -L "$HOME/.config/git/config" ]
-  [ -d "$DOT_ROOT/.git" ]
+  # -e, not -d: in a git worktree .git is a file holding a gitdir: line.
+  [ -e "$DOT_ROOT/.git" ]
 
   after=$(home_snapshot)
   [ "$before" = "$after" ] || {
@@ -134,8 +135,9 @@ link_one() {
   run env DOT_ROOT="$DOT_ROOT" bash "$DOT_ROOT/uninstall.sh" --dry-run
   [ "$status" -eq 0 ]
 
-  apps=$(printf '%s\n' "$output" | grep -n '^Applications$' | cut -d: -f1)
-  brew=$(printf '%s\n' "$output" | grep -n '^Homebrew and the repo$' | cut -d: -f1)
+  # The section rule around the title is layout; the order of the two is not.
+  apps=$(printf '%s\n' "$output" | grep -n ' Applications ' | cut -d: -f1)
+  brew=$(printf '%s\n' "$output" | grep -n ' Homebrew and the repo ' | cut -d: -f1)
   [ -n "$apps" ]
   [ -n "$brew" ]
   [ "$apps" -lt "$brew" ]
@@ -188,7 +190,7 @@ link_one() {
   run env DOT_ROOT="$DOT_ROOT" bash "$DOT_ROOT/uninstall.sh" --dry-run
   [ "$status" -eq 0 ]
   [[ $output == *"left alone"* ]]
-  [[ $output != *"remove  ~/.local/state"* ]]
+  ! says remove "~/.local/state"
   [ -f "$DOT_STATE/brew-bundle.log" ]
 }
 
@@ -199,7 +201,7 @@ link_one() {
   run env DOT_ROOT="$DOT_ROOT" bash "$DOT_ROOT/uninstall.sh" --dry-run
   [ "$status" -eq 0 ]
   # BY NAME: a bare `*"remove"*` also matches the unconditional `remove <DOT_ROOT>`.
-  [[ $output == *"remove  ${DOT_STATE/#$HOME/\~}"* ]]
+  says remove "${DOT_STATE/#$HOME/\~}"
   [[ $output != *"left alone"* ]]
   [ -d "$DOT_STATE/backups" ]
 }
@@ -213,9 +215,9 @@ link_one() {
 
   run env DOT_ROOT="$DOT_ROOT" bash "$DOT_ROOT/uninstall.sh" --dry-run
   [ "$status" -eq 0 ]
-  [[ $output == *"remove  ${DOT_STATE/#$HOME/\~}/logs/20240101-000000.log"* ]]
+  says remove "${DOT_STATE/#$HOME/\~}/logs/20240101-000000.log"
   [[ $output != *"left alone"* ]]
-  [[ $output == *"remove  ${DOT_STATE/#$HOME/\~}"* ]]
+  says remove "${DOT_STATE/#$HOME/\~}"
   [ -f "$DOT_STATE/logs/20240101-000000.log" ]
 }
 
@@ -226,9 +228,9 @@ link_one() {
 
   run env DOT_ROOT="$DOT_ROOT" bash "$DOT_ROOT/uninstall.sh" --dry-run
   [ "$status" -eq 0 ]
-  [[ $output == *"None to keep"* ]]
+  says backups 'none to keep'
   [[ $output != *"left alone"* ]]
-  [[ $output != *"remove  ~/.local/state"* ]]
+  ! says remove "~/.local/state"
 }
 
 @test "uninstall: the backup tree survives a dry run and is reported" {

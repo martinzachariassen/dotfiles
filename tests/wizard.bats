@@ -178,7 +178,7 @@ in_strict_shell() {
   # test would prove nothing about a config anybody agreed to.
   run wizard_run < <(printf 'y\n')
   [ "$status" -eq 0 ]
-  [[ $output == *"(none"* ]]
+  says modules 'none -- you add them to the config yourself'
   [ -f "$DOT_CONFIG" ]
   [ "$(cfg_list 'modules.enabled')" = "" ]
 }
@@ -316,4 +316,56 @@ EOF
   run modules_enabled
   [[ $output != *bogus* ]]
   [[ $output == *git* ]]
+}
+
+# --- The preview ------------------------------------------------------------
+#
+# fzf runs it as its own process per keystroke, so it has to stand alone. What
+# it says is the only thing between a name and a decision about that name.
+
+@test "preview: names the packages, the files and the hooks of a module" {
+  run wizard_preview containers
+  [ "$status" -eq 0 ]
+  [[ $output == *"$(module_desc containers)"* ]]
+  [[ $output == *packages* ]]
+  [[ $output == *".colima"* ]]
+  [[ $output == *hooks* ]]
+}
+
+@test "preview: a package set has nothing but packages to show" {
+  run wizard_preview apps
+  [ "$status" -eq 0 ]
+  [[ $output == *packages* ]]
+  [[ $output != *links* ]]
+  [[ $output != *hooks* ]]
+}
+
+@test "preview: every module previews without failing" {
+  # It runs inside fzf, where a crash is an empty pane and nothing else.
+  local name
+  while IFS= read -r name; do
+    run wizard_preview "$name"
+    [ "$status" -eq 0 ] || {
+      echo "wizard_preview $name exited $status"
+      return 1
+    }
+    [ -n "$output" ]
+  done < <(modules_all)
+}
+
+@test "review: the totals count the chosen modules, and only those" {
+  # The numbers are the point of the review: a list of names says nothing about
+  # how much is about to happen.
+  local one two
+  IFS=$'\t' read -r _ one < <(__wizard_totals "$(printf 'git\n')")
+  IFS=$'\t' read -r _ two < <(__wizard_totals "$(printf 'git\nzsh\n')")
+  [ "$one" -gt 0 ]
+  [ "$two" -gt "$one" ]
+}
+
+@test "review: nothing chosen totals nothing, rather than failing" {
+  local packages files
+  IFS=$'\t' read -r packages files < <(__wizard_totals '')
+  [ "$packages" -eq 0 ]
+  [ "$files" -eq 0 ]
 }

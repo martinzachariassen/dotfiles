@@ -54,9 +54,9 @@ modules_require_known() {
   unknown=$(modules_unknown | tr '\n' ' ')
   [[ -z ${unknown// /} ]] && return 0
   available=$(modules_all | tr '\n' ' ')
-  die "config lists module(s) that do not exist: ${unknown% }
-    available:  ${available% }
-    edit:       $DOT_CONFIG"
+  die "config lists module(s) that do not exist: ${unknown% }" \
+    available "${available% }" \
+    edit "${DOT_CONFIG/#$HOME/\~}"
 }
 
 modules_enabled_dirs() {
@@ -92,9 +92,9 @@ modules_preflight() {
   )
 
   ((${#bad[@]} == 0)) && return 0
-  die "hook(s) will not parse -- nothing was changed:
-    ${bad[*]}
-    reproduce with:  bash -n $DOT_ROOT/${bad[0]}"
+  die 'hook(s) will not parse -- nothing was changed' \
+    hooks "${bad[*]}" \
+    reproduce "bash -n $DOT_ROOT/${bad[0]}"
 }
 
 # Hooks are EXECUTED, never sourced: nothing leaks back but an exit status,
@@ -116,7 +116,7 @@ module_apply() {
   dir=$(modules_dir "$name")
 
   if [[ ! -d $dir/home && ! -f $dir/apply.sh ]]; then
-    dim 'packages only'
+    dim 'packages only -- nothing to link, no hook to run'
   fi
 
   # A failing Brewfile stops this module, not the run.
@@ -127,7 +127,7 @@ module_apply() {
   if ((packaged)); then
     fold_status "$name: apply.sh failed" module_run_hook "$name" apply.sh
   else
-    dim "skipped $name/apply.sh -- its packages are not installed"
+    dim skipped "$name/apply.sh -- its packages are not installed"
   fi
 }
 
@@ -151,9 +151,9 @@ module_doctor() {
   fi
 
   if fs_check_tree "$dir"; then
-    if [[ -n $tracked ]]; then ok 'files        all linked'; fi
+    if [[ -n $tracked ]]; then ok files 'all linked'; fi
   else
-    fail "$name: files are not linked -- run: dot apply"
+    fail files 'not linked -- run: dot apply'
   fi
 
   fold_status "$name: doctor.sh reported problems" module_run_hook "$name" doctor.sh

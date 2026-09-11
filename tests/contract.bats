@@ -257,6 +257,44 @@ teardown() { teardown_sandbox; }
   done
 }
 
+@test "only lib/ui.sh emits colour or glyphs" {
+  # lib/CLAUDE.md has said this since the file was written, and nothing held it.
+  # A printf with an escape anywhere else is a second place that decides what
+  # output looks like, and the first one to disagree with NO_COLOR or with an
+  # ASCII locale. Shipped shell only: tests/ builds fixtures out of escapes.
+  local file offenders=()
+  while IFS= read -r file; do
+    [[ $file == */lib/ui.sh ]] && continue
+    if grep -q $'\033' "$file"; then offenders+=("${file#"$DOT_ROOT"/}"); fi
+  done < <(find "$DOT_ROOT/lib" "$DOT_ROOT/bin" "$DOT_ROOT/core" "$DOT_ROOT/modules" \
+    -type f \( -name '*.sh' -o -name dot \))
+
+  ((${#offenders[@]} == 0)) || {
+    printf 'escape sequences outside lib/ui.sh: %s\n' "${offenders[*]}"
+    return 1
+  }
+}
+
+@test "a transcript carries no escape sequences" {
+  # lib/ui.sh settles colour while stdout is still the terminal, which is the
+  # only moment it can. The transcript therefore has to strip on the way into
+  # the file, or every log is unreadable in an editor -- and the log is the
+  # whole point of the line that names it.
+  config_generate "A" "a@b.c" ""
+  mkdir -p "$HOME/.local/bin"
+  printf '#!/usr/bin/env bash\nexport DOT_ROOT="%s"\n' "$DOT_ROOT" >"$HOME/.local/bin/dot"
+  chmod +x "$HOME/.local/bin/dot"
+
+  DOT_COLOR=1 run "$DOT_ROOT/bin/dot" apply
+
+  local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
+  [ -f "$log" ]
+  ! grep -q $'\033' "$log"
+  # The tail is there too: a stripper that loses the last lines is worse than
+  # none, since those are the ones naming what went wrong.
+  grep -q 'Summary' "$log"
+}
+
 @test "claude-code: all three hooks derive \$want from data/settings.json alike" {
   # Replaces the old allow/deny literal check: the literals are gone, and the
   # only thing left to keep in step is how each hook reads the data file.
@@ -602,13 +640,14 @@ EOF
     return 1
   }
 
-  # The heredoc alone, not the whole file: `cmd_add`'s own comments say "add",
-  # and matching those would let a verb usage never lists slip through.
+  # The usage function alone, not the whole file: `cmd_add`'s own comments say
+  # "add", and matching those would let a verb usage never lists slip through.
+  # The verb is the label argument, which is what puts it in the column.
   local usage verb
   usage=$(sed -n '/^usage() {$/,/^}$/p' "$DOT_ROOT/bin/dot")
 
   for verb in "${verbs[@]}"; do
-    grep -qE "^  $verb " <<<"$usage" || no_usage+=("$verb")
+    grep -qE "^  say $verb " <<<"$usage" || no_usage+=("$verb")
     grep -qE "^dot $verb( |$)" "$DOT_ROOT/README.md" || no_readme+=("$verb")
   done
 

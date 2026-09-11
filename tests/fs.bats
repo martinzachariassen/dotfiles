@@ -102,7 +102,7 @@ teardown() { teardown_sandbox; }
   rm "$HOME/.gitconfig"
   run fs_link_tree "$m"
 
-  [[ $output == *"link    ~/.gitconfig"* ]]
+  says link "~/.gitconfig"
   [[ $output != *"already linked"* ]]
 }
 
@@ -205,7 +205,7 @@ EOF
   run fs_report
 
   [[ $output == *"1 backed up"* ]]
-  [[ $output == *"Replaced files were moved to $DOT_STATE/backups/"* ]]
+  says backups "${DOT_STATE/#$HOME/\~}/backups/$DOT_RUN_ID"
 }
 
 @test "backup: one run uses one directory, even across a second boundary" {
@@ -285,7 +285,7 @@ EOF
   export DOT_DRY_RUN=1
 
   run fs_link_tree "$m"
-  [[ $output == *"link    ~/.gitconfig"* ]]
+  says link "~/.gitconfig"
 
   # `run` is a subshell, so re-do it here for the tally.
   fs_link_tree "$m"
@@ -381,9 +381,9 @@ EOF
 
   run fs_check_tree "$m"
   [ "$status" -eq 1 ]
-  [[ $output == *"wrong target    ~/gone.conf"* ]]
-  [[ $output == *"broken link     ~/dangling.conf"* ]]
-  [[ $output == *"not linked      ~/absent.conf"* ]]
+  says "wrong target" "~/gone.conf"
+  says "broken link" "~/dangling.conf"
+  says "not linked" "~/absent.conf"
 }
 
 @test "check: drift in one file is drift, even with clean files around it" {
@@ -451,7 +451,7 @@ EOF
 
 @test "report: nothing done says so" {
   run fs_report
-  [[ $output == *"No files to link."* ]]
+  says files "none to link"
 }
 
 @test "pairs: Finder's metadata is not a file this repo links" {

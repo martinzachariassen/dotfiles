@@ -48,6 +48,7 @@ dot remove <module>    Undo one module and disable it
 dot config             Open the config file in $EDITOR
 dot config --init      Create it for the first time (runs the picker)
 dot doctor             Check this machine; read-only
+dot doctor --verbose   The same, including every check that passed
 ```
 
 `add` and `remove` take `--dry-run` too. Re-running `dot apply` is safe and

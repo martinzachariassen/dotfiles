@@ -47,19 +47,22 @@ brew_bundle() {
   [[ -f $file ]] || return 0
 
   if ! brew_load; then
-    fail "Homebrew is not installed; cannot install packages for $label"
+    fail packages "Homebrew is not installed -- cannot install for $label"
     return 1
   fi
 
   if [[ $DOT_DRY_RUN == 1 ]]; then
-    info "brew bundle --file ${file#"$DOT_ROOT"/}"
+    info packages "brew bundle --file ${file#"$DOT_ROOT"/}"
     return 0
   fi
 
   # --no-upgrade: apply installs what is missing; upgrading is `brew upgrade`.
-  brew bundle --file "$file" --no-upgrade && return 0
+  # Quoted, not raw: brew's own hundreds of lines stay visible as they stream,
+  # but at the weight of a footnote. The status comes back through PIPESTATUS.
+  brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
+  if ((PIPESTATUS[0] == 0)); then return 0; fi
 
-  fail "brew bundle failed for $label"
+  fail packages "brew bundle failed for $label"
 
   # brew's own output is hundreds of lines above by now, and "failed" alone is
   # not something a user can act on. Name the packages that are still absent.
@@ -67,7 +70,7 @@ brew_bundle() {
   missing=$(brew_missing "$file") || status=$?
   case $status in
     1)
-      while IFS= read -r line; do dim "still missing: $line"; done <<<"$missing"
+      while IFS= read -r line; do dim 'still missing' "$line"; done <<<"$missing"
       if grep -q '^Cask ' <<<"$missing"; then
         dim 'a cask already in /Applications by hand: brew install --cask --adopt <name>'
       fi
@@ -87,16 +90,16 @@ brew_check() {
 
   [[ -f $file ]] || return 0
   if ! brew_load; then
-    fail "packages     Homebrew is not installed; cannot check $label"
+    fail packages "Homebrew is not installed -- cannot check $label"
     return 1
   fi
 
   missing=$(brew_missing "$file") || status=$?
   case $status in
-    0) ok 'packages     all installed' ;;
+    0) ok packages 'all installed' ;;
     1) while IFS= read -r line; do
-      fail "packages     $line is not installed -- run: dot apply"
+      fail packages "$line is not installed -- run: dot apply"
     done <<<"$missing" ;;
-    2) warn 'packages     could not be checked -- brew bundle check did not answer' ;;
+    2) warn packages 'could not be checked -- brew bundle check did not answer' ;;
   esac
 }

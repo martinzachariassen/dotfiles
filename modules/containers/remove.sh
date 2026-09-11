@@ -16,7 +16,7 @@ for plugin in docker-compose docker-buildx; do
   link="$HOME/.docker/cli-plugins/$plugin"
   [[ -L $link ]] || continue
   if [[ -z $plugin_dir ]]; then
-    warn "left alone  ${link/#$HOME/\~} -- no Homebrew left to prove it is ours"
+    warn 'left alone' "${link/#$HOME/\~} -- no Homebrew left to prove it is ours"
   # A link pointing elsewhere was put there by something else (Docker Desktop).
   elif [[ $(readlink "$link") == "$plugin_dir/"* ]]; then
     fs_unlink "$link"

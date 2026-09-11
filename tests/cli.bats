@@ -61,8 +61,8 @@ pass_core_checks() {
 
   dot apply --dry-run
   [ "$status" -eq 0 ]
-  [[ $output == *"Module: git  [1/1]"* ]]
-  [[ $output == *"1 enabled: git"* ]]
+  [[ $output == *"[1/1]"* ]]
+  says modules "1 applied"
 }
 
 @test "apply: a real run leaves a transcript and names it" {
@@ -81,7 +81,7 @@ pass_core_checks() {
   [ -f "$log" ]
   [[ $(cat "$log") == *"Core packages"* ]]
   [[ $(cat "$log") == *"Summary"* ]]
-  [[ $output == *"Full output:"* ]]
+  [[ $output == *"-apply.log"* ]]
 }
 
 @test "apply: a dry run writes no log" {
@@ -137,7 +137,7 @@ pass_core_checks() {
 
   [[ $output == *"unclaimed"* ]]
   [[ $output != *"Everything looks right"* ]]
-  [[ $output == *"warnings above"* ]]
+  [[ $output == *warning* ]]
   # Still 0: `dot doctor && ...` must keep working.
   [ "$status" -eq 0 ]
 }
@@ -171,7 +171,7 @@ pass_core_checks() {
   run "$DOT_ROOT/bin/dot" doctor
 
   [ "$status" -eq 1 ]
-  [[ $output == *"not installed in ~/.local/bin"* ]]
+  says dot "not installed at ~/.local/bin/dot -- run: dot apply"
   [[ $output != *"not executable"* ]]
 }
 
@@ -185,7 +185,8 @@ pass_core_checks() {
   [ "$status" -eq 1 ]
   [[ $output == *"unknown module 'typoo'"* ]]
   [[ $output != *"Everything looks right"* ]]
-  [[ $output == *"Module: git"* ]]
+  # The real module is still reached: its group line is there, named and described.
+  says git "$(module_desc git)"
 }
 
 @test "config: an unknown option is refused" {
@@ -251,8 +252,8 @@ pass_core_checks() {
 
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
-  [[ $output == *"Orphaned links"* ]]
-  [[ $output == *"dot         installed"* ]]
+  says orphans "none"
+  says dot 'installed'
 }
 
 @test "apply: a machine the checks reject does not report success" {
@@ -265,7 +266,7 @@ pass_core_checks() {
 
   run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -ne 0 ]
-  [[ $output == *"Finished with problems"* ]]
+  [[ $output == *problem* ]]
 }
 
 @test "apply: a dry run does not run the checks" {
@@ -381,7 +382,7 @@ staged_git() {
   staged_git
 
   run "$DOT_ROOT/bin/dot" remove git
-  [[ $output == *"Packages stay installed"* ]]
+  says packages 'stay installed. Removing those is `brew uninstall`, yours to run.'
 }
 
 @test "remove: a module already out of the list is still swept" {
@@ -445,7 +446,7 @@ staged_git() {
 
   run "$DOT_ROOT/bin/dot" remove git
   [ "$status" -ne 0 ]
-  [[ $output == *"Edit it by hand"* ]]
+  [[ $output == *"edit it by hand"* ]]
   # Nothing was swept on the way to that refusal.
   [ -L "$HOME/.config/git/config" ]
 }
@@ -498,7 +499,7 @@ staged_git() {
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-add.log" ]
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-remove.log" ]
   # And it holds the run, not just its name.
-  [[ $(cat "$DOT_STATE/logs/$DOT_RUN_ID-remove.log") == *"Module: git"* ]]
+  [[ $(cat "$DOT_STATE/logs/$DOT_RUN_ID-remove.log") == *"1 module"* ]]
 }
 
 @test "logs: the two read-only verbs write none" {

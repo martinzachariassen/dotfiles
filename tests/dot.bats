@@ -80,7 +80,7 @@ EOF
   DOT_DRY_RUN=0 bash "$DOT_ROOT/core/apply.sh" >/dev/null
 
   run bash "$DOT_ROOT/core/doctor.sh"
-  [[ $output == *"dot         installed"* ]]
+  says dot "installed"
   [[ $output != *"different checkout"* ]]
 }
 

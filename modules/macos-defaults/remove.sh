@@ -36,6 +36,8 @@ done < <(grep -v '^[[:space:]]*\(#\|$\)' "$data" 2>/dev/null)
 warn 'macOS preferences were changed and cannot be put back'
 dim 'Values from before this repo ran were never recorded. Domains written to:'
 # `<<<` adds a newline of its own; the trailing one would sort a blank first.
+ui_nest
 while IFS= read -r domain; do
-  dim "  $domain"
+  dim "$domain"
 done < <(sort -u <<<"${domains%$'\n'}")
+ui_unnest

@@ -33,7 +33,7 @@ BREW_UNINSTALL='https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstal
 while (($#)); do
   case $1 in
     --dry-run) DOT_DRY_RUN=1 ;;
-    *) die "unknown option '$1'. Try: bash uninstall.sh [--dry-run]" ;;
+    *) die "unknown option '$1'" next 'bash uninstall.sh [--dry-run]' ;;
   esac
   shift
 done
@@ -47,13 +47,13 @@ export DOT_DRY_RUN
 # could drift from it.
 if [[ $DOT_DRY_RUN != 1 ]]; then
   [[ -t 0 ]] ||
-    die 'Refusing to run unattended. Use --dry-run to see the plan.'
+    die 'Refusing to run unattended' next 'bash uninstall.sh --dry-run'
 
   "$BASH" "$0" --dry-run || die 'The preview failed; nothing was changed.'
 
-  heading 'Confirm'
-  say 'Everything listed above will be removed, and there is no undo.'
-  printf '  Type %sremove%s to continue: ' "$__C_BOLD" "$__C_RESET"
+  heading 'Confirm' 'there is no undo'
+  say 'Everything listed above will be removed.'
+  printf '\n  Type %sremove%s to continue: ' "$__C_BOLD" "$__C_RESET"
   read -r answer || answer=''
   [[ $answer == remove ]] || die 'Nothing was changed.'
 fi
@@ -61,10 +61,13 @@ fi
 # --- Modules ------------------------------------------------------------------
 # Every module, enabled or not: a module switched off last month still left
 # its files behind.
+heading 'Modules' 'every one, enabled or not'
 while IFS= read -r name; do
   [[ -f "$(modules_dir "$name")/remove.sh" ]] || continue
-  heading "Module: $name"
+  step '' '' "$name" "$(module_desc "$name")"
+  ui_nest
   module_remove "$name"
+  ui_unnest
 done < <(modules_all)
 
 # --- Links ---------------------------------------------------------------------
@@ -76,7 +79,7 @@ if ((${#links[@]})); then
     fs_unlink "$link"
   done
 else
-  say 'None found.'
+  say links 'none found'
 fi
 
 # --- The CLI shim ---------------------------------------------------------------
@@ -89,10 +92,10 @@ if [[ -f $shim ]]; then
   if grep -qF "DOT_ROOT=\"$DOT_ROOT\"" "$shim" 2>/dev/null; then
     fs_discard "$shim"
   else
-    warn 'left alone  ~/.local/bin/dot points at a different checkout'
+    warn 'left alone' "points at a different checkout: ${shim/#$HOME/\~}"
   fi
 else
-  say 'Not installed.'
+  say dot 'not installed'
 fi
 
 # --- Config ----------------------------------------------------------------------
@@ -102,7 +105,7 @@ if [[ -f $DOT_CONFIG ]]; then
   # rmdir: the directory goes only if our config was the single thing in it.
   [[ $DOT_DRY_RUN == 1 ]] || rmdir "$(dirname "$DOT_CONFIG")" 2>/dev/null || true
 else
-  say 'None found.'
+  say config 'none found'
 fi
 
 # --- Logs -------------------------------------------------------------------------
@@ -115,26 +118,26 @@ if [[ -n $(find "$DOT_STATE/logs" -mindepth 1 -name '*.log' -print -quit 2>/dev/
   done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort)
   [[ $DOT_DRY_RUN == 1 ]] || rmdir "$DOT_STATE/logs" 2>/dev/null || true
 else
-  say 'None found.'
+  say logs 'none found'
 fi
 
 # --- Backups -----------------------------------------------------------------------
 heading 'Backups'
 if [[ -n $(find "$DOT_STATE/backups" -mindepth 1 -print -quit 2>/dev/null) ]]; then
   # A warning about something KEPT: the only copy of your replaced files.
-  warn "kept  ${DOT_STATE/#$HOME/\~}/backups"
+  warn 'kept' "${DOT_STATE/#$HOME/\~}/backups"
   dim 'Your own files, moved aside by an earlier apply. Nothing else has a copy.'
   dim 'Delete them yourself once you have looked.'
 else
-  say 'None to keep.'
+  say backups 'none to keep'
   # rmdir, never rm -rf: a file nothing in this repo created keeps the directory
   # alive. Tested up front so a dry run prints the real run's words; logs/ is
   # excluded because a dry run has not removed it yet.
   if [[ -d $DOT_STATE ]]; then
     if [[ -n $(find "$DOT_STATE" -mindepth 1 -not -path "$DOT_STATE/backups" -not -path "$DOT_STATE/logs*" -print -quit 2>/dev/null) ]]; then
-      warn "left alone  ${DOT_STATE/#$HOME/\~} holds files this repo did not create"
+      warn 'left alone' "${DOT_STATE/#$HOME/\~} holds files this repo did not create"
     else
-      info "remove  ${DOT_STATE/#$HOME/\~}"
+      info 'remove' "${DOT_STATE/#$HOME/\~}"
       [[ $DOT_DRY_RUN == 1 ]] || rmdir "$DOT_STATE/backups" "$DOT_STATE" 2>/dev/null || true
     fi
   fi
@@ -153,7 +156,7 @@ have_brew=0
 if brew_load; then
   have_brew=1
 elif [[ -d /opt/homebrew || -d /usr/local/Homebrew ]]; then
-  fail 'Homebrew looks installed but could not be loaded -- refusing to guess what it owns'
+  fail homebrew 'looks installed but could not be loaded -- refusing to guess what it owns'
 fi
 
 remove_applications() {
@@ -161,25 +164,25 @@ remove_applications() {
   local -a casks
 
   if [[ $DOT_DRY_RUN == 1 ]]; then
-    info 'brew services stop --all'
+    info services 'stop --all'
   else
     brew services stop --all >/dev/null 2>&1 || true
   fi
 
   mapfile -t casks < <(brew list --cask 2>/dev/null)
   if ((${#casks[@]} == 0)); then
-    say 'No applications installed.'
+    say casks 'none installed'
   elif [[ $DOT_DRY_RUN == 1 ]]; then
     for cask in "${casks[@]}"; do
-      info "uninstall  $cask"
+      info 'uninstall' "$cask"
     done
     dim '--zap as well: application support, preferences and caches go too'
   elif brew uninstall --cask --zap --force "${casks[@]}"; then
-    ok "removed ${#casks[@]} application(s)"
+    ok casks "removed ${#casks[@]} application(s)"
   else
     # `fail` so the guard below stops the run before Homebrew goes.
     while IFS= read -r cask; do
-      fail "could not remove $cask -- remove it by hand, then re-run"
+      fail casks "could not remove $cask -- remove it by hand, then re-run"
     done < <(brew list --cask 2>/dev/null)
   fi
 }
@@ -187,7 +190,7 @@ remove_applications() {
 if ((have_brew)); then
   remove_applications
 else
-  say 'Homebrew is not installed; nothing to remove.'
+  say casks 'Homebrew is not installed; nothing to remove'
 fi
 
 # brew_headcount -- "<formulae installed> <formulae no Brewfile here names>". A
@@ -221,7 +224,7 @@ heading 'Homebrew and the repo'
 
 # Everything above, `dot apply` can put back; nothing below can be.
 if ((DOT_FAILURES > 0)); then
-  die "$DOT_FAILURES problem(s) above -- stopping before Homebrew and the repo."
+  die "$DOT_FAILURES problem(s) above -- stopping before Homebrew and the repo"
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
@@ -237,7 +240,7 @@ if [[ $DOT_DRY_RUN == 1 ]]; then
   else
     info 'uninstall Homebrew and every package it manages'
   fi
-  info "remove  $DOT_ROOT"
+  info 'remove' "$DOT_ROOT"
   heading 'Dry run'
   dim 'Nothing was changed.'
   exit 0

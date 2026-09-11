@@ -16,6 +16,6 @@ for plugin in docker-compose docker-buildx; do
   if [[ -x "$plugin_dir/$plugin" ]]; then
     fs_link "$plugin_dir/$plugin" "$HOME/.docker/cli-plugins/$plugin"
   else
-    warn "$plugin is not installed -- brew bundle should have. Run: dot apply"
+    warn plugins "$plugin is not installed -- brew bundle should have. Run: dot apply"
   fi
 done

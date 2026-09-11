@@ -17,11 +17,26 @@ existing verb can reach -- not a convenience.
   attempted. Safe because `contract.bats` proves no `doctor.sh` writes to
   `$HOME`. Skipped under `--dry-run`, where every check would report drift the
   run deliberately did not fix.
+- **`run_checks` captures each group; `apply`'s module loop streams.** A report
+  is read afterwards, so it can be collapsed to one line per healthy module; a
+  `brew bundle` that takes two minutes has to be visible while it runs. The
+  capture is a redirect in the CURRENT shell, never `$(...)`: the tallies are
+  shell variables and a subshell would drop them.
+- **`doctor` may give a count now.** It used not to, because a hook's three
+  problems came back as one rolled-up exit status and a summary may not
+  contradict the lines above it. `ui_group` reads the hook's own records, so
+  the number and the lines are the same evidence. `--verbose` prints every
+  check, including the ones that passed.
 - **`modules_preflight` runs after validation and before the first link.**
   Everything above it only reads.
-- **The transcript `tee` must be drained.** `__transcript_start` sets fds 3/4
+- **The transcript writer must be drained.** `__transcript_start` sets fds 3/4
   and `__DOT_TEE_PID`; `lib/dot.sh`'s EXIT trap restores and `wait`s. Without
   it bash exits unreaped and the log loses the lines naming the failure.
+- **It is one `sed`, not a `tee`.** `lib/ui.sh` settles colour before this
+  redirect exists, so a plain `tee` wrote every escape sequence into the log.
+  `h` keeps the raw line, the substitution strips it, `w` puts the clean copy
+  in the file and `g` brings the raw one back for the terminal. One process, so
+  the trap's single `wait` still drains everything.
 - **Once-per-run work lives here.** Nothing inside `modules_enabled` can
   memoise, so validation (`cfg_parse_problems`, then `modules_require_known`)
   runs here, once, before anything is touched. `doctor` reports both instead.

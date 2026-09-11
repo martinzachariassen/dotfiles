@@ -11,7 +11,7 @@ zdotdir="$DOT_CONFIG_HOME/zsh"
 
 # Empty ZDOTDIR means "not observable from here", not "unset".
 if [[ -n ${ZDOTDIR:-} && $ZDOTDIR != "$zdotdir" ]]; then
-  warn "zsh          ZDOTDIR is $ZDOTDIR, expected ${zdotdir/#$HOME/\~}"
+  warn zsh "ZDOTDIR is $ZDOTDIR, expected ${zdotdir/#$HOME/\~}"
 fi
 
 stray=()
@@ -20,11 +20,11 @@ for f in .zshrc .zprofile .zlogin .zlogout; do
 done
 
 if ((${#stray[@]} > 0)); then
-  warn "zsh          ~/${stray[0]} exists but zsh reads ${zdotdir/#$HOME/\~} -- something wrote there and it has no effect"
+  warn zsh "dead config at ~/${stray[0]} -- zsh reads ${zdotdir/#$HOME/\~}, so it has no effect"
   for f in "${stray[@]:1}"; do
-    warn "zsh          ~/$f likewise"
+    warn zsh "dead config at ~/$f likewise"
   done
-  dim "             move the lines you want into ${zdotdir/#$HOME/\~}/local.zsh, then delete the file"
+  dim "move the lines you want into ${zdotdir/#$HOME/\~}/local.zsh, then delete the file"
 else
-  ok "zsh          no dead config in ~ (ZDOTDIR is ${zdotdir/#$HOME/\~})"
+  ok zsh "no dead config in ~ (ZDOTDIR is ${zdotdir/#$HOME/\~})"
 fi

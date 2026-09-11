@@ -60,6 +60,30 @@ toml_list() {
 cfg_get() { toml_get "$DOT_CONFIG" "$1" "${2:-}"; }
 cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 
+# Set when taplo ran and did not answer, so doctor can say so. Never a problem
+# line: a checker that crashed is not evidence about the file, and refusing to
+# apply over it would make a broken taplo lock the machine out of its config.
+DOT_CFG_UNCHECKED=0
+
+# Only meaningful after cfg_parse_problems has run in this process.
+cfg_unchecked() { ((DOT_CFG_UNCHECKED)); }
+
+# __cfg_taplo -- four answers: 0 valid, 1 invalid, 2 could not be checked,
+# 3 not installed yet. taplo documents 1 for a file with syntax errors, so
+# anything else is taplo itself falling over (a rust panic exits 101) -- and
+# that must never render as "your config is not valid TOML". Not installed is
+# its own answer because it is the normal state before phase 1, not a fault.
+__cfg_taplo() {
+  local taplo=${DOT_TAPLO_BIN:-taplo} status=0
+  command -v "$taplo" >/dev/null 2>&1 || return 3
+  "$taplo" check "$DOT_CONFIG" >/dev/null 2>&1 || status=$?
+  case $status in
+    0) return 0 ;;
+    1) return 1 ;;
+    *) return 2 ;;
+  esac
+}
+
 # cfg_parse_problems -- one line per sign the config did not parse whole.
 #
 # dasel does not validate: on a malformed line it stops, keeps what it read and
@@ -69,17 +93,21 @@ cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 # has installed it, and they miss a typo in the LAST table.
 cfg_parse_problems() {
   local -A seen=()
-  local name
+  local name status=0
 
   # An INPUT, like DOT_BREW_BIN: without one the "not installed yet" branch is
   # unreachable on any machine that has taplo, and that is the branch the two
   # heuristics below exist for.
-  local taplo=${DOT_TAPLO_BIN:-taplo}
-  if command -v "$taplo" >/dev/null 2>&1 &&
-    ! "$taplo" check "$DOT_CONFIG" >/dev/null 2>&1; then
-    printf 'is not valid TOML -- see:  %s check %s\n' "$taplo" "$DOT_CONFIG"
-    return 0
-  fi
+  DOT_CFG_UNCHECKED=0
+  __cfg_taplo || status=$?
+  case $status in
+    1)
+      printf 'is not valid TOML -- see:  %s check %s\n' \
+        "${DOT_TAPLO_BIN:-taplo}" "$DOT_CONFIG"
+      return 0
+      ;;
+    2) DOT_CFG_UNCHECKED=1 ;;
+  esac
 
   while IFS= read -r name; do
     seen[$name]=1
@@ -127,12 +155,12 @@ config_generate() {
   local name=$1 email=$2 modules=$3 signingkey=${4:-} line
 
   if cfg_exists; then
-    fail "$DOT_CONFIG already exists -- delete it first to regenerate"
+    fail config "${DOT_CONFIG/#$HOME/\~} already exists -- delete it first to regenerate"
     return 1
   fi
 
   if [[ $DOT_DRY_RUN == 1 ]]; then
-    info "write   $DOT_CONFIG"
+    info write "${DOT_CONFIG/#$HOME/\~}"
     return 0
   fi
 
@@ -174,7 +202,7 @@ FOOTER
     fi
   } >"$DOT_CONFIG"
 
-  ok "wrote $DOT_CONFIG"
+  ok config "wrote ${DOT_CONFIG/#$HOME/\~}"
 }
 
 # --- Editing `enabled` ------------------------------------------------------

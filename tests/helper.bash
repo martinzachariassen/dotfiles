@@ -47,6 +47,17 @@ teardown_sandbox() {
   return 0
 }
 
+# says LABEL MESSAGE -- $output holds a status line with this label and this
+# message. Runs of spaces are squeezed first, so what is asserted is the two
+# things said and not how wide lib/ui.sh chose to make the column. A test that
+# pins the padding turns a layout decision into a contract, and every caller
+# used to carry its own copy of it.
+says() {
+  local squeezed
+  squeezed=$(tr -s ' ' <<<"$output")
+  [[ $squeezed == *"$1 $2"* ]]
+}
+
 # home_snapshot -- sorted listing of $HOME with the CONTENT of every file, so
 # diffing before/after proves nothing was written. ~/Library is pruned: brew
 # and macOS write there on their own.

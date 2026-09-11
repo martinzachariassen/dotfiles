@@ -12,7 +12,7 @@ bin_dir="$HOME/.local/bin"
 target="$bin_dir/dot"
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info "write   ~/.local/bin/dot"
+  info write "${target/#$HOME/\~}"
 else
   mkdir -p "$bin_dir"
   cat >"$target" <<EOF
@@ -22,7 +22,7 @@ export DOT_ROOT="$DOT_ROOT"
 exec "\$DOT_ROOT/bin/dot" "\$@"
 EOF
   chmod +x "$target"
-  ok "dot is at ~/.local/bin/dot"
+  ok dot "installed at ${target/#$HOME/\~}"
 fi
 
 if [[ $DOT_DRY_RUN != 1 ]]; then

@@ -155,7 +155,7 @@ no_jq() {
 
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
   [ "$status" -ne 0 ]
-  [[ $output == *"found array"* ]]
+  [[ $output == *"is array, not a JSON object"* ]]
   [ "$(cat "$HOME/.claude/settings.json")" = "[]" ]
 
   run_hook "$DOT_ROOT/modules/claude-code" remove.sh

@@ -34,10 +34,10 @@ check com.apple.dock autohide bool "$dock_autohide"
 
 # warn, not fail: an OS update reverting a key is not a broken install.
 if ((${#drift[@]} == 0)); then
-  ok 'defaults     every managed key matches data/defaults.tsv'
+  ok defaults 'every managed key matches data/defaults.tsv'
 else
   for row in "${drift[@]}"; do
-    warn "defaults     $row"
+    warn defaults "$row"
   done
-  dim '             put them back with: dot apply'
+  dim 'put them back with: dot apply'
 fi

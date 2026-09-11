@@ -17,7 +17,7 @@ data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
 want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline.sh"' "$data")
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info "write   ~/.claude/settings.json ($(jq -r 'keys_unsorted | join(", ")' <<<"$want"))"
+  info write "${dest/#$HOME/\~} ($(jq -r 'keys_unsorted | join(", ")' <<<"$want"))"
   exit 0
 fi
 
@@ -28,7 +28,7 @@ mkdir -p "$(dirname "$dest")"
 # and object is the real requirement anyway. All three hooks ask this question.
 kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'
 if [[ $kind != object ]]; then
-  fail "${dest/#$HOME/\~}: expected a JSON object, found $kind -- fix it or move it aside, then: dot apply"
+  fail settings "${dest/#$HOME/\~} is $kind, not a JSON object -- fix it or move it aside, then: dot apply"
   exit 1
 fi
 
@@ -41,9 +41,9 @@ chmod "$(stat -f '%Lp' "$dest")" "$tmp"
 # so a jq that dies mid-merge prints the success line and exits 0. The temp file
 # is ours, so `rm` is right where a user's file would need fs_discard.
 if jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"; then
-  ok "Claude Code settings: $(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
+  ok settings "$(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
 else
   rm -f "$tmp"
-  fail "jq could not rewrite ${dest/#$HOME/\~} -- it was left as it was"
+  fail settings "jq could not rewrite ${dest/#$HOME/\~} -- it was left as it was"
   exit 1
 fi

@@ -62,7 +62,7 @@ fs_classify() {
 
 # fs_link SRC DST -- idempotent; an already-correct link prints nothing.
 fs_link() {
-  local src=$1 dst=$2 rel=${2#"$HOME"/} state backup what
+  local src=$1 dst=$2 rel=${2#"$HOME"/} short=${2/#$HOME/\~} state backup what
 
   state=$(fs_classify "$src" "$dst")
 
@@ -74,11 +74,11 @@ fs_link() {
   # Intent is announced before acting, so a dry run and a real run use the same
   # words (tests/fs.bats pins this).
   case $state in
-    missing) info "link    ~/$rel" ;;
-    wrong-target | broken) info "relink  ~/$rel" ;;
+    missing) info link "$short" ;;
+    wrong-target | broken) info relink "$short" ;;
     clobbered)
       if [[ -d $dst ]]; then what='directory'; else what='file'; fi
-      info "backup  ~/$rel  (real $what in the way)"
+      info backup "$short  (real $what in the way)"
       ;;
   esac
   [[ $DOT_DRY_RUN == 1 ]] || {
@@ -111,7 +111,7 @@ fs_link_tree() {
   done < <(fs_pairs "$1")
 
   if ((n > 0 && DOT_N_UNCHANGED - before == n)); then
-    ok "files        all $n already linked"
+    ok files "all $n already linked"
   fi
 }
 
@@ -124,7 +124,7 @@ fs_link_tree() {
 fs_unlink() {
   local dst=$1
   [[ -L $dst ]] || return 0
-  info "unlink  ${dst/#$HOME/\~}"
+  info unlink "${dst/#$HOME/\~}"
   [[ $DOT_DRY_RUN == 1 ]] || rm -f "$dst"
 }
 
@@ -133,28 +133,28 @@ fs_unlink() {
 fs_discard() {
   local dst=$1
   [[ -f $dst ]] || return 0
-  info "remove  ${dst/#$HOME/\~}"
+  info remove "${dst/#$HOME/\~}"
   [[ $DOT_DRY_RUN == 1 ]] || rm -f "$dst"
 }
 
 # fs_check_tree DIR -- read-only drift report. Returns 1 on any drift.
 fs_check_tree() {
-  local src dst rel state drift=0
+  local src dst short state drift=0
   while IFS=$'\t' read -r src dst; do
     state=$(fs_classify "$src" "$dst")
-    rel=${dst#"$HOME"/}
+    short=${dst/#$HOME/\~}
     case $state in
       ok) ;;
-      missing) warn "not linked      ~/$rel" ;;
-      wrong-target) warn "wrong target    ~/$rel" ;;
+      missing) warn 'not linked' "$short" ;;
+      wrong-target) warn 'wrong target' "$short" ;;
       clobbered)
         if [[ -d $dst ]]; then
-          warn "real directory  ~/$rel"
+          warn 'real directory' "$short"
         else
-          warn "real file       ~/$rel"
+          warn 'real file' "$short"
         fi
         ;;
-      broken) warn "broken link     ~/$rel" ;;
+      broken) warn 'broken link' "$short" ;;
     esac
     [[ $state == ok ]] || drift=1
   done < <(fs_pairs "$1")
@@ -169,15 +169,16 @@ fs_report() {
   ((DOT_N_UNCHANGED)) && parts+=("$DOT_N_UNCHANGED unchanged")
 
   if ((${#parts[@]} == 0)); then
-    say "No files to link."
+    say files 'none to link'
   else
     # printf, not IFS + "${parts[*]}": that joins on the FIRST char of IFS only.
     summary=$(printf ', %s' "${parts[@]}")
-    say "${summary:2}"
+    say files "${summary:2}"
   fi
 
   if fs_backup_used; then
-    dim "Replaced files were moved to $DOT_STATE/backups/$DOT_RUN_ID"
+    say backups "${DOT_STATE/#$HOME/\~}/backups/$DOT_RUN_ID"
+    dim 'Files that were in the way. Nothing else has a copy of them.'
   fi
 }
 
