@@ -8,6 +8,12 @@ macOS setup: Homebrew, packages, and config files. One command on a fresh Mac.
 curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
 ```
 
+This is Martin's own machine setup, public so it can be read and forked, not a
+tool built for someone else's. Forking it means the [`[user]` table in
+`profiles.toml`](#profiles) first — the wizard copies that name, noreply
+email and public signing key into `config.toml` without asking, so a fork run
+as-is signs commits with *his* identity.
+
 [How it works](#how-it-works) · [Commands](#commands) ·
 [Core concepts](#core-concepts) · [Configuration](#configuration) ·
 [Modules](#modules) · [Uninstalling](#uninstalling) ·
