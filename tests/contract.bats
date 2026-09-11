@@ -621,8 +621,10 @@ EOF
 }
 
 @test "the verb count in the docs is the count bin/dot actually has" {
-  # The other half of the same drift: prose that names a NUMBER. Five files say
-  # it one way or another, and a fifth verb made four of them wrong at once.
+  # The other half of the same drift: prose that names a NUMBER. Several files
+  # say it one way or another, and a fifth verb made four of them wrong at once.
+  # docs/ is globbed rather than listed: a new page there must be covered by
+  # this the day it is written, not the day someone remembers to add it.
   #
   # The map runs word -> number, never the reverse: asked to find the word for
   # a count it does not know, this would have to skip, and a guard that skips
@@ -645,9 +647,13 @@ EOF
 
   # Newlines collapsed: prose wraps, and "Not a sixth\n  verb" is the same claim
   # as "not a sixth verb". `[^.]` keeps a match from spanning two sentences.
-  local -a stale=()
-  local file claim num flat
-  for file in bin/dot bin/CLAUDE.md CLAUDE.md README.md uninstall.sh; do
+  local -a stale=() files=(bin/dot bin/CLAUDE.md CLAUDE.md README.md uninstall.sh)
+  local file claim num flat doc
+  while IFS= read -r doc; do
+    files+=("${doc#"$DOT_ROOT"/}")
+  done < <(find "$DOT_ROOT/docs" -maxdepth 1 -type f -name '*.md' | sort)
+
+  for file in "${files[@]}"; do
     flat=$(tr '\n' ' ' <"$DOT_ROOT/$file")
 
     while IFS= read -r claim; do

@@ -6,6 +6,14 @@ Per-directory rules: [`lib/`](lib/CLAUDE.md) · [`core/`](core/CLAUDE.md) ·
 
 English everywhere: code, comments, commits, docs.
 
+## Docs
+
+`README.md` is the overview and stays short; the depth lives in
+[`docs/`](docs/). Two things the README alone may not lose, both held by
+`contract.bats`: the module tables naming every module, and the command list
+naming every verb. Prose in `docs/` that states a verb count is held to the
+same check, by glob, so a new page there is covered the day it is written.
+
 ## Before committing
 
 ```sh
