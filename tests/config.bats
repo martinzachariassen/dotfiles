@@ -364,6 +364,71 @@ EOF
   [ "$(stat -f '%Lp' "$DOT_CONFIG")" = "644" ]
 }
 
+@test "taplo: exit 1 means the file is invalid, and says so" {
+  # The answer taplo documents for a file with syntax errors.
+  generated_config
+  printf '#!/bin/sh\nexit 1\n' >"$DOT_TMP/taplo-invalid"
+  chmod +x "$DOT_TMP/taplo-invalid"
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-invalid"
+
+  run cfg_parse_problems
+  [ "$status" -eq 0 ]
+  [[ $output == *"not valid TOML"* ]]
+}
+
+@test "taplo: a crash is a third answer, not a verdict about the file" {
+  # A rust panic exits 101. Read as "invalid", it told you a perfectly good
+  # config was broken -- and, worse, `dot apply` refused over it, so a taplo
+  # that fell over locked the machine out of its own configuration.
+  generated_config
+  printf '#!/bin/sh\necho "panicked at ..." >&2\nexit 101\n' >"$DOT_TMP/taplo-crash"
+  chmod +x "$DOT_TMP/taplo-crash"
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-crash"
+
+  run cfg_parse_problems
+  [ "$status" -eq 0 ]
+  [[ $output != *"not valid TOML"* ]]
+  # Nothing at all: a checker that did not answer is not a problem with the file.
+  [ -z "$output" ]
+}
+
+@test "taplo: the crash is still reported, not swallowed" {
+  # Silence would be the opposite mistake: the two heuristics left behind miss
+  # a typo in the last table, so doctor has to say the real check did not run.
+  generated_config
+  printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
+  chmod +x "$DOT_TMP/taplo-crash"
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-crash"
+
+  cfg_parse_problems >/dev/null
+  run cfg_unchecked
+  [ "$status" -eq 0 ]
+}
+
+@test "taplo: a clean answer leaves nothing to report" {
+  generated_config
+  printf '#!/bin/sh\nexit 0\n' >"$DOT_TMP/taplo-ok"
+  chmod +x "$DOT_TMP/taplo-ok"
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-ok"
+
+  run cfg_parse_problems
+  [ -z "$output" ]
+  cfg_parse_problems >/dev/null
+  run cfg_unchecked
+  [ "$status" -ne 0 ]
+}
+
+@test "taplo: not installed yet is not a crash either" {
+  # The normal state before phase 1 has run. It must not set the flag doctor
+  # warns on, or a fresh machine warns about its own bootstrap order.
+  generated_config
+  export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"
+
+  cfg_parse_problems >/dev/null
+  run cfg_unchecked
+  [ "$status" -ne 0 ]
+}
+
 @test "enabled: an edit that would not parse never replaces the file" {
   # taplo is asked BEFORE the mv, because after it there is nothing to roll
   # back to. A stub that always refuses is what makes that branch reachable.

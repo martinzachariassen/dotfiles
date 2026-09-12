@@ -68,6 +68,43 @@ teardown() { teardown_sandbox; }
   [[ $output == *"brew bundle failed for demo"* ]]
 }
 
+@test "bundle: brew's own output is kept, indented and out of the way" {
+  # It streams through a pipe now, so two things can go wrong at once: the
+  # output can be swallowed, and the failure can be lost because the pipeline's
+  # status is the last command's. Both are checked here.
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() {
+    printf 'Using jq\na second line\n'
+    return 1
+  }
+  brew_missing() { return 2; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  [[ $output == *"Using jq"* ]]
+  [[ $output == *"a second line"* ]]
+  # Indented past this repo's own lines, so the eye can skip it.
+  [[ $output =~ ^[[:space:]]{4,}Using\ jq ]] ||
+    [[ $(grep 'Using jq' <<<"$output") =~ ^[[:space:]]{4,} ]]
+}
+
+@test "bundle: a package still missing after a failure is named" {
+  # brew's own hundreds of lines are above by now, and "failed" alone is not
+  # something anyone can act on.
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 1; }
+  brew_missing() {
+    printf 'Formula jq\n'
+    return 1
+  }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  says 'still missing' 'Formula jq'
+}
+
 @test "bundle: --no-upgrade is passed, so apply never bumps a version" {
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }

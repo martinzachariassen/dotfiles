@@ -153,6 +153,117 @@ pass_core_checks() {
   [[ $output == *"Everything looks right"* ]]
 }
 
+@test "doctor: a healthy module is one line, and --verbose is the way back" {
+  # The point of the collapse: forty green lines hid the three red ones. What
+  # must not happen is that the detail becomes unreachable.
+  config_generate "A" "a@b.c" "git"
+  pass_core_checks
+  fs_link_tree "$DOT_ROOT/modules/git"
+
+  run "$DOT_ROOT/bin/dot" doctor
+  [[ $output != *"all linked"* ]]
+
+  run "$DOT_ROOT/bin/dot" doctor --verbose
+  [[ $output == *"all linked"* ]]
+}
+
+@test "apply: five real modules, then the checks accept what they produced" {
+  # The end-to-end nothing covered: link the files, run the hooks, then observe
+  # the machine. brew is stubbed, so what runs for real is every file and every
+  # hook, not Homebrew. Two modules are left out because they are the two that
+  # reach outside $HOME -- macos-defaults writes system preferences, dev-cli
+  # downloads runtimes -- and containers needs a real Homebrew prefix to find
+  # the docker plugins it links. Each of those three has its own file here.
+  config_generate "A" "a@b.c" "$(printf 'claude-code\ncmux\ngit\nssh\nzsh\n')"
+  mkdir -p "$DOT_TMP/stub"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/brew"
+  # Inherited from the developer's own shell, it reads as drift in the sandbox.
+  unset ZDOTDIR
+
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
+  # 0 or a warning: the 1Password agent socket is not in a throwaway $HOME.
+  [ "$status" -eq 0 ] || [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output != *problem* ]]
+
+  # The verifying pass is the assertion, but only if the files really moved.
+  [ -L "$HOME/.config/git/config" ]
+  [ -L "$HOME/.config/zsh/.zshrc" ]
+  [ -L "$HOME/.ssh/config" ]
+  [ -L "$HOME/.config/cmux/cmux.json" ]
+  [ -f "$HOME/.claude/settings.json" ]
+  [ -f "$HOME/.config/git/config.local" ]
+
+  # Every module reported, and the healthy ones as one line each.
+  local name
+  for name in claude-code cmux git ssh zsh; do
+    says "$name" "$(module_desc "$name")"
+  done
+}
+
+@test "apply: a second run of the same five changes nothing and says so" {
+  # Idempotence is the promise `dot apply` makes, and the converged run is the
+  # one people actually see. It must not report work it did not do.
+  config_generate "A" "a@b.c" "$(printf 'claude-code\ncmux\ngit\nssh\nzsh\n')"
+  mkdir -p "$DOT_TMP/stub"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/brew"
+  unset ZDOTDIR
+
+  env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply >/dev/null 2>&1 || true
+  local after_first
+  after_first=$(home_snapshot)
+
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" DOT_RUN_ID=second \
+    "$DOT_ROOT/bin/dot" apply
+  [[ $output != *problem* ]]
+  # Nothing linked, nothing relinked: the tally says unchanged and only that.
+  [[ $output == *unchanged* ]]
+  [[ $output != *"linked,"* ]]
+
+  # And the second run really did leave $HOME alone. The transcript is the one
+  # file it is allowed to add.
+  local after_second
+  after_second=$(home_snapshot)
+  [ "$after_first" = "$after_second" ]
+}
+
+@test "doctor: an unknown option is refused, like every other verb's" {
+  config_generate "A" "a@b.c" ""
+  run "$DOT_ROOT/bin/dot" doctor --verbos
+  [ "$status" -ne 0 ]
+  [[ $output == *"unknown option"* ]]
+}
+
+@test "apply: a taplo that crashed does not stop the run" {
+  # cfg_parse_problems used to read any non-zero exit as "your config is not
+  # valid TOML", and apply dies on any problem line -- so a broken checker
+  # locked the machine out of a configuration that was never wrong.
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
+  chmod +x "$DOT_TMP/taplo-crash"
+
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-crash"
+
+  run "$DOT_ROOT/bin/dot" apply
+  [ "$status" -eq 0 ]
+  [[ $output != *"not valid TOML"* ]]
+}
+
+@test "doctor: a taplo that crashed is reported as a check that did not run" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
+  chmod +x "$DOT_TMP/taplo-crash"
+
+  export DOT_TAPLO_BIN="$DOT_TMP/taplo-crash"
+
+  run "$DOT_ROOT/bin/dot" doctor
+  [[ $output == *"could not check it"* ]]
+  [[ $output != *"not valid TOML"* ]]
+}
+
 @test "doctor: a shim that lost its executable bit is not called missing" {
   config_generate "A" "a@b.c" ""
   pass_core_checks

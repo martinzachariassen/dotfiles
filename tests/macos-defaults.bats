@@ -162,6 +162,18 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$(grep -c 'log out and back in' "$DOT_ROOT/modules/macos-defaults/apply.sh")" -eq 1 ]
 }
 
+@test "apply: a real run says what it did, in the same column as everything else" {
+  # The hook runs for real here, against the `defaults` stub. What was never
+  # checked is the line it closes on: a module whose whole job is invisible
+  # changes has nothing else to show for itself.
+  with_settings 'dock_tilesize = 64'
+
+  apply
+  [ "$status" -eq 0 ]
+  says defaults 'written'
+  [ -f "$CALLS" ]
+}
+
 @test "dry run: describes the writes and makes none" {
   with_settings 'dock_tilesize = 64'
   local before

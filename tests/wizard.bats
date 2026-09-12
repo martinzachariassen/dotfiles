@@ -399,3 +399,12 @@ EOF
   [ "$packages" -eq 0 ]
   [ "$files" -eq 0 ]
 }
+
+# --- Not tested here, and why -------------------------------------------------
+#
+# The picker DRAWING -- the border label, the preview pane, the header -- was
+# checked by hand against a real fzf in a pty, and it draws. It is not a test:
+# under bats the pty never gets its EOF and the run hangs, and a test that hangs
+# costs more than the one it replaces. What can be pinned without a terminal is
+# pinned above: every option the real fzf accepts, the preview command surviving
+# the quoting fzf runs it through, and the name the picker returns.

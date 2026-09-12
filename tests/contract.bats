@@ -295,6 +295,23 @@ teardown() { teardown_sandbox; }
   grep -q 'Summary' "$log"
 }
 
+@test "a transcript keeps the lines of the run that died" {
+  # The whole reason the EXIT trap drains the writer. A run that ends in `die`
+  # is exactly the one whose log gets read, and the message naming the cause is
+  # the last thing printed -- so it is the first thing a buffer loses.
+  config_generate "A" "a@b.c" "$(printf 'git\nno-such-module\n')"
+
+  DOT_COLOR=1 run "$DOT_ROOT/bin/dot" apply
+  [ "$status" -ne 0 ]
+
+  local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
+  [ -f "$log" ]
+  grep -q 'no-such-module' "$log"
+  # The labelled block under it too, not just the headline.
+  grep -q 'available' "$log"
+  ! grep -q $'\033' "$log"
+}
+
 @test "claude-code: all three hooks derive \$want from data/settings.json alike" {
   # Replaces the old allow/deny literal check: the literals are gone, and the
   # only thing left to keep in step is how each hook reads the data file.

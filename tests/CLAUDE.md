@@ -19,6 +19,15 @@ never an argument against a change.
 - **The root `CLAUDE.md` ban on history does not apply here.** In shipped code
   the bug that produced a rule is noise; in a test it is the specification --
   a guard whose reason is not written down is one the next person deletes.
+- **No test may need a terminal.** `fzf` is stubbed, or asked to parse its
+  options and exit with `--filter`. Driving it through a pty works by hand and
+  was tried: under bats the pty never gets its EOF and the run hangs. The note
+  at the end of `wizard.bats` says so, so the next person does not rediscover
+  it. The same goes for sleeps -- a test paced by them fails on a loaded
+  machine, which is worse than the coverage is worth.
+- **A hook that reaches outside `$HOME` gets its tool shadowed on PATH**, never
+  skipped: `defaults`, `mise` and `brew` all have stubs here, and that is what
+  makes an `apply.sh` nobody could run in CI reachable at all.
 
 ## `contract.bats`
 

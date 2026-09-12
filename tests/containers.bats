@@ -30,6 +30,81 @@ no_brew() {
   DOT_BREW_BIN="$DOT_TMP/no-such-brew" remove "$DOT_TMP/empty"
 }
 
+# apply.sh reaches into Homebrew's prefix for two binaries, so on a machine
+# without them it never ran and neither branch was ever seen. A `brew` that
+# answers --prefix with a directory under $DOT_TMP makes both reachable.
+apply() {
+  run env PATH="$DOT_TMP/bin:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="${1:-0}" \
+    DOT_MODULE=containers DOT_MODULE_DIR="$DOT_ROOT/modules/containers" \
+    "$BASH" "$DOT_ROOT/modules/containers/apply.sh"
+}
+
+with_prefix() {
+  mkdir -p "$DOT_TMP/bin"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "%s"\n' "$DOT_TMP/brew" >"$DOT_TMP/bin/brew"
+  chmod +x "$DOT_TMP/bin/brew"
+  mkdir -p "$DOT_TMP/brew/lib/docker/cli-plugins"
+}
+
+@test "apply: both plugins are linked, and the run says where" {
+  with_prefix
+  local dir="$DOT_TMP/brew/lib/docker/cli-plugins"
+  printf '#!/bin/sh\n' >"$dir/docker-compose"
+  printf '#!/bin/sh\n' >"$dir/docker-buildx"
+  chmod +x "$dir/docker-compose" "$dir/docker-buildx"
+
+  apply
+  [ "$status" -eq 0 ]
+  [ -L "$PLUGINS/docker-compose" ]
+  [ -L "$PLUGINS/docker-buildx" ]
+  says link '~/.docker/cli-plugins/docker-compose'
+}
+
+@test "apply: a plugin Homebrew never installed is named, not skipped quietly" {
+  # The docker CLI looks in this one directory and nowhere else, so a missing
+  # plugin is a command that does not exist with no explanation anywhere.
+  with_prefix
+  local dir="$DOT_TMP/brew/lib/docker/cli-plugins"
+  printf '#!/bin/sh\n' >"$dir/docker-compose"
+  chmod +x "$dir/docker-compose"
+
+  apply
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  says plugins 'docker-buildx is not installed -- brew bundle should have. Run: dot apply'
+  [ -L "$PLUGINS/docker-compose" ]
+  [ ! -e "$PLUGINS/docker-buildx" ]
+}
+
+@test "apply: a dry run names the links and makes none" {
+  with_prefix
+  local dir="$DOT_TMP/brew/lib/docker/cli-plugins"
+  printf '#!/bin/sh\n' >"$dir/docker-compose"
+  printf '#!/bin/sh\n' >"$dir/docker-buildx"
+  chmod +x "$dir/docker-compose" "$dir/docker-buildx"
+  local before
+  before=$(home_snapshot)
+
+  apply 1
+  [ "$status" -eq 0 ]
+  says link '~/.docker/cli-plugins/docker-compose'
+  [ "$(home_snapshot)" = "$before" ]
+}
+
+@test "apply: no Homebrew at all stops before it guesses a path" {
+  # `$(brew --prefix)` on a machine without brew yields an empty string, and
+  # the hook would then link from /lib/docker/cli-plugins.
+  mkdir -p "$DOT_TMP/empty"
+  run env PATH="$DOT_TMP/empty" DOT_BREW_BIN="$DOT_TMP/no-such-brew" \
+    DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    DOT_MODULE=containers DOT_MODULE_DIR="$DOT_ROOT/modules/containers" \
+    "$BASH" "$DOT_ROOT/modules/containers/apply.sh"
+  [ "$status" -ne 0 ]
+  [[ $output == *"Homebrew is not on PATH"* ]]
+  [ ! -e "$PLUGINS/docker-compose" ]
+}
+
 @test "remove: a link into Homebrew's prefix is taken back" {
   command -v brew >/dev/null 2>&1 || skip 'no Homebrew on this machine'
   local dir
