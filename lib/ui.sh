@@ -364,7 +364,9 @@ ui_problems() {
 
 # --- The verdict ------------------------------------------------------------
 
-__ui_count() {
+# ui_count N NOUN -- "1 module", "9 modules". Every count in the output goes
+# through it, so "core + 1 modules" cannot come back.
+ui_count() {
   if (($1 == 1)); then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi
 }
 
@@ -377,14 +379,14 @@ ui_verdict() {
   local good=$1 unit=${2:-group} line=''
 
   if ((DOT_FAILURES > 0)); then
-    line=$(__ui_count "$DOT_FAILURES" problem)
-    if ((DOT_WARNINGS > 0)); then line+=", $(__ui_count "$DOT_WARNINGS" warning)"; fi
+    line=$(ui_count "$DOT_FAILURES" problem)
+    if ((DOT_WARNINGS > 0)); then line+=", $(ui_count "$DOT_WARNINGS" warning)"; fi
   elif ((DOT_WARNINGS > 0)); then
-    line=$(__ui_count "$DOT_WARNINGS" warning)
+    line=$(ui_count "$DOT_WARNINGS" warning)
   fi
 
   if ((DOT_GROUPS_TOTAL > 0 && DOT_FAILURES + DOT_WARNINGS > 0)); then
-    line+=" in $((DOT_GROUPS_TOTAL - DOT_GROUPS_CLEAN)) of $DOT_GROUPS_TOTAL ${unit}s"
+    line+=" in $((DOT_GROUPS_TOTAL - DOT_GROUPS_CLEAN)) of $(ui_count "$DOT_GROUPS_TOTAL" "$unit")"
   fi
 
   if ((DOT_FAILURES > 0)); then
@@ -398,7 +400,7 @@ ui_verdict() {
 
   ui_problems
   if ((DOT_GROUPS_CLEAN > 0)); then
-    ok "$(__ui_count "$DOT_GROUPS_CLEAN" "$unit") clean"
+    ok "$(ui_count "$DOT_GROUPS_CLEAN" "$unit") clean"
   fi
 }
 
@@ -438,6 +440,9 @@ die() {
     __ui_render dim "$1" "$2" >&2
     shift 2
   done
+  # An odd argument left over is a caller that meant to say something. Printing
+  # it unlabelled beats dropping it, which is what a bare `while` pair loop does.
+  if (($#)); then __ui_render dim '' "$1" >&2; fi
   ui_unnest
   exit 1
 }

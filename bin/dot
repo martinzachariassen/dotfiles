@@ -161,7 +161,7 @@ cmd_apply() {
   local -a names
   mapfile -t names < <(modules_enabled)
 
-  heading 'Applying' "core + ${#names[@]} modules"
+  heading 'Applying' "core + $(ui_count "${#names[@]}" module)"
   step '' '' core 'packages, then the files this repo owns itself'
   ui_nest
   fs_link_tree "$DOT_ROOT/core"
@@ -429,7 +429,7 @@ run_checks() {
   local -a names
   mapfile -t names < <(modules_enabled)
 
-  if [[ -z $note ]]; then note="core + ${#names[@]} modules"; fi
+  if [[ -z $note ]]; then note="core + $(ui_count "${#names[@]}" module)"; fi
   heading "$title" "$note"
   __check_group core 'the repo, the shim, the config' __core_checks
 
