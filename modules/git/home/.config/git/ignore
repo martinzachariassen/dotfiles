@@ -1,0 +1,21 @@
+# Global gitignore.
+
+# macOS
+.DS_Store
+.AppleDouble
+Icon?
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Environment
+.env
+.env.local
+.direnv/
+
+**/.claude/settings.local.json
+
+**/.claude/.cc-writes/

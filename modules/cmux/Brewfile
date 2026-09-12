@@ -1,0 +1,9 @@
+# No ghostty cask: cmux embeds libghostty and reads home/.config/ghostty/config
+# itself.
+
+cask "cmux"
+
+# The `font-family` line in that config names this exact face; without it the
+# terminal renders every prompt glyph as a tofu box. modules/zsh names the same
+# cask for the same reason -- brew installs it once.
+cask "font-jetbrains-mono-nerd-font"

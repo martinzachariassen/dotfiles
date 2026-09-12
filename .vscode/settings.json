@@ -1,0 +1,17 @@
+{
+  // Bash IDE (mads-hartmann.bash-ide-vscode) - "Go to Definition" across scripts.
+  // Needed here because the source paths are dynamic: source "${DOT_ROOT:?}/lib/dot.sh"
+  // cannot be resolved statically, so index the whole workspace instead.
+  "bashIde.includeAllWorkspaceSymbols": true,
+
+  // Include scripts with no file extension (bin/dot) alongside *.sh.
+  "bashIde.globPattern": "**/{*.sh,*.bash,*.inc,*.command,bin/*}",
+
+  // shellcheck already runs via timonwong.shellcheck -- avoid duplicate diagnostics.
+  "bashIde.shellcheckPath": "",
+
+  // Extensionless scripts should be treated as shell.
+  "files.associations": {
+    "bin/dot": "shellscript"
+  }
+}

@@ -1,0 +1,9 @@
+[tools]
+java = "temurin-25"
+python = "latest"
+node = "latest"
+bun = "latest"
+maven = "latest"
+gradle = "latest"
+just = "latest"
+terraform = "latest"

@@ -1,0 +1,7 @@
+# home/.ssh/config points IdentityAgent at 1Password's agent socket, so without
+# the app this module's one config file resolves to nothing and doctor.sh warns
+# on every run. Named here rather than in `apps`, which nothing declares a
+# dependency on.
+
+cask "1password"     # the agent lives in the app; the CLI alone is not enough
+cask "1password-cli" # op

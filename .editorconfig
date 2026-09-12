@@ -1,0 +1,17 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# shfmt reads this too; keeps editor format-on-save agreeing with `make fmt -ci`.
+# bin/dot has no extension, so it needs its own pattern.
+[{*.sh,bin/dot}]
+switch_case_indent = true
+
+[*.md]
+trim_trailing_whitespace = false

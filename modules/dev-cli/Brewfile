@@ -1,0 +1,14 @@
+# Tools you would install by hand in the first week. Anything rarer is
+# `brew install` when needed.
+
+brew "firebase-cli"
+brew "gh"
+brew "gitleaks"
+cask "gcloud-cli"
+brew "jq"
+brew "just-lsp"
+brew "ktlint"
+brew "lazydocker"
+brew "lazygit"
+brew "mise"         # language runtimes (brew owns CLIs, mise owns runtimes)
+brew "zoxide"

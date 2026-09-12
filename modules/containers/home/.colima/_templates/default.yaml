@@ -1,0 +1,25 @@
+# Read by `colima start` only for profiles that do not exist yet. The one
+# reason it is here: sshConfig: true makes every start prepend an Include to
+# ~/.ssh/config, which is a link into this repo.
+#
+# EVERY OTHER KEY IS COLIMA'S DEFAULT, RESTATED, AND MUST STAY. The template
+# replaces the flag defaults instead of merging: with sshConfig alone, colima
+# 0.10.3 starts with cpu 0, disk 0, memory 0. Removing a line zeroes it.
+#
+# cpu and memory are the deliberate exception: the stock 2 GiB runs a
+# container but cannot build one (buildkit OOM-killed with no mention of
+# memory). Raise per machine with `colima start --cpu 6 --memory 12`.
+
+cpu: 4
+disk: 100
+memory: 8
+arch: host # not aarch64: must be right on an Intel mac too
+runtime: docker
+modelRunner: docker
+network:
+  mode: shared
+  interface: en0
+  gatewayAddress: 192.168.5.2
+mounts: []
+
+sshConfig: false

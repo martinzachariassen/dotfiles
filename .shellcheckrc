@@ -1,0 +1,5 @@
+external-sources=true
+
+# SC1091: sourced paths are dynamic ($DOT_ROOT).
+# SC2016: single-quoted `backticks` are help text, not command substitutions.
+disable=SC1091,SC2016

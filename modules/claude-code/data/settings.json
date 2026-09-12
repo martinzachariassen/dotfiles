@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "cleanupPeriodDays": 7,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0
+  },
+  "outputStyle": "concise",
+  "spinnerTipsEnabled": false,
+  "theme": "custom:catppuccin-latte",
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": true
+}

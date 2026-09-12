@@ -1,0 +1,7 @@
+# Apps a work machine needs and a personal one has no reason to install. Kept
+# out of `apps` so enabling that module never drags an employer's stack in.
+
+cask "intune-company-portal" # MDM enrolment
+cask "microsoft-office"
+cask "microsoft-teams"
+cask "slack"

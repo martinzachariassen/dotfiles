@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # macOS: the tests exercise BSD find, stat and readlink.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install tooling
+        # Two sets, and contract.bats holds both: the quality gates
+        # (modules/dotfiles-dev) and core/Brewfile, because the suite runs
+        # `dot doctor` and that checks core's packages are installed. A missing
+        # one turns every "a clean machine says so" test red.
+        # bash: the runner's /bin/bash is 3.2, and the suite must run under 5.
+        run: brew install bash bats-core dasel fzf git jq shellcheck shfmt taplo
+
+      - name: make check
+        run: make check
