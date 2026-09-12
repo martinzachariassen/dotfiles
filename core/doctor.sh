@@ -40,14 +40,20 @@ case ":$PATH:" in
 esac
 
 if cfg_exists; then
-  problems=$(cfg_parse_problems)
-  if [[ -z $problems ]]; then
+  # Through a file, not `$(...)`: cfg_parse_problems sets DOT_CFG_UNCHECKED, and
+  # a subshell would drop it -- the third answer would then be silently lost on
+  # every run. One taplo invocation either way.
+  problems=$(mktemp "${TMPDIR:-/tmp}/dot-cfg.XXXXXX")
+  cfg_parse_problems >"$problems"
+
+  if [[ ! -s $problems ]]; then
     ok config "${DOT_CONFIG/#$HOME/\~}"
   else
     while IFS= read -r problem; do
       fail config "$problem"
-    done <<<"$problems"
+    done <"$problems"
   fi
+  rm -f "$problems"
   # A checker that fell over is not evidence about the file. Said out loud
   # rather than swallowed, because the two heuristics left behind miss a typo
   # in the last table.
