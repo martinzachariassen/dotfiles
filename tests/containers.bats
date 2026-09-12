@@ -156,9 +156,18 @@ with_prefix() {
 # literal) and check what doctor.sh reports about the current process's env.
 
 doctor() {
+  # A stopped `colima`, shadowed onto PATH the way the other stubs here are.
+  # Without it the VM check answers differently on a machine that has colima
+  # than on one that does not -- `fail colima 'not installed'` rather than a
+  # warning -- so the exit status these tests read was the machine's and not
+  # the hook's. That is why they passed on a laptop and failed on CI.
+  mkdir -p "$DOT_TMP/bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$DOT_TMP/bin/colima"
+  chmod +x "$DOT_TMP/bin/colima"
+
   # `-u` flags in "$@" must precede every NAME=VALUE assignment, HOME and
   # DOT_ROOT included -- env stops parsing options at the first one it sees.
-  run env "$@" HOME="$HOME" DOT_ROOT="$DOT_ROOT" \
+  run env "$@" HOME="$HOME" DOT_ROOT="$DOT_ROOT" PATH="$DOT_TMP/bin:$PATH" \
     "$BASH" "$DOT_ROOT/modules/containers/doctor.sh"
 }
 
