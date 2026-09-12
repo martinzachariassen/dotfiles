@@ -174,9 +174,12 @@ transcript either.
 
 A module that reports nothing wrong collapses to a single line. One that does
 expands, showing only what needs attention, and the run ends by repeating those
-findings rather than telling you to scroll. `dot doctor --verbose` prints every
-check, passed ones included. `NO_COLOR` turns colour off; a locale that is not
-UTF-8 falls back to ASCII markers of the same width.
+findings rather than telling you to scroll. The count in that last line is the
+count of the lines under it: a hook is a separate process, so its findings reach
+the driver as records rather than as an exit status, and three problems in one
+hook are counted as three. `dot doctor --verbose` prints every check, passed
+ones included. `NO_COLOR` turns colour off; a locale that is not UTF-8 falls
+back to ASCII markers of the same width.
 
 ## Templating
 

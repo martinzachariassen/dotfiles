@@ -49,7 +49,10 @@ source "$DOT_ROOT/lib/brew.sh"
 source "$DOT_ROOT/lib/modules.sh"
 source "$DOT_ROOT/lib/wizard.sh"
 
-# One line per crash, e.g.  ✗ lib/fs.sh:114: mv "$dst" "$backup" (exit 1)
+# One line per crash, e.g.  lib/fs.sh:114: mv "$dst" "$backup" (exit 1), drawn
+# by ui.sh like every other failure -- this file used to spell out the glyph and
+# the colour itself, which made it the second place deciding what output looks
+# like and the first one that would disagree with an ASCII locale.
 # For more, run the hook by hand: bash -x modules/git/apply.sh
 __DOT_REPORTED=0
 __dot_on_err() {
@@ -59,8 +62,9 @@ __dot_on_err() {
   ((BASH_SUBSHELL == 0)) || return 0
   ((__DOT_REPORTED)) && return 0
   __DOT_REPORTED=1
-  printf '  %s✗ %s:%s: %s (exit %s)%s\n' \
-    "$__C_RED" "${src#"$DOT_ROOT"/}" "$line" "$cmd" "$status" "$__C_RESET" >&2
+  # __ui_render, not fail: a crash is not a tallied finding, and a record here
+  # would be swallowed by a collapse instead of naming the thing that broke.
+  __ui_render fail '' "${src#"$DOT_ROOT"/}:$line: $cmd (exit $status)" >&2
   return 0
 }
 

@@ -34,6 +34,13 @@ else
 fi
 unset __ui_colour
 
+# Taking colour back out again, for bin/dot's transcript. A sed expression and
+# not a function because it runs inside the redirect that makes the log, where
+# there is no shell left to call one. It lives here for the same reason the
+# escapes above do: what colour looks like is this file's knowledge, and a strip
+# spelled somewhere else is the copy that stops matching when a code is added.
+__UI_STRIP_SGR="s/$(printf '\033')\[[0-9;]*m//g"
+
 # Every glyph is one column wide in both alphabets, so the label column starts
 # in the same place whichever one is in use. A locale that does not say UTF-8
 # renders ✓ as a question mark or worse, and an unset LANG is the normal case
@@ -103,6 +110,11 @@ DOT_STATUS_WARN=3
 # Anything in the stream WITHOUT the marker is some other program's output
 # (brew, defaults, a bare echo). Those lines are always shown: the collapse may
 # only hide what has explicitly reported itself healthy.
+#
+# Two severities are the protocol talking to itself rather than a printer:
+# `foldopen` and `foldshut` bracket one child process, and carry the exit status
+# fold_status folded into the tallies so ui_group can reconcile that one number
+# with the findings the child actually recorded.
 __UI_RS=$'\036'
 __UI_FS=$'\037'
 
@@ -135,7 +147,7 @@ __ui_render() {
 
   case $sev in
     ok) glyph=$__G_OK colour=$__C_GREEN ;;
-    fail | rollup) glyph=$__G_FAIL colour=$__C_RED ;;
+    fail) glyph=$__G_FAIL colour=$__C_RED ;;
     warn) glyph=$__G_WARN colour=$__C_YELLOW ;;
     info) glyph=$__G_INFO colour=$__C_BLUE ;;
     step) glyph=$__G_STEP colour=$__C_BOLD ;;
@@ -230,12 +242,25 @@ DOT_PROBLEMS=()
 DOT_GROUPS_CLEAN=0
 DOT_GROUPS_TOTAL=0
 
-# ui_group NAME NOTE FILE -- render the captured stream in FILE as one group.
+# ui_group NAME NOTE FILE -- render the captured stream in FILE as one group,
+# and reconcile the tallies with what that stream actually says.
+#
+# The reconciliation is here because nowhere else can do it. A hook is a
+# separate process: its own ok/warn/fail never touched this shell's counters,
+# and fold_status could add only one for the exit status however many findings
+# the hook reported -- three warnings came back as "1 warning". So a fold scope
+# (fold_status's two markers, around one child) is read as: every finding inside
+# it is added here, and the one fold_status counted for the status is taken back
+# whenever the child named the problem itself.
+#
+# Records outside every fold scope were printed by THIS shell, which counted
+# them as it printed them; they are left alone.
 ui_group() {
   local name=$1 note=$2 file=$3
-  local line sev label msg rest entry raw=0 n_fail=0
-  local -a detail=() kept=()
+  local line sev label msg rest entry counted raw=0
+  local -a detail=()
   local worst='ok'
+  local in_fold=0 fold_fail=0 fold_warn=0 add_fail=0 add_warn=0
 
   while IFS= read -r line; do
     if [[ $line != "$__UI_RS"* ]]; then
@@ -250,25 +275,61 @@ ui_group() {
     rest=${line#"$__UI_RS"}
     sev=${rest%%"$__UI_FS"*}
     rest=${rest#*"$__UI_FS"}
-    detail+=("$sev$__UI_FS$rest")
+
+    # Flat by assumption: fold_status is a driver's call, and the hooks it runs
+    # do not run hooks of their own. A nested scope would be read as the inner
+    # one only -- the day a hook needs to fold a child, this needs a stack.
     case $sev in
-      fail) n_fail=$((n_fail + 1)) ;;
+      foldopen)
+        in_fold=1 fold_fail=0 fold_warn=0
+        continue
+        ;;
+      foldshut)
+        counted=${rest%%"$__UI_FS"*}
+        msg=${rest#*"$__UI_FS"}
+        case $counted in
+          fail)
+            # The child named the failure itself, so the roll-up would be the
+            # same finding a second time under a tally that counted it once.
+            # Only THIS child's records can say that -- a failure recorded
+            # elsewhere in the group explains nothing about this one, and
+            # dropping the roll-up over it lost the only line naming a hook
+            # that died before it could print anything.
+            if ((fold_fail > 0)); then
+              DOT_FAILURES=$((DOT_FAILURES - 1))
+            else
+              detail+=("fail$__UI_FS$__UI_FS$msg")
+            fi
+            ;;
+          warn)
+            if ((fold_fail + fold_warn > 0)); then
+              DOT_WARNINGS=$((DOT_WARNINGS - 1))
+            else
+              detail+=("warn$__UI_FS$__UI_FS$msg")
+            fi
+            ;;
+        esac
+        add_fail=$((add_fail + fold_fail))
+        add_warn=$((add_warn + fold_warn))
+        in_fold=0 fold_fail=0 fold_warn=0
+        continue
+        ;;
     esac
+
+    detail+=("$sev$__UI_FS$rest")
+    if ((in_fold)); then
+      case $sev in
+        fail) fold_fail=$((fold_fail + 1)) ;;
+        warn) fold_warn=$((fold_warn + 1)) ;;
+      esac
+    fi
   done <"$file"
 
-  # A roll-up is fold_status saying a hook exited non-zero. When the hook also
-  # said WHAT went wrong, the roll-up is the same finding a second time -- and
-  # the tally counted it once, so repeating both would make the summary
-  # contradict itself. Kept only when it is the only thing there is.
+  DOT_FAILURES=$((DOT_FAILURES + add_fail))
+  DOT_WARNINGS=$((DOT_WARNINGS + add_warn))
+
   for entry in ${detail[@]+"${detail[@]}"}; do
     sev=${entry%%"$__UI_FS"*}
-    if [[ $sev == rollup ]]; then
-      ((n_fail == 0)) || continue
-      entry="fail${entry#rollup}"
-      sev=fail
-    fi
-    kept+=("$entry")
-
     rest=${entry#*"$__UI_FS"}
     label=${rest%%"$__UI_FS"*}
     msg=${rest#*"$__UI_FS"}
@@ -294,7 +355,7 @@ ui_group() {
 
   __ui_render "$worst" "$name" "$note" "$__UI_GROUP_W"
   if [[ $worst != ok ]] || ((raw)) || [[ -n ${DOT_VERBOSE:-} ]]; then
-    __ui_detail ${kept[@]+"${kept[@]}"}
+    __ui_detail ${detail[@]+"${detail[@]}"}
   fi
 }
 
@@ -385,7 +446,13 @@ ui_verdict() {
     line=$(ui_count "$DOT_WARNINGS" warning)
   fi
 
-  if ((DOT_GROUPS_TOTAL > 0 && DOT_FAILURES + DOT_WARNINGS > 0)); then
+  # "in X of Y modules" is only true when every finding came from a group.
+  # doctor prints orphan links outside all of them, and apply and remove print
+  # everything outside one; blaming those on modules is the same summary saying
+  # two different things. DOT_PROBLEMS holds exactly the grouped findings, so
+  # counting it is what proves the qualifier rather than assuming it.
+  if ((DOT_GROUPS_TOTAL > 0 && DOT_FAILURES + DOT_WARNINGS > 0)) &&
+    ((${#DOT_PROBLEMS[@]} == DOT_FAILURES + DOT_WARNINGS)); then
     line+=" in $((DOT_GROUPS_TOTAL - DOT_GROUPS_CLEAN)) of $(ui_count "$DOT_GROUPS_TOTAL" "$unit")"
   fi
 
@@ -410,22 +477,35 @@ ui_verdict() {
 # back into the tallies. The child has already printed its own detail; MESSAGE
 # only says which hook broke.
 #
-# `rollup`, not `fail`: it renders and counts exactly like one, but ui_group
-# drops it when the child named the problem itself, so the same finding is not
-# listed twice under a tally that counted it once. A hook that died before it
-# could say anything is the case it exists for.
+# Under the record protocol it brackets the child with a scope instead of
+# printing a roll-up line: a status is one number and a child can have many
+# findings, so ui_group -- which can see both -- decides what the roll-up and
+# the tallies should be. Without records there is nobody to reconcile with, and
+# the status is all there is to report.
 fold_status() {
-  local msg=$1 status=0
+  local msg=$1 status=0 counted='' records=${DOT_UI_RECORDS:-}
   shift
+  if [[ -n $records ]]; then printf '%s%s\n' "$__UI_RS" foldopen >&2; fi
+
   "$@" || status=$?
   case $status in
     0) ;;
-    "$DOT_STATUS_WARN") DOT_WARNINGS=$((DOT_WARNINGS + 1)) ;;
+    "$DOT_STATUS_WARN")
+      counted=warn
+      DOT_WARNINGS=$((DOT_WARNINGS + 1))
+      ;;
     *)
-      __ui_line rollup "$msg" >&2
+      counted=fail
       DOT_FAILURES=$((DOT_FAILURES + 1))
       ;;
   esac
+
+  if [[ -n $records ]]; then
+    printf '%s%s%s%s%s%s\n' \
+      "$__UI_RS" foldshut "$__UI_FS" "$counted" "$__UI_FS" "$msg" >&2
+  elif [[ $counted == fail ]]; then
+    __ui_render fail '' "$msg" >&2
+  fi
 }
 
 # die MESSAGE [LABEL VALUE]... -- the pairs land in the same column every other

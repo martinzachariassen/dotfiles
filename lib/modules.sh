@@ -50,11 +50,12 @@ modules_unknown() {
 # A typo in a hand-edited config must be an error, not a run that reports
 # success having installed three modules out of four.
 modules_require_known() {
-  local unknown available
+  local unknown available n
   unknown=$(modules_unknown | tr '\n' ' ')
   [[ -z ${unknown// /} ]] && return 0
   available=$(modules_all | tr '\n' ' ')
-  die "config lists module(s) that do not exist: ${unknown% }" \
+  n=$(wc -w <<<"$unknown" | tr -d ' ')
+  die "config lists $(ui_count "$n" module) that do not exist: ${unknown% }" \
     available "${available% }" \
     edit "${DOT_CONFIG/#$HOME/\~}"
 }
@@ -92,7 +93,7 @@ modules_preflight() {
   )
 
   ((${#bad[@]} == 0)) && return 0
-  die 'hook(s) will not parse -- nothing was changed' \
+  die "$(ui_count "${#bad[@]}" hook) will not parse -- nothing was changed" \
     hooks "${bad[*]}" \
     reproduce "bash -n $DOT_ROOT/${bad[0]}"
 }

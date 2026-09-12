@@ -50,12 +50,13 @@ __transcript_start() {
   # naming the failure. 2>&1, because a transcript without the warnings is none.
   #
   # One sed, not a tee: lib/ui.sh settles colour before this redirect exists, so
-  # a plain tee wrote every escape into the log. `h` keeps the raw line, the
-  # substitution strips it, `w` puts the clean copy in the file and `g` brings
+  # a plain tee wrote every escape into the log. `h` keeps the raw line,
+  # __UI_STRIP_SGR strips it, `w` puts the clean copy in the file and `g` brings
   # the raw one back for the terminal. One process, so the trap's single wait
-  # still drains everything.
+  # still drains everything. The expression comes from lib/ui.sh: this file may
+  # not spell out what an escape looks like any more than it may print one.
   exec 3>&1 4>&2
-  exec > >(sed -l -e h -e "s/$(printf '\033')\[[0-9;]*m//g" -e "w $__DOT_LOG" -e g) 2>&1
+  exec > >(sed -l -e h -e "$__UI_STRIP_SGR" -e "w $__DOT_LOG" -e g) 2>&1
   __DOT_TEE_PID=$!
 }
 

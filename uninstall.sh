@@ -178,7 +178,7 @@ remove_applications() {
     done
     dim '--zap as well: application support, preferences and caches go too'
   elif brew uninstall --cask --zap --force "${casks[@]}"; then
-    ok casks "removed ${#casks[@]} application(s)"
+    ok casks "removed $(ui_count "${#casks[@]}" application)"
   else
     # `fail` so the guard below stops the run before Homebrew goes.
     while IFS= read -r cask; do
@@ -224,7 +224,7 @@ heading 'Homebrew and the repo'
 
 # Everything above, `dot apply` can put back; nothing below can be.
 if ((DOT_FAILURES > 0)); then
-  die "$DOT_FAILURES problem(s) above -- stopping before Homebrew and the repo"
+  die "$(ui_count "$DOT_FAILURES" problem) above -- stopping before Homebrew and the repo"
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then

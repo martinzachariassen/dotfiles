@@ -259,20 +259,61 @@ teardown() { teardown_sandbox; }
 
 @test "only lib/ui.sh emits colour or glyphs" {
   # lib/CLAUDE.md has said this since the file was written, and nothing held it.
-  # A printf with an escape anywhere else is a second place that decides what
-  # output looks like, and the first one to disagree with NO_COLOR or with an
-  # ASCII locale. Shipped shell only: tests/ builds fixtures out of escapes.
+  # A printf with an escape or a glyph anywhere else is a second place that
+  # decides what output looks like, and the first one to disagree with NO_COLOR
+  # or with an ASCII locale.
+  #
+  # Two greps, because the two halves hide in different places. Shell source
+  # never holds a raw ESC byte -- an escape is written $'\033' and stays six
+  # characters until bash reads it -- so the colour half is a search for those
+  # spellings. A glyph, on the other hand, IS in the file, and every one of them
+  # is non-ASCII: any byte outside printable ASCII is the whole alphabet at once
+  # and needs no list to keep up to date.
+  #
+  # Shipped shell that bin/dot runs: tests/ builds fixtures out of escapes, and
+  # modules/*/home/ and modules/*/data/ are other programs' files that this repo
+  # only links into place.
   local file offenders=()
   while IFS= read -r file; do
     [[ $file == */lib/ui.sh ]] && continue
-    if grep -q $'\033' "$file"; then offenders+=("${file#"$DOT_ROOT"/}"); fi
+    if grep -qE '\\(033|e\[|x1[bB])' "$file" ||
+      [[ -n $(LC_ALL=C tr -d '\11\12\40-\176' <"$file") ]]; then
+      offenders+=("${file#"$DOT_ROOT"/}")
+    fi
   done < <(find "$DOT_ROOT/lib" "$DOT_ROOT/bin" "$DOT_ROOT/core" "$DOT_ROOT/modules" \
-    -type f \( -name '*.sh' -o -name dot \))
+    -type f \( -name '*.sh' -o -name dot \) \
+    -not -path '*/home/*' -not -path '*/data/*')
 
   ((${#offenders[@]} == 0)) || {
-    printf 'escape sequences outside lib/ui.sh: %s\n' "${offenders[*]}"
+    printf 'colour or glyphs outside lib/ui.sh: %s\n' "${offenders[*]}"
     return 1
   }
+}
+
+@test "the colour-and-glyph contract can actually see an offender" {
+  # The version this replaced looked for a raw ESC byte and so passed on every
+  # file in the repo, including one printing a literal glyph. A contract that
+  # cannot fail is not one, so the detection is checked against both halves.
+  local probe="$DOT_TMP/probe.sh"
+
+  # Colour, written the only way shell source can write it.
+  cat >"$probe" <<'EOF'
+red=$'\033[31m'
+EOF
+  grep -qE '\\(033|e\[|x1[bB])' "$probe"
+
+  # A glyph, which is in the file as itself.
+  cat >"$probe" <<'EOF'
+printf '  ✗ broke\n'
+EOF
+  [ -n "$(LC_ALL=C tr -d '\11\12\40-\176' <"$probe")" ]
+
+  # And plain ASCII, which is neither.
+  cat >"$probe" <<'EOF'
+printf '  x broke\n'
+EOF
+  ! grep -qE '\\(033|e\[|x1[bB])' "$probe"
+  [ -z "$(LC_ALL=C tr -d '\11\12\40-\176' <"$probe")" ]
 }
 
 @test "a transcript carries no escape sequences" {

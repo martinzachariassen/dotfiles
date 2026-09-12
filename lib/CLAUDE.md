@@ -79,9 +79,20 @@ Sourced, never executed. **7 files, no subdirectories.**
   captures the stream, and `ui_group` renders one green line for a module that
   reported nothing wrong. Anything in that stream **without** the marker is
   another program's output and is never hidden.
-- **`fold_status` emits `rollup`, not `fail`.** It counts and renders like one,
-  but `ui_group` drops it when the hook named the problem itself -- otherwise
-  the summary lists one finding twice under a tally that counted it once.
+- **`ui_group` is where the tallies are reconciled, because only it sees both
+  halves.** A hook's own `fail`/`warn` run in another process and never touch
+  the driver's counters; `fold_status` can add only one for an exit status,
+  however many findings the hook recorded. So `fold_status` brackets its child
+  with `foldopen`/`foldshut` records carrying what it counted, and `ui_group`
+  adds that child's findings and takes the roll-up back **when that same child
+  named the problem** -- never because something else in the group failed, which
+  used to eat the only line naming a hook that died silently.
+- **The verdict's "in X of Y modules" is earned, not assumed.** It is appended
+  only when `DOT_PROBLEMS` accounts for every counted finding; orphan links and
+  anything `apply`/`remove` prints live outside all groups.
+- **Colour is stripped with `__UI_STRIP_SGR`.** `bin/dot`'s transcript needs the
+  pattern and may not spell it itself -- a second copy is the one that stops
+  matching when a code is added.
 - `DOT_UI_INDENT` is exported, so a hook's output nests under the step line it
   belongs to. Move it with `ui_nest`/`ui_unnest`, never by hand.
 

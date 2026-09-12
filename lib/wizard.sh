@@ -24,15 +24,20 @@ __wizard_fzf_opts() {
 # wizard_preview NAME -- what a module would actually do, shown beside the
 # picker. Its own process per keystroke, which is why it sources the library
 # rather than being handed anything.
+#
+# Through `say` and `ui_nest` like everything else: a pane that pads its own
+# label column is a second owner of the width, and the one place that would not
+# follow when ui.sh moves it.
 wizard_preview() {
   local name=$1 dir file n
   dir=$(modules_dir "$name")
 
-  printf '%s\n\n' "$(module_desc "$name")"
+  say "$(module_desc "$name")"
+  printf '\n'
 
   if [[ -f $dir/Brewfile ]]; then
     n=$(grep -cE '^[[:space:]]*(brew|cask|tap|mas) ' "$dir/Brewfile" || true)
-    printf 'packages  %s\n' "$n"
+    say packages "$(ui_count "$n" package)"
   fi
 
   n=0
@@ -40,17 +45,19 @@ wizard_preview() {
     n=$((n + 1))
   done < <(fs_pairs "$dir")
   if ((n > 0)); then
-    printf 'links     %s file(s) into your home directory:\n' "$n"
+    say links "$(ui_count "$n" file) into your home directory:"
+    ui_nest
     while IFS=$'\t' read -r _ file; do
-      printf '            %s\n' "${file/#$HOME/\~}"
+      say "${file/#$HOME/\~}"
     done < <(fs_pairs "$dir")
+    ui_unnest
   fi
 
   local hooks=''
   for file in apply.sh doctor.sh remove.sh; do
     if [[ -f $dir/$file ]]; then hooks+=", ${file%.sh}"; fi
   done
-  if [[ -n $hooks ]]; then printf 'hooks     %s\n' "${hooks:2}"; fi
+  if [[ -n $hooks ]]; then say hooks "${hooks:2}"; fi
 }
 
 # The module name travels as a hidden first field (--with-nth=2), never

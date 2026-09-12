@@ -22,14 +22,23 @@ record() {
 # --- The column -------------------------------------------------------------
 
 @test "the label column is the same width whoever wrote the line" {
-  run bash -c "source '$DOT_ROOT/lib/ui.sh'; ok a 'one'; ok longerlabel 'two'"
+  # ASCII and no colour so a byte offset IS the column: a glyph is three bytes
+  # in the other alphabet, and an escape is several more that a terminal never
+  # draws. Both lines carry the same prefix either way, but a number that means
+  # what it says is worth the two variables.
+  run env NO_COLOR=1 DOT_ASCII=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; ok a 'one'; ok longerlabel 'two'"
   local first second
-  first=$(printf '%s\n' "$output" | sed -n '1s/.*\(one\)/\1/p')
-  second=$(printf '%s\n' "$output" | head -1 | grep -bo 'one' | cut -d: -f1)
-  # The message of a short label starts where a padded column would put it,
-  # never where the caller happened to type it.
-  [ "$second" -ge 12 ]
+  first=$(sed -n '1p' <<<"$output" | grep -bo 'one' | cut -d: -f1)
+  second=$(sed -n '2p' <<<"$output" | grep -bo 'two' | cut -d: -f1)
+
+  # The comparison is the test: a label three times longer may not push its own
+  # message right, which is what every call site padding for itself used to do.
   [ -n "$first" ]
+  [ -n "$second" ]
+  [ "$first" -eq "$second" ]
+  # And the column is ui.sh's, not the width the caller happened to type.
+  [ "$first" -ge 12 ]
 }
 
 @test "one argument is a message, two are a label and a message" {
@@ -207,6 +216,56 @@ EOF
   [ "${#DOT_PROBLEMS[@]}" -eq 2 ]
 }
 
+@test "a hook's findings are counted one by one, not as one exit status" {
+  # fold_status sees a number, and a hook with three problems exits once. The
+  # tally said "1 problem" and the list underneath it said three, which is the
+  # one thing the summary may not do.
+  local hook="$DOT_TMP/doctor.sh"
+  cat >"$hook" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$DOT_ROOT/lib/dot.sh"
+warn one 'first'
+warn two 'second'
+warn three 'third'
+EOF
+  record fold_status 'demo: doctor.sh reported problems' bash "$hook"
+  ui_group demo 'a demo module' "$SINK"
+
+  [ "$DOT_WARNINGS" -eq 3 ]
+  [ "$DOT_FAILURES" -eq 0 ]
+  [ "${#DOT_PROBLEMS[@]}" -eq 3 ]
+}
+
+@test "a roll-up survives beside a failure that is not its own" {
+  # The drop used to be decided by the failure count of the WHOLE group, so a
+  # package check that failed silenced the only line naming a hook that died
+  # before it could print anything. Each roll-up now answers for its own child.
+  local hook="$DOT_TMP/doctor.sh"
+  printf '#!/usr/bin/env bash\nexit 9\n' >"$hook"
+  record eval "fail packages 'colima is not installed'
+    fold_status 'core checks failed' bash '$hook'"
+
+  run ui_group core 'the repo, the shim, the config' "$SINK"
+  [[ $output == *'colima is not installed'* ]]
+  [[ $output == *'core checks failed'* ]]
+}
+
+@test "a roll-up is dropped when its own child named the problem" {
+  local hook="$DOT_TMP/doctor.sh"
+  cat >"$hook" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+source "$DOT_ROOT/lib/dot.sh"
+fail files 'not linked -- run: dot apply'
+EOF
+  record fold_status 'demo: doctor.sh reported problems' bash "$hook"
+  ui_group demo 'a demo module' "$SINK"
+
+  [ "$DOT_FAILURES" -eq 1 ]
+  [ "${#DOT_PROBLEMS[@]}" -eq 1 ]
+}
+
 # --- The verdict ------------------------------------------------------------
 
 @test "the count in the verdict is the count of the lines above it" {
@@ -241,8 +300,25 @@ EOF
   [ "$(ui_count 2 module)" = "2 modules" ]
 }
 
+@test "the verdict blames modules only when every finding came from one" {
+  # doctor prints orphan links outside every group. Counting those into "in X
+  # of Y modules" produced "1 warning in 0 of 1 module", which is a summary
+  # arguing with itself.
+  record eval 'ok packages "all installed"'
+  ui_group demo 'a demo module' "$SINK"
+  DOT_WARNINGS=1
+
+  run ui_verdict 'All good.' module
+  [[ $output == *'1 warning'* ]]
+  [[ $output != *' of 1 module'* ]]
+}
+
 @test "the verdict's group total is singular too" {
-  DOT_FAILURES=1 DOT_GROUPS_TOTAL=1 DOT_GROUPS_CLEAN=0
+  # Through a real group rather than by setting the counters: the qualifier is
+  # now allowed only when the repeated list accounts for every finding, so a
+  # hand-set tally with nothing behind it no longer describes any run.
+  record eval 'fail files "not linked"'
+  ui_group demo 'a demo module' "$SINK"
   run ui_verdict 'All good.' module
   [[ $output == *"of 1 module"* ]]
   [[ $output != *"of 1 modules"* ]]
