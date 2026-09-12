@@ -223,7 +223,9 @@ teardown() { teardown_sandbox; }
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 1 ]
-  [[ $output == *"still missing: Formula jq"* ]]
+  # `says`, not a literal: "still missing" is a label in the aligned column now,
+  # and how wide that column is belongs to lib/ui.sh rather than to this test.
+  says 'still missing' 'Formula jq'
 }
 
 @test "bundle: a missing cask points at the one flag that fixes it" {
