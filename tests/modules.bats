@@ -311,3 +311,124 @@ run_script() {
   run_script "true"
   [ "$status" -eq 0 ]
 }
+
+# --- modules_preflight ------------------------------------------------------
+#
+# The last gate before anything in $HOME moves. Without it a syntax error in
+# modules/x/apply.sh surfaces halfway through an apply that has already
+# relinked half the home directory, and there is nothing to roll back with.
+# bin/dot calls it twice -- once in apply, once in add, after the config write.
+
+# enable NAME... -- the config modules_enabled reads.
+enable() {
+  printf 'schema = 1\n\n[modules]\nenabled = [\n' >"$DOT_CONFIG"
+  local n
+  for n in "$@"; do printf '  "%s",\n' "$n" >>"$DOT_CONFIG"; done
+  printf ']\n' >>"$DOT_CONFIG"
+}
+
+@test "preflight: hooks that parse let the run continue" {
+  local m
+  m=$(make_module demo)
+  hook "$m" apply.sh 0
+  hook "$m" doctor.sh 0
+  enable demo
+
+  run modules_preflight
+  [ "$status" -eq 0 ]
+}
+
+@test "preflight: a module with no hooks at all is not a problem" {
+  make_module demo
+  enable demo
+
+  run modules_preflight
+  [ "$status" -eq 0 ]
+}
+
+@test "preflight: a hook that will not parse stops the run" {
+  local m
+  m=$(make_module demo)
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$m/apply.sh"
+  enable demo
+
+  run modules_preflight
+  [ "$status" -ne 0 ]
+}
+
+@test "preflight: the broken hook is named, and so is the way to reproduce it" {
+  # "a hook is broken" is not actionable when a run enables a dozen modules.
+  local m
+  m=$(make_module demo)
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$m/doctor.sh"
+  enable demo
+
+  run modules_preflight
+  [[ $output == *"modules/demo/doctor.sh"* ]]
+  [[ $output == *"bash -n"* ]]
+}
+
+@test "preflight: it says nothing was changed, because nothing was" {
+  local m before
+  m=$(make_module demo)
+  printf 'x\n' >"$m/home/.demorc"
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$m/apply.sh"
+  enable demo
+
+  before=$(home_snapshot)
+  run modules_preflight
+  [ "$status" -ne 0 ]
+  [[ $output == *"nothing was changed"* ]]
+  [ "$(home_snapshot)" = "$before" ]
+}
+
+@test "preflight: every broken hook is listed, not just the first" {
+  local a b
+  a=$(make_module alpha)
+  b=$(make_module beta)
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$a/apply.sh"
+  printf '#!/usr/bin/env bash\ncase x\n' >"$b/remove.sh"
+  enable alpha beta
+
+  run modules_preflight
+  [[ $output == *"modules/alpha/apply.sh"* ]]
+  [[ $output == *"modules/beta/remove.sh"* ]]
+}
+
+@test "preflight: a DISABLED module's broken hook does not block the run" {
+  # It parses what this run may execute. A module nobody enabled is not that,
+  # and failing on it would make one stale directory un-appliable for everyone.
+  local m
+  m=$(make_module demo)
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$m/apply.sh"
+  enable
+
+  run modules_preflight
+  [ "$status" -eq 0 ]
+}
+
+@test "preflight: core is parsed too -- it runs like a module" {
+  mkdir -p "$REPO/core"
+  printf '#!/usr/bin/env bash\nif [ 1\n' >"$REPO/core/apply.sh"
+  enable
+
+  run modules_preflight
+  [ "$status" -ne 0 ]
+  [[ $output == *"core/apply.sh"* ]]
+}
+
+@test "preflight: all three hook names are parsed, not only apply.sh" {
+  local hook m
+  for hook in apply.sh doctor.sh remove.sh; do
+    rm -rf "$REPO/modules"
+    m=$(make_module demo)
+    printf '#!/usr/bin/env bash\nif [ 1\n' >"$m/$hook"
+    enable demo
+
+    run modules_preflight
+    [ "$status" -ne 0 ] || {
+      echo "$hook was not parsed"
+      return 1
+    }
+  done
+}
