@@ -479,6 +479,15 @@ EOF
   [ -z "$(grep -oE 'HOME/\.colima[a-z/._-]*' "$dir/remove.sh" | grep -v 'HOME/\.colima/default' || true)" ]
 }
 
+@test "swift: apply.sh, doctor.sh and remove.sh agree on the VS Code extension id" {
+  # remove.sh only reports the id it names, so a rename in one place and not the
+  # others is either a doctor that never finds what apply.sh installed, or a
+  # remove.sh that reports the wrong extension as left behind.
+  local dir="$DOT_ROOT/modules/swift"
+  [ "$(grep '^ext=' "$dir/apply.sh")" = "$(grep '^ext=' "$dir/doctor.sh")" ]
+  [ "$(grep '^ext=' "$dir/apply.sh")" = "$(grep '^ext=' "$dir/remove.sh")" ]
+}
+
 # --- invariants that span files (root CLAUDE.md) -----------------------------
 #
 # Each of these is a rule whose whole content is "these files must agree", and

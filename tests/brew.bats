@@ -152,24 +152,28 @@ teardown() { teardown_sandbox; }
   [ -z "$output" ]
 }
 
-@test "missing: every absent package is named, formula and cask alike" {
+@test "missing: every absent package is named, formula, cask and app alike" {
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   # brew's real wording, arrow included: the sed deliberately does not anchor
   # on that glyph, because a C locale would make an anchored match find
-  # nothing and every package would silently read as installed.
+  # nothing and every package would silently read as installed. "or updated"
+  # is real Homebrew wording too -- the sed does not anchor on the full
+  # sentence either, for the same reason.
   brew() {
     printf "brew bundle can't satisfy your Brewfile's dependencies.\n"
-    printf '\xe2\x86\x92 Cask docker needs to be installed.\n'
-    printf '\xe2\x86\x92 Formula jq needs to be installed.\n'
+    printf '\xe2\x86\x92 Cask docker needs to be installed or updated.\n'
+    printf '\xe2\x86\x92 Formula jq needs to be installed or updated.\n'
+    printf '\xe2\x86\x92 App Xcode needs to be installed or updated.\n'
     printf 'Satisfy missing dependencies with `brew bundle install`.\n'
     return 1
   }
 
   run brew_missing "$DOT_TMP/Brewfile"
   [ "$status" -eq 1 ]
-  [ "${#lines[@]}" -eq 2 ]
+  [ "${#lines[@]}" -eq 3 ]
   [ "${lines[0]}" = "Cask docker" ]
   [ "${lines[1]}" = "Formula jq" ]
+  [ "${lines[2]}" = "App Xcode" ]
 }
 
 @test "missing: a failure it cannot parse is 2, never a silent 0" {
@@ -255,6 +259,33 @@ teardown() { teardown_sandbox; }
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [[ $output != *"--adopt"* ]]
+}
+
+@test "bundle: a missing App Store app points at signing into mas" {
+  printf 'mas "Xcode", id: 497799835\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 1; }
+  brew_missing() {
+    printf 'App Xcode\n'
+    return 1
+  }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  [[ $output == *"mas signed in"* ]]
+}
+
+@test "bundle: a formula-only failure does not offer the mas advice" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 1; }
+  brew_missing() {
+    printf 'Formula jq\n'
+    return 1
+  }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [[ $output != *"mas signed in"* ]]
 }
 
 @test "bundle: brew that cannot say what is missing says so, not nothing" {

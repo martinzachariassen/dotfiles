@@ -1,0 +1,11 @@
+# Xcode ships the iOS SDKs, simulators and codesigning tools; Homebrew cannot
+# cask it (Apple's licence keeps it App-Store-only), so mas drives the same
+# install `xcodebuild` and the simulator already expect on disk. Sign into the
+# App Store yourself first -- mas has had no way to do that non-interactively
+# since Apple locked the sign-in flow behind 2FA. `dot doctor` says so.
+brew "mas"
+mas "Xcode", id: 497799835
+
+brew "swiftlint"
+brew "swiftformat"
+brew "xcbeautify" # pretty-prints `xcodebuild`'s output in an integrated terminal

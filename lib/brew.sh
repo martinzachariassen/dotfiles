@@ -16,8 +16,9 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is not
-# installed. Returns 0 satisfied, 1 missing, 2 the check itself could not run.
+# brew_missing FILE -- "<Formula|Cask|App> <name>" per package FILE names that
+# is not installed. Returns 0 satisfied, 1 missing, 2 the check itself could
+# not run.
 #
 # 2 is distinct on purpose: a check that could not run must never read as "all
 # installed". `brew bundle check` rather than parsing the Brewfile here -- it is
@@ -33,8 +34,10 @@ brew_missing() {
   ((status)) || return 0
 
   # Matched without the leading arrow: it is a multibyte glyph, and a C locale
-  # would make this silently match nothing.
-  out=$(sed -n -E 's/^.*(Formula|Cask) ([^ ]+) needs to be installed\.$/\1 \2/p' <<<"$out")
+  # would make this silently match nothing. Not anchored on the full sentence:
+  # Homebrew's wording grew "or updated" after this was written, and matching
+  # up to "installed" survives the next rewording too.
+  out=$(sed -n -E 's/^.*(Formula|Cask|App) ([^ ]+) needs to be installed.*$/\1 \2/p' <<<"$out")
   [[ -n $out ]] || return 2
   printf '%s\n' "$out"
   return 1
@@ -73,6 +76,9 @@ brew_bundle() {
       while IFS= read -r line; do dim 'still missing' "$line"; done <<<"$missing"
       if grep -q '^Cask ' <<<"$missing"; then
         dim 'a cask already in /Applications by hand: brew install --cask --adopt <name>'
+      fi
+      if grep -q '^App ' <<<"$missing"; then
+        dim 'an App Store app needs mas signed in first -- open App Store.app, then: dot apply'
       fi
       ;;
     2) dim 'brew could not say what is missing -- see its output above' ;;

@@ -30,15 +30,20 @@ packages() {
   done < <(brewfiles) | sort -u
 }
 
-@test "every Brewfile line is brew, cask, tap, a comment or blank" {
+@test "every Brewfile line is brew, cask, tap, mas, a comment or blank" {
   # packages() would silently drop anything else, and so would this repo's
   # idea of what it installs.
+  #
+  # mas is not audited below -- `brew info` has no `--mas`, and mas apps do not
+  # show up in Homebrew's own JSON the way a rename or deprecation would. An id
+  # pinned here is checked the same way any other App Store link is: by hand.
   local f line bad=()
   while IFS= read -r f; do
     while IFS= read -r line; do
       case $line in
         '' | '#'*) ;;
         'brew "'*'"'* | 'cask "'*'"'* | 'tap "'*'"'*) ;;
+        'mas "'*'", id: '[0-9]*) ;;
         *) bad+=("${f#"$DOT_ROOT"/}: $line") ;;
       esac
     done <"$f"
