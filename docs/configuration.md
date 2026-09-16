@@ -109,8 +109,9 @@ does not recognise, so an unknown key is never an error:
 signingkey = "ssh-ed25519 AAAA..."
 ```
 
-The table name is the module name. Two modules take settings today:
-[`git`](../modules/git/README.md) reads `signingkey`, and
+The table name is the module name. Three modules take settings today:
+[`git`](../modules/git/README.md) reads `signingkey`,
 [`macos-defaults`](../modules/macos-defaults/README.md) reads `dock_autohide`,
-`dock_tilesize` and `screenshot_dir`. Each README lists its keys, their
-defaults, and how a bad value is handled.
+`dock_tilesize` and `screenshot_dir`, and
+[`swift`](../modules/swift/README.md) reads `simulators`, a list. Each README
+lists its keys, their defaults, and how a bad value is handled.

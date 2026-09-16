@@ -23,6 +23,9 @@ signingkey = "ssh-ed25519 AAAA"
 [settings.macos-defaults]
 dock_autohide = false
 dock_tilesize = 64
+
+[settings.swift]
+simulators = ["iOS 17.4", "iOS 16.4"]
 EOF
 }
 teardown() { teardown_sandbox; }
@@ -86,6 +89,18 @@ teardown() { teardown_sandbox; }
 @test "setting: undefined module setting returns the default" {
   run module_setting git nonexistent 'fallback'
   [ "$output" = "fallback" ]
+}
+
+@test "setting: a list setting reads one element per line" {
+  run module_setting_list swift simulators
+  [ "${lines[0]}" = "iOS 17.4" ]
+  [ "${lines[1]}" = "iOS 16.4" ]
+  [ "${#lines[@]}" -eq 2 ]
+}
+
+@test "setting: an undefined list setting yields nothing, not the module's other keys" {
+  run module_setting_list git simulators
+  [ -z "$output" ]
 }
 
 # --- a config that does not parse whole --------------------------------------

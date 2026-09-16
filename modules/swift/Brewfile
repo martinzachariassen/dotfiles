@@ -14,3 +14,8 @@ brew "xcbeautify" # pretty-prints `xcodebuild`'s output in an integrated termina
 # conflict there turns into a corrupt project. xcodegen generates it from
 # project.yml, a text file VS Code can edit directly instead.
 brew "xcodegen"
+
+# `xcodebuild -downloadPlatform` only ever offers what is current for the
+# installed Xcode; naming an older simulator (settings.swift.simulators) needs
+# xcodes' own runtime catalog instead.
+brew "xcodes"

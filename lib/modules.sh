@@ -30,6 +30,14 @@ module_setting_bool() {
   [[ $(module_setting "$1" "$2" "${3:-false}") == true ]]
 }
 
+# module_setting_list NAME KEY -- [settings.<name>].<key> as a TOML array, one
+# element per line. Same bracket-syntax requirement as module_setting; no
+# default, because an absent key and an empty array must read the same way.
+module_setting_list() {
+  local name=$1 key=$2
+  cfg_list "settings[\"$name\"].$key"
+}
+
 # Enabled modules that exist, alphabetically. Silent by design: every caller
 # reads it in a subshell, so a warning here would print once per caller and no
 # cache could fix it. Complaining is modules_require_known's job, called once.

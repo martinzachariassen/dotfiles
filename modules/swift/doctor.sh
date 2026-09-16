@@ -53,3 +53,25 @@ if [[ -x $code ]]; then
 else
   dim vscode 'not installed -- the Swift extension was skipped'
 fi
+
+# --- simulator runtimes (settings.swift.simulators) --------------------------
+
+mapfile -t simulators < <(module_setting_list swift simulators)
+
+if ((${#simulators[@]})); then
+  if [[ ! -d $xcode ]] || [[ $developer_dir != "$xcode/Contents/Developer" ]]; then
+    dim simulators 'not checked -- Xcode is not the selected developer directory yet'
+  else
+    # Read-only, and safe on $HOME for the same reason `defaults read` is:
+    # simctl's own state lives under ~/Library/Developer/CoreSimulator, which
+    # home_snapshot prunes (tests/helper.bash).
+    installed=$(xcrun simctl list runtimes 2>/dev/null || true)
+    for name in "${simulators[@]}"; do
+      if grep -qF "$name" <<<"$installed"; then
+        ok simulator "$name installed"
+      else
+        warn simulator "$name not installed -- run: dot apply"
+      fi
+    done
+  fi
+fi

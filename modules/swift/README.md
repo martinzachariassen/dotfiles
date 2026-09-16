@@ -9,9 +9,10 @@ not distributed any other way — but nothing here opens its window.
 
 ```mermaid
 flowchart LR
-  B["Brewfile<br/>mas · swiftlint · swiftformat · xcbeautify · xcodegen"] --> X["Xcode.app<br/>via mas, id 497799835"]
+  B["Brewfile<br/>mas · swiftlint · swiftformat · xcbeautify · xcodegen · xcodes"] --> X["Xcode.app<br/>via mas, id 497799835"]
   B --> T["CLI tools<br/>on PATH"]
   A["apply.sh"] --> E["VS Code extension<br/>sswg.swift-lang"]
+  A --> S["xcodes runtimes install<br/>settings.swift.simulators"]
   X -. "sourcekit-lsp, xcodebuild,<br/>the simulator" .-> E
   T -. "xcodegen generate" .-> P["project.yml<br/>-> .xcodeproj"]
 ```
@@ -78,6 +79,31 @@ A pure Swift Package (`Package.swift`) needs none of this: it has no
 `.xcodeproj` to generate in the first place. XcodeGen is for the day the
 project is an iOS *app* rather than a library.
 
+## Simulator runtimes
+
+```toml
+[settings.swift]
+simulators = ["iOS 17.4", "iOS 16.4"]
+```
+
+| Setting | Default | Notes |
+|---|---|---|
+| `simulators` | `[]` | names as `xcrun simctl list runtimes` prints them |
+
+Nothing downloads unless it is named here: each runtime is a multi-gigabyte
+Apple asset, not something to fetch on every `dot apply`. Missing ones are
+installed with [`xcodes`](https://github.com/XcodesOrg/xcodes) `runtimes
+install`, not `xcodebuild -downloadPlatform` — the latter only ever offers
+what is current for the installed Xcode, so an older simulator needs the
+third-party tool's own catalog instead. This repo has not run either command
+against a real Xcode install yet, so the exact syntax and its behaviour are
+unverified and may need adjusting once it has; a failed install is a `warn`
+naming the retry command, never a `fail`.
+
+Both hooks skip the check entirely — `dim`, not silent — until Xcode, not the
+Command Line Tools, is the selected developer directory: see
+["Three things this cannot automate"](#three-things-this-cannot-automate).
+
 ## `doctor.sh`
 
 Reads state, writes nothing:
@@ -88,6 +114,7 @@ Reads state, writes nothing:
 | Selected | `xcode-select -p` equals Xcode's `Contents/Developer` |
 | Licence accepted | `defaults read` compares the agreed and installed versions |
 | VS Code extension | the extensions folder, not `code --list-extensions` |
+| Simulator runtimes | `xcrun simctl list runtimes`, one row per configured entry |
 
 The extension check reads `~/.vscode/extensions/` directly rather than running
 `code --list-extensions`, which **creates** `~/.vscode` and
