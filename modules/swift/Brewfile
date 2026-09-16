@@ -9,3 +9,8 @@ mas "Xcode", id: 497799835
 brew "swiftlint"
 brew "swiftformat"
 brew "xcbeautify" # pretty-prints `xcodebuild`'s output in an integrated terminal
+
+# project.pbxproj is a plist format Xcode owns; hand-editing it is how a merge
+# conflict there turns into a corrupt project. xcodegen generates it from
+# project.yml, a text file VS Code can edit directly instead.
+brew "xcodegen"

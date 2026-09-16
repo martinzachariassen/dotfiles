@@ -9,10 +9,11 @@ not distributed any other way — but nothing here opens its window.
 
 ```mermaid
 flowchart LR
-  B["Brewfile<br/>mas · swiftlint · swiftformat · xcbeautify"] --> X["Xcode.app<br/>via mas, id 497799835"]
+  B["Brewfile<br/>mas · swiftlint · swiftformat · xcbeautify · xcodegen"] --> X["Xcode.app<br/>via mas, id 497799835"]
   B --> T["CLI tools<br/>on PATH"]
   A["apply.sh"] --> E["VS Code extension<br/>sswg.swift-lang"]
   X -. "sourcekit-lsp, xcodebuild,<br/>the simulator" .-> E
+  T -. "xcodegen generate" .-> P["project.yml<br/>-> .xcodeproj"]
 ```
 
 ## Three things this cannot automate
@@ -46,6 +47,36 @@ Once the three steps above are done:
   output into something readable.
 - Storyboards and XIBs still need Interface Builder — a reason to leave a
   SwiftUI-only project as one.
+- SwiftUI's canvas preview is Xcode-only, with no VS Code equivalent. Building
+  and running on the simulator from the terminal is the substitute.
+
+## Project config: XcodeGen instead of `.xcodeproj`
+
+`project.pbxproj` is a plist Xcode generates and rewrites on every change in
+its UI — hand-editing it is how two people touch the same project and get a
+conflict neither can resolve by reading it. [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+turns that around: describe targets, schemes and build settings in a
+`project.yml` that is just text, then generate the project from it.
+
+```yaml
+# project.yml, in the app's own repo -- not this one.
+name: MyApp
+options:
+  bundleIdPrefix: com.example
+targets:
+  MyApp:
+    type: application
+    platform: iOS
+    sources: [Sources]
+```
+
+```sh
+xcodegen generate   # writes MyApp.xcodeproj -- .gitignore it, keep project.yml
+```
+
+A pure Swift Package (`Package.swift`) needs none of this: it has no
+`.xcodeproj` to generate in the first place. XcodeGen is for the day the
+project is an iOS *app* rather than a library.
 
 ## `doctor.sh`
 
