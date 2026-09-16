@@ -48,12 +48,18 @@ if ((${#simulators[@]})); then
         ok simulator "$name already installed"
       elif [[ $DOT_DRY_RUN == 1 ]]; then
         info simulator "install $name"
-      elif xcodes runtimes install "$name" >/dev/null 2>&1; then
+      # Quoted, not silenced: the same reason brew_bundle streams through
+      # ui_quote instead of redirecting to /dev/null -- a multi-gigabyte
+      # download has to stay visible while it runs, not just as a verdict
+      # afterwards. `if pipeline; then` (not PIPESTATUS after a bare
+      # statement) because this runs at top level under `set -e`: a bare
+      # failing pipeline here would exit the script before the else branch
+      # ever ran, same trap brew_bundle avoids by living behind its caller's
+      # `||`.
+      elif xcodes runtimes install "$name" 2>&1 | ui_quote; then
         ok simulator "$name installed"
       else
-        # xcodes' runtime catalog, not xcodebuild -downloadPlatform: the
-        # latter only ever offers what is current for the installed Xcode. A
-        # failed install is a warning, not a failure -- a multi-gigabyte
+        # A failed install is a warning, not a failure: a multi-gigabyte
         # download over flaky network earns a retry, not a red exit status
         # that hides everything else this run did.
         warn simulator "could not install $name -- retry: xcodes runtimes install \"$name\""

@@ -117,7 +117,7 @@ a module is never half-enabled.
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
 | `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
 | `macos-defaults` | [Dock, Finder, keyboard, screenshots](modules/macos-defaults/README.md) — imperative, no files at all |
-| `swift` | [Xcode via mas, Swift CLI tooling, XcodeGen, and the VS Code extension](modules/swift/README.md) |
+| `swift` | [Xcode via mas, Swift CLI tooling, XcodeGen, simulator runtimes, and the VS Code extension](modules/swift/README.md) |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this
 repo installs but does not configure.

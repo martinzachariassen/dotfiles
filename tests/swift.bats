@@ -347,6 +347,28 @@ EOF
   [[ $(cat "$ran") == *"runtimes install iOS 17.4"* ]]
 }
 
+@test "apply: xcodes' own output streams, indented, while it downloads" {
+  # A runtime install is multi-gigabyte and can run for minutes -- silence
+  # until the verdict would look like a hang. This is the same check
+  # tests/brew.bats runs on brew_bundle's ui_quote pipe.
+  fake_xcode 16.0
+  stub_tools "$XCODE/Contents/Developer" 16.0
+  write_simulators_config "iOS 17.4"
+  stub_xcrun ""
+  cat >"$STUB/xcodes" <<'EOF'
+#!/usr/bin/env bash
+printf 'Downloading iOS 17.4\na second line\n'
+exit 0
+EOF
+  chmod +x "$STUB/xcodes"
+
+  apply 0 "$STUB/code" "$XCODE"
+  [ "$status" -eq 0 ]
+  [[ $output == *"Downloading iOS 17.4"* ]]
+  [[ $output == *"a second line"* ]]
+  [[ $(grep 'Downloading iOS 17.4' <<<"$output") =~ ^[[:space:]]{4,} ]]
+}
+
 @test "apply: a failed simulator install is a warning naming the retry command" {
   fake_xcode 16.0
   stub_tools "$XCODE/Contents/Developer" 16.0
