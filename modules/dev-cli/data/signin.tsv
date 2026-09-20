@@ -1,0 +1,12 @@
+# The CLIs in this module's Brewfile that are useless until you log in once:
+# command, the Brewfile package that provides it, where that tool keeps its
+# credentials (under $HOME), the command that puts them there, why it matters.
+# Tab-separated, one CLI per line.
+#
+# Column 2 is checked against Brewfile by tests/contract.bats: a row here is a
+# claim that THIS module installs the tool, and a tool another module owns
+# belongs in that module's doctor.sh instead.
+
+gh	gh	.config/gh/hosts.yml	gh auth login	gh pr, gh repo, and the push that asks for a password
+gcloud	gcloud-cli	.config/gcloud/credentials.db	gcloud auth login	every gcloud call, and the ADC other SDKs read
+firebase	firebase-cli	.config/configstore/firebase-tools.json	firebase login	deploys, and the emulators that check a project

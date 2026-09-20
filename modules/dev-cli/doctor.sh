@@ -34,3 +34,29 @@ if ((${#missing[@]} == 0)); then
 else
   fail runtimes "not installed: ${missing[*]} -- run: dot apply"
 fi
+
+# --- sign-ins ---------------------------------------------------------------
+#
+# Installing these is one command; signing in to each is three more, and a
+# fresh machine says nothing until something fails hours later with a 401.
+# Answered from the credential store on disk, never by asking the tool:
+# `gcloud auth list` and `firebase login:list` CREATE their config directory
+# on a machine that has none, the write-while-checking this hook already
+# refuses for mise.
+#
+# A path is weaker evidence than a question -- a tool that moved its store
+# would warn forever -- so the warning names the path it looked at. The escape
+# hatch is the Brewfile: drop the package and `command -v` skips the row.
+signin="${DOT_MODULE_DIR:-$(dirname "$0")}/data/signin.tsv"
+while IFS=$'\t' read -r cmd _ rel login _; do
+  if [[ -z $cmd || $cmd == '#'* ]]; then continue; fi
+  if ! command -v "$cmd" >/dev/null 2>&1; then continue; fi
+
+  # -s, not -e: gh writes an empty hosts.yml the first time it reads a config.
+  if [[ -s $HOME/$rel ]]; then
+    ok "$cmd" 'signed in'
+  else
+    warn "$cmd" "never signed in on this machine -- run: $login"
+    dim "no credentials at ~/$rel"
+  fi
+done <"$signin"

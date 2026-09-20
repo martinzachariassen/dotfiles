@@ -429,6 +429,30 @@ EOF
   [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
 }
 
+@test "dev-cli: every sign-in row names a package this module installs" {
+  # A row is a claim that THIS module puts the CLI on the machine, and that is
+  # what makes `command -v` a fair skip rather than a check quietly never
+  # running. A tool another module owns belongs in that module's doctor.sh --
+  # "a module that owns a tool's config owns its Brewfile line".
+  local dir="$DOT_ROOT/modules/dev-cli"
+  local cmd pkg rest missing=()
+  while IFS=$'\t' read -r cmd pkg rest; do
+    [[ -n $cmd && $cmd != '#'* ]] || continue
+    grep -qE "^(brew|cask) \"$pkg\"" "$dir/Brewfile" || missing+=("$cmd -> $pkg")
+  done <"$dir/data/signin.tsv"
+
+  # Non-empty first, or an emptied table makes this pass over nothing forever.
+  [ -s "$dir/data/signin.tsv" ] || {
+    echo 'data/signin.tsv is empty'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'signin.tsv names a package modules/dev-cli/Brewfile does not:\n'
+    printf '  %s\n' "${missing[@]}"
+    return 1
+  }
+}
+
 @test "dev-cli: doctor.sh never invokes mise" {
   # `mise ls` CREATES ~/.local/share/mise and ~/.local/state/mise on a machine
   # that has neither -- the check would write to the $HOME it is checking, the
