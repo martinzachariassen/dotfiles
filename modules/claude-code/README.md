@@ -72,6 +72,26 @@ remove then cannot take its keys back out of.
 - **`if`, never `jq … && mv`.** `set -e` ignores a non-final member of an `&&`
   list, so a `jq` that died mid-merge printed the success line and exited `0`.
 
+## The one thing no key can settle
+
+Every managed key is merged whether or not Claude Code can reach Anthropic, so
+a machine this module reports as perfect is still one `claude` run away from a
+login prompt. `doctor.sh` says so instead, and names `claude auth login`.
+
+The token is not a file. It is a **login keychain item**, which is why no
+amount of comparing `~/.claude/settings.json` could have caught it — and why
+the check reads item *attributes* and never `security find-generic-password
+-w`. Decrypting the secret is what raises a keychain authorisation dialog, and
+a read-only check may not block on a human.
+
+`ANTHROPIC_API_KEY` counts as signed in too: Claude Code authenticates either
+way, so asking only the keychain would warn at a machine that works.
+
+The service name belongs to Anthropic, not to this repo, so it is the fragile
+half — and the warning names it, rather than leaving a machine where it changed
+warning forever with nothing on screen to say why. `DOT_CLAUDE_KEYCHAIN` is the
+input that makes both branches reachable in a test.
+
 ## Managed keys
 
 The current set lives in [`data/settings.json`](data/settings.json): the status

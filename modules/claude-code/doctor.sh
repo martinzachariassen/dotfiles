@@ -35,3 +35,25 @@ else
     done <<<"$drift"
   fi
 fi
+
+# --- sign-in ----------------------------------------------------------------
+#
+# Every key above is merged whether or not Claude Code can reach Anthropic, so
+# a machine this module reports as perfect is still one run away from a login
+# prompt. Nothing under ~/.claude answers it: the token is a login keychain
+# item, which is also why no file check could have caught this.
+#
+# Attributes only, never `-w`. Reading the secret is what raises a keychain
+# authorisation dialog, and a read-only check may not block on a human. The
+# service name is the fragile half -- Anthropic owns it -- so it is named in
+# the warning rather than only in this comment.
+keychain=${DOT_CLAUDE_KEYCHAIN:-Claude Code-credentials}
+
+if [[ -n ${ANTHROPIC_API_KEY:-} ]]; then
+  ok auth 'ANTHROPIC_API_KEY is set'
+elif security find-generic-password -s "$keychain" >/dev/null 2>&1; then
+  ok auth 'signed in'
+else
+  warn auth 'never signed in on this machine -- run: claude auth login'
+  dim "no \"$keychain\" item in the login keychain"
+fi
