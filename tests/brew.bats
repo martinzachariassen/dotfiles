@@ -326,6 +326,163 @@ teardown() { teardown_sandbox; }
   [ "$DOT_FAILURES" -eq 2 ]
 }
 
+# --- brew_unmanaged ---------------------------------------------------------
+#
+# The only check in this repo that looks outward from the machine instead of
+# inward from the repo: what is installed here that a rebuild would not get.
+# Same three answers as brew_missing, and 2 matters for the same reason -- a
+# machine whose packages could not be listed must not read as fully written
+# down.
+
+# fixture_repo -- a DOT_ROOT whose Brewfiles are only what a test puts there.
+# The real repo's would make every assertion depend on what this machine has.
+fixture_repo() {
+  DOT_ROOT="$DOT_TMP/repo"
+  mkdir -p "$DOT_ROOT/core" "$DOT_ROOT/modules/one" "$DOT_ROOT/modules/two"
+  printf 'brew "bash"\n' >"$DOT_ROOT/core/Brewfile"
+  : >"$DOT_ROOT/modules/one/Brewfile"
+  : >"$DOT_ROOT/modules/two/Brewfile"
+}
+
+# installed "FORMULA..." "CASK..." -- the machine, as brew would describe it.
+# The names go into globals and the word splitting is deliberate: a `local`
+# would be out of scope by the time brew_unmanaged calls the stub, and every
+# assertion below would then be made against an empty machine.
+installed() {
+  MACHINE_FORMULAE=$1
+  MACHINE_CASKS=$2
+  brew() {
+    case $1 in
+      # shellcheck disable=SC2086
+      leaves) printf '%s\n' $MACHINE_FORMULAE ;;
+      # shellcheck disable=SC2086
+      list) printf '%s\n' $MACHINE_CASKS ;;
+      *) return 1 ;;
+    esac
+  }
+}
+
+@test "unmanaged: no Homebrew is 2 -- could not run, not 'all accounted for'" {
+  fixture_repo
+  local status=0
+  (
+    PATH=
+    brew_unmanaged
+  ) || status=$?
+  [ "$status" -eq 2 ]
+}
+
+@test "unmanaged: a checkout whose Brewfiles cannot be read is 2, not a finding" {
+  # Every package on the machine would be unmanaged, which is a broken
+  # checkout reported as forty things to fix.
+  DOT_ROOT="$DOT_TMP/empty"
+  mkdir -p "$DOT_ROOT"
+  installed jq ''
+
+  run brew_unmanaged
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: brew that cannot answer is 2, never a silent 0" {
+  fixture_repo
+  brew() { return 1; }
+
+  run brew_unmanaged
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: a machine holding only what the repo names says nothing" {
+  fixture_repo
+  printf 'brew "jq"\ncask "raycast"\n' >"$DOT_ROOT/modules/one/Brewfile"
+  installed 'bash jq' raycast
+
+  run brew_unmanaged
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: a formula and a cask nothing names are both reported" {
+  fixture_repo
+  printf 'brew "jq"\n' >"$DOT_TMP/repo/modules/one/Brewfile"
+  installed 'bash fd jq' curseforge
+
+  run brew_unmanaged
+  [ "$status" -eq 1 ]
+  [ "${#lines[@]}" -eq 2 ]
+  [ "${lines[0]}" = "Formula fd" ]
+  [ "${lines[1]}" = "Cask curseforge" ]
+}
+
+@test "unmanaged: a DISABLED module's Brewfile still counts as named" {
+  # The question is what the next machine would not get, and `dot add
+  # work-apps` brings this back. Reading only the enabled list would make a
+  # machine with one module switched off report that module's whole Brewfile.
+  fixture_repo
+  printf 'cask "teams"\n' >"$DOT_ROOT/modules/two/Brewfile"
+  # Nothing is enabled at all. Narrowing the scan to the enabled list is the
+  # change this fails on, and it is the tempting one -- every other check in
+  # the repo is about enabled modules.
+  modules_enabled() { :; }
+  installed bash teams
+
+  run brew_unmanaged
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: a tap-qualified Brewfile line matches the bare install" {
+  # brew installs homebrew/cask/foo as `foo`, and a comparison that kept the
+  # tap would report it as unmanaged on every machine that has it.
+  fixture_repo
+  printf 'cask "homebrew/cask/docker"\n' >"$DOT_ROOT/modules/one/Brewfile"
+  installed bash docker
+
+  run brew_unmanaged
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: a trailing comment does not become part of the name" {
+  fixture_repo
+  printf 'brew "mise" # brew owns CLIs, mise owns runtimes\n' \
+    >"$DOT_ROOT/modules/one/Brewfile"
+  installed 'bash mise' ''
+
+  run brew_unmanaged
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "unmanaged: the check never mutates the machine" {
+  fixture_repo
+  brew() {
+    printf 'auto-update=%s args=%s\n' "${HOMEBREW_NO_AUTO_UPDATE:-unset}" "$*" \
+      >>"$DOT_TMP/brew-calls"
+    case $1 in
+      leaves) printf 'bash\n' ;;
+      list) : ;;
+    esac
+  }
+
+  run brew_unmanaged
+  [ "$status" -eq 0 ]
+
+  # Read-only subcommands only, and never with auto-update on.
+  local calls
+  calls=$(cat "$DOT_TMP/brew-calls")
+  [[ $calls == *"leaves --installed-on-request"* ]]
+  [[ $calls == *"list --cask"* ]]
+  [[ $calls != *"auto-update=unset"* ]]
+
+  # Every subcommand it reached for, not just the two expected ones present:
+  # an added `brew bundle` would satisfy the assertions above and still write.
+  local asked
+  asked=$(sed -n 's/^.*args=\([a-z-]*\).*$/\1/p' "$DOT_TMP/brew-calls" | sort -u | tr '\n' ' ')
+  [ "$asked" = "leaves list " ]
+}
+
 @test "check: a check that could not answer warns, and never passes" {
   # The 2 branch. Calling it green is the bug this whole three-state contract
   # exists to prevent; calling it a failure would make every machine without

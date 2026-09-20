@@ -34,7 +34,9 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
 - **Runs per-module hooks** for what a symlink cannot do: macOS `defaults`, a
   generated git include, a `jq` merge into `~/.claude/settings.json`.
 - **Reports drift** with `dot doctor`, which changes nothing. A module with
-  nothing wrong is one line; one with something wrong expands to say what.
+  nothing wrong is one line; one with something wrong expands to say what. It
+  also looks the other way, and names the packages installed by hand that no
+  `Brewfile` would put on the next machine.
 - **Takes it all back** with [`uninstall.sh`](docs/uninstall.md).
 
 ```
@@ -50,6 +52,12 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
   ✓ ssh            SSH client config; keys come from the 1Password agent
   ✓ zsh            zsh with XDG layout, aliases, PATH and prompt
   ✓ orphans        none
+  → unmanaged      4 packages no Brewfile names
+        Formula fd
+        Formula goreleaser
+        Formula poppler
+        Cask curseforge
+        add one to a module Brewfile and the next machine gets it too.
 
 ── Result ──────────────────────────────────────────────────────────────────
   ✓ Everything looks right.

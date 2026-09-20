@@ -103,3 +103,52 @@ brew_check() {
     2) warn packages 'could not be checked -- brew bundle check did not answer' ;;
   esac
 }
+
+# brew_unmanaged -- "<Formula|Cask> <name>" per package this machine has that no
+# Brewfile in the repo names. The same three answers as brew_missing, and 2 is
+# distinct for the same reason: a check that could not run must never read as
+# "everything is accounted for".
+#
+# Every check above this one asks whether the repo made it onto the machine.
+# This is the only one that looks the other way, and it answers a different
+# question: what would the NEXT machine not get? A tool installed in week one
+# and never written down is invisible until the rebuild that does not have it.
+#
+# EVERY Brewfile, not just the enabled ones. `dot add work-apps` still brings
+# back what a disabled module names, so that package is not lost and listing it
+# would mean a machine with one module switched off reports its whole Brewfile
+# here. Only what no module at all names is a package that exists nowhere but
+# on this disk.
+#
+# `leaves --installed-on-request` is what "by hand" means to brew: it drops
+# dependencies, so a tool is named and its tree is not. A formula that LATER
+# becomes something else's dependency falls out of that list -- brew leaves'
+# own blind spot, and the price of not reading the install receipt of every keg.
+brew_unmanaged() {
+  command -v brew >/dev/null 2>&1 || return 2
+
+  # LC_ALL=C throughout: comm compares bytes, and a sort that collated `-` or
+  # `@` by locale rules instead would make it disagree with its own input.
+  local named formulae casks out
+  named=$(
+    cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null |
+      sed -n -E 's/^(brew|cask) "([^"]*\/)?([^"]+)".*/\3/p' | LC_ALL=C sort -u
+  )
+  # No Brewfile read at all would make every package on the machine unmanaged.
+  # That is a broken checkout, not a finding.
+  [[ -n $named ]] || return 2
+
+  formulae=$(HOMEBREW_NO_AUTO_UPDATE=1 brew leaves --installed-on-request 2>/dev/null) || return 2
+  casks=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask 2>/dev/null) || return 2
+
+  out=$(
+    comm -23 <(LC_ALL=C sort -u <<<"$formulae") <(printf '%s\n' "$named") |
+      awk 'NF {print "Formula", $0}'
+    comm -23 <(LC_ALL=C sort -u <<<"$casks") <(printf '%s\n' "$named") |
+      awk 'NF {print "Cask", $0}'
+  )
+
+  [[ -n $out ]] || return 0
+  printf '%s\n' "$out"
+  return 1
+}

@@ -133,6 +133,37 @@ outright that the module leaves nothing else behind.
 A module therefore only needs a `remove.sh` for what the sweep structurally
 cannot see. The four kinds are listed in [modules.md](modules.md#removesh).
 
+## Looking the other way: packages nothing names
+
+Every check above asks whether the repo made it onto the machine. One asks the
+opposite, and it is the only one that does: **what does this machine have that
+no `Brewfile` names?**
+
+```
+  ✓ orphans        none
+  → unmanaged      4 packages no Brewfile names
+        Formula fd
+        Cask curseforge
+```
+
+That is `brew leaves --installed-on-request` and `brew list --cask`, minus
+every package named by **any** `Brewfile` in the repo — enabled or not, since
+`dot add work-apps` still brings back what a disabled module names, and reading
+only the enabled list would make a machine with one module switched off report
+that module's whole `Brewfile`. What is left exists nowhere but on this disk,
+and a rebuild would silently do without it.
+
+It is `info`, never `warn`, and bumps no tally. Installing something by hand is
+not a defect and never becomes one; a line that is yellow on every machine
+forever is the same bug as a summary that is green on a broken one. Like the
+orphan scan it sits outside every module group, because it is about the machine
+and not about any one module.
+
+`brew leaves` is what "by hand" means to Homebrew: it drops dependencies, so a
+tool is named and its tree is not. The blind spot it inherits is a formula that
+*later* becomes something else's dependency — it falls out of the list, and
+finding it again would mean reading the install receipt of every keg.
+
 ## Your files stay yours
 
 **Nothing here deletes a real file.** Symlinks and provably-generated files

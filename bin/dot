@@ -440,10 +440,18 @@ run_checks() {
   done
   rm -f "$__checks_sink"
 
-  # Reported, never deleted. Grouped by module because the two causes need
-  # opposite advice: for a path the repo no longer ships `rm` is the whole fix;
-  # for a module switched off it is a false all-clear, since nothing runs a
-  # disabled module's remove.sh and its defaults and generated files stay.
+  # Both of these sit outside every group on purpose: they are about the
+  # machine rather than any one module, and ui_verdict drops its "in X of Y
+  # modules" qualifier rather than blame a module for them.
+  __orphan_report
+  __unmanaged_report
+}
+
+# Reported, never deleted. Grouped by module because the two causes need
+# opposite advice: for a path the repo no longer ships `rm` is the whole fix;
+# for a module switched off it is a false all-clear, since nothing runs a
+# disabled module's remove.sh and its defaults and generated files stay.
+__orphan_report() {
   local mod path found=0 unowned='' repo=${DOT_ROOT/#$HOME/\~}
   local -A bymod=()
   local -a order=()
@@ -495,6 +503,35 @@ run_checks() {
   if ((hooks)); then
     dim 'Add DOT_DRY_RUN=1 to any of those to see what it would do first.'
   fi
+}
+
+# The orphan scan's mirror image. That one asks what the repo left on the
+# machine; this asks what the machine has that the repo never wrote down --
+# the tools installed in week one that a rebuild silently does without.
+#
+# `info`, not `warn`: hand-installing something is not a defect and never
+# becomes one, and a line that is yellow on every machine forever is the same
+# bug as a summary that is green on a broken one. Nothing here bumps a tally.
+__unmanaged_report() {
+  local out line status=0
+  out=$(brew_unmanaged) || status=$?
+
+  case $status in
+    0) __ui_render ok unmanaged 'none' "$__UI_GROUP_W" ;;
+    1)
+      local n
+      n=$(grep -c . <<<"$out")
+      __ui_render info unmanaged \
+        "$(ui_count "$n" package) no Brewfile names" "$__UI_GROUP_W"
+      ui_nest
+      ui_nest
+      while IFS= read -r line; do say "$line"; done <<<"$out"
+      dim 'add one to a module Brewfile and the next machine gets it too.'
+      ui_unnest
+      ui_unnest
+      ;;
+    2) __ui_render dim unmanaged 'could not be listed -- brew did not answer' "$__UI_GROUP_W" ;;
+  esac
 }
 
 # --- doctor ----------------------------------------------------------------

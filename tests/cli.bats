@@ -153,6 +153,56 @@ pass_core_checks() {
   [[ $output == *"Everything looks right"* ]]
 }
 
+# with_brew "FORMULA..." "CASK..." -- a Homebrew holding exactly these. A stub
+# on PATH and not a shell function: the verb is another process and cannot see
+# one. Everything else it is asked answers 0 and says nothing, which is what
+# the other brew stubs in this file do.
+with_brew() {
+  mkdir -p "$DOT_TMP/stub"
+  cat >"$DOT_TMP/stub/brew" <<EOF
+#!/usr/bin/env bash
+case "\$1 \$2" in
+  'leaves --installed-on-request') printf '%s\n' $1 ;;
+  'list --cask') printf '%s\n' $2 ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "$DOT_TMP/stub/brew"
+}
+
+@test "doctor: a package no Brewfile names is reported, and is not a problem" {
+  # The half of the picture doctor never had: what this machine has that the
+  # repo does not, and so what a rebuild would quietly do without. It has to
+  # be visible and it has to stay out of the verdict -- hand-installing
+  # something is not a defect, and a line that is yellow on every machine
+  # forever is the same bug as a summary that is green on a broken one.
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  with_brew fd curseforge
+
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" doctor
+
+  [ "$status" -eq 0 ]
+  says unmanaged '2 packages no Brewfile names'
+  [[ $output == *"Formula fd"* ]]
+  [[ $output == *"Cask curseforge"* ]]
+  [[ $output == *"Everything looks right"* ]]
+  [[ $output != *problem* ]]
+  [[ $output != *warning* ]]
+}
+
+@test "doctor: a machine holding only what the Brewfiles name says so" {
+  # And the repo's own Brewfiles are what it reads: bash is core/Brewfile's.
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  with_brew bash ''
+
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" doctor
+
+  [ "$status" -eq 0 ]
+  says unmanaged 'none'
+}
+
 @test "doctor: a healthy module is one line, and --verbose is the way back" {
   # The point of the collapse: forty green lines hid the three red ones. What
   # must not happen is that the detail becomes unreachable.

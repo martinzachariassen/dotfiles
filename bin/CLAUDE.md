@@ -30,6 +30,12 @@ existing verb can reach -- not a convenience.
   contradict the lines above it. `ui_group` reads the hook's own records, so
   the number and the lines are the same evidence. `--verbose` prints every
   check, including the ones that passed.
+- **`__orphan_report` and `__unmanaged_report` sit outside every group**, and
+  outside `ui_verdict`'s "in X of Y modules" qualifier with them: both are
+  about the machine rather than any one module. `__unmanaged_report` is
+  `info` and bumps no tally -- installing something by hand is not a defect,
+  and a line yellow on every machine forever is the same bug as a summary
+  green on a broken one.
 - **`modules_preflight` runs after validation and before the first link.**
   Everything above it only reads.
 - **The transcript writer must be drained.** `__transcript_start` sets fds 3/4

@@ -12,7 +12,7 @@ Sourced, never executed. **7 files, no subdirectories.**
 | `config.sh` | reading and generating `config.toml` |
 | `fs.sh` | linking, backups, orphan scan |
 | `modules.sh` | discovery, enablement, hook running |
-| `brew.sh` | `brew bundle`, and the read-only `brew_check` doctor uses |
+| `brew.sh` | `brew bundle`, and the read-only `brew_check`/`brew_unmanaged` doctor uses |
 | `wizard.sh` | the first-run picker |
 
 ## Rules
@@ -39,7 +39,14 @@ Sourced, never executed. **7 files, no subdirectories.**
   checkout speaks; `cfg_parse_problems` refuses anything else. A version marker
   that guarantees nothing is worse than none -- it looks like a check.
 - **`brew_missing` has three answers**, not two: satisfied, missing, and *could
-  not be checked*. The third must never render as green.
+  not be checked*. The third must never render as green. `brew_unmanaged` has
+  the same three, for the same reason.
+- **`brew_unmanaged` reads every Brewfile, enabled or not.** It asks what the
+  *next* machine would not get, and `dot add` still brings back what a disabled
+  module names. Narrowing it to the enabled list is the change that makes a
+  machine with one module switched off report that module's whole Brewfile --
+  the mirror image of the orphan scan's wide-scan/narrow-claim split, and the
+  reason a test stubs `modules_enabled` empty.
 - **`modules_preflight` parses every hook before `$HOME` is touched.**
 - **dasel reads `-` as subtraction.** Only bracket syntax:
   `settings["x-y"].key`. Always go through `module_setting`, and never build a
