@@ -23,6 +23,14 @@ setup() {
   # about. The tests that vary them vary one at a time.
   FW="$DOT_TMP/socketfilterfw"
   SUDO_LOCAL="$DOT_TMP/sudo_local"
+
+  # The two software-update domains, pointed inside the sandbox. doctor.sh asks
+  # whether the DOMAIN answers to tell an unwritten key from an unreadable one,
+  # and the real /Library/Preferences is neither writable by a test nor the
+  # same on two machines -- so a suite that left these alone would be deciding
+  # a branch from whatever the developer's Mac happens to hold.
+  SU_DOMAIN="$DOT_TMP/SoftwareUpdate"
+  COMMERCE_DOMAIN="$DOT_TMP/commerce"
   with_filevault 'FileVault is On.'
   with_firewall 'Firewall is enabled. (State = 1)'
   with_touch_id 'auth       sufficient     pam_tid.so'
@@ -72,6 +80,7 @@ doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
     DOT_SOCKETFILTERFW="$FW" DOT_SUDO_LOCAL="$SUDO_LOCAL" \
+    DOT_SOFTWAREUPDATE_PREFS="$SU_DOMAIN" DOT_COMMERCE_PREFS="$COMMERCE_DOMAIN" \
     "$BASH" "$DOT_ROOT/modules/macos-defaults/doctor.sh"
 }
 
@@ -112,6 +121,15 @@ case $1 in
   read)
     f=$(key_file "$2" "$3")
     if [[ -f $f ]]; then cat "$f"; exit 0; fi
+    # A read with no key is a read of the whole DOMAIN, which doctor.sh makes
+    # to tell "this key was never written" from "this domain did not answer".
+    # It succeeds when the store knows the domain at all, in either shape.
+    if [[ -z $3 ]]; then
+      p=$(printf '%s' "$2" | tr -c '[:alnum:]' '_')
+      compgen -G "$DEFAULTS_DIR/${p}_*" >/dev/null && exit 0
+      awk -F'\t' -v d="$2 " 'index($1, d) == 1 { f = 1 } END { exit !f }' "$DEFAULTS_STORE"
+      exit
+    fi
     awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE"
     ;;
 esac
@@ -126,7 +144,7 @@ STUB
   with_updates AutomaticDownload 1
   with_updates CriticalUpdateInstall 1
   with_updates ConfigDataInstall 1
-  with_updates_domain /Library/Preferences/com.apple.commerce AutoUpdate 1
+  with_updates_domain "$COMMERCE_DOMAIN" AutoUpdate 1
   # Written, not left out: all six keys ship ON, so the healthy machine for the
   # one the repo wants OFF is an explicit 0. Leaving it unwritten here would
   # make every test in this file carry that warning.
@@ -136,7 +154,7 @@ STUB
 
 # with_updates KEY VALUE -- one software update switch on the system domain.
 with_updates() {
-  with_updates_domain /Library/Preferences/com.apple.SoftwareUpdate "$1" "$2"
+  with_updates_domain "$SU_DOMAIN" "$1" "$2"
 }
 
 with_updates_domain() {
@@ -146,9 +164,19 @@ with_updates_domain() {
 # without_updates KEY -- a key macOS never wrote, which is not the same as one
 # written to 0 and is the whole point of the two tests that use it.
 without_updates() {
-  grep -v "^/Library/Preferences/com.apple.SoftwareUpdate $1	" \
+  grep -v "^$SU_DOMAIN $1	" \
     "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
   mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
+}
+
+# unreadable_domain DOMAIN -- a domain that exists and does not answer: the
+# store forgets every key it had, and a plist is left beside it. That is the
+# only shape `defaults` gives to tell a permission or parse failure from a key
+# macOS simply never wrote.
+unreadable_domain() {
+  grep -v "^$1 " "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
+  mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
+  : >"$1.plist"
 }
 
 # with_browser BUNDLE -- the LaunchServices handler list as `defaults` prints
@@ -581,7 +609,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 
 # --- software update ----------------------------------------------------------
 #
-# Five switches macOS does not treat as one, split here the same way: four that
+# Six switches macOS does not treat as one, split here the same way: five that
 # have a right answer, and the one that installs a whole new major version.
 # This machine went from macOS 26 to 27 on its own and the only way anyone
 # would have known is that the check exists.
@@ -607,7 +635,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: a key macOS never wrote is not read as off" {
-  # The trap this check had to avoid. All five ship ON, so a Mac whose owner
+  # The trap this check had to avoid. All six ship ON, so a Mac whose owner
   # never opened the pane has no key at all -- and calling that "off" sends
   # you to a checkbox that is already ticked.
   with_settings '# nothing set'
@@ -624,7 +652,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: an unwritten version-bump key is the fresh Mac, not a quiet one" {
-  # The same rule as the four above, pointing the other way: this key ships ON
+  # The same rule as the five above, pointing the other way: this key ships ON
   # too, so a Mac whose owner never opened the pane IS set to install whole
   # versions unasked. Reading the missing key as "off" made the default answer
   # green on exactly the machine the row exists for -- a fresh install, which
@@ -636,7 +664,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *"including major ones"* ]]
-  # And only that: the four are still green beside it.
+  # And only that: the five are still green beside it.
   says updates 'checked, downloaded and security-patched automatically'
 }
 
@@ -666,9 +694,9 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [[ $output == *"AutomaticallyInstallMacOSUpdates -bool false"* ]]
 }
 
-@test "updates: turning the version bump off leaves the other four alone" {
+@test "updates: turning the version bump off leaves the other five alone" {
   # The whole point of splitting them. The fix named above must not be a fix
-  # that costs you security patches, so the four stay green beside it.
+  # that costs you security patches, so the five stay green beside it.
   with_settings '# nothing set'
   with_store
   with_updates AutomaticallyInstallMacOSUpdates 1
@@ -687,6 +715,60 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *"macos_auto_update"* ]]
+}
+
+@test "updates: a domain that does not answer warns instead of passing" {
+  # `defaults read` fails the same way for a key macOS never wrote and for a
+  # domain this process cannot read, and reading both as "unwritten" makes the
+  # five baseline switches GREEN on a machine nobody could ask -- a summary
+  # green on a broken machine, which is the failure this whole file exists for.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$SU_DOMAIN"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output != *"security-patched automatically"* ]]
+}
+
+@test "updates: one unreadable domain does not speak for the other" {
+  # App Store updates live in com.apple.commerce. A machine that answers about
+  # five switches and not the sixth must say exactly that.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$COMMERCE_DOMAIN"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output == *"App Store apps"* ]]
+}
+
+@test "updates: an unreadable version-bump key is not read as on, or as off" {
+  # The setting decides which answer is wanted; neither answer is available
+  # here, and both branches of it have to say so rather than pick one.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$SU_DOMAIN"
+  apply
+  doctor
+  [[ $output == *"could not be read -- whether macOS installs new versions"* ]]
+  [[ $output != *"including major ones"* ]]
+  [[ $output != *"waits for you"* ]]
+}
+
+@test "updates: a domain that answers with no key at all is still the default" {
+  # The other half of the pair, and the reason the two are told apart at all:
+  # a domain that READS and simply has no such key is a machine sitting at
+  # every shipped default, which is green and must stay green.
+  with_settings '# nothing set'
+  with_store
+  without_updates AutomaticCheckEnabled
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
 }
 
 @test "updates: macos_auto_update = true is green when macOS does install them" {
@@ -763,6 +845,39 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *"still open in Safari"* ]]
+}
+
+@test "browser: a LaunchServices database that does not answer says so" {
+  # The `|| true` this replaced turned a failed read into an empty handler
+  # list, which prints as "https links still open in Safari" -- a confident
+  # answer to a question nobody could ask, sending you to a confirmation sheet
+  # you may well have answered years ago.
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  # A domain that exists and will not answer: the plist is beside it, and the
+  # stub knows no key for it.
+  mkdir -p "$HOME/Library/Preferences/com.apple.LaunchServices"
+  : >"$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output != *"still open in Safari"* ]]
+}
+
+@test "browser: a Mac with no handler list at all is the fresh one, not a mute one" {
+  # The half that must NOT warn about a read: nothing has ever overridden a
+  # handler on this machine, which is Safari and is the answer the check wants
+  # to give. An absent LSHandlers key is that machine.
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"still open in Safari"* ]]
+  [[ $output != *"could not be read"* ]]
 }
 
 @test "browser: an empty setting says nothing at all" {

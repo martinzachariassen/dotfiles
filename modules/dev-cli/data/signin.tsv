@@ -1,9 +1,17 @@
 # The CLIs in this module's Brewfile that are useless until you log in once:
-# command, the Brewfile package that provides it, where that tool keeps its
-# credentials (under $HOME), the command that puts them there, what it costs.
-# Tab-separated, one CLI per line.
+# command, the Brewfile package that provides it, the file that proves a login
+# (under $HOME), the pattern that proves it, the command that puts it there,
+# what it costs. Tab-separated, one CLI per line.
 #
-# Column 5 completes "what it costs: ...", and is what makes three yellow
+# Column 4 is the whole point of columns 3 and 4 being two columns. A file
+# existing, or merely holding bytes, is not a credential: gcloud's
+# credentials.db is a SQLite file that stays non-empty after its rows are
+# revoked, and firebase-tools.json keeps its client id and usage counters
+# after a logout. Either would report "signed in" on a logged-out machine.
+# The pattern is an ERE matched against the file, read-only, and names the
+# thing a login actually writes.
+#
+# Column 6 completes "what it costs: ...", and is what makes three yellow
 # lines a list worth working down rather than three tools you may not need
 # today. tests/dev-cli.bats holds every row to having one.
 #
@@ -11,6 +19,6 @@
 # claim that THIS module installs the tool, and a tool another module owns
 # belongs in that module's doctor.sh instead.
 
-gh	gh	.config/gh/hosts.yml	gh auth login	gh pr, gh repo, and the push that asks for a password
-gcloud	gcloud-cli	.config/gcloud/credentials.db	gcloud auth login	every gcloud call, and the ADC other SDKs read
-firebase	firebase-cli	.config/configstore/firebase-tools.json	firebase login	deploys, and the emulators that check a project
+gh	gh	.config/gh/hosts.yml	(oauth_token|users?):	gh auth login	gh pr, gh repo, and the push that asks for a password
+gcloud	gcloud-cli	.config/gcloud/configurations/config_default	^account[[:space:]]*=[[:space:]]*[^[:space:]]	gcloud auth login	every gcloud call, and the ADC other SDKs read
+firebase	firebase-cli	.config/configstore/firebase-tools.json	"(tokens|user)"	firebase login	deploys, and the emulators that check a project

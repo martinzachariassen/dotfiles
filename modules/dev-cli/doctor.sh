@@ -44,16 +44,25 @@ fi
 # on a machine that has none, the write-while-checking this hook already
 # refuses for mise.
 #
-# A path is weaker evidence than a question -- a tool that moved its store
-# would warn forever -- so the warning names the path it looked at. The escape
-# hatch is the Brewfile: drop the package and `command -v` skips the row.
+# A file is weaker evidence than a question -- a tool that moved its store, or
+# renamed what it writes into it, would warn forever -- so the warning names
+# the path it looked at. The escape hatch is the Brewfile: drop the package and
+# `command -v` skips the row.
 signin="${DOT_MODULE_DIR:-$(dirname "$0")}/data/signin.tsv"
-while IFS=$'\t' read -r cmd _ rel login costs; do
+while IFS=$'\t' read -r cmd _ rel pattern login costs; do
   if [[ -z $cmd || $cmd == '#'* ]]; then continue; fi
   if ! command -v "$cmd" >/dev/null 2>&1; then continue; fi
 
-  # -s, not -e: gh writes an empty hosts.yml the first time it reads a config.
-  if [[ -s $HOME/$rel ]]; then
+  # The pattern, not the file's size: every one of these stores keeps existing
+  # -- and keeps holding bytes -- after a logout. credentials.db is still a
+  # SQLite database with its rows gone, firebase-tools.json still carries the
+  # settings that are not credentials, and gh writes an empty hosts.yml the
+  # first time it merely READS a config. Column 4 names what a login writes.
+  #
+  # -a so a store that is not text still gets a yes or a no: without it grep
+  # can decline to read the file, which is a third answer this row has no way
+  # to say and would report as "never signed in".
+  if [[ -f $HOME/$rel ]] && grep -qaE -- "$pattern" "$HOME/$rel"; then
     ok "$cmd" 'signed in'
   else
     warn "$cmd" "never signed in on this machine -- run: $login"
@@ -61,6 +70,6 @@ while IFS=$'\t' read -r cmd _ rel login costs; do
     # fresh machine gets three yellow lines about tools it may not need today,
     # and the whole point is that the bill arrives hours later.
     dim "what it costs: $costs"
-    dim "no credentials at ~/$rel"
+    dim "no credentials in ~/$rel"
   fi
 done <"$signin"

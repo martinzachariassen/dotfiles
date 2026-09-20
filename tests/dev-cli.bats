@@ -58,9 +58,9 @@ stub() {
   done
 }
 
-# fixture_devcli [CMD PKG PATH LOGIN WHY] -- a copy of the module carrying its
-# own sign-in table, one row, or with no arguments a table holding nothing but
-# a comment and a blank line.
+# fixture_devcli [CMD PKG PATH PATTERN LOGIN WHY] -- a copy of the module
+# carrying its own sign-in table, one row, or with no arguments a table holding
+# nothing but a comment and a blank line.
 #
 # DOT_MODULE_DIR is where the hook finds BOTH data files, so a row naming a
 # command no machine has is reachable without building an unreal PATH --
@@ -76,13 +76,13 @@ fixture_devcli() {
   cp -R "$DOT_ROOT/modules/dev-cli/home" "$MODULE_DIR/home"
   {
     printf '# a fixture, not the shipped table\n\n'
-    if (($#)); then printf '%s\t%s\t%s\t%s\t%s\n' "$@"; fi
+    if (($#)); then printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$@"; fi
   } >"$MODULE_DIR/data/signin.tsv"
 }
 
 # The fixture row every sign-in test uses, so each one says only what it is
 # about. `widget` is a command no machine has unless `stub` put it there.
-WIDGET_ROW=(widget widget .config/widget/creds 'widget login' 'every widget you own')
+WIDGET_ROW=(widget widget .config/widget/creds '"token"' 'widget login' 'every widget you own')
 
 # Every runtime mise's config pins, present in the install tree: a sign-in test
 # must not be reading a report about missing runtimes.
@@ -151,11 +151,73 @@ with_runtimes() {
   stub widget
   fixture_devcli "${WIDGET_ROW[@]}"
   mkdir -p "$HOME/.config/widget"
-  printf 'token\n' >"$HOME/.config/widget/creds"
+  printf '{"token": "abc"}\n' >"$HOME/.config/widget/creds"
 
   doctor
   [ "$status" -eq 0 ]
   says widget 'signed in'
+}
+
+@test "doctor: a store that survived a logout is not a sign-in" {
+  # The reason column 4 exists. Every one of these stores keeps existing after
+  # a logout, and two of them keep holding bytes: gcloud's credentials.db is
+  # still a SQLite database once its rows are revoked, and firebase-tools.json
+  # keeps its client id and usage counters. A size test calls both signed in.
+  with_mise 'exit 0'
+  with_runtimes
+  stub widget
+  fixture_devcli "${WIDGET_ROW[@]}"
+  mkdir -p "$HOME/.config/widget"
+  printf '{"usage": 12, "clientId": "not-a-credential"}\n' >"$HOME/.config/widget/creds"
+
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"widget login"* ]]
+}
+
+@test "doctor: the pattern is matched inside a store that is not text" {
+  # credentials.db is SQLite. Without -a, grep declines to read it and answers
+  # the same as an empty file -- a third state the row has no way to say, and
+  # one that would report a signed-in machine as never having logged in.
+  with_mise 'exit 0'
+  with_runtimes
+  stub widget
+  fixture_devcli "${WIDGET_ROW[@]}"
+  mkdir -p "$HOME/.config/widget"
+  printf 'SQLite format 3\000\000\001{"token": "abc"}\000\000\n' \
+    >"$HOME/.config/widget/creds"
+
+  doctor
+  [ "$status" -eq 0 ]
+  says widget 'signed in'
+}
+
+@test "doctor: the table has six columns on every row" {
+  # A row that lost a tab shifts every column after it: the pattern becomes the
+  # login command, which matches nothing, and the tool reads as logged out
+  # forever. contract.bats only holds the generic 4-to-6 range.
+  local line
+  while IFS= read -r line; do
+    [[ -n $line && $line != '#'* ]] || continue
+    [ "$(awk -F'\t' '{ print NF }' <<<"$line")" -eq 6 ] || {
+      echo "not six columns: $line"
+      return 1
+    }
+  done <"$DOT_ROOT/modules/dev-cli/data/signin.tsv"
+}
+
+@test "doctor: every shipped row's pattern is an ERE grep accepts" {
+  # A pattern that does not compile makes grep exit 2, which this hook reads as
+  # "not signed in" -- a row that is yellow on every machine, for a reason
+  # nothing on screen would name.
+  local cmd pattern
+  while IFS=$'\t' read -r cmd _ _ pattern _; do
+    [[ -n $cmd && $cmd != '#'* ]] || continue
+    printf '\n' | grep -qaE -- "$pattern" || [ "$?" -eq 1 ] || {
+      echo "$cmd has a pattern grep will not compile: $pattern"
+      return 1
+    }
+  done <"$DOT_ROOT/modules/dev-cli/data/signin.tsv"
 }
 
 @test "doctor: a CLI with no credentials names the login command" {
@@ -164,7 +226,7 @@ with_runtimes() {
   with_mise 'exit 0'
   with_runtimes
   stub widget
-  fixture_devcli widget widget .config/widget/creds 'widget login --scopes all' 'the widgets'
+  fixture_devcli widget widget .config/widget/creds '"token"' 'widget login --scopes all' 'the widgets'
 
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
@@ -172,7 +234,7 @@ with_runtimes() {
 }
 
 @test "doctor: what the missing sign-in costs is printed, not just filed" {
-  # Column 5 is the reason to work the list down. A fresh machine gets one of
+  # Column 6 is the reason to work the list down. A fresh machine gets one of
   # these per CLI, and "not signed in to gcloud" alone is a line you scroll
   # past -- the bill for scrolling past it arrives hours later as a 401.
   with_mise 'exit 0'
@@ -185,13 +247,13 @@ with_runtimes() {
 }
 
 @test "doctor: every shipped row says what it costs" {
-  # The table is the specification, and a row missing column 5 prints "what it
+  # The table is the specification, and a row missing column 6 prints "what it
   # costs:" with nothing after it -- which reads as a bug in the tool.
   local cmd costs
-  while IFS=$'\t' read -r cmd _ _ _ costs; do
+  while IFS=$'\t' read -r cmd _ _ _ _ costs; do
     [[ -n $cmd && $cmd != '#'* ]] || continue
     [ -n "$costs" ] || {
-      echo "$cmd has no column 5"
+      echo "$cmd has no column 6"
       return 1
     }
   done <"$DOT_ROOT/modules/dev-cli/data/signin.tsv"
@@ -223,7 +285,8 @@ with_runtimes() {
 
 @test "doctor: an empty credential file is not a sign-in" {
   # gh writes an empty hosts.yml the first time it reads a config, so -e would
-  # call a machine signed in for having run `gh` once.
+  # call a machine signed in for having run `gh` once. The pattern answers this
+  # one too, and this test stays because it is the case that came first.
   with_mise 'exit 0'
   with_runtimes
   stub widget

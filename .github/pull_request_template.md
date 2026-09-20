@@ -33,7 +33,7 @@ Paste a real run, never a sketch: DOT_COLUMNS=76 dot doctor
 
 ## Docs in the same commit
 
-<!-- The table in CLAUDE.md, as a list. contract.bats catches the three marked;
+<!-- The table in CLAUDE.md, as a list. contract.bats catches the four marked;
      the rest is a hand check, so tick them honestly. -->
 
 - [ ] A module added, renamed or dropped -> the module tables in `README.md` *(tested)*

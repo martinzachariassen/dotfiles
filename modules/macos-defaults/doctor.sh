@@ -104,25 +104,50 @@ fi
 # Reading /Library/Preferences needs no root; writing it does, which is why
 # these are not rows in data/defaults.tsv either.
 #
-# They are split across five keys because macOS does not treat them as one
-# switch, and neither should this: four are the ones you always want, and
+# They are split across six keys because macOS does not treat them as one
+# switch, and neither should this: five are the ones you always want, and
 # AutomaticallyInstallMacOSUpdates is the one that installs a whole new major
 # version without being asked. Lumping them together is how a machine ends up
 # a version ahead of where its owner meant to be, with the alternative being
 # to turn security patches off to stop it.
-su=/Library/Preferences/com.apple.SoftwareUpdate
+#
+# Inputs, like the two paths above: a domain under /Library/Preferences is not
+# something a test may write, so without them the branches below are the ones
+# the machine running the tests never takes.
+su=${DOT_SOFTWAREUPDATE_PREFS:-/Library/Preferences/com.apple.SoftwareUpdate}
+commerce=${DOT_COMMERCE_PREFS:-/Library/Preferences/com.apple.commerce}
 
-# flag DOMAIN KEY -- 1, 0, or the empty string for a key macOS never wrote.
-# Empty is NOT off: every one of these ships on, and a machine whose owner
-# never opened the pane has no key at all. Saying "off" there would send you
-# to a checkbox that is already ticked.
-flag() { defaults read "$1" "$2" 2>/dev/null || true; }
+# pref DOMAIN KEY PLIST -- the value, `<unset>` for a key that was never
+# written, or `<unreadable>` when the read itself did not answer.
+#
+# `defaults read` exits non-zero for both, and collapsing them loses the
+# three-state rule: every key here ships ON, so an absent one is a machine at
+# its shipped default and must stay green, while a domain this process cannot
+# read is a question that could not be asked and must warn. The plist beside
+# the domain settles which -- a domain that exists but does not answer is the
+# only one of the two that failed.
+unset_='<unset>' unreadable='<unreadable>'
+pref() {
+  local value
+  if value=$(defaults read "$1" "$2" 2>/dev/null); then
+    printf '%s\n' "$value"
+  elif [[ ! -e $3 ]] || defaults read "$1" >/dev/null 2>&1; then
+    printf '%s\n' "$unset_"
+  else
+    printf '%s\n' "$unreadable"
+  fi
+}
 
-# report WHAT VALUE -- the four that have one right answer.
-su_off=()
+# flag DOMAIN KEY -- pref for the two domains named as absolute paths, whose
+# plist is the path with .plist on the end.
+flag() { pref "$1" "$2" "$1.plist"; }
+
+# report WHAT VALUE -- the five that have one right answer.
+su_off=() su_unknown=()
 report() {
   case $2 in
     0) su_off+=("$1") ;;
+    "$unreadable") su_unknown+=("$1") ;;
     *) ;; # 1, or unwritten and therefore at its shipped default
   esac
 }
@@ -130,30 +155,38 @@ report 'checks for updates' "$(flag "$su" AutomaticCheckEnabled)"
 report 'downloads them' "$(flag "$su" AutomaticDownload)"
 report 'installs security responses' "$(flag "$su" CriticalUpdateInstall)"
 report 'installs XProtect and system data' "$(flag "$su" ConfigDataInstall)"
-report 'updates App Store apps' "$(flag /Library/Preferences/com.apple.commerce AutoUpdate)"
+report 'updates App Store apps' "$(flag "$commerce" AutoUpdate)"
 
-if ((${#su_off[@]} == 0)); then
+if ((${#su_off[@]} == 0 && ${#su_unknown[@]} == 0)); then
   ok updates 'checked, downloaded and security-patched automatically'
 else
   for what in "${su_off[@]}"; do
     warn updates "macOS no longer $what"
   done
-  dim 'System Settings > General > Software Update > the (i) beside Automatic Updates'
+  for what in "${su_unknown[@]}"; do
+    warn updates "could not be read -- whether macOS $what"
+  done
+  if ((${#su_off[@]})); then
+    dim 'System Settings > General > Software Update > the (i) beside Automatic Updates'
+  fi
 fi
 
-# The taste of the five, so it is a setting -- and the default is off, because
+# The taste of the six, so it is a setting -- and the default is off, because
 # the failure it prevents is the expensive one. A major version that arrives on
 # its own cannot be undone without erasing the disk, while a minor patch it
 # skips is a button you press when it suits you. Both branches are reachable,
 # so neither is a machine nobody tested.
 #
-# Unwritten is ON here, the same reading `flag` gives the four above and for
+# Unwritten is ON here, the same reading `pref` gives the five above and for
 # the same reason: this key ships on too. Only `0` is off, and everything else
 # is a machine macOS may take to the next major version unasked -- including
 # the fresh Mac whose owner never opened the pane, which is the one machine
 # this check exists for and the one an "unwritten means off" would let pass.
+# Unreadable is neither answer, in both branches of the setting.
 macos_auto=$(flag "$su" AutomaticallyInstallMacOSUpdates)
-if module_setting_bool macos-defaults macos_auto_update false; then
+if [[ $macos_auto == "$unreadable" ]]; then
+  warn updates 'could not be read -- whether macOS installs new versions on its own'
+elif module_setting_bool macos-defaults macos_auto_update false; then
   case $macos_auto in
     0) warn updates 'macOS updates are not installed automatically, and macos_auto_update asks for that' ;;
     *) ok updates 'macOS updates install automatically' ;;
@@ -163,7 +196,7 @@ elif [[ $macos_auto == 0 ]]; then
 else
   warn updates 'macOS installs new versions on its own -- including major ones'
   dim "turn it off: sudo defaults write $su AutomaticallyInstallMacOSUpdates -bool false"
-  dim 'the four switches above stay on; only the version bump becomes yours'
+  dim 'the five switches above stay on; only the version bump becomes yours'
 fi
 
 # --- default browser --------------------------------------------------------
@@ -176,6 +209,17 @@ fi
 # which is what a machine that wants Safari sets.
 want_browser=$(module_setting macos-defaults browser 'com.google.chrome')
 if [[ -n $want_browser ]]; then
+  # The LaunchServices database, and the plist that says whether it can be
+  # read at all. A `|| true` here would turn a read that FAILED into "no
+  # handler", which prints as a confident "still opens in Safari" for a
+  # question nobody could ask -- and sends you to a sheet you already answered.
+  #
+  # An absent LSHandlers key is not that: it is a Mac on which nothing has ever
+  # overridden a handler, which IS Safari and IS the fresh machine this check
+  # exists for.
+  ls_domain=com.apple.LaunchServices/com.apple.launchservices.secure
+  handlers=$(pref "$ls_domain" LSHandlers \
+    "$HOME/Library/Preferences/$ls_domain.plist")
   # `defaults` prints a dict's keys in alphabetical order, so LSHandlerRoleAll
   # always precedes the LSHandlerURLScheme it belongs to. The "-" guard drops
   # the one inside LSHandlerPreferredVersions, which sorts earlier still.
@@ -189,17 +233,24 @@ if [[ -n $want_browser ]]; then
   # Printing an empty `role` and exiting is deliberate: $() strips the newline,
   # so a scheme with no handler lands in the "still opens in Safari" branch
   # rather than sending the scan on to some other entry's answer.
-  have_browser=$(defaults read com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers 2>/dev/null |
-    awk '/^[[:space:]]*\{[[:space:]]*$/{ role = "" }
-         /LSHandlerRoleAll = /{ r = $0; sub(/.*= "?/, "", r); sub(/"?;$/, "", r); if (r != "-") role = r }
-         /LSHandlerURLScheme = https/{ print role; exit }' || true)
-
-  if [[ $have_browser == "$want_browser" ]]; then
-    ok browser "$want_browser opens https links"
-  elif [[ -z $have_browser ]]; then
-    warn browser "https links still open in Safari, not $want_browser"
-    dim "open $want_browser and accept its offer to become the default"
+  if [[ $handlers == "$unreadable" ]]; then
+    warn browser 'could not be read -- LaunchServices did not answer'
   else
-    warn browser "https links open in $have_browser, and browser asks for $want_browser"
+    if [[ $handlers == "$unset_" ]]; then handlers=''; fi
+    if ! have_browser=$(printf '%s\n' "$handlers" |
+      awk '/^[[:space:]]*\{[[:space:]]*$/{ role = "" }
+           /LSHandlerRoleAll = /{ r = $0; sub(/.*= "?/, "", r); sub(/"?;$/, "", r); if (r != "-") role = r }
+           /LSHandlerURLScheme = https/{ print role; exit }'); then
+      # A dump that arrived and did not parse is the third state too: the shape
+      # of this output is `defaults`' own, and it has changed before.
+      warn browser 'could not be read -- the LaunchServices dump did not parse'
+    elif [[ $have_browser == "$want_browser" ]]; then
+      ok browser "$want_browser opens https links"
+    elif [[ -z $have_browser ]]; then
+      warn browser "https links still open in Safari, not $want_browser"
+      dim "open $want_browser and accept its offer to become the default"
+    else
+      warn browser "https links open in $have_browser, and browser asks for $want_browser"
+    fi
   fi
 fi

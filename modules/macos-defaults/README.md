@@ -121,9 +121,9 @@ A tool that answers nothing is a **warning**, never silence: a question that
 could not be asked is not a healthy answer, the same three-state rule
 `brew_missing` exists to keep.
 
-## Software update, split five ways
+## Software update, split six ways
 
-macOS keeps automatic updates in five keys under `/Library/Preferences`, and
+macOS keeps automatic updates in six keys under `/Library/Preferences`, and
 they are reported as two groups rather than one, because they are not one
 decision:
 
@@ -140,7 +140,7 @@ The last one is the reason the split exists. It does not mean "security
 patches"; it means macOS installs *whole versions* on its own, major ones
 included. Left on, a Mac can move to the next major release unasked — and the
 only way back is erasing the disk, while the fix for the surprise is a switch
-that also stops the patches. Off, the four above keep every automatic update
+that also stops the patches. Off, the five above keep every automatic update
 this machine actually wants, and the version bump becomes a button you press.
 
 Reading `/Library/Preferences` needs no root; writing it does, which is why
@@ -151,7 +151,7 @@ sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate \
   AutomaticallyInstallMacOSUpdates -bool false
 ```
 
-**A key macOS never wrote is not "off".** All five ship on, so a Mac whose
+**A key macOS never wrote is not "off".** All six ship on, so a Mac whose
 owner never opened the pane has no key at all — calling that off would send
 you to a checkbox that is already ticked.
 
@@ -160,6 +160,15 @@ place getting it backwards costs something: a fresh Mac nobody has touched
 **is** set to install whole versions unasked. Reading its missing key as "off"
 would make the default answer green on exactly the machine the row exists for.
 Only a literal `0` is off.
+
+**And a key that could not be read is neither.** `defaults read` exits
+non-zero for a key that was never written and for a domain this process cannot
+read, so the check asks the *domain* as well: one that answers and holds no
+such key is a machine at its shipped default and stays green, and one that
+does not answer at all is a question that could not be asked, which warns.
+Collapsing the two would make all six switches green on a Mac nobody could ask
+— the three-state rule again, and the one place in this module where getting it
+wrong produces a clean bill of health rather than a wrong line.
 
 ## The default browser
 
@@ -171,12 +180,19 @@ So it is reported, from the LaunchServices handler for `https`, against the
 `browser` setting. The setting is also the escape hatch: `browser = ""` says
 nothing at all, which is what a Mac that wants Safari sets.
 
+The same three states apply, and here the middle one is the common case: a Mac
+with **no** handler list has never had a handler overridden, which is Safari
+and is exactly what the check wants to report. A LaunchServices database that
+*fails* to read is not that, and says so instead of naming a browser.
+
 It lives here rather than in `apps` because it is macOS system state, not
 something that module installs — the same reason FileVault is here.
 
-Both paths are inputs — `DOT_SOCKETFILTERFW` and `DOT_SUDO_LOCAL` — because
-otherwise the branch a test needs is the one the machine running it never
-takes.
+The paths are inputs — `DOT_SOCKETFILTERFW`, `DOT_SUDO_LOCAL` and the two
+software-update domains, `DOT_SOFTWAREUPDATE_PREFS` and `DOT_COMMERCE_PREFS` —
+because otherwise the branch a test needs is the one the machine running it
+never takes. A test may not write to `/Library/Preferences` at all, which is
+what leaves the unreadable-domain branch unreachable without them.
 
 ## This module cannot be undone
 

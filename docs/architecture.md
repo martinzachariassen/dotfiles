@@ -143,7 +143,10 @@ no `Brewfile` names?**
   ✓ orphans        none
   → unmanaged      4 packages no Brewfile names
         Formula fd
+        Formula goreleaser
+        Formula poppler
         Cask curseforge
+        add one to a module Brewfile and the next machine gets it too.
 ```
 
 That is `brew leaves --installed-on-request` and `brew list --cask`, minus
@@ -196,11 +199,17 @@ everywhere:
   none, which would make a read-only check write to the thing it is checking.
   For the same reason the login shell is read from the account's directory
   record and not from `$SHELL`, which answers for the running window.
+  On disk is not the same as *present*, though: a credential store outlives the
+  login that filled it, so each row names the pattern a login actually writes
+  rather than asking whether the file has bytes in it.
 - **A row is silent when the thing is not installed.** Dropping the package or
   the cask is how you decline a tool, and the Brewfile is what `contract.bats`
   holds the tables against.
 - **A question that could not be asked is a warning**, never a green line — the
-  three-state rule `brew_missing` keeps.
+  three-state rule `brew_missing` keeps. `defaults read` is where this is
+  easiest to get wrong: it fails the same way for a key macOS never wrote and
+  for a domain that cannot be read, and the first of those is a healthy machine.
+  So the domain is asked as well, and only a domain that will not answer warns.
 - **Anything reported and not fixable from here has an off switch.** A check
   that cannot be satisfied and cannot be silenced goes yellow on every run
   forever, which says exactly as little as a summary that is green on a broken
@@ -218,6 +227,12 @@ the leaves still holding exactly what was written are ever taken back.
 `config.toml` is the same trade: `dot add` and `dot remove` splice one line
 into one array and copy every other byte through, comments and spacing
 included.
+
+A file the repo *generates* is the same trade read the other way. `config.local`
+and `allowed_signers` both sit at conventional paths, so both carry a header
+saying this repo wrote them — and `apply.sh` checks it before writing exactly as
+`remove.sh` checks it before deleting. A file already there without the header
+belongs to whoever wrote it, and a run says so and leaves it untouched.
 
 The proof is the array's shape. `dot config --init` writes one `"name",` per
 line, and that is the only shape these will edit. Reformat it by hand —

@@ -110,6 +110,19 @@ symptom is precise: doctor answers a key that is a path with "run `dot apply`",
 `dot apply` refuses it on purpose, and the line stays yellow forever behind a
 command that changes nothing.
 
+What it looks for **in** the file is an active record, not the key as a
+substring: a record is `<principals> [options] <keytype> <base64>`, and the
+keytype and its base64 are matched as an adjacent pair of fields. `ssh-keygen`
+ignores a commented or unparseable line, so a search that did not would call a
+machine that cannot verify a single commit healthy — the key sitting in a
+comment above the record that actually rotated it is the shape that does it.
+
+The header is proof of ownership for `apply.sh` as much as for `remove.sh`: a
+file already at this path **without** it belongs to whoever wrote it, so a run
+says so and leaves every byte alone. `config.local` still points git at it —
+reading a file someone else maintains costs nothing — and `doctor.sh` then
+answers the only question that matters, whether it names the key you sign with.
+
 Turning signing off again, or moving `signingkey` to a path after a run that
 wrote a file, **removes** the stale `allowed_signers` — the header is the proof
 it was ours. Nothing reads a file `config.local` no longer points at, so this

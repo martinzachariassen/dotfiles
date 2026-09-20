@@ -47,18 +47,29 @@ green and the first 401 arrives an hour later. So `doctor.sh` reads
 |---|---|
 | 1 | the command |
 | 2 | the Brewfile package that provides it |
-| 3 | where that tool keeps its credentials, under `$HOME` |
-| 4 | the command that puts them there |
-| 5 | what it costs — printed under the warning, and the reason to act on it |
+| 3 | the file that proves a login, under `$HOME` |
+| 4 | the pattern that proves it — an ERE, matched against that file |
+| 5 | the command that puts it there |
+| 6 | what it costs — printed under the warning, and the reason to act on it |
 
 It looks for the **credential store on disk** and never asks the tool.
 `gcloud auth list` and `firebase login:list` create their config directory on a
 machine that has none — a check writing to the `$HOME` it is checking, the same
 trap `mise ls` sets above.
 
-A path is weaker evidence than a question, so the warning names the path it
-looked at: a tool that moves its store would otherwise warn forever with
-nothing on screen to say why.
+**A file is not a credential, and neither is a file with bytes in it.** That is
+what column 4 is for: every one of these stores outlives the login that filled
+it. `credentials.db` is still a SQLite database once its rows are revoked,
+`firebase-tools.json` keeps its client id and usage counters after a logout,
+and `gh` writes an empty `hosts.yml` the first time it merely *reads* a config.
+A size test calls all three signed in. The pattern names what a login actually
+writes, and `gcloud`'s row points at `configurations/config_default` rather
+than the database precisely because `account = …` is a line a revoke clears and
+a SQLite page is not.
+
+A file is weaker evidence than a question, so the warning names the path it
+looked at: a tool that moves its store — or renames what it writes into it —
+would otherwise warn forever with nothing on screen to say why.
 
 A row only speaks when `command -v` finds the tool, which is what keeps a
 machine that wants no `gcloud` from staying yellow forever — drop the package

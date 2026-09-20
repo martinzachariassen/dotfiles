@@ -177,8 +177,10 @@ teardown() { teardown_sandbox; }
       *.toml) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
       # A row that lost its tabs reads as a domain with no key: `defaults write`
-      # would then be called with too few arguments, or the wrong ones.
-      *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
+      # would then be called with too few arguments, or the wrong ones. The
+      # range is the generic half only -- each table's exact arity is pinned by
+      # its own module's test, which is where the meaning of column 5 lives.
+      *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 6 { exit 1 }' "$f" || bad+=("$f -- not a 4-to-6-column TSV") ;;
       # Every git command on the machine reads this file, and a malformed line
       # makes all of them fail. doctor.sh checks the GENERATED config.local and
       # never the tracked one next to it, which is the bigger of the two.
@@ -435,15 +437,19 @@ EOF
   # running. A tool another module owns belongs in that module's doctor.sh --
   # "a module that owns a tool's config owns its Brewfile line".
   local dir="$DOT_ROOT/modules/dev-cli"
-  local cmd pkg rest missing=()
+  local cmd pkg rest missing=() rows=0
   while IFS=$'\t' read -r cmd pkg rest; do
     [[ -n $cmd && $cmd != '#'* ]] || continue
+    ((++rows))
     grep -qE "^(brew|cask) \"$pkg\"" "$dir/Brewfile" || missing+=("$cmd -> $pkg")
   done <"$dir/data/signin.tsv"
 
-  # Non-empty first, or an emptied table makes this pass over nothing forever.
-  [ -s "$dir/data/signin.tsv" ] || {
-    echo 'data/signin.tsv is empty'
+  # A count of DATA rows, not a size: the file ships with a comment header, so
+  # `-s` holds for a table whose every row has been deleted -- and this test
+  # would then pass over nothing forever, which is the regression it exists to
+  # catch.
+  [ "$rows" -gt 0 ] || {
+    echo 'data/signin.tsv has no rows, only comments'
     return 1
   }
   [ ${#missing[@]} -eq 0 ] || {
@@ -460,15 +466,18 @@ EOF
   # never runs. It is also the documented escape hatch -- dropping the cask is
   # how you decline an app -- and an escape hatch nothing enforces is prose.
   local dir="$DOT_ROOT/modules/apps"
-  local app cask rest missing=()
+  local app cask rest missing=() rows=0
   while IFS=$'\t' read -r app cask rest; do
     [[ -n $app && $app != '#'* ]] || continue
+    ((++rows))
     grep -qE "^cask \"$cask\"" "$dir/Brewfile" || missing+=("$app -> $cask")
   done <"$dir/data/launch.tsv"
 
-  # Non-empty first, or an emptied table makes this pass over nothing forever.
-  [ -s "$dir/data/launch.tsv" ] || {
-    echo 'data/launch.tsv is empty'
+  # A count of DATA rows, not a size: the comment header alone satisfies `-s`,
+  # so an emptied table would leave the escape hatch above untested -- prose
+  # again, which is what this test exists not to be.
+  [ "$rows" -gt 0 ] || {
+    echo 'data/launch.tsv has no rows, only comments'
     return 1
   }
   [ ${#missing[@]} -eq 0 ] || {
