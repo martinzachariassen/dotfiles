@@ -16,6 +16,42 @@ setup() {
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\n' "$CALLS" >"$BIN/defaults"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN/killall"
   chmod +x "$BIN/defaults" "$BIN/killall"
+
+  # The three checks doctor.sh makes that are not `defaults` keys at all. Each
+  # reads real system state, so each is shadowed -- and shadowed to a HEALTHY
+  # machine by default, so every other test in this file says only what it is
+  # about. The tests that vary them vary one at a time.
+  FW="$DOT_TMP/socketfilterfw"
+  SUDO_LOCAL="$DOT_TMP/sudo_local"
+  with_filevault 'FileVault is On.'
+  with_firewall 'Firewall is enabled. (State = 1)'
+  with_touch_id 'auth       sufficient     pam_tid.so'
+}
+
+# with_filevault TEXT / with_firewall TEXT -- a tool that answers TEXT. The
+# answer goes in a file the stub cats, not into the generated script: these
+# strings carry parentheses and quotes, and escaping them into a heredoc is a
+# second thing to get wrong.
+with_filevault() {
+  printf '%s\n' "$1" >"$DOT_TMP/filevault-answer"
+  printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/filevault-answer" >"$BIN/fdesetup"
+  chmod +x "$BIN/fdesetup"
+}
+
+with_firewall() {
+  printf '%s\n' "$1" >"$DOT_TMP/firewall-answer"
+  printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/firewall-answer" >"$FW"
+  chmod +x "$FW"
+}
+
+# with_touch_id LINE -- the contents of pam.d/sudo_local. An empty LINE means
+# no file at all, which is what macOS actually ships.
+with_touch_id() {
+  if [[ -z $1 ]]; then
+    rm -f "$SUDO_LOCAL"
+  else
+    printf '%s\n' "$1" >"$SUDO_LOCAL"
+  fi
 }
 
 teardown() { teardown_sandbox; }
@@ -35,6 +71,7 @@ apply() {
 doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    DOT_SOCKETFILTERFW="$FW" DOT_SUDO_LOCAL="$SUDO_LOCAL" \
     "$BASH" "$DOT_ROOT/modules/macos-defaults/doctor.sh"
 }
 
@@ -337,4 +374,119 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$status" -ne "$DOT_STATUS_WARN" ]
   [[ $output == *"cannot read"* ]]
   [[ $output != *"cannot be put back"* ]]
+}
+
+# --- what the module can only report -----------------------------------------
+#
+# FileVault, the firewall and Touch ID for sudo are not `defaults` keys: each
+# needs root to change and two need a GUI, so apply.sh cannot write them and
+# data/defaults.tsv must not list them. doctor.sh reports them anyway, because
+# this is the module for macOS system state and nothing else in the repo would
+# ever look at a machine with the firewall off.
+
+@test "system: FileVault on is one green line" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says filevault 'on'
+}
+
+@test "system: FileVault off is a warning that says what is at stake" {
+  # The only one of the three that cannot be fixed after the laptop is gone.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_filevault 'FileVault is Off.'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"FileVault"* ]] || [[ $output == *"filevault"* ]]
+  [[ $output == *"Privacy & Security"* ]]
+}
+
+@test "system: an fdesetup that answers nothing is never read as healthy" {
+  # A question that could not be asked is not a green answer -- the same
+  # three-state rule brew_missing exists to keep.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_filevault ''
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+}
+
+@test "system: the firewall blocking everything still counts as on" {
+  # State 2 is "on, and block all incoming". Matching only 1 would nag the
+  # most locked-down machine there is.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_firewall 'Firewall is enabled. (State = 2)'
+  doctor
+  [ "$status" -eq 0 ]
+  says firewall 'on'
+}
+
+@test "system: the firewall off names the command that turns it on" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_firewall 'Firewall is disabled. (State = 0)'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"--setglobalstate on"* ]]
+}
+
+@test "system: no socketfilterfw at all says so, rather than nothing" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  rm -f "$FW"
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"cannot be checked"* ]]
+}
+
+@test "system: Touch ID for sudo is the uncommented line, not the file" {
+  # macOS ships sudo_local.template with pam_tid commented out. Copying it and
+  # changing nothing is the most likely half-done state there is, and testing
+  # for the file alone would call it finished.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_touch_id '#auth       sufficient     pam_tid.so'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"does not unlock sudo"* ]]
+}
+
+@test "system: no sudo_local at all is the same answer" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_touch_id ''
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"does not unlock sudo"* ]]
+}
+
+@test "system: touch_id_sudo = false says nothing at all about it" {
+  # A taste, not a baseline. Without the setting a machine that does not want
+  # it stays yellow forever, which is the bug a permanently green line is.
+  with_settings 'touch_id_sudo = false'
+  with_store
+  apply
+  with_touch_id ''
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output != *"sudo"* ]]
+}
+
+@test "system: none of the three is in the table apply.sh writes" {
+  # data/defaults.tsv is the list of what this module WRITES, and remove.sh
+  # derives the domains it warns about from column 1. A row here would make
+  # apply.sh run `defaults write` against a setting that is not one.
+  ! grep -qiE 'filevault|socketfilterfw|pam_tid|com\.apple\.alf' "$TSV"
 }

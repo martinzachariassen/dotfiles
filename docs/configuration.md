@@ -112,5 +112,11 @@ signingkey = "ssh-ed25519 AAAA..."
 The table name is the module name. Two modules take settings today:
 [`git`](../modules/git/README.md) reads `signingkey`, and
 [`macos-defaults`](../modules/macos-defaults/README.md) reads `dock_autohide`,
-`dock_tilesize` and `screenshot_dir`. Each README lists its keys, their
-defaults, and how a bad value is handled.
+`dock_tilesize`, `screenshot_dir` and `touch_id_sudo`. Each README lists its
+keys, their defaults, and how a bad value is handled.
+
+`touch_id_sudo` is the odd one: it turns a *check* off rather than changing
+what a run writes. Touch ID for `sudo` needs root and cannot be applied from
+here at all, so the only thing this repo can do about it is keep mentioning it
+— and a machine that would rather keep typing its password needs a way to stop
+being told.

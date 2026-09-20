@@ -53,12 +53,14 @@ can be refused. The file holds only what a reader could not argue with.
 | `dock_autohide` | `true` | normalised to a literal `true`/`false` |
 | `dock_tilesize` | `48` | must be a positive integer — `defaults -int` stores non-numeric as `0`, and tilesize `0` is a Dock with no icons |
 | `screenshot_dir` | `Pictures/Screenshots` | relative to `$HOME` unless absolute; a leading `~` is expanded, not taken literally |
+| `touch_id_sudo` | `true` | not written at all — only *checked*; see below |
 
 ```toml
 [settings.macos-defaults]
 dock_autohide  = true
 dock_tilesize  = 48
 screenshot_dir = "Pictures/Screenshots"
+touch_id_sudo  = true
 ```
 
 A bad value is a `fail`, not a `die`: one wrong field must not cost the rest of
@@ -79,6 +81,44 @@ reach "Done".
 reverting a key is not a broken install. But it is otherwise invisible — the
 only symptom is a Mac that behaves slightly wrong — which is why every row is
 checked.
+
+## Three things it reports and cannot write
+
+FileVault, the application firewall and Touch ID for `sudo` are not `defaults`
+keys. Each needs root to change and two need a GUI, so `apply.sh` cannot write
+them — and they are deliberately **not** in `data/defaults.tsv`, which is the
+list of what this module writes and what `remove.sh` derives its domains from.
+A row there would make `apply.sh` run `defaults write` against something that
+is not a preference at all.
+
+`doctor.sh` reports them anyway, because this is the module for macOS system
+state and a Mac with the firewall off is otherwise something nothing in this
+repo ever looks at. Reading all three needs no root and no unlock:
+
+| Checked with | Green when |
+|---|---|
+| `fdesetup status` | `FileVault is On.` |
+| `socketfilterfw --getglobalstate` | `State = 1` or `2` — 2 is on *and* blocking all incoming |
+| `/etc/pam.d/sudo_local` | it holds an **uncommented** `pam_tid.so` auth line |
+
+The last one is the subtle one. macOS ships `sudo_local.template` with the
+`pam_tid` line commented out, so copying the template and changing nothing is
+the most likely half-done state there is — and a check for the file alone would
+call it finished.
+
+Touch ID is also the only one of the three with a setting. FileVault and the
+firewall are baselines; wanting `sudo` to keep asking for a password is a
+taste, and without `touch_id_sudo = false` a machine that holds it would stay
+yellow forever — which says exactly as little as a machine that is always
+green.
+
+A tool that answers nothing is a **warning**, never silence: a question that
+could not be asked is not a healthy answer, the same three-state rule
+`brew_missing` exists to keep.
+
+Both paths are inputs — `DOT_SOCKETFILTERFW` and `DOT_SUDO_LOCAL` — because
+otherwise the branch a test needs is the one the machine running it never
+takes.
 
 ## This module cannot be undone
 
