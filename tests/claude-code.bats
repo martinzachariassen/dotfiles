@@ -28,12 +28,25 @@ setup() {
 
 teardown() { teardown_sandbox; }
 
+# Every authentication route is passed explicitly, empty by default: a
+# developer running the suite with one of these exported would otherwise decide
+# the result, and the branch that matters is the one where none is set.
 doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" \
     ANTHROPIC_API_KEY="${API_KEY:-}" \
+    ANTHROPIC_AUTH_TOKEN="${AUTH_TOKEN:-}" \
+    CLAUDE_CODE_USE_BEDROCK="${USE_BEDROCK:-}" \
+    CLAUDE_CODE_USE_VERTEX="${USE_VERTEX:-}" \
     DOT_MODULE=claude-code DOT_MODULE_DIR="$DOT_ROOT/modules/claude-code" \
     "$BASH" "$DOT_ROOT/modules/claude-code/doctor.sh"
+}
+
+# with_settings LINE -- this module's settings table. The module list has to
+# name it, or module_setting reads a table nothing enabled.
+with_settings() {
+  printf 'schema = 1\n\n[modules]\nenabled = ["claude-code"]\n\n[settings.claude-code]\n%s\n' \
+    "$1" >"$DOT_CONFIG"
 }
 
 # with_keychain EXIT -- a `security` that answers as the real one does: 0 when
@@ -77,6 +90,64 @@ with_keychain() {
   doctor
   [ "$status" -eq 0 ]
   says auth 'ANTHROPIC_API_KEY is set'
+}
+
+@test "auth: a bearer token is a signed-in machine too" {
+  # A gateway in front of the API. No keychain item will ever exist on such a
+  # machine, so the keychain question is the wrong one to answer it with.
+  with_keychain 44
+  AUTH_TOKEN=not-a-real-token
+  doctor
+  [ "$status" -eq 0 ]
+  says auth 'ANTHROPIC_AUTH_TOKEN is set'
+}
+
+@test "auth: a machine pointed at Bedrock is not a machine that owes a login" {
+  # AWS carries the credentials, and `claude auth login` is advice that does
+  # nothing there -- a yellow line forever with a command that cannot help.
+  with_keychain 44
+  USE_BEDROCK=1
+  doctor
+  [ "$status" -eq 0 ]
+  says auth 'pointed at Bedrock, which brings its own credentials'
+}
+
+@test "auth: the same for Vertex" {
+  with_keychain 44
+  USE_VERTEX=1
+  doctor
+  [ "$status" -eq 0 ]
+  says auth 'pointed at Vertex AI, which brings its own credentials'
+}
+
+@test "auth: a variable set to 0 is not a cloud provider" {
+  # `CLAUDE_CODE_USE_BEDROCK=0` is how you turn it OFF, and reading any
+  # non-empty value as "on" would call that machine authenticated.
+  with_keychain 44
+  USE_BEDROCK=0
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"claude auth login"* ]]
+}
+
+@test "auth: auth_check = false is the way out when the item is renamed" {
+  # The last resort. Anthropic owns that service string, and the day it
+  # changes every machine here warns forever about a login it already has.
+  # Everything this repo reports and cannot fix has an off switch.
+  with_settings 'auth_check = false'
+  with_keychain 44
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output != *auth* ]]
+}
+
+@test "auth: the check speaks by default, with no settings table at all" {
+  # The other half of the setting: a config that never mentions this module
+  # must still be asked. A default that silenced it would be a check nobody
+  # has ever seen run.
+  with_keychain 44
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
 }
 
 @test "auth: the secret itself is never read" {

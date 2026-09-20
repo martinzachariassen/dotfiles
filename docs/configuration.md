@@ -109,16 +109,22 @@ does not recognise, so an unknown key is never an error:
 signingkey = "ssh-ed25519 AAAA..."
 ```
 
-The table name is the module name. Two modules take settings today:
-[`git`](../modules/git/README.md) reads `signingkey`, and
+The table name is the module name. Three modules take settings today:
+[`git`](../modules/git/README.md) reads `signingkey`,
 [`macos-defaults`](../modules/macos-defaults/README.md) reads `dock_autohide`,
 `dock_tilesize`, `screenshot_dir`, `touch_id_sudo`, `macos_auto_update` and
-`browser`. Each README lists its keys, their defaults, and how a bad value is
-handled.
+`browser`, and [`claude-code`](../modules/claude-code/README.md) reads
+`auth_check`. Each README lists its keys, their defaults, and how a bad value
+is handled.
 
-The last three are a kind of their own: they steer a *check* rather than
-changing what a run writes. Touch ID for `sudo`, the software update switches
-and the default browser all need root or a GUI confirmation, so the only thing
-this repo can do about them is keep mentioning them — and a machine that would
-rather keep typing its password, take macOS versions as they come, or open
-links in Safari needs a way to stop being told.
+**Four of them are a kind of their own:** they steer a *check* rather than
+changing what a run writes. Touch ID for `sudo`, the software update switches,
+the default browser and Claude Code's sign-in all need root, a GUI
+confirmation or a login this repo cannot perform, so the only thing it can do
+about them is keep mentioning them — and a machine that would rather keep
+typing its password, take macOS versions as they come, open links in Safari or
+authenticate some way nobody here anticipated needs a way to stop being told.
+
+That is the rule rather than four exceptions: **anything this repo reports and
+cannot fix gets an off switch**, because a line that is yellow on every machine
+forever says exactly as little as a summary that is green on a broken one.

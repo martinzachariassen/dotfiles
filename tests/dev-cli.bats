@@ -82,7 +82,7 @@ fixture_devcli() {
 
 # The fixture row every sign-in test uses, so each one says only what it is
 # about. `widget` is a command no machine has unless `stub` put it there.
-WIDGET_ROW=(widget widget .config/widget/creds 'widget login' 'the widgets')
+WIDGET_ROW=(widget widget .config/widget/creds 'widget login' 'every widget you own')
 
 # Every runtime mise's config pins, present in the install tree: a sign-in test
 # must not be reading a report about missing runtimes.
@@ -169,6 +169,32 @@ with_runtimes() {
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *"widget login --scopes all"* ]]
+}
+
+@test "doctor: what the missing sign-in costs is printed, not just filed" {
+  # Column 5 is the reason to work the list down. A fresh machine gets one of
+  # these per CLI, and "not signed in to gcloud" alone is a line you scroll
+  # past -- the bill for scrolling past it arrives hours later as a 401.
+  with_mise 'exit 0'
+  with_runtimes
+  stub widget
+  fixture_devcli "${WIDGET_ROW[@]}"
+
+  doctor
+  [[ $output == *"every widget you own"* ]]
+}
+
+@test "doctor: every shipped row says what it costs" {
+  # The table is the specification, and a row missing column 5 prints "what it
+  # costs:" with nothing after it -- which reads as a bug in the tool.
+  local cmd costs
+  while IFS=$'\t' read -r cmd _ _ _ costs; do
+    [[ -n $cmd && $cmd != '#'* ]] || continue
+    [ -n "$costs" ] || {
+      echo "$cmd has no column 5"
+      return 1
+    }
+  done <"$DOT_ROOT/modules/dev-cli/data/signin.tsv"
 }
 
 @test "doctor: the path it looked at is named, because that is the weak half" {

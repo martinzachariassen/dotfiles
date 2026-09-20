@@ -49,7 +49,7 @@ green and the first 401 arrives an hour later. So `doctor.sh` reads
 | 2 | the Brewfile package that provides it |
 | 3 | where that tool keeps its credentials, under `$HOME` |
 | 4 | the command that puts them there |
-| 5 | why it matters |
+| 5 | what it costs — printed under the warning, and the reason to act on it |
 
 It looks for the **credential store on disk** and never asks the tool.
 `gcloud auth list` and `firebase login:list` create their config directory on a

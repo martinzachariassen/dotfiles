@@ -11,10 +11,15 @@
 # it, the preferences domain macOS creates on first launch, what you lose.
 # Tab-separated, one app per line.
 #
+# Column 4 completes "installed but never opened -- no ...", so it starts with
+# no article: doctor.sh owns the sentence and this file owns the words, and
+# "no the launcher" is what having both own half of it reads like.
+# tests/apps.bats holds every row to that.
+#
 # Column 2 is checked against Brewfile by tests/contract.bats: a row here is a
 # claim that THIS module installs the app. Dropping the cask silences the row,
 # which is the escape hatch for an app you decided you did not want.
 
-Raycast	raycast	com.raycast.macos	the launcher, and the hotkey it binds
-Thaw	thaw	com.stonerl.Thaw	the menu bar manager
-Stats	stats	eu.exelban.Stats	the resource monitor in the menu bar
+Raycast	raycast	com.raycast.macos	launcher, and no hotkey to reach it
+Thaw	thaw	com.stonerl.Thaw	menu bar manager
+Stats	stats	eu.exelban.Stats	resource monitor in the menu bar

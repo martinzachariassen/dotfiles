@@ -47,6 +47,11 @@ Sourced, never executed. **7 files, no subdirectories.**
   machine with one module switched off report that module's whole Brewfile --
   the mirror image of the orphan scan's wide-scan/narrow-claim split, and the
   reason a test stubs `modules_enabled` empty.
+- **Formulae and casks are two namespaces.** `brew "docker"` and
+  `cask "docker"` are different packages, so `brew_unmanaged` keeps a list per
+  kind and compares each against its own. One merged set lets a Brewfile naming
+  either vouch for a hand-installed other -- silence in the one check whose
+  whole job is to break it.
 - **`modules_preflight` parses every hook before `$HOME` is touched.**
 - **dasel reads `-` as subtraction.** Only bracket syntax:
   `settings["x-y"].key`. Always go through `module_setting`, and never build a

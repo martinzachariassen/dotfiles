@@ -29,8 +29,8 @@ orphan scan has nothing to say.
 reports the ones that never were:
 
 ```
-!  Raycast   installed but never opened -- no the launcher, and the hotkey it binds
-   open -a Raycast, then turn on its own "launch at login"
+  ▲ Raycast      installed but never opened -- no launcher, and no hotkey to reach it
+    open -a Raycast, then turn on its own "launch at login"
 ```
 
 Three rules keep it from becoming a permanently yellow line:
@@ -40,6 +40,9 @@ Three rules keep it from becoming a permanently yellow line:
 - **A row is silent when the app is not installed.** Dropping the cask from
   `Brewfile` is the escape hatch for an app you decided against. Column 2 names
   that cask, and `tests/contract.bats` holds the two files together.
+- **Column 4 finishes the sentence, and carries no article.** `doctor.sh` owns
+  the words around it; two files owning half a sentence each is how you get
+  "no the launcher". `tests/apps.bats` holds every row to it.
 - **First launch, not "running now".** macOS writes the preferences domain the
   first time an app opens and never takes it back, so quitting Stats for an
   afternoon changes nothing. It is weaker evidence than the login item, which

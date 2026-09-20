@@ -85,6 +85,20 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 - Read a module's **own** settings through `module_setting` only -- it is what
   gets the bracket syntax right. The shared `[user]` table is not a module
   setting; `git/apply.sh` reads it with `cfg_get`, and that is the exception.
+  Every key read this way is named in the module's `README.md` and in
+  `docs/configuration.md`; `contract.bats` holds all three together.
+- **A check for something this repo cannot fix needs an off switch.** Touch ID
+  for `sudo`, the macOS version bump, the default browser and Claude Code's
+  sign-in each need root, a GUI confirmation or a login no hook can perform, so
+  each takes a setting; a table-driven check (`dev-cli`, `apps`) uses its
+  Brewfile line instead, and the row goes quiet when the tool is gone. A check
+  that can neither be satisfied nor silenced is yellow on every run forever,
+  which says exactly as little as a summary green on a broken machine.
+- **A question that could not be asked is a `warn`, never silence** -- the
+  three-state rule `brew_missing` keeps. And the tool it asks is an input with
+  its real path as the default (`DOT_SOCKETFILTERFW`, `DOT_SSH_ADD`,
+  `DOT_DSCL_BIN`), or the branch a test needs is the one the machine running it
+  never takes.
 - **Validate values yourself.** `defaults`, dasel and git config accept
   anything and exit 0.
 - `fail` over `die` for one bad setting, so the rest still runs.

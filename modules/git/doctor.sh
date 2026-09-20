@@ -43,10 +43,19 @@ fi
 # looks unsigned. Asking git for the path rather than assuming it means a
 # hand-edited config.local is checked as it actually reads.
 allow=$(git config --file "$dest" --get gpg.ssh.allowedSignersFile 2>/dev/null || true)
-if [[ -n $signingkey && $(grep -c '^\[commit\]' "$dest") -gt 0 ]]; then
+if [[ -n $signingkey ]] && grep -q '^\[commit\]' "$dest"; then
   if [[ -z $allow ]]; then
-    warn git 'signing is on but nothing verifies it -- run: dot apply'
-    dim 'git log --show-signature answers "No signature" for your own commits'
+    # The same shape test apply.sh makes, held against it by tests/git.bats.
+    # A signingkey holding a PATH is a machine `dot apply` deliberately will
+    # not fix, so sending it there is a yellow line that stays yellow with a
+    # command that changes nothing. Name the cause apply names instead.
+    if [[ $signingkey == ssh-*' '* || $signingkey == sk-*' '* ]]; then
+      warn git 'signing is on but nothing verifies it -- run: dot apply'
+      dim 'git log --show-signature answers "No signature" for your own commits'
+    else
+      warn git 'signature verification off -- signingkey is not a literal public key'
+      dim 'put the key itself in config.toml, not a path to it'
+    fi
   elif [[ ! -f $allow ]]; then
     fail git "allowedSignersFile points at a missing file: ${allow/#$HOME/\~}"
   elif ! grep -qF -- "$signingkey" "$allow"; then

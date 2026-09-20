@@ -182,22 +182,30 @@ tools:
 |---|---|
 | `core` | the Command Line Tools are still there, and the developer directory is not a dead path |
 | `dev-cli` | `gh`, `gcloud` and `firebase` have credentials on disk |
-| `claude-code` | the CLI has a keychain item, or `ANTHROPIC_API_KEY` |
+| `claude-code` | the CLI can authenticate at all — keychain item, API key, token, Bedrock or Vertex |
 | `ssh` | the 1Password agent is live **and** holds a key |
 | `apps` | the menu bar apps have been opened at least once |
+| `zsh` | the account's login shell is zsh, so any of it is read |
 | `macos-defaults` | FileVault, the firewall, Touch ID, the update switches, the default browser |
 
-Three rules keep this from becoming noise, and they are the same three
+Four rules keep this from becoming noise, and they are the same four
 everywhere:
 
 - **The evidence is on disk, never the tool's own answer.** `gcloud auth list`
   and `firebase login:list` create their config directory on a machine that has
   none, which would make a read-only check write to the thing it is checking.
+  For the same reason the login shell is read from the account's directory
+  record and not from `$SHELL`, which answers for the running window.
 - **A row is silent when the thing is not installed.** Dropping the package or
   the cask is how you decline a tool, and the Brewfile is what `contract.bats`
   holds the tables against.
 - **A question that could not be asked is a warning**, never a green line — the
   three-state rule `brew_missing` keeps.
+- **Anything reported and not fixable from here has an off switch.** A check
+  that cannot be satisfied and cannot be silenced goes yellow on every run
+  forever, which says exactly as little as a summary that is green on a broken
+  machine. `touch_id_sudo`, `macos_auto_update`, `browser` and `auth_check` are
+  that switch; for the table-driven checks the Brewfile line is.
 
 ## Your files stay yours
 

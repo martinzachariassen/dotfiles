@@ -118,7 +118,7 @@ su=/Library/Preferences/com.apple.SoftwareUpdate
 # to a checkbox that is already ticked.
 flag() { defaults read "$1" "$2" 2>/dev/null || true; }
 
-# report LABEL VALUE WHAT -- the four that have one right answer.
+# report WHAT VALUE -- the four that have one right answer.
 su_off=()
 report() {
   case $2 in
@@ -146,18 +146,24 @@ fi
 # its own cannot be undone without erasing the disk, while a minor patch it
 # skips is a button you press when it suits you. Both branches are reachable,
 # so neither is a machine nobody tested.
+#
+# Unwritten is ON here, the same reading `flag` gives the four above and for
+# the same reason: this key ships on too. Only `0` is off, and everything else
+# is a machine macOS may take to the next major version unasked -- including
+# the fresh Mac whose owner never opened the pane, which is the one machine
+# this check exists for and the one an "unwritten means off" would let pass.
 macos_auto=$(flag "$su" AutomaticallyInstallMacOSUpdates)
 if module_setting_bool macos-defaults macos_auto_update false; then
   case $macos_auto in
     0) warn updates 'macOS updates are not installed automatically, and macos_auto_update asks for that' ;;
     *) ok updates 'macOS updates install automatically' ;;
   esac
-elif [[ $macos_auto == 1 ]]; then
+elif [[ $macos_auto == 0 ]]; then
+  ok updates 'a new macOS version waits for you'
+else
   warn updates 'macOS installs new versions on its own -- including major ones'
   dim "turn it off: sudo defaults write $su AutomaticallyInstallMacOSUpdates -bool false"
   dim 'the four switches above stay on; only the version bump becomes yours'
-else
-  ok updates 'a new macOS version waits for you'
 fi
 
 # --- default browser --------------------------------------------------------
@@ -173,9 +179,20 @@ if [[ -n $want_browser ]]; then
   # `defaults` prints a dict's keys in alphabetical order, so LSHandlerRoleAll
   # always precedes the LSHandlerURLScheme it belongs to. The "-" guard drops
   # the one inside LSHandlerPreferredVersions, which sorts earlier still.
+  #
+  # `role` is cleared at each element of the array -- a bare `{` on its own
+  # line, which a nested dict (`KEY = {`) is not. Without that, an https entry
+  # carrying no LSHandlerRoleAll of its own would be answered with the previous
+  # entry's handler: a confident wrong name is worse here than none, because
+  # the wrong name reads as a browser you forgot installing.
+  #
+  # Printing an empty `role` and exiting is deliberate: $() strips the newline,
+  # so a scheme with no handler lands in the "still opens in Safari" branch
+  # rather than sending the scan on to some other entry's answer.
   have_browser=$(defaults read com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers 2>/dev/null |
-    awk '/LSHandlerRoleAll = /{ r = $0; sub(/.*= "?/, "", r); sub(/"?;$/, "", r); if (r != "-") role = r }
-         /LSHandlerURLScheme = https/{ if (role != "") { print role; exit } }' || true)
+    awk '/^[[:space:]]*\{[[:space:]]*$/{ role = "" }
+         /LSHandlerRoleAll = /{ r = $0; sub(/.*= "?/, "", r); sub(/"?;$/, "", r); if (r != "-") role = r }
+         /LSHandlerURLScheme = https/{ print role; exit }' || true)
 
   if [[ $have_browser == "$want_browser" ]]; then
     ok browser "$want_browser opens https links"

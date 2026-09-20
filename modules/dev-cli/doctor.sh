@@ -48,7 +48,7 @@ fi
 # would warn forever -- so the warning names the path it looked at. The escape
 # hatch is the Brewfile: drop the package and `command -v` skips the row.
 signin="${DOT_MODULE_DIR:-$(dirname "$0")}/data/signin.tsv"
-while IFS=$'\t' read -r cmd _ rel login _; do
+while IFS=$'\t' read -r cmd _ rel login costs; do
   if [[ -z $cmd || $cmd == '#'* ]]; then continue; fi
   if ! command -v "$cmd" >/dev/null 2>&1; then continue; fi
 
@@ -57,6 +57,10 @@ while IFS=$'\t' read -r cmd _ rel login _; do
     ok "$cmd" 'signed in'
   else
     warn "$cmd" "never signed in on this machine -- run: $login"
+    # The column that turns a list into a reason to work down it. Without it a
+    # fresh machine gets three yellow lines about tools it may not need today,
+    # and the whole point is that the bill arrives hours later.
+    dim "what it costs: $costs"
     dim "no credentials at ~/$rel"
   fi
 done <"$signin"

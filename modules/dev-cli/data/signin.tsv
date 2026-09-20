@@ -1,7 +1,11 @@
 # The CLIs in this module's Brewfile that are useless until you log in once:
 # command, the Brewfile package that provides it, where that tool keeps its
-# credentials (under $HOME), the command that puts them there, why it matters.
+# credentials (under $HOME), the command that puts them there, what it costs.
 # Tab-separated, one CLI per line.
+#
+# Column 5 completes "what it costs: ...", and is what makes three yellow
+# lines a list worth working down rather than three tools you may not need
+# today. tests/dev-cli.bats holds every row to having one.
 #
 # Column 2 is checked against Brewfile by tests/contract.bats: a row here is a
 # claim that THIS module installs the tool, and a tool another module owns

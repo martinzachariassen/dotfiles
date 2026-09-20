@@ -59,9 +59,11 @@ script under `/bin/bash` — the one shell still there once Homebrew is gone.
   holds real files an earlier `apply` moved aside, and nothing else has a copy.
   It is reported as kept, and deleting it is yours to do.
 - **It never deletes a real file it did not put there.** Symlinks into the
-  repo, the two generated files it can prove it wrote, and the paths that are
-  the repo's own by definition. The directories then go with `rmdir`, not
-  `rm -rf`, so a file some other tool left keeps it alive and gets reported.
+  repo, the generated files it can prove it wrote — `config.local` and
+  `allowed_signers` by their header, `~/.claude/settings.json` leaf by leaf —
+  and the paths that are the repo's own by definition. The directories then go
+  with `rmdir`, not `rm -rf`, so a file some other tool left keeps it alive and
+  gets reported.
 - **It cannot undo macOS defaults.** It reports the domains instead — and only
   when at least one is still in force, because it runs every module's
   `remove.sh`, enabled or not, and a machine that never turned

@@ -1,1 +1,1 @@
-description = "GUI apps and fonts as casks, and the ones that do nothing until opened"
+description = "GUI apps and fonts as casks, plus an opened-once check"

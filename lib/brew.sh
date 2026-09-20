@@ -129,22 +129,28 @@ brew_unmanaged() {
 
   # LC_ALL=C throughout: comm compares bytes, and a sort that collated `-` or
   # `@` by locale rules instead would make it disagree with its own input.
-  local named formulae casks out
-  named=$(
-    cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null |
-      sed -n -E 's/^(brew|cask) "([^"]*\/)?([^"]+)".*/\3/p' | LC_ALL=C sort -u
-  )
+  #
+  # Two lists, and never one. `brew "docker"` and `cask "docker"` are different
+  # packages that happen to share a word, so a single set would let a Brewfile
+  # naming either of them vouch for a hand-installed other -- silence in the
+  # one place this check exists to break, and silence that gets likelier the
+  # more the repo installs.
+  local files named_brew named_cask formulae casks out
+  files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
+  named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
+  named_cask=$(sed -n -E 's/^cask "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
+
   # No Brewfile read at all would make every package on the machine unmanaged.
   # That is a broken checkout, not a finding.
-  [[ -n $named ]] || return 2
+  [[ -n $named_brew || -n $named_cask ]] || return 2
 
   formulae=$(HOMEBREW_NO_AUTO_UPDATE=1 brew leaves --installed-on-request 2>/dev/null) || return 2
   casks=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask 2>/dev/null) || return 2
 
   out=$(
-    comm -23 <(LC_ALL=C sort -u <<<"$formulae") <(printf '%s\n' "$named") |
+    comm -23 <(LC_ALL=C sort -u <<<"$formulae") <(printf '%s\n' "$named_brew") |
       awk 'NF {print "Formula", $0}'
-    comm -23 <(LC_ALL=C sort -u <<<"$casks") <(printf '%s\n' "$named") |
+    comm -23 <(LC_ALL=C sort -u <<<"$casks") <(printf '%s\n' "$named_cask") |
       awk 'NF {print "Cask", $0}'
   )
 

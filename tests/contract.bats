@@ -666,6 +666,39 @@ EOF
   }
 }
 
+@test "every setting a hook reads is documented where a reader looks" {
+  # CLAUDE.md's table says a module's settings land in that module's README and
+  # in docs/configuration.md. Both are hand-maintained prose, and a setting is
+  # exactly the kind of thing that ships working and undocumented -- the hook
+  # reads it, the default hides it, and nobody can discover it exists.
+  #
+  # The hook calls are the one truth: `module_setting NAME KEY` is a key, and a
+  # reader who cannot find it has no way to set it.
+  local mod key call missing=() seen=0
+  while IFS= read -r call; do
+    seen=$((seen + 1))
+    mod=$(awk '{print $2}' <<<"$call")
+    key=$(awk '{print $3}' <<<"$call")
+    grep -qF "\`$key\`" "$DOT_ROOT/modules/$mod/README.md" 2>/dev/null ||
+      missing+=("modules/$mod/README.md: $key")
+    grep -qF "\`$key\`" "$DOT_ROOT/docs/configuration.md" ||
+      missing+=("docs/configuration.md: $key")
+  done < <(grep -rhoE 'module_setting(_bool)? [a-z-]+ [a-z_]+' \
+    "$DOT_ROOT"/modules/*/apply.sh "$DOT_ROOT"/modules/*/doctor.sh \
+    "$DOT_ROOT"/modules/*/remove.sh 2>/dev/null | sort -u)
+
+  # A renamed helper would make this pass over nothing, forever.
+  [ "$seen" -gt 0 ] || {
+    echo 'no module_setting call was found at all'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'a setting a hook reads is named nowhere a reader would look:\n'
+    printf '  %s\n' "${missing[@]}"
+    return 1
+  }
+}
+
 @test "no apply.sh changes anything in \$HOME under --dry-run" {
   # The counterpart to the remove.sh snapshot above, and the more important
   # half: apply.sh is the hook that WRITES. Every one of them gates on

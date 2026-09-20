@@ -127,6 +127,10 @@ STUB
   with_updates CriticalUpdateInstall 1
   with_updates ConfigDataInstall 1
   with_updates_domain /Library/Preferences/com.apple.commerce AutoUpdate 1
+  # Written, not left out: all six keys ship ON, so the healthy machine for the
+  # one the repo wants OFF is an explicit 0. Leaving it unwritten here would
+  # make every test in this file carry that warning.
+  with_updates AutomaticallyInstallMacOSUpdates 0
   with_browser com.google.chrome
 }
 
@@ -137,6 +141,14 @@ with_updates() {
 
 with_updates_domain() {
   printf '%s %s\t%s\n' "$1" "$2" "$3" >>"$DEFAULTS_STORE"
+}
+
+# without_updates KEY -- a key macOS never wrote, which is not the same as one
+# written to 0 and is the whole point of the two tests that use it.
+without_updates() {
+  grep -v "^/Library/Preferences/com.apple.SoftwareUpdate $1	" \
+    "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
+  mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
 }
 
 # with_browser BUNDLE -- the LaunchServices handler list as `defaults` prints
@@ -153,6 +165,27 @@ with_browser() {
             LSHandlerRoleAll = "-";
         };
         LSHandlerRoleAll = "$1";
+        LSHandlerURLScheme = https;
+    }
+)
+EOF
+}
+
+# with_browser_after BUNDLE -- BUNDLE claiming a content type in an EARLIER
+# array element, and the https element carrying no LSHandlerRoleAll of its own.
+# A real LSHandlers list is a mix of both shapes, and an awk that carried its
+# last-seen role across elements would answer https with BUNDLE.
+with_browser_after() {
+  local f
+  f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
+  cat >"$f" <<EOF
+(
+        {
+        LSHandlerContentType = "public.html";
+        LSHandlerRoleAll = "$1";
+    },
+        {
+        LSHandlerRoleViewer = "com.apple.Safari";
         LSHandlerURLScheme = https;
     }
 )
@@ -579,12 +612,45 @@ wrote() { grep -qF "$1" "$CALLS"; }
   # you to a checkbox that is already ticked.
   with_settings '# nothing set'
   with_store
-  # A store holding nothing but the browser answer: no update key exists.
+  # A store holding nothing but the browser answer: no update key exists. The
+  # sixth is written back, because the same rule points the other way for it
+  # and the test below is the one about that.
   : >"$DEFAULTS_STORE"
+  with_updates AutomaticallyInstallMacOSUpdates 0
   apply
   doctor
   [ "$status" -eq 0 ]
   says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: an unwritten version-bump key is the fresh Mac, not a quiet one" {
+  # The same rule as the four above, pointing the other way: this key ships ON
+  # too, so a Mac whose owner never opened the pane IS set to install whole
+  # versions unasked. Reading the missing key as "off" made the default answer
+  # green on exactly the machine the row exists for -- a fresh install, which
+  # is the machine this whole check was written for.
+  with_settings '# nothing set'
+  with_store
+  without_updates AutomaticallyInstallMacOSUpdates
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"including major ones"* ]]
+  # And only that: the four are still green beside it.
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macos_auto_update = true is green on a Mac that never wrote it" {
+  # The mirror of the test above, and what keeps the two branches from
+  # disagreeing about what an unwritten key means: ON either way. Getting this
+  # pair to disagree is what made the default answer green on a fresh install.
+  with_settings 'macos_auto_update = true'
+  with_store
+  without_updates AutomaticallyInstallMacOSUpdates
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'macOS updates install automatically'
 }
 
 @test "updates: macOS installing its own versions is a warning by default" {
@@ -682,6 +748,21 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [[ $output != *'"-"'* ]]
   [[ $output != *'browser - '* ]]
+}
+
+@test "browser: a role from an earlier entry is not the https answer" {
+  # LSHandlers is an array, and the handler for https is whatever THAT element
+  # says. An awk keeping its last-seen LSHandlerRoleAll across elements would
+  # report the content-type entry above it -- a confident wrong name, which
+  # reads as a browser you forgot installing rather than as a sheet you never
+  # answered. Cleared at each bare `{`, which a nested `KEY = {` is not.
+  with_settings '# nothing set'
+  with_store
+  with_browser_after com.google.chrome
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"still open in Safari"* ]]
 }
 
 @test "browser: an empty setting says nothing at all" {

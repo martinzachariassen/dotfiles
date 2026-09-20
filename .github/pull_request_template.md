@@ -40,7 +40,7 @@ Paste a real run, never a sketch: DOT_COLUMNS=76 dot doctor
 - [ ] A verb, or an option it takes -> `usage()` in `bin/dot`, the command list in `README.md` *(tested)*
 - [ ] A verb count named in `docs/` prose *(tested)*
 - [ ] What a run prints -> `docs/architecture.md`, and every sample block showing it
-- [ ] A module's settings -> that module's `README.md`, and `docs/configuration.md`
+- [ ] A module's settings -> that module's `README.md`, and `docs/configuration.md` *(tested)*
 - [ ] A rule the driver enforces -> the `CLAUDE.md` of the directory it lives in
 - [ ] Sample output regenerated from a real run, not edited by hand
 

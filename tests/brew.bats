@@ -444,6 +444,46 @@ installed() {
   [ -z "$output" ]
 }
 
+@test "unmanaged: a cask does not vouch for a formula of the same name" {
+  # `brew "docker"` and `cask "docker"` are different packages sharing a word.
+  # One set of names for both would make a Brewfile naming either of them
+  # silence the other -- and the silence lands in the one check that exists to
+  # say what nothing here installs, on the names most likely to collide.
+  fixture_repo
+  printf 'cask "docker"\n' >"$DOT_ROOT/modules/one/Brewfile"
+  installed 'bash docker' docker
+
+  run brew_unmanaged
+  [ "$status" -eq 1 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "Formula docker" ]
+}
+
+@test "unmanaged: and a formula does not vouch for a cask either" {
+  fixture_repo
+  printf 'brew "docker"\n' >"$DOT_ROOT/modules/one/Brewfile"
+  installed 'bash docker' docker
+
+  run brew_unmanaged
+  [ "$status" -eq 1 ]
+  [ "${#lines[@]}" -eq 1 ]
+  [ "${lines[0]}" = "Cask docker" ]
+}
+
+@test "unmanaged: a repo naming no casks at all is not a machine full of them" {
+  # The empty side of the split. `comm` against an empty list must report
+  # every cask, and against a repo that has none the guard above must still
+  # tell "no Brewfile could be read" apart from "no cask line in any of them".
+  fixture_repo
+  installed bash 'raycast slack'
+
+  run brew_unmanaged
+  [ "$status" -eq 1 ]
+  [ "${#lines[@]}" -eq 2 ]
+  [ "${lines[0]}" = "Cask raycast" ]
+  [ "${lines[1]}" = "Cask slack" ]
+}
+
 @test "unmanaged: a trailing comment does not become part of the name" {
   fixture_repo
   printf 'brew "mise" # brew owns CLIs, mise owns runtimes\n' \

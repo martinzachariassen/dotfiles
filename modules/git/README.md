@@ -104,6 +104,19 @@ generated file, then does it again with a *different* key and requires that to
 fail. An `allowed_signers` that accepts anything is worse than none, and a test
 that only compares strings could not tell the two apart.
 
+`doctor.sh` makes the **same** shape test, held against `apply.sh` by a test
+that reads both literals out of the files. Without that they drift, and the
+symptom is precise: doctor answers a key that is a path with "run `dot apply`",
+`dot apply` refuses it on purpose, and the line stays yellow forever behind a
+command that changes nothing.
+
+Turning signing off again, or moving `signingkey` to a path after a run that
+wrote a file, **removes** the stale `allowed_signers` — the header is the proof
+it was ours. Nothing reads a file `config.local` no longer points at, so this
+is tidiness rather than a fix; but *derive, never record* cuts both ways, and a
+generated file the repo has stopped accounting for is one only `uninstall.sh`
+would find again.
+
 ## Removal
 
 Both generated files are *written*, not linked, so the symlink sweep cannot see

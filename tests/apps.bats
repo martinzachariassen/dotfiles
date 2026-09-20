@@ -104,6 +104,19 @@ first_row() { rows | head -1; }
   [ "$before" = "$after" ]
 }
 
+@test "column 4 finishes the sentence doctor.sh starts" {
+  # The warning is "... never opened -- no $lost", so a column holding its own
+  # article reads "no the launcher". Two files own half a sentence each, and
+  # only one of them can own the grammar; this is where that is decided.
+  local app lost
+  while IFS=$'\t' read -r app _ _ lost; do
+    [[ $lost != the\ * && $lost != a\ * && $lost != an\ * ]] || {
+      echo "$app: column 4 starts with an article, and \"no $lost\" is the result"
+      return 1
+    }
+  done < <(rows)
+}
+
 @test "the table has four columns on every row" {
   # Column 4 is read into the warning text. A row missing it warns about an
   # app losing nothing, which reads as a bug in the app rather than the table.

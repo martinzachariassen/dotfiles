@@ -26,10 +26,11 @@ link to it. Two copies of one rule is the pair that stops agreeing.
 | A limit in the table below | that table, `docs/development.md`, `contract.bats` |
 | A rule the driver enforces | the `CLAUDE.md` of the directory it lives in |
 
-`contract.bats` catches three of those and no more: a module the README never
-names, a verb missing from `usage()` or the README, and prose in `docs/` naming
-a verb count `bin/dot` no longer has. The rest is a hand check, so a doc claim
-worth keeping is worth a test in `contract.bats`.
+`contract.bats` catches four of those and no more: a module the README never
+names, a verb missing from `usage()` or the README, prose in `docs/` naming a
+verb count `bin/dot` no longer has, and a setting a hook reads that neither the
+module's `README.md` nor `docs/configuration.md` mentions. The rest is a hand
+check, so a doc claim worth keeping is worth a test in `contract.bats`.
 
 **Sample output is pasted from a real run**, never sketched: regenerate it with
 `DOT_COLUMNS=76 dot doctor` or `bash uninstall.sh --dry-run` rather than

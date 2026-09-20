@@ -30,6 +30,9 @@ while IFS=$'\t' read -r app _ domain lost; do
   if [[ -e $HOME/Library/Preferences/$domain.plist ]]; then
     ok "$app" 'opened at least once'
   else
+    # Column 4 completes "no ...", so it carries no article of its own.
+    # tests/apps.bats holds the table to that: the sentence is built here and
+    # the words are there, and only one of the two places can own the grammar.
     warn "$app" "installed but never opened -- no $lost"
     dim "open -a $app, then turn on its own \"launch at login\""
   fi

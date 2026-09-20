@@ -155,6 +155,12 @@ sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate \
 owner never opened the pane has no key at all — calling that off would send
 you to a checkbox that is already ticked.
 
+That holds for the sixth row as much as the first five, and it is the one
+place getting it backwards costs something: a fresh Mac nobody has touched
+**is** set to install whole versions unasked. Reading its missing key as "off"
+would make the default answer green on exactly the machine the row exists for.
+Only a literal `0` is off.
+
 ## The default browser
 
 `apps` installs Chrome; nothing makes it the browser. Every link opens in
