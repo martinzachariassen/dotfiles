@@ -124,7 +124,7 @@ a module is never half-enabled.
 | `claude-code` | [the CLI, and keys merged into `~/.claude/settings.json`](modules/claude-code/README.md) |
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
 | `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
-| `macos-defaults` | [Dock, Finder, keyboard, screenshots](modules/macos-defaults/README.md) — imperative, no files at all |
+| `macos-defaults` | [Dock, Finder, keyboard, screenshots, locale units](modules/macos-defaults/README.md) — imperative, no files at all |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this
 repo installs but does not configure.

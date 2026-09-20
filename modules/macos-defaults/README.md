@@ -4,9 +4,9 @@ Repo: [dotfiles](../../README.md) · The module contract:
 [docs/modules.md](../../docs/modules.md)
 
 macOS system preferences — Dock, Finder, trackpad, keyboard, text substitution,
-screenshots. Imperative and idempotent, and the only *tool* module that links
-no files at all: none of this is a file, so it has no `home/` and no Brewfile
-either.
+screenshots, and the locale units. Imperative and idempotent, and the only
+*tool* module that links no files at all: none of this is a file, so it has no
+`home/` and no Brewfile either.
 
 Nothing here needs root.
 
@@ -28,6 +28,15 @@ every key, and `remove.sh` cannot name a domain `apply.sh` no longer writes.
 
 `tests/contract.bats` pins all three to the same `data=` line, and separately
 forbids `remove.sh` from naming a domain by hand.
+
+### Units are written, not inherited
+
+The locale rows — 24-hour clock, metric, Celsius — are values macOS would
+otherwise derive from the region the installer was answered with. On a machine
+set up as Norwegian they change nothing; writing them anyway is what makes the
+answer a property of *this repo* rather than of an installer dialog nobody
+remembers. That is the same reason every other row is here: a preference that
+depends on how the machine was set up is one a rebuild can get wrong.
 
 Column 3 is the `defaults` type, so `apply.sh` writes with `-$type`. Both
 readers have to undo it the same way, because `defaults read` prints a bool as
