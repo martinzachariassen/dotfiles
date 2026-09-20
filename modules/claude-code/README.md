@@ -100,7 +100,9 @@ to it:
 The service name belongs to Anthropic, not to this repo, so it is the fragile
 half — and the warning names it, rather than leaving a machine where it changed
 warning forever with nothing on screen to say why. `DOT_CLAUDE_KEYCHAIN` is the
-input that makes both branches reachable in a test.
+input that follows it: a machine where the name changed keeps its check instead
+of waiting for this repo, and `tests/claude-code.bats` holds the override to
+reaching `security` itself and not only the message.
 
 ## Settings
 

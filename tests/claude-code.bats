@@ -31,6 +31,11 @@ teardown() { teardown_sandbox; }
 # Every authentication route is passed explicitly, empty by default: a
 # developer running the suite with one of these exported would otherwise decide
 # the result, and the branch that matters is the one where none is set.
+#
+# DOT_CLAUDE_KEYCHAIN is passed the same way and must stay EMPTY here, not set
+# to the default: empty falls through to the hook's own literal, which is what
+# leaves "the keychain item it looked for is named" testing the hook rather
+# than this line.
 doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" \
@@ -38,6 +43,7 @@ doctor() {
     ANTHROPIC_AUTH_TOKEN="${AUTH_TOKEN:-}" \
     CLAUDE_CODE_USE_BEDROCK="${USE_BEDROCK:-}" \
     CLAUDE_CODE_USE_VERTEX="${USE_VERTEX:-}" \
+    DOT_CLAUDE_KEYCHAIN="${KEYCHAIN:-}" \
     DOT_MODULE=claude-code DOT_MODULE_DIR="$DOT_ROOT/modules/claude-code" \
     "$BASH" "$DOT_ROOT/modules/claude-code/doctor.sh"
 }
@@ -80,6 +86,18 @@ with_keychain() {
   with_keychain 44
   doctor
   [[ $output == *"Claude Code-credentials"* ]]
+}
+
+@test "auth: the item name is an input, so a machine can follow it when it moves" {
+  # The escape hatch for the fragile half, and it has to reach `security`
+  # itself: a message naming the new item while the question still asked for
+  # the old one is a check that answers about nothing.
+  with_keychain 44
+  KEYCHAIN='Claude Code-credentials-v2'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *'Claude Code-credentials-v2'* ]]
+  [[ $(cat "$DOT_TMP/security-calls") == *'Claude Code-credentials-v2'* ]]
 }
 
 @test "auth: an API key in the environment is a signed-in machine too" {
