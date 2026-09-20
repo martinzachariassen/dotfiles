@@ -119,6 +119,10 @@ deliberately. That friction is the point.
   the handoff. Irreversible summaries state counts, not categories.
 - **Never end a loop with `cmd && printf`.** A false last test leaves status 1
   and `set -e` kills the caller. Use `if`.
+- **No secret value enters the repo.** API keys are `op://` references in
+  `modules/zsh/home/.config/op/env`, resolved by `op run`; a line is added only
+  once its 1Password item exists, or every run reading the file aborts. See
+  [`modules/zsh/README.md`](modules/zsh/README.md#api-keys).
 - **Quote user input** before it reaches TOML, git config or `defaults`. Those
   tools accept garbage and exit 0.
 - **Dry run and real run print the same words.** Announce intent before acting.

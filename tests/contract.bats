@@ -534,6 +534,29 @@ EOF
 # each was on the honour system until one of them had already drifted: the
 # bash-5 list said four places while uninstall.sh had quietly become a fifth.
 
+# op_env_bad_lines FILE -- line numbers of everything that is not a comment,
+# blank, or NAME=op://... Numbers only: printing the line would print the secret.
+op_env_bad_lines() {
+  awk '/^#/ || !NF { next } !/^[A-Z][A-Z0-9_]*=op:\/\/[^ \t]+$/ { printf "%s ", NR }' "$1"
+}
+
+@test "zsh: the op env file holds references, never a value" {
+  # Tracked, so a pasted key is a leaked one.
+  local bad
+  bad=$(op_env_bad_lines "$DOT_ROOT/modules/zsh/home/.config/op/env")
+  [ -z "$bad" ] || {
+    printf 'op/env line %sis not NAME=op://...; the file holds references only\n' "$bad"
+    return 1
+  }
+}
+
+@test "zsh: the op env probe can actually see a value" {
+  # A check that cannot fail is not one.
+  local f="$DOT_TMP/env"
+  printf '# c\n\nOK=op://V/I/credential\nBAD=sk-abc123\n' >"$f"
+  [ "$(op_env_bad_lines "$f")" = "4 " ]
+}
+
 @test "bash 5: every place that guards it is named by all the others" {
   # install.sh installs it, core/Brewfile keeps brew from cleaning it up, and
   # three scripts refuse to run without it. A new guard that no comment mentions
