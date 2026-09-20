@@ -7,6 +7,19 @@
   "paneBorderColor": "#3A3A3A",
   "activePaneBorderColor": "#5E9EFF",
 
+  "app": {
+    // Agent sessions resume on launch, so quitting loses little.
+    "confirmQuit": "dirty-only",
+    "sendAnonymousTelemetry": false
+  },
+
+  // agentPermissionPrompt stays on: it is the one alert that means an agent
+  // is stopped until you answer.
+  "notifications": {
+    "agentTurnComplete": "never",
+    "agentIdleReminder": false
+  },
+
   // This file uses JSON with comments (JSONC).
   // Uncomment and edit any setting to make it file-managed.
   // Remove a setting to fall back to the value saved in Settings.
