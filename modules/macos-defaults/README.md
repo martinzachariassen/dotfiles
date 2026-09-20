@@ -54,13 +54,17 @@ can be refused. The file holds only what a reader could not argue with.
 | `dock_tilesize` | `48` | must be a positive integer — `defaults -int` stores non-numeric as `0`, and tilesize `0` is a Dock with no icons |
 | `screenshot_dir` | `Pictures/Screenshots` | relative to `$HOME` unless absolute; a leading `~` is expanded, not taken literally |
 | `touch_id_sudo` | `true` | not written at all — only *checked*; see below |
+| `macos_auto_update` | `false` | not written at all — only *checked*; see below |
+| `browser` | `"com.google.chrome"` | not written at all — only *checked*; `""` silences it |
 
 ```toml
 [settings.macos-defaults]
-dock_autohide  = true
-dock_tilesize  = 48
-screenshot_dir = "Pictures/Screenshots"
-touch_id_sudo  = true
+dock_autohide     = true
+dock_tilesize     = 48
+screenshot_dir    = "Pictures/Screenshots"
+touch_id_sudo     = true
+macos_auto_update = false
+browser           = "com.google.chrome"
 ```
 
 A bad value is a `fail`, not a `die`: one wrong field must not cost the rest of
@@ -82,14 +86,15 @@ reverting a key is not a broken install. But it is otherwise invisible — the
 only symptom is a Mac that behaves slightly wrong — which is why every row is
 checked.
 
-## Three things it reports and cannot write
+## What it reports and cannot write
 
-FileVault, the application firewall and Touch ID for `sudo` are not `defaults`
-keys. Each needs root to change and two need a GUI, so `apply.sh` cannot write
-them — and they are deliberately **not** in `data/defaults.tsv`, which is the
-list of what this module writes and what `remove.sh` derives its domains from.
-A row there would make `apply.sh` run `defaults write` against something that
-is not a preference at all.
+FileVault, the application firewall, Touch ID for `sudo`, the software update
+switches and the default browser are not `defaults` keys this module may
+write. Each needs root or a GUI confirmation, so `apply.sh` cannot set them —
+and they are deliberately **not** in `data/defaults.tsv`, which is the list of
+what this module writes and what `remove.sh` derives its domains from. A row
+there would make `apply.sh` run `defaults write` against something that is not
+a preference at all.
 
 `doctor.sh` reports them anyway, because this is the module for macOS system
 state and a Mac with the firewall off is otherwise something nothing in this
@@ -115,6 +120,53 @@ green.
 A tool that answers nothing is a **warning**, never silence: a question that
 could not be asked is not a healthy answer, the same three-state rule
 `brew_missing` exists to keep.
+
+## Software update, split five ways
+
+macOS keeps automatic updates in five keys under `/Library/Preferences`, and
+they are reported as two groups rather than one, because they are not one
+decision:
+
+| Key | Domain | Wanted |
+|---|---|---|
+| `AutomaticCheckEnabled` | `com.apple.SoftwareUpdate` | on |
+| `AutomaticDownload` | `com.apple.SoftwareUpdate` | on |
+| `CriticalUpdateInstall` | `com.apple.SoftwareUpdate` | on — security responses |
+| `ConfigDataInstall` | `com.apple.SoftwareUpdate` | on — XProtect and system data |
+| `AutoUpdate` | `com.apple.commerce` | on — App Store apps |
+| `AutomaticallyInstallMacOSUpdates` | `com.apple.SoftwareUpdate` | `macos_auto_update`, default **off** |
+
+The last one is the reason the split exists. It does not mean "security
+patches"; it means macOS installs *whole versions* on its own, major ones
+included. Left on, a Mac can move to the next major release unasked — and the
+only way back is erasing the disk, while the fix for the surprise is a switch
+that also stops the patches. Off, the four above keep every automatic update
+this machine actually wants, and the version bump becomes a button you press.
+
+Reading `/Library/Preferences` needs no root; writing it does, which is why
+this is a report and names the command:
+
+```
+sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate \
+  AutomaticallyInstallMacOSUpdates -bool false
+```
+
+**A key macOS never wrote is not "off".** All five ship on, so a Mac whose
+owner never opened the pane has no key at all — calling that off would send
+you to a checkbox that is already ticked.
+
+## The default browser
+
+`apps` installs Chrome; nothing makes it the browser. Every link opens in
+Safari until someone clicks through a confirmation sheet, and no script may
+click it — that sheet is the whole security property.
+
+So it is reported, from the LaunchServices handler for `https`, against the
+`browser` setting. The setting is also the escape hatch: `browser = ""` says
+nothing at all, which is what a Mac that wants Safari sets.
+
+It lives here rather than in `apps` because it is macOS system state, not
+something that module installs — the same reason FileVault is here.
 
 Both paths are inputs — `DOT_SOCKETFILTERFW` and `DOT_SUDO_LOCAL` — because
 otherwise the branch a test needs is the one the machine running it never

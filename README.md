@@ -42,7 +42,7 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
 ```
 ── Checking ─────────────────────────────────────────────── core + 9 modules
   ✓ core           the repo, the shim, the config
-  ✓ apps           Packages: GUI apps and fonts, installed as Homebrew casks
+  ✓ apps           GUI apps and fonts as casks, and the ones that do nothing until opened
   ✓ claude-code    Claude Code CLI and its status line
   ✓ cmux           cmux terminal config -- Option key stays native macOS input
   ✓ containers     Docker via colima (a Linux VM, no Docker Desktop)
@@ -125,13 +125,13 @@ a module is never half-enabled.
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
 | `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
 | `macos-defaults` | [Dock, Finder, keyboard, screenshots, locale units](modules/macos-defaults/README.md) — imperative, no files at all |
+| `apps` | [GUI casks and fonts](modules/apps/README.md): Raycast, Chrome, VS Code, … — plus the ones that do nothing until opened |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this
 repo installs but does not configure.
 
 | Package set | What it installs |
 |---|---|
-| `apps` | GUI casks and fonts: Raycast, Chrome, VS Code, … |
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
 | `dotfiles-dev` | the toolchain `make check` runs, for a machine you develop *this repo* on |
 

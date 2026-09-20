@@ -1,0 +1,20 @@
+# Menu bar apps: casks this module installs that do nothing whatsoever until
+# they are opened once. A launcher nobody launched has no hotkey, and a menu
+# bar monitor that never ran has no menu bar item -- while `brew bundle` and
+# the orphan scan both report a machine in perfect health, because the cask is
+# on disk exactly as asked.
+#
+# Only apps that are USELESS until running belong here. Chrome, VS Code and
+# Spotify are opened when you want them and are not this module's business.
+#
+# app name (the bundle under /Applications), the Brewfile cask that installs
+# it, the preferences domain macOS creates on first launch, what you lose.
+# Tab-separated, one app per line.
+#
+# Column 2 is checked against Brewfile by tests/contract.bats: a row here is a
+# claim that THIS module installs the app. Dropping the cask silences the row,
+# which is the escape hatch for an app you decided you did not want.
+
+Raycast	raycast	com.raycast.macos	the launcher, and the hotkey it binds
+Thaw	thaw	com.stonerl.Thaw	the menu bar manager
+Stats	stats	eu.exelban.Stats	the resource monitor in the menu bar

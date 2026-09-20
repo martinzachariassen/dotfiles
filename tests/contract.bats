@@ -453,6 +453,31 @@ EOF
   }
 }
 
+@test "apps: every launch row names a cask this module installs" {
+  # Same claim as dev-cli's sign-in table, one layer up: a row asserts that
+  # THIS module puts the app on the machine, and that is what makes "not in
+  # /Applications, say nothing" a fair skip rather than a check that quietly
+  # never runs. It is also the documented escape hatch -- dropping the cask is
+  # how you decline an app -- and an escape hatch nothing enforces is prose.
+  local dir="$DOT_ROOT/modules/apps"
+  local app cask rest missing=()
+  while IFS=$'\t' read -r app cask rest; do
+    [[ -n $app && $app != '#'* ]] || continue
+    grep -qE "^cask \"$cask\"" "$dir/Brewfile" || missing+=("$app -> $cask")
+  done <"$dir/data/launch.tsv"
+
+  # Non-empty first, or an emptied table makes this pass over nothing forever.
+  [ -s "$dir/data/launch.tsv" ] || {
+    echo 'data/launch.tsv is empty'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'launch.tsv names a cask modules/apps/Brewfile does not:\n'
+    printf '  %s\n' "${missing[@]}"
+    return 1
+  }
+}
+
 @test "dev-cli: doctor.sh never invokes mise" {
   # `mise ls` CREATES ~/.local/share/mise and ~/.local/state/mise on a machine
   # that has neither -- the check would write to the $HOME it is checking, the

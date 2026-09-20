@@ -164,6 +164,41 @@ tool is named and its tree is not. The blind spot it inherits is a formula that
 *later* becomes something else's dependency — it falls out of the list, and
 finding it again would mean reading the install receipt of every keg.
 
+## Installed is not set up
+
+There is a third question, and it is the one a fresh Mac actually fails. The
+checks above ask whether the repo reached the machine; the one before it asks
+what the machine has that the repo does not. Neither notices that `gh` is
+installed and signed in to nothing, that Claude Code has every managed key and
+no credentials, that the SSH agent is serving a socket and no keys, or that
+Raycast is in `/Applications` and has never been opened.
+
+Each of those is a machine `dot apply` finishes green on and that does not
+work, with the symptom arriving hours later as a 401, a login prompt or a
+hotkey that does nothing. They are spread across the modules that own the
+tools:
+
+| Where | Asks |
+|---|---|
+| `core` | the Command Line Tools are still there, and the developer directory is not a dead path |
+| `dev-cli` | `gh`, `gcloud` and `firebase` have credentials on disk |
+| `claude-code` | the CLI has a keychain item, or `ANTHROPIC_API_KEY` |
+| `ssh` | the 1Password agent is live **and** holds a key |
+| `apps` | the menu bar apps have been opened at least once |
+| `macos-defaults` | FileVault, the firewall, Touch ID, the update switches, the default browser |
+
+Three rules keep this from becoming noise, and they are the same three
+everywhere:
+
+- **The evidence is on disk, never the tool's own answer.** `gcloud auth list`
+  and `firebase login:list` create their config directory on a machine that has
+  none, which would make a read-only check write to the thing it is checking.
+- **A row is silent when the thing is not installed.** Dropping the package or
+  the cask is how you decline a tool, and the Brewfile is what `contract.bats`
+  holds the tables against.
+- **A question that could not be asked is a warning**, never a green line — the
+  three-state rule `brew_missing` keeps.
+
 ## Your files stay yours
 
 **Nothing here deletes a real file.** Symlinks and provably-generated files

@@ -91,9 +91,15 @@ rows() { grep -v '^[[:space:]]*\(#\|$\)' "$TSV"; }
 # the exact translation doctor.sh has to get right.
 with_store() {
   export DEFAULTS_STORE="$DOT_TMP/defaults-store"
+  # Answers that do not fit on one line: the store is key<TAB>value, and
+  # LSHandlers is a plist array. A file per key rather than a second store, so
+  # the stub stays one `case` and any key can be given either shape.
+  export DEFAULTS_DIR="$DOT_TMP/defaults-answers"
   : >"$DEFAULTS_STORE"
+  mkdir -p "$DEFAULTS_DIR"
   cat >"$BIN/defaults" <<'STUB'
 #!/usr/bin/env bash
+key_file() { printf '%s/%s' "$DEFAULTS_DIR" "$(printf '%s %s' "$1" "$2" | tr -c '[:alnum:]' '_')"; }
 case $1 in
   write)
     value=$5
@@ -103,10 +109,59 @@ case $1 in
     esac
     printf '%s %s\t%s\n' "$2" "$3" "$value" >>"$DEFAULTS_STORE"
     ;;
-  read) awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE" ;;
+  read)
+    f=$(key_file "$2" "$3")
+    if [[ -f $f ]]; then cat "$f"; exit 0; fi
+    awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE"
+    ;;
 esac
 STUB
   chmod +x "$BIN/defaults"
+
+  # A healthy machine by default, so every test that is about something else
+  # says only that. The same rule setup() follows for FileVault and the
+  # firewall -- these reads reach /Library/Preferences and the LaunchServices
+  # database, neither of which a fake $HOME can hold.
+  with_updates AutomaticCheckEnabled 1
+  with_updates AutomaticDownload 1
+  with_updates CriticalUpdateInstall 1
+  with_updates ConfigDataInstall 1
+  with_updates_domain /Library/Preferences/com.apple.commerce AutoUpdate 1
+  with_browser com.google.chrome
+}
+
+# with_updates KEY VALUE -- one software update switch on the system domain.
+with_updates() {
+  with_updates_domain /Library/Preferences/com.apple.SoftwareUpdate "$1" "$2"
+}
+
+with_updates_domain() {
+  printf '%s %s\t%s\n' "$1" "$2" "$3" >>"$DEFAULTS_STORE"
+}
+
+# with_browser BUNDLE -- the LaunchServices handler list as `defaults` prints
+# it, BUNDLE handling https. The "-" inside LSHandlerPreferredVersions is not
+# decoration: it sorts before LSHandlerRoleAll and is the thing doctor.sh's
+# awk has to skip, so a stub without it would pass over the bug.
+with_browser() {
+  local f
+  f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
+  cat >"$f" <<EOF
+(
+        {
+        LSHandlerPreferredVersions =         {
+            LSHandlerRoleAll = "-";
+        };
+        LSHandlerRoleAll = "$1";
+        LSHandlerURLScheme = https;
+    }
+)
+EOF
+}
+
+# with_no_browser -- a Mac nobody ever answered the "make default?" sheet on.
+with_no_browser() {
+  rm -f "$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
 }
 
 wrote() { grep -qF "$1" "$CALLS"; }
@@ -489,4 +544,154 @@ wrote() { grep -qF "$1" "$CALLS"; }
   # derives the domains it warns about from column 1. A row here would make
   # apply.sh run `defaults write` against a setting that is not one.
   ! grep -qiE 'filevault|socketfilterfw|pam_tid|com\.apple\.alf' "$TSV"
+}
+
+# --- software update ----------------------------------------------------------
+#
+# Five switches macOS does not treat as one, split here the same way: four that
+# have a right answer, and the one that installs a whole new major version.
+# This machine went from macOS 26 to 27 on its own and the only way anyone
+# would have known is that the check exists.
+
+@test "updates: every switch on is one green line" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: a switch turned off is named, one line each" {
+  with_settings '# nothing set'
+  with_store
+  with_updates CriticalUpdateInstall 0
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"security responses"* ]]
+  [[ $output == *"Software Update"* ]]
+}
+
+@test "updates: a key macOS never wrote is not read as off" {
+  # The trap this check had to avoid. All five ship ON, so a Mac whose owner
+  # never opened the pane has no key at all -- and calling that "off" sends
+  # you to a checkbox that is already ticked.
+  with_settings '# nothing set'
+  with_store
+  # A store holding nothing but the browser answer: no update key exists.
+  : >"$DEFAULTS_STORE"
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macOS installing its own versions is a warning by default" {
+  # The expensive failure, and the reason the default is off: a major version
+  # that arrives on its own cannot be undone without erasing the disk.
+  with_settings '# nothing set'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"including major ones"* ]]
+  [[ $output == *"AutomaticallyInstallMacOSUpdates -bool false"* ]]
+}
+
+@test "updates: turning the version bump off leaves the other four alone" {
+  # The whole point of splitting them. The fix named above must not be a fix
+  # that costs you security patches, so the four stay green beside it.
+  with_settings '# nothing set'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macos_auto_update = true wants the opposite, and says so" {
+  # A setting is only a setting if both answers are checked. With it on, a
+  # machine NOT installing macOS updates is the one that has drifted.
+  with_settings 'macos_auto_update = true'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 0
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"macos_auto_update"* ]]
+}
+
+@test "updates: macos_auto_update = true is green when macOS does install them" {
+  with_settings 'macos_auto_update = true'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'macOS updates install automatically'
+}
+
+# --- default browser ----------------------------------------------------------
+#
+# Installing a browser and being sent to it are two things, and `apps` only
+# does the first. No script may do the second: the confirmation sheet is the
+# whole point of it.
+
+@test "browser: the browser the setting names passes" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says browser 'com.google.chrome opens https links'
+}
+
+@test "browser: a Mac nobody answered the sheet on still opens Safari" {
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"Safari"* ]]
+}
+
+@test "browser: a different browser is named, not just called wrong" {
+  # Both halves, because "not chrome" does not tell you what you are looking
+  # at -- an installer you forgot running is a different problem to a sheet
+  # you never answered.
+  with_settings '# nothing set'
+  with_store
+  with_browser com.brave.browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"com.brave.browser"* ]]
+  [[ $output == *"com.google.chrome"* ]]
+}
+
+@test "browser: the placeholder inside LSHandlerPreferredVersions is skipped" {
+  # `defaults` prints dict keys alphabetically, so that nested LSHandlerRoleAll
+  # = "-" arrives BEFORE the real one. An awk that took the last value seen
+  # without the guard would report every machine as handing https to "-".
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [[ $output != *'"-"'* ]]
+  [[ $output != *'browser - '* ]]
+}
+
+@test "browser: an empty setting says nothing at all" {
+  # The escape hatch, and the same shape as touch_id_sudo: a machine that
+  # wants Safari must not stay yellow forever.
+  with_settings 'browser = ""'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output != *"browser"* ]]
 }

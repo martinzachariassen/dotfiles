@@ -5,6 +5,23 @@
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
+# install.sh step 1, and the only step nothing looked at again afterwards.
+# Homebrew is built on top of it, so it is asked first: a macOS upgrade can
+# leave the active developer directory pointing at a path that is no longer
+# there, and every git, cc and `brew install` then fails with "invalid active
+# developer path" -- a message that names neither this repo nor the fix.
+#
+# `-p` alone is not the check. It answers from a stored preference, not from
+# the disk, so it keeps printing the old path after the directory is gone.
+xcode_select=${DOT_XCODE_SELECT:-/usr/bin/xcode-select}
+if ! clt=$("$xcode_select" -p 2>/dev/null) || [[ -z $clt ]]; then
+  fail xcode 'Command Line Tools missing -- run: xcode-select --install'
+elif [[ ! -x $clt/usr/bin/git ]]; then
+  fail xcode "developer directory is broken: $clt -- run: xcode-select --install"
+else
+  ok xcode "${clt/#$HOME/\~}"
+fi
+
 if brew_load; then
   ok homebrew "$(brew --prefix)"
 else

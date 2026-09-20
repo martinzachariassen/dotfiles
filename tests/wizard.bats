@@ -333,7 +333,10 @@ EOF
 }
 
 @test "preview: a package set has nothing but packages to show" {
-  run wizard_preview apps
+  # work-apps, not apps: `apps` was a package set until it grew doctor.sh, and
+  # the preview is where that shows first. Crossing the line is allowed; being
+  # labelled on the wrong side of it is what this test refuses.
+  run wizard_preview work-apps
   [ "$status" -eq 0 ]
   [[ $output == *packages* ]]
   [[ $output != *links* ]]
