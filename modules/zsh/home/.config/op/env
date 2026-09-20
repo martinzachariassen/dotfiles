@@ -1,0 +1,5 @@
+# op run --env-file="$HOME/.config/op/env" -- <command>
+# Every line must resolve: one reference to a missing item aborts the run before
+# <command> starts, so a line is added only once its item exists in 1Password.
+
+CONTEXT7_API_KEY=op://Development/Context7/credential
