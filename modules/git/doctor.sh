@@ -37,3 +37,21 @@ fi
 if ! git config --file "$dest" --list >/dev/null 2>&1; then
   fail git "${dest/#$HOME/\~} does not parse -- delete it and run: dot apply"
 fi
+
+# Verification fails the way a missing file usually does not: git answers "No
+# signature" for a commit that carries one, so the only symptom is a repo that
+# looks unsigned. Asking git for the path rather than assuming it means a
+# hand-edited config.local is checked as it actually reads.
+allow=$(git config --file "$dest" --get gpg.ssh.allowedSignersFile 2>/dev/null || true)
+if [[ -n $signingkey && $(grep -c '^\[commit\]' "$dest") -gt 0 ]]; then
+  if [[ -z $allow ]]; then
+    warn git 'signing is on but nothing verifies it -- run: dot apply'
+    dim 'git log --show-signature answers "No signature" for your own commits'
+  elif [[ ! -f $allow ]]; then
+    fail git "allowedSignersFile points at a missing file: ${allow/#$HOME/\~}"
+  elif ! grep -qF -- "$signingkey" "$allow"; then
+    warn git "${allow/#$HOME/\~} does not hold the key in config.toml -- run: dot apply"
+  else
+    ok git 'signatures can be verified'
+  fi
+fi

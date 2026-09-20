@@ -32,6 +32,7 @@ What lands in it:
 |---|---|
 | `[user] name`, `email` | always — from `[user]` in `config.toml` |
 | `signingkey`, `[gpg]`, `[gpg "ssh"]`, `[commit] gpgsign` | only when the key is set **and** 1Password's signer is on disk |
+| `gpg.ssh.allowedSignersFile` | also only when the key is a *literal* public key |
 | `[core] editor` | only when VS Code is installed |
 
 Both conditionals exist because the alternative fails silently and late. A
@@ -67,12 +68,51 @@ naming it here is what makes `module_apply`'s one promise true: the signer
 exists by the time `apply.sh` decides whether signing can be switched on. `brew
 bundle` is idempotent, so the duplicate costs nothing.
 
+## Verifying is a second setting
+
+Signing a commit and being able to check one are configured separately, and
+having only the first is a half-configuration git reports in the most
+misleading way available:
+
+```
+$ git log --show-signature -1
+error: gpg.ssh.allowedSignersFile needs to be configured and exist
+...
+No signature
+```
+
+The commit *is* signed. `ssh-keygen` simply has no file saying which key counts
+as yours, so it cannot say anything — and "No signature" is what a repo full of
+signed commits then looks like.
+
+So `apply.sh` writes a second file, `~/.config/git/allowed_signers`, holding
+one line:
+
+```
+you@example.com ssh-ed25519 AAAA...
+```
+
+It is written only when signing itself was switched on — a file naming a key
+nothing can sign with is no use — and only when `signingkey` holds a **literal
+public key**. Git also accepts a *path* there, and a path copied into this file
+produces something `ssh-keygen` refuses to read, which git reports as a failed
+verification rather than as the bad config it is. That case warns and leaves
+signing alone.
+
+`tests/git.bats` signs a payload with a real key and verifies it against the
+generated file, then does it again with a *different* key and requires that to
+fail. An `allowed_signers` that accepts anything is worse than none, and a test
+that only compares strings could not tell the two apart.
+
 ## Removal
 
-`config.local` is *written*, not linked, so the symlink sweep cannot see it.
-`remove.sh` greps for the generated-by header before deleting — `config.local`
-is a conventional name, and a hand-written one may well predate this module. If
-the header is not there, the file is named and left alone.
+Both generated files are *written*, not linked, so the symlink sweep cannot see
+either. `remove.sh` greps for the generated-by header before deleting —
+`config.local` and `allowed_signers` are both conventional names, and a
+hand-written one may well predate this module. If the header is not there, the
+file is named and left alone. One function greps both, so the literal that
+proves ownership exists once; `tests/git.bats` reads it back out of that line
+rather than keeping a third copy.
 
 ## Settings
 

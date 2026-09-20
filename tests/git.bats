@@ -14,6 +14,15 @@ setup() {
   chmod +x "$OPSIGN"
 
   DEST="$HOME/.config/git/config.local"
+  ALLOW="$HOME/.config/git/allowed_signers"
+
+  # Real keypairs, because the allowed_signers test signs and verifies for
+  # real. A made-up "ssh-ed25519 AAAAKEY" can only ever prove that a string
+  # was copied from one file to another, and the format is the whole point.
+  ssh-keygen -q -t ed25519 -C '' -N '' -f "$DOT_TMP/id"
+  ssh-keygen -q -t ed25519 -C '' -N '' -f "$DOT_TMP/other"
+  KEY=$(cut -d' ' -f1,2 <"$DOT_TMP/id.pub")
+  OTHER_KEY=$(cut -d' ' -f1,2 <"$DOT_TMP/other.pub")
 }
 
 teardown() { teardown_sandbox; }
@@ -135,16 +144,117 @@ gitcfg() { git config --file "$DEST" --get "$1"; }
   [ "$(gitcfg core.editor)" = "$code --wait" ]
 }
 
+# --- allowed_signers ---------------------------------------------------------
+#
+# Signing and verifying are two settings, and only the first was ever written.
+# The failure is quiet in the worst way: every commit carries a signature and
+# `git log --show-signature` reports "No signature", so a repo full of signed
+# commits reads as a repo with none.
+
+@test "verify: a real signature verifies against the file apply wrote" {
+  # The round trip, with ssh-keygen doing exactly what git shells out to do.
+  # Anything weaker only proves a string was copied between two files, and the
+  # bug this closes was never about the string -- it was about there being no
+  # file for ssh-keygen to check the key against at all.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+  [ "$status" -eq 0 ]
+  [ -f "$ALLOW" ]
+
+  printf 'a commit object\n' >"$DOT_TMP/payload"
+  ssh-keygen -Y sign -q -f "$DOT_TMP/id" -n git "$DOT_TMP/payload"
+
+  run ssh-keygen -Y verify -f "$ALLOW" -I 'ada@example.com' -n git \
+    -s "$DOT_TMP/payload.sig" <"$DOT_TMP/payload"
+  [ "$status" -eq 0 ]
+}
+
+@test "verify: a signature from another key does NOT verify" {
+  # The guard on the guard. A file ssh-keygen merely parses would pass the
+  # test above even if it named the wrong key, and an allowed_signers that
+  # accepts anything is worse than none.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+
+  printf 'a commit object\n' >"$DOT_TMP/payload"
+  ssh-keygen -Y sign -q -f "$DOT_TMP/other" -n git "$DOT_TMP/payload"
+
+  run ssh-keygen -Y verify -f "$ALLOW" -I 'ada@example.com' -n git \
+    -s "$DOT_TMP/payload.sig" <"$DOT_TMP/payload"
+  [ "$status" -ne 0 ]
+}
+
+@test "verify: the principal is the identity, so the file names one signer" {
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+  [ "$(grep -v '^#' "$ALLOW")" = "ada@example.com $KEY" ]
+}
+
+@test "verify: config.local points git at that file, absolutely" {
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+  [ "$(gitcfg gpg.ssh.allowedSignersFile)" = "$ALLOW" ]
+  # git run from a GUI inherits no shell and expands no ~.
+  [[ $(gitcfg gpg.ssh.allowedSignersFile) == /* ]]
+}
+
+@test "verify: no signer means no signing, and so nothing to verify with" {
+  # The file would name a key nothing can sign with. All of it or none.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply 0 "$DOT_TMP/not-installed"
+  [ ! -e "$ALLOW" ]
+  run gitcfg gpg.ssh.allowedSignersFile
+  [ "$status" -ne 0 ]
+}
+
+@test "verify: a signingkey that is a path is refused, not written out" {
+  # git accepts a path in user.signingkey. An allowed_signers line holding one
+  # is a file ssh-keygen cannot read, which git reports as a verification
+  # failure rather than as the bad config it is.
+  with_config 'Ada' 'ada@example.com' '~/.ssh/id_ed25519.pub'
+  apply
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [ ! -e "$ALLOW" ]
+  # Signing itself still stands: only the verification half is refused.
+  [ "$(gitcfg commit.gpgsign)" = 'true' ]
+  run gitcfg gpg.ssh.allowedSignersFile
+  [ "$status" -ne 0 ]
+}
+
+@test "verify: the key changing in config.toml rewrites the file" {
+  # config.local and allowed_signers must not drift apart: one names a key and
+  # the other decides whose signatures count.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+  rm -f "$DOT_CONFIG"
+  with_config 'Ada' 'ada@example.com' "$OTHER_KEY"
+  apply
+  [ "$(grep -v '^#' "$ALLOW")" = "ada@example.com $OTHER_KEY" ]
+  [ "$(grep -c . "$ALLOW")" -eq 3 ]
+}
+
 # --- dry run ----------------------------------------------------------------
 
-@test "dry run: announces the write and makes none" {
-  with_config 'Ada' 'ada@example.com' 'ssh-ed25519 AAAAKEY'
+@test "dry run: announces both writes and makes neither" {
+  with_config 'Ada' 'ada@example.com' "$KEY"
   local before
   before=$(home_snapshot)
   apply 1
   [ "$status" -eq 0 ]
   [[ $output == *"config.local"* ]]
+  [[ $output == *"allowed_signers"* ]]
   [ "$(home_snapshot)" = "$before" ]
+}
+
+@test "dry run: says the same words as the run it previews" {
+  # The signing decision settles which files get written, so it has to be made
+  # before the preview prints -- a dry run that announces a file the real run
+  # then skips is the one thing --dry-run may not do.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply 1 "$DOT_TMP/not-installed"
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"1Password"* ]]
+  [[ $output != *"allowed_signers"* ]]
 }
 
 # --- remove.sh --------------------------------------------------------------
@@ -156,6 +266,26 @@ gitcfg() { git config --file "$DEST" --get "$1"; }
   remove
   [ "$status" -eq 0 ]
   [ ! -e "$DEST" ]
+}
+
+@test "remove: takes back allowed_signers too, not just config.local" {
+  # Two generated files now, and the sweep sees neither: both are written, not
+  # linked. A second file added to apply.sh and not to remove.sh is a file left
+  # behind that nothing in the repo would ever mention again.
+  with_config 'Ada' 'ada@example.com' "$KEY"
+  apply
+  [ -f "$ALLOW" ]
+  remove
+  [ "$status" -eq 0 ]
+  [ ! -e "$ALLOW" ]
+}
+
+@test "remove: leaves an allowed_signers this repo did not write" {
+  mkdir -p "$(dirname "$ALLOW")"
+  printf 'someone@else.com ssh-ed25519 AAAATHEIRS\n' >"$ALLOW"
+  remove
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [ -f "$ALLOW" ]
 }
 
 @test "remove: leaves a config.local this repo did not write" {
@@ -174,7 +304,10 @@ gitcfg() { git config --file "$DEST" --get "$1"; }
   literal=$(sed -n "s/.*grep -q '\(.*\)' \"\$dest\".*/\1/p" "$DOT_ROOT/modules/git/remove.sh")
   [ -n "$literal" ]
 
-  with_config 'Ada' 'ada@example.com'
+  with_config 'Ada' 'ada@example.com' "$KEY"
   apply
   grep -qF "$literal" "$DEST"
+  # Both generated files carry it, because remove.sh greps both with the one
+  # literal above. A header on only one of them is the other left behind.
+  grep -qF "$literal" "$ALLOW"
 }
