@@ -3,6 +3,9 @@
 # An OS update or a Settings pane reverts a value and says nothing; the only
 # symptom is a Mac that behaves slightly wrong. Reading the same file apply.sh
 # writes from makes the whole table one loop, so nothing is sampled.
+#
+# What this module can only report, and why each of those is not a row in the
+# table, is in modules/macos-defaults/README.md.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
@@ -42,23 +45,11 @@ else
   dim 'put them back with: dot apply'
 fi
 
-# --- what this module can only report ---------------------------------------
-#
-# Three settings that are not `defaults` keys and never will be: each needs
-# root to change and two need a GUI, so apply.sh cannot write them and the
-# table must not pretend otherwise -- data/defaults.tsv is the list of what
-# this module WRITES, and remove.sh derives its domain list from it.
-#
-# They live in this module anyway because it is the one for macOS system state,
-# and a machine with the firewall off would otherwise be something nothing in
-# this repo ever looks at. Reading all three needs no root and no unlock.
-#
-# The paths are inputs, like DOT_BREW_BIN: without them the branch a test needs
-# is the one the machine running it never takes.
+# Inputs, so the branches below are reachable in a test: a domain under
+# /Library/Preferences is not something a test may write.
 fw=${DOT_SOCKETFILTERFW:-/usr/libexec/ApplicationFirewall/socketfilterfw}
 sudo_local=${DOT_SUDO_LOCAL:-/etc/pam.d/sudo_local}
 
-# The one of the three that cannot be fixed after the laptop is gone.
 case $(fdesetup status 2>/dev/null) in
   *'FileVault is On'*) ok filevault 'on' ;;
   *'FileVault is Off'*)
@@ -83,12 +74,10 @@ else
   warn firewall "cannot be checked -- $fw is not there"
 fi
 
-# A taste rather than a baseline, so it has a setting the other two do not:
-# a machine that does not want it must not stay yellow forever.
 if module_setting_bool macos-defaults touch_id_sudo true; then
-  # macOS ships sudo_local.template and no sudo_local, precisely because this
-  # is a hand step. The template's pam_tid line is commented out, so the file
-  # existing proves nothing -- an uncommented auth line is the whole evidence.
+  # macOS ships sudo_local.template with its pam_tid line commented out, so
+  # the file existing proves nothing -- an uncommented auth line is the whole
+  # evidence.
   if [[ -f $sudo_local ]] &&
     grep -qE '^[[:space:]]*auth[[:space:]].*pam_tid\.so' "$sudo_local"; then
     ok touch-id 'unlocks sudo'
@@ -99,21 +88,6 @@ if module_setting_bool macos-defaults touch_id_sudo true; then
   fi
 fi
 
-# --- software update --------------------------------------------------------
-#
-# Reading /Library/Preferences needs no root; writing it does, which is why
-# these are not rows in data/defaults.tsv either.
-#
-# They are split across six keys because macOS does not treat them as one
-# switch, and neither should this: five are the ones you always want, and
-# AutomaticallyInstallMacOSUpdates is the one that installs a whole new major
-# version without being asked. Lumping them together is how a machine ends up
-# a version ahead of where its owner meant to be, with the alternative being
-# to turn security patches off to stop it.
-#
-# Inputs, like the two paths above: a domain under /Library/Preferences is not
-# something a test may write, so without them the branches below are the ones
-# the machine running the tests never takes.
 su=${DOT_SOFTWAREUPDATE_PREFS:-/Library/Preferences/com.apple.SoftwareUpdate}
 commerce=${DOT_COMMERCE_PREFS:-/Library/Preferences/com.apple.commerce}
 
@@ -123,9 +97,7 @@ commerce=${DOT_COMMERCE_PREFS:-/Library/Preferences/com.apple.commerce}
 # `defaults read` exits non-zero for both, and collapsing them loses the
 # three-state rule: every key here ships ON, so an absent one is a machine at
 # its shipped default and must stay green, while a domain this process cannot
-# read is a question that could not be asked and must warn. The plist beside
-# the domain settles which -- a domain that exists but does not answer is the
-# only one of the two that failed.
+# read must warn. The plist beside the domain settles which.
 unset_='<unset>' unreadable='<unreadable>'
 pref() {
   local value
@@ -171,18 +143,10 @@ else
   fi
 fi
 
-# The taste of the six, so it is a setting -- and the default is off, because
-# the failure it prevents is the expensive one. A major version that arrives on
-# its own cannot be undone without erasing the disk, while a minor patch it
-# skips is a button you press when it suits you. Both branches are reachable,
-# so neither is a machine nobody tested.
-#
-# Unwritten is ON here, the same reading `pref` gives the five above and for
-# the same reason: this key ships on too. Only `0` is off, and everything else
-# is a machine macOS may take to the next major version unasked -- including
-# the fresh Mac whose owner never opened the pane, which is the one machine
-# this check exists for and the one an "unwritten means off" would let pass.
-# Unreadable is neither answer, in both branches of the setting.
+# Unwritten is ON here, the same reading `pref` gives the five above: this key
+# ships on too, so only a literal `0` is off. A fresh Mac whose owner never
+# opened the pane is the machine this check exists for, and "unwritten means
+# off" would let exactly that one pass.
 macos_auto=$(flag "$su" AutomaticallyInstallMacOSUpdates)
 if [[ $macos_auto == "$unreadable" ]]; then
   warn updates 'could not be read -- whether macOS installs new versions on its own'
@@ -199,24 +163,14 @@ else
   dim 'the five switches above stay on; only the version bump becomes yours'
 fi
 
-# --- default browser --------------------------------------------------------
-#
-# Installing a browser and being sent to it are two things, and `apps` only
-# does the first: every link on a fresh Mac opens in Safari until someone
-# clicks through a confirmation sheet that no script may click for it.
-#
-# The setting is the escape hatch as well -- an empty one says nothing at all,
-# which is what a machine that wants Safari sets.
+# An empty `browser` setting says nothing at all, which is what a machine that
+# wants Safari sets.
 want_browser=$(module_setting macos-defaults browser 'com.google.chrome')
 if [[ -n $want_browser ]]; then
-  # The LaunchServices database, and the plist that says whether it can be
-  # read at all. A `|| true` here would turn a read that FAILED into "no
-  # handler", which prints as a confident "still opens in Safari" for a
-  # question nobody could ask -- and sends you to a sheet you already answered.
-  #
-  # An absent LSHandlers key is not that: it is a Mac on which nothing has ever
-  # overridden a handler, which IS Safari and IS the fresh machine this check
-  # exists for.
+  # An absent LSHandlers key is a Mac on which nothing has ever overridden a
+  # handler, which IS Safari and IS the fresh machine this check exists for. A
+  # read that FAILED is not that, and a `|| true` here would report the two
+  # alike.
   ls_domain=com.apple.LaunchServices/com.apple.launchservices.secure
   handlers=$(pref "$ls_domain" LSHandlers \
     "$HOME/Library/Preferences/$ls_domain.plist")
@@ -227,12 +181,10 @@ if [[ -n $want_browser ]]; then
   # `role` is cleared at each element of the array -- a bare `{` on its own
   # line, which a nested dict (`KEY = {`) is not. Without that, an https entry
   # carrying no LSHandlerRoleAll of its own would be answered with the previous
-  # entry's handler: a confident wrong name is worse here than none, because
-  # the wrong name reads as a browser you forgot installing.
+  # entry's handler, and a wrong name reads as a browser you forgot installing.
   #
   # Printing an empty `role` and exiting is deliberate: $() strips the newline,
-  # so a scheme with no handler lands in the "still opens in Safari" branch
-  # rather than sending the scan on to some other entry's answer.
+  # so a scheme with no handler lands in the "still opens in Safari" branch.
   if [[ $handlers == "$unreadable" ]]; then
     warn browser 'could not be read -- LaunchServices did not answer'
   else

@@ -4,8 +4,8 @@
 # the SSH agent" is ticked, and the failure never mentions ssh config.
 #
 # Two questions, not one: whether the agent is there, and whether it holds a
-# key. The second is not the first -- a locked vault serves a live socket and
-# no identities, which is a machine that cannot push and reads as healthy.
+# key. A locked vault serves a live socket and no identities, which is a
+# machine that cannot push and reads as healthy.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
@@ -13,8 +13,8 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 # Same literal as IdentityAgent in home/.ssh/config (tests/ssh.bats).
 sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
-# An input, like DOT_BREW_BIN: the no-keys branch is the one a developer
-# machine with an unlocked vault never takes.
+# An input, so the no-keys branch is reachable on a developer machine with an
+# unlocked vault.
 ssh_add=${DOT_SSH_ADD:-ssh-add}
 
 # -S, not -e: an ordinary file at that path is not healthy.
@@ -24,13 +24,9 @@ if [[ ! -S $sock ]]; then
   exit 0
 fi
 
-# A live socket is not a usable agent. A locked vault, or a key the agent was
-# never told to expose, answers exactly like an empty one -- and then every
-# push and every commit signature fails, while this module reported green.
-#
 # Listing is not signing: the agent answers a key list without raising a
-# 1Password approval dialog, which is the whole reason this is allowed in a
-# read-only check. Never `ssh-add -T` or anything that signs.
+# 1Password approval dialog, which is what makes this allowed in a read-only
+# check. Never `ssh-add -T` or anything that signs.
 #
 # ssh-add's three exit codes are three different machines: 0 listed keys, 1 an
 # agent holding none, 2 an agent that could not be reached at all.

@@ -20,13 +20,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/dot.sh"
 # Top level, not a hook: `dot doctor && ...` must survive an orphaned link.
 __DOT_EXIT_WARN=0
 
-# --- The transcript ----------------------------------------------------------
-#
-# Only the verbs that CHANGE the machine: apply, add, remove. A tee makes vi
-# unusable under `config`, and `doctor` runs as the tail of `apply`, where a
-# second transcript would nest. uninstall.sh removes logs/ and must keep
-# agreeing they are ours. One file per run, <timestamp>-<verb>.log, twenty kept;
-# the timestamp leads and is fixed width, so the rotating sort ignores the verb.
+# The transcript belongs to the verbs that CHANGE the machine -- see
+# bin/CLAUDE.md. uninstall.sh removes logs/ and must keep agreeing they are ours.
 __DOT_LOG=''
 
 __transcript_start() {
@@ -39,7 +34,8 @@ __transcript_start() {
   mkdir -p "$DOT_STATE/logs"
 
   # touch BEFORE the tee, so this run is one of the twenty by construction
-  # rather than racing the async redirect.
+  # rather than racing the async redirect. The timestamp leads and is fixed
+  # width, so the rotating sort ignores the verb.
   touch "$__DOT_LOG"
   while IFS= read -r old; do
     rm -f "$old"
@@ -47,14 +43,14 @@ __transcript_start() {
 
   # fd 3/4 and __DOT_TEE_PID are the contract with lib/dot.sh's EXIT trap: it
   # restores them and waits, or bash exits unreaped and the log loses the lines
-  # naming the failure. 2>&1, because a transcript without the warnings is none.
+  # naming the failure.
   #
   # One sed, not a tee: lib/ui.sh settles colour before this redirect exists, so
   # a plain tee wrote every escape into the log. `h` keeps the raw line,
   # __UI_STRIP_SGR strips it, `w` puts the clean copy in the file and `g` brings
-  # the raw one back for the terminal. One process, so the trap's single wait
-  # still drains everything. The expression comes from lib/ui.sh: this file may
-  # not spell out what an escape looks like any more than it may print one.
+  # the raw one back for the terminal. The expression comes from lib/ui.sh:
+  # this file may not spell out what an escape looks like any more than it may
+  # print one.
   exec 3>&1 4>&2
   exec > >(sed -l -e h -e "$__UI_STRIP_SGR" -e "w $__DOT_LOG" -e g) 2>&1
   __DOT_TEE_PID=$!
@@ -99,7 +95,6 @@ usage() {
   printf '\n'
 }
 
-# --- apply -----------------------------------------------------------------
 cmd_apply() {
   # Anything unknown is fatal: `dot apply --dry` must not apply for real.
   while (($#)); do
@@ -196,16 +191,13 @@ cmd_apply() {
   return 0
 }
 
-# --- add / remove ------------------------------------------------------------
-#
-# Five verbs, not three: switching a module OFF had no path at all, since
-# `apply` walks only the enabled list and `uninstall.sh` is all-or-nothing.
-# The only commands that write to an existing config.toml, and they write one
-# array (lib/config.sh) -- one reformatted by hand makes them refuse.
+# add and remove are the only commands that write to an existing config.toml,
+# and they write one array (lib/config.sh) -- one reformatted by hand makes
+# them refuse.
 
 # __module_arg VERB ARGS... -- sets __MODULE_NAME, and DOT_DRY_RUN when asked.
-# It must NOT print its answer: read through `$(...)` the --dry-run export would
-# be lost in the subshell and the verb would go on to act for real.
+# It must NOT print its answer: read through `$(...)` the --dry-run export
+# would be lost in the subshell and the verb would go on to act for real.
 __module_arg() {
   local verb=$1
   shift
@@ -362,7 +354,6 @@ cmd_remove() {
   return 0
 }
 
-# --- config ----------------------------------------------------------------
 cmd_config() {
   case ${1:-} in
     --init)
@@ -384,15 +375,12 @@ cmd_config() {
   ${EDITOR:-vi} "$DOT_CONFIG"
 }
 
-# --- checks ----------------------------------------------------------------
-# Shared by `doctor` and the tail of `apply`. Safe there because contract.bats
-# proves no doctor.sh writes to $HOME.
+# run_checks is shared by `doctor` and the tail of `apply`, and is safe there
+# because contract.bats proves no doctor.sh writes to $HOME.
 #
-# Every group is captured rather than printed straight through: a hook is its
-# own process, so its exit status was all a driver could see, and a report that
-# cannot tell a healthy module from a quiet one has to print all of them. The
-# capture is a redirect in THIS shell, never `$(...)` -- the tallies are shell
-# variables and a subshell would drop them.
+# Every group is captured rather than printed straight through, so a healthy
+# module can collapse to one line. The capture is a redirect in THIS shell,
+# never `$(...)`: the tallies are shell variables and a subshell would drop them.
 __checks_sink=''
 
 # Exported explicitly, not as a `VAR=x cmd` prefix: the hooks are separate
@@ -407,8 +395,8 @@ __check_group() {
   ui_group "$name" "$note" "$__checks_sink"
 }
 
-# The core checks, as a group of their own. Core runs like a module everywhere
-# else in this repo; here it finally reports like one too.
+# Core runs like a module everywhere else in this repo; here it reports like
+# one too.
 __core_checks() {
   # `fail`: this is exactly what will stop the next apply.
   local unknown
@@ -440,9 +428,9 @@ run_checks() {
   done
   rm -f "$__checks_sink"
 
-  # Both of these sit outside every group on purpose: they are about the
-  # machine rather than any one module, and ui_verdict drops its "in X of Y
-  # modules" qualifier rather than blame a module for them.
+  # Both of these sit outside every group: they are about the machine rather
+  # than any one module, and ui_verdict drops its "in X of Y modules"
+  # qualifier rather than blame a module for them.
   __orphan_report
   __unmanaged_report
 }
@@ -505,13 +493,10 @@ __orphan_report() {
   fi
 }
 
-# The orphan scan's mirror image. That one asks what the repo left on the
-# machine; this asks what the machine has that the repo never wrote down --
-# the tools installed in week one that a rebuild silently does without.
-#
-# `info`, not `warn`: hand-installing something is not a defect and never
-# becomes one, and a line that is yellow on every machine forever is the same
-# bug as a summary that is green on a broken one. Nothing here bumps a tally.
+# The orphan scan's mirror image: what the machine has that the repo never
+# wrote down. `info`, not `warn`, and it bumps no tally -- hand-installing
+# something is not a defect, and a line yellow on every machine forever is the
+# same bug as a summary green on a broken one.
 __unmanaged_report() {
   local out line status=0
   out=$(brew_unmanaged) || status=$?
@@ -534,7 +519,6 @@ __unmanaged_report() {
   esac
 }
 
-# --- doctor ----------------------------------------------------------------
 cmd_doctor() {
   while (($#)); do
     case $1 in
@@ -550,10 +534,6 @@ cmd_doctor() {
 
   run_checks 'Checking'
 
-  # A count, now that there is one to give. It used to be refused because a
-  # hook's three problems came back as a single rolled-up exit status, and a
-  # summary may not contradict the lines above it; ui_group reads the hook's
-  # own records, so the number and the lines are the same evidence.
   heading 'Result'
   ui_verdict 'Everything looks right.' module
   if [[ -z ${DOT_VERBOSE:-} ]] && ((DOT_FAILURES + DOT_WARNINGS > 0)); then
@@ -561,7 +541,6 @@ cmd_doctor() {
   fi
 }
 
-# --- dispatch --------------------------------------------------------------
 case "${1:-}" in
   apply)
     shift

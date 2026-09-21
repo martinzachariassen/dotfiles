@@ -37,7 +37,7 @@ fmt_tokens() {
   fi
 }
 
-# Sub-minute collapses to "<1m" so it stops flickering.
+# Sub-minute collapses to "<1m" so the countdown stops flickering.
 fmt_eta() {
   local s=$1
   if ((s < 0)); then s=0; fi

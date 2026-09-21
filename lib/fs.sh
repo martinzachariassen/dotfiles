@@ -115,8 +115,6 @@ fs_link_tree() {
   fi
 }
 
-# --- Removal ----------------------------------------------------------------
-#
 # Two helpers, not one "delete this path": a link is recognised by where it
 # points, a generated file by its header. The guard lives here, not the caller.
 
@@ -236,7 +234,7 @@ fs_repo_links() {
 # claim stays narrow: letting a disabled module claim its files would hide every
 # orphan the wide scan exists to expose. The name is attribution, not a claim --
 # which module SHIPS the path, so the caller can name its remove.sh -- and is
-# empty when none does, where removing the link is the whole fix.
+# empty when none does.
 #
 # The empty field goes LAST, and that is load-bearing: tab is IFS whitespace, so
 # `read -r a b` on "<TAB>path" would skip a leading empty field and put the path

@@ -1,24 +1,13 @@
-# Menu bar apps: casks this module installs that do nothing whatsoever until
-# they are opened once. A launcher nobody launched has no hotkey, and a menu
-# bar monitor that never ran has no menu bar item -- while `brew bundle` and
-# the orphan scan both report a machine in perfect health, because the cask is
-# on disk exactly as asked.
+# Menu bar apps that do nothing whatsoever until opened once, and which every
+# other check in this repo therefore reports as healthy. Why each column is
+# shaped the way it is: modules/apps/README.md.
 #
-# Only apps that are USELESS until running belong here. Chrome, VS Code and
-# Spotify are opened when you want them and are not this module's business.
-#
-# app name (the bundle under /Applications), the Brewfile cask that installs
-# it, the preferences domain macOS creates on first launch, what you lose.
+# app (the bundle under /Applications), the Brewfile cask that installs it,
+# the preferences domain macOS creates on first launch, what you lose.
 # Tab-separated, one app per line.
 #
-# Column 4 completes "installed but never opened -- no ...", so it starts with
-# no article: doctor.sh owns the sentence and this file owns the words, and
-# "no the launcher" is what having both own half of it reads like.
-# tests/apps.bats holds every row to that.
-#
-# Column 2 is checked against Brewfile by tests/contract.bats: a row here is a
-# claim that THIS module installs the app. Dropping the cask silences the row,
-# which is the escape hatch for an app you decided you did not want.
+# Column 4 completes "installed but never opened -- no ...", so it carries no
+# article of its own. Column 2 is checked against Brewfile by contract.bats.
 
 Raycast	raycast	com.raycast.macos	launcher, and no hotkey to reach it
 Thaw	thaw	com.stonerl.Thaw	menu bar manager

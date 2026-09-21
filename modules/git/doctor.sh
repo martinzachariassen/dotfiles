@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # config.local is generated, so fs_check_tree cannot see it, and apply.sh
-# degrades silently by design: with a signingkey set but 1Password not installed
-# yet it writes no signing block and warns once. That warning scrolls past, and
-# every commit is then unsigned with nothing to notice.
+# degrades silently by design: with a signingkey set but 1Password not
+# installed yet it writes no signing block and warns once. That warning scrolls
+# past, and every commit is then unsigned with nothing to notice.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
@@ -12,13 +12,11 @@ dest="$HOME/.config/git/config.local"
 signingkey=$(module_setting git signingkey '')
 
 # names_key FILE KEY -- is KEY an ACTIVE record in an allowed_signers file?
-#
-# `grep -F` would also match the key inside a comment or a line ssh-keygen
-# cannot parse, and git ignores both -- reporting verification as healthy
-# against a record nothing will ever use. A line is
-# "<principals> [options] <keytype> <base64> [comment]", so the keytype and its
-# base64 are matched as an adjacent pair of fields anywhere after the
-# principals, which is the only part of a record the key itself decides.
+# `grep -F` would also match the key inside a comment or an unparseable line,
+# which git ignores -- reporting verification as healthy against a record
+# nothing will ever use. A line is "<principals> [options] <keytype> <base64>
+# [comment]", so the keytype and its base64 are matched as an adjacent pair of
+# fields anywhere after the principals.
 names_key() {
   local rest=${2#* }
   awk -v t="${2%% *}" -v b="${rest%% *}" '
@@ -54,17 +52,15 @@ if ! git config --file "$dest" --list >/dev/null 2>&1; then
   fail git "${dest/#$HOME/\~} does not parse -- delete it and run: dot apply"
 fi
 
-# Verification fails the way a missing file usually does not: git answers "No
-# signature" for a commit that carries one, so the only symptom is a repo that
-# looks unsigned. Asking git for the path rather than assuming it means a
-# hand-edited config.local is checked as it actually reads.
+# Asking git for the path rather than assuming it means a hand-edited
+# config.local is checked as it actually reads.
 allow=$(git config --file "$dest" --get gpg.ssh.allowedSignersFile 2>/dev/null || true)
 if [[ -n $signingkey ]] && grep -q '^\[commit\]' "$dest"; then
   if [[ -z $allow ]]; then
-    # The same shape test apply.sh makes, held against it by tests/git.bats.
-    # A signingkey holding a PATH is a machine `dot apply` deliberately will
-    # not fix, so sending it there is a yellow line that stays yellow with a
-    # command that changes nothing. Name the cause apply names instead.
+    # The same shape test apply.sh makes, held against it by tests/git.bats. A
+    # signingkey holding a PATH is a machine `dot apply` deliberately will not
+    # fix, so sending it there is a yellow line behind a command that changes
+    # nothing. Name the cause apply names instead.
     if [[ $signingkey == ssh-*' '* || $signingkey == sk-*' '* ]]; then
       warn git 'signing is on but nothing verifies it -- run: dot apply'
       dim 'git log --show-signature answers "No signature" for your own commits'
@@ -79,8 +75,7 @@ if [[ -n $signingkey ]] && grep -q '^\[commit\]' "$dest"; then
       warn git "${allow/#$HOME/\~} does not hold the key in config.toml -- run: dot apply"
     else
       # apply.sh leaves a file it did not write alone, so "run: dot apply" here
-      # would be a yellow line that stays yellow with a command that changes
-      # nothing -- the same trap the path-shaped signingkey sets above.
+      # would be the same yellow-forever trap as the path-shaped signingkey.
       warn git "${allow/#$HOME/\~} does not name your key, and this repo did not write it"
       dim 'add the key in config.toml to it, or move it aside and run: dot apply'
     fi

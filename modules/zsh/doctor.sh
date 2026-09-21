@@ -9,25 +9,18 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 
 zdotdir="$DOT_CONFIG_HOME/zsh"
 
-# --- the shell that reads any of it ------------------------------------------
+# Everything below asks what zsh will read, and none of it means anything if
+# zsh is not the shell that starts.
 #
-# Everything below asks what zsh will read. None of it means anything if zsh
-# is not the shell that starts, and this module has no way to notice: ~/.zshenv
-# is a link, the layout under ZDOTDIR is correct, and every check here passes
-# on a machine where not one line of it is ever sourced.
-#
-# `dscl`, not $SHELL. $SHELL is whatever the RUNNING shell was told, so a
-# `zsh` typed into a bash login window answers for the window rather than for
-# the account -- the one case worth catching, answered wrongly. The directory
-# record is what a login reads.
-#
-# An input like DOT_BREW_BIN: the branch that matters is the one a Mac set up
-# since Catalina never takes.
+# `dscl`, not $SHELL: $SHELL is whatever the RUNNING shell was told, so a `zsh`
+# typed into a bash login window answers for the window rather than for the
+# account -- the one case worth catching, answered wrongly. An input, because
+# the branch that matters is the one a Mac set up since Catalina never takes.
 dscl_bin=${DOT_DSCL_BIN:-/usr/bin/dscl}
 if [[ -x $dscl_bin ]]; then
   # `if`, not a pipeline into sed: under pipefail a dscl that fails takes the
   # whole assignment down, and the ERR trap turns "could not be read" into a
-  # crash. Never `|| true` -- that would lose the distinction it is testing.
+  # crash. Never `|| true` -- that loses the distinction being tested.
   if record=$("$dscl_bin" . -read "/Users/$(id -un)" UserShell 2>/dev/null); then
     login_shell=$(sed -n 's/^UserShell: //p' <<<"$record")
   else
@@ -43,8 +36,7 @@ if [[ -x $dscl_bin ]]; then
       ;;
   esac
 else
-  # Same rule as the firewall check in macos-defaults: a question that could
-  # not be asked is not a healthy answer.
+  # A question that could not be asked is not a healthy answer.
   warn zsh "login shell cannot be checked -- $dscl_bin is not there"
 fi
 

@@ -1,22 +1,18 @@
 #!/usr/bin/env bash
 #
-# The gap every other check in this repo steps over: `brew bundle` is green the
-# moment a cask lands on disk, and for a menu bar app that is barely half of
-# being installed. Raycast with no hotkey bound is a fresh Mac's most confusing
-# state -- the app is there, the Brewfile is satisfied, nothing is wrong, and
-# the key you press does nothing.
+# `brew bundle` is green the moment a cask lands on disk, and for a menu bar
+# app that is half an installation: Raycast with no hotkey bound is a fresh
+# Mac's most confusing state. Nothing else in the repo can see it.
 #
-# First launch is the evidence, not "is it running now": a machine where you
-# quit Stats for an hour must not go yellow, and once macOS has written the
-# preferences domain it stays written. Weaker than asking about the login item,
-# which is the thing actually wanted -- but that lives in a database only root
-# reads, and a check that needs sudo is a check nobody runs.
+# First launch is the evidence, not "is it running now": macOS writes the
+# preferences domain the first time an app opens and never takes it back. See
+# modules/apps/README.md.
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-# An input, like DOT_BREW_BIN: without it the "not installed" branch is the one
-# the machine running the tests never takes.
+# An input, so the "not installed" branch is reachable on a machine that has
+# the apps.
 apps_dir=${DOT_APPS_DIR:-/Applications}
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/launch.tsv"
 
@@ -30,9 +26,8 @@ while IFS=$'\t' read -r app _ domain lost; do
   if [[ -e $HOME/Library/Preferences/$domain.plist ]]; then
     ok "$app" 'opened at least once'
   else
-    # Column 4 completes "no ...", so it carries no article of its own.
-    # tests/apps.bats holds the table to that: the sentence is built here and
-    # the words are there, and only one of the two places can own the grammar.
+    # Column 4 completes "no ...", so it carries no article of its own;
+    # tests/apps.bats holds the table to that.
     warn "$app" "installed but never opened -- no $lost"
     dim "open -a $app, then turn on its own \"launch at login\""
   fi

@@ -12,5 +12,5 @@
   "spinnerTipsEnabled": false,
   "theme": "custom:catppuccin-latte",
   "inputNeededNotifEnabled": false,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": false
 }

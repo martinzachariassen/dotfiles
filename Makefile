@@ -1,5 +1,6 @@
-# Every check this repo runs. CI, README and CLAUDE.md all say `make check`;
-# the commands live here and nowhere else. Logic belongs in lib/, not here.
+# Every check this repo runs. The commands live here and nowhere else, so a
+# workflow cannot grow a second copy free to disagree; contract.bats holds
+# that. Logic belongs in lib/, not here.
 #
 #   make check       lint, fmt-check, test (what CI runs)
 #   make fmt         rewrite files to the project's formatting
@@ -31,9 +32,8 @@ test:
 	@echo "==> bats"
 	@bats tests/
 
-# Deliberately NOT part of `check`: it needs the network and its verdict changes
-# when Homebrew changes, so it must not fail a pull request about something
-# else. CI runs it on a schedule instead.
+# Deliberately NOT part of `check`: it needs the network and its verdict
+# changes when Homebrew does. See docs/development.md.
 brew-audit:
 	@echo "==> brew audit"
 	@DOT_BREW_AUDIT=1 bats tests/brewfiles.bats

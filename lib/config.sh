@@ -9,8 +9,7 @@
 cfg_exists() { [[ -f $DOT_CONFIG ]]; }
 
 # Bump only when the file's shape changes enough that an older `dot` would
-# misread a newer config, or the reverse. Checked, not just written: a version
-# marker that guarantees nothing is worse than none, because it looks like one.
+# misread a newer config, or the reverse.
 DOT_CONFIG_SCHEMA=1
 
 # Only "" and '' need undoing. YAML's other escapes are deliberately absent: no
@@ -60,9 +59,6 @@ toml_list() {
 cfg_get() { toml_get "$DOT_CONFIG" "$1" "${2:-}"; }
 cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 
-# Set when taplo ran and did not answer, so doctor can say so. Never a problem
-# line: a checker that crashed is not evidence about the file, and refusing to
-# apply over it would make a broken taplo lock the machine out of its config.
 DOT_CFG_UNCHECKED=0
 
 # Only meaningful after cfg_parse_problems has run in this process.
@@ -72,7 +68,7 @@ cfg_unchecked() { ((DOT_CFG_UNCHECKED)); }
 # 3 not installed yet. taplo documents 1 for a file with syntax errors, so
 # anything else is taplo itself falling over (a rust panic exits 101) -- and
 # that must never render as "your config is not valid TOML". Not installed is
-# its own answer because it is the normal state before phase 1, not a fault.
+# its own answer because it is the normal state before phase 1.
 __cfg_taplo() {
   local taplo=${DOT_TAPLO_BIN:-taplo} status=0
   command -v "$taplo" >/dev/null 2>&1 || return 3
@@ -95,9 +91,6 @@ cfg_parse_problems() {
   local -A seen=()
   local name status=0
 
-  # An INPUT, like DOT_BREW_BIN: without one the "not installed yet" branch is
-  # unreachable on any machine that has taplo, and that is the branch the two
-  # heuristics below exist for.
   DOT_CFG_UNCHECKED=0
   __cfg_taplo || status=$?
   case $status in
@@ -113,23 +106,22 @@ cfg_parse_problems() {
     seen[$name]=1
   done < <(dasel -i toml -o yaml 'keys()' <"$DOT_CONFIG" 2>/dev/null | sed 's/^- //')
 
-  # 1. Every declared [table] must be visible to the parser. Names are only
-  #    compared, never turned into a selector (dasel reads `-` as subtraction).
+  # Names are only compared, never turned into a selector: dasel reads `-` as
+  # subtraction.
   while IFS= read -r name; do
     if [[ -z ${seen[$name]:-} ]]; then
       printf 'declares [%s] but the parser cannot see it -- syntax error above that line\n' "$name"
     fi
   done < <(sed -n 's/^\[\[*\([A-Za-z0-9_-]\{1,\}\)[].].*/\1/p' "$DOT_CONFIG" | sort -u)
 
-  # 2. modules.enabled must be READABLE -- `enabled = []` is legal; a missing
-  #    key is a truncated file.
+  # `enabled = []` is legal; a key that cannot be read at all is a truncated
+  # file.
   if [[ -n ${seen[modules]:-} ]] &&
     ! dasel -i toml -o yaml 'modules.enabled' <"$DOT_CONFIG" >/dev/null 2>&1; then
     printf 'has a [modules] table with no readable `enabled` list\n'
   fi
 
-  # 3. The schema must be one this checkout speaks. Reported rather than
-  #    migrated: config.toml is the user's file and nothing here rewrites it.
+  # Reported rather than migrated: config.toml is the user's file.
   local schema
   schema=$(toml_get "$DOT_CONFIG" 'schema' '')
   if [[ -z $schema ]]; then
@@ -205,16 +197,13 @@ FOOTER
   ok config "wrote ${DOT_CONFIG/#$HOME/\~}"
 }
 
-# --- Editing `enabled` ------------------------------------------------------
-#
-# The one exception to "config.toml is written once", and the narrowest one
-# available: a single array, a line at a time, every other byte copied through.
-# Same trade claude-code makes with ~/.claude/settings.json. Hand-editing stays
-# supported, so an array that lost the generated shape makes these REFUSE.
+# Editing `enabled` is the one exception to "config.toml is written once", and
+# the narrowest one available: a single array, a line at a time, every other
+# byte copied through. Hand-editing stays supported, so an array that lost the
+# generated shape makes these REFUSE. See lib/CLAUDE.md.
 
-# __cfg_enabled_span -- "first last" line indices of the array body: the line
-# after `enabled = [` and the line holding `]`. Fails when the array was
-# reformatted by hand, and the caller must then say so rather than guess.
+# __cfg_enabled_span -- "first last" line indices of the array body. Fails when
+# the array was reformatted by hand, and the caller must then say so.
 __cfg_enabled_span() {
   local -a lines
   local i n start=0 end=0
@@ -248,8 +237,8 @@ cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
 
 # __cfg_write_lines -- give the user's file back the way it came. mktemp is 0600
 # and `mv` carries that onto the destination, so a config kept at 0644 would come
-# back private (claude-code's hooks guard the same way). Validated before the
-# swap: after `mv` there is nothing to roll back to.
+# back private. Validated before the swap: after `mv` there is nothing to roll
+# back to.
 __cfg_write_lines() {
   local tmp taplo=${DOT_TAPLO_BIN:-taplo}
   tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")

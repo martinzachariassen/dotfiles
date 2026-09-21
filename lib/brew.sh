@@ -2,10 +2,9 @@
 #
 # Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
-# The fallback path is an INPUT, like DOT_CODE_BIN in modules/git: without one,
-# "Homebrew could not be loaded" is unreachable on any machine that has it --
-# the branch where containers/remove.sh cannot prove a link is ours. install.sh
-# keeps its own copy and its own name for it: it shares nothing, including this.
+# The fallback path is an input, so "Homebrew could not be loaded" is reachable
+# on a machine that has it. install.sh keeps its own copy and its own name for
+# it: it shares nothing, including this.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
@@ -16,13 +15,12 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is not
-# installed. Returns 0 satisfied, 1 missing, 2 the check itself could not run.
+# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is
+# not installed. Returns 0 satisfied, 1 missing, 2 the check could not run.
 #
 # 2 is distinct on purpose: a check that could not run must never read as "all
-# installed". `brew bundle check` rather than parsing the Brewfile here -- it is
-# the only reader that agrees with `brew bundle` about what installed means.
-# HOMEBREW_NO_AUTO_UPDATE because a check may not mutate the machine.
+# installed". `brew bundle check` rather than parsing the Brewfile here -- it
+# is the only reader that agrees with `brew bundle` about what installed means.
 brew_missing() {
   local file=$1 out status=0
   [[ -f $file ]] || return 0
@@ -57,8 +55,8 @@ brew_bundle() {
   fi
 
   # --no-upgrade: apply installs what is missing; upgrading is `brew upgrade`.
-  # Quoted, not raw: brew's own hundreds of lines stay visible as they stream,
-  # but at the weight of a footnote. The status comes back through PIPESTATUS.
+  # Quoted, so brew's hundreds of lines stay visible as they stream but at the
+  # weight of a footnote. The status comes back through PIPESTATUS.
   brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
   if ((PIPESTATUS[0] == 0)); then return 0; fi
 
@@ -104,26 +102,17 @@ brew_check() {
   esac
 }
 
-# brew_unmanaged -- "<Formula|Cask> <name>" per package this machine has that no
-# Brewfile in the repo names. The same three answers as brew_missing, and 2 is
-# distinct for the same reason: a check that could not run must never read as
-# "everything is accounted for".
+# brew_unmanaged -- "<Formula|Cask> <name>" per package this machine has that
+# no Brewfile in the repo names, with the same three answers as brew_missing.
+# The one check that looks the other way: what would the NEXT machine not get?
+# See docs/architecture.md.
 #
-# Every check above this one asks whether the repo made it onto the machine.
-# This is the only one that looks the other way, and it answers a different
-# question: what would the NEXT machine not get? A tool installed in week one
-# and never written down is invisible until the rebuild that does not have it.
-#
-# EVERY Brewfile, not just the enabled ones. `dot add work-apps` still brings
-# back what a disabled module names, so that package is not lost and listing it
-# would mean a machine with one module switched off reports its whole Brewfile
-# here. Only what no module at all names is a package that exists nowhere but
-# on this disk.
+# EVERY Brewfile, not just the enabled ones: `dot add work-apps` still brings
+# back what a disabled module names, so listing those would make a machine with
+# one module switched off report that module's whole Brewfile.
 #
 # `leaves --installed-on-request` is what "by hand" means to brew: it drops
-# dependencies, so a tool is named and its tree is not. A formula that LATER
-# becomes something else's dependency falls out of that list -- brew leaves'
-# own blind spot, and the price of not reading the install receipt of every keg.
+# dependencies, so a tool is named and its tree is not.
 brew_unmanaged() {
   command -v brew >/dev/null 2>&1 || return 2
 
@@ -132,9 +121,7 @@ brew_unmanaged() {
   #
   # Two lists, and never one. `brew "docker"` and `cask "docker"` are different
   # packages that happen to share a word, so a single set would let a Brewfile
-  # naming either of them vouch for a hand-installed other -- silence in the
-  # one place this check exists to break, and silence that gets likelier the
-  # more the repo installs.
+  # naming either of them vouch for a hand-installed other.
   local files named_brew named_cask formulae casks out
   files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
   named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)

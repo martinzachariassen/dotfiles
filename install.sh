@@ -9,9 +9,9 @@ set -euo pipefail
 REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-# An INPUT, like lib/brew.sh's DOT_BREW_BIN: without one, step 2's "not
-# installed yet" branch is unreachable on every machine anyone could test from.
-# Its own name and its own default; install.sh still shares nothing.
+# An input, so step 2's "not installed yet" branch is reachable on a machine
+# that has Homebrew. Its own name and its own default: install.sh shares
+# nothing, including this.
 BREW_PREFIX="${DOTFILES_BREW_PREFIX:-/opt/homebrew}"
 
 echo "==> dotfiles bootstrap"
@@ -25,7 +25,6 @@ step() {
   printf '==> [%s/%s] %s\n' "$1" "$TOTAL_STEPS" "$2"
 }
 
-# --- Guards -----------------------------------------------------------------
 [ "$(uname -s)" = "Darwin" ] || {
   echo "This is macOS only." >&2
   exit 1
@@ -58,7 +57,6 @@ if macos=$(sw_vers -productVersion 2>/dev/null); then
   esac
 fi
 
-# --- 1. Xcode Command Line Tools --------------------------------------------
 # The GUI installer is asynchronous: trigger it, then poll.
 if xcode-select -p >/dev/null 2>&1; then
   step 1 "Xcode Command Line Tools already installed"
@@ -82,7 +80,6 @@ else
   echo
 fi
 
-# --- 2. Homebrew ------------------------------------------------------------
 if [ -x "$BREW_PREFIX/bin/brew" ]; then
   step 2 "Homebrew already installed"
   eval "$("$BREW_PREFIX/bin/brew" shellenv)"
@@ -108,7 +105,6 @@ else
 fi
 echo "    Homebrew at $(brew --prefix)"
 
-# --- 3. bash 5 ---------------------------------------------------------------
 # One of five places that must agree on bash 5 (core/Brewfile, bin/dot,
 # uninstall.sh, lib/dot.sh). Here because step 5 needs it before core/Brewfile
 # runs; tests/contract.bats holds the five together.
@@ -122,7 +118,6 @@ else
   HOMEBREW_NO_ASK=1 brew install bash
 fi
 
-# --- 4. The repo ------------------------------------------------------------
 if [ -d "$REPO_DIR/.git" ]; then
   step 4 "Updating existing checkout"
 
@@ -154,7 +149,6 @@ else
   git clone "$REPO_URL" "$REPO_DIR"
 fi
 
-# --- 5. Hand off ------------------------------------------------------------
 step 5 "Handing off to dot apply"
 echo "    It installs the core packages, asks what you want on this machine,"
 echo "    then links your files. It writes a log and tells you where."

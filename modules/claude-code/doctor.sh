@@ -36,25 +36,20 @@ else
   fi
 fi
 
-# --- sign-in ----------------------------------------------------------------
-#
 # Every key above is merged whether or not Claude Code can reach Anthropic, so
 # a machine this module reports as perfect is still one run away from a login
 # prompt. Nothing under ~/.claude answers it: the token is a login keychain
-# item, which is also why no file check could have caught this.
+# item.
 #
-# Attributes only, never `-w`. Reading the secret is what raises a keychain
+# Attributes only, never `-w`. Reading the secret raises a keychain
 # authorisation dialog, and a read-only check may not block on a human. The
-# service name is the fragile half -- Anthropic owns it, and it is a string in
-# someone else's product -- so it is named in the warning rather than only in
-# this comment, and `auth_check = false` is the way out on the day it changes.
+# service name is Anthropic's, so it is named in the warning rather than only
+# here, and `auth_check = false` is the way out on the day it changes.
 keychain=${DOT_CLAUDE_KEYCHAIN:-Claude Code-credentials}
 
-# Signing in is one of several ways to authenticate, and every one of the
-# others is a machine that works. A check that knew only the login flow would
-# warn forever at one pointed at Bedrock, at Vertex or at a gateway -- which
-# says exactly as little as a line that is green on a broken machine. The env
-# vars are asked first because Claude Code itself prefers them to the keychain.
+# Signing in is one of several ways to authenticate, and every other one is a
+# machine that works. The env vars are asked first because Claude Code itself
+# prefers them to the keychain.
 if module_setting_bool claude-code auth_check true; then
   if [[ -n ${ANTHROPIC_API_KEY:-} ]]; then
     ok auth 'ANTHROPIC_API_KEY is set'

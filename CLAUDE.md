@@ -129,22 +129,33 @@ deliberately. That friction is the point.
 
 ## Comments
 
-The bar is high and the default is **no comment**. Code that needs prose to be
-readable should be rewritten instead. Three things earn one:
+**The default is no comment.** A comment is a second copy of the truth, and the
+copy is the one that goes stale when the code under it changes. Code that needs
+prose to be readable gets rewritten instead -- a clearer name, a smaller
+function, an early return -- and the prose deleted with it.
 
-1. A landmine that looks fine.
-2. An invariant a future edit would break -- name the other place that must
-   agree.
-3. A road not taken.
+Two things still earn one, and nothing else does:
 
-One to three lines, and never more than a short paragraph at the top of a file.
-Explain **why this decision**, never what bash does.
+1. **A landmine that looks fine.** Code that is right for a reason the next
+   reader would undo.
+2. **An invariant that spans files.** Name the other place that must agree --
+   and only where `contract.bats` holds the two together, or the comment is
+   decoration.
 
-Cut on sight:
+One line where one will do, three at the outside, and never a paragraph. Say
+**why this decision**, never what bash does.
+
+Delete on sight, in code that already exists as much as in new code:
 
 - **History.** No "used to", "the old version did", "once", "was found by".
   Git has it. A rule stands on its reason, not on the bug that produced it.
 - **Restating the code.** A comment that paraphrases the line under it.
 - **Section banners** that only name what is obviously below.
+- **A second copy of `docs/` or a `CLAUDE.md`.** The reasoning lives in one of
+  those; a comment restating it is the copy that stops agreeing first. Link
+  rather than repeat, or say nothing.
 - **A promise no test keeps.** If a comment says two files must agree, either
   `contract.bats` holds them together or the comment is decoration.
+
+`tests/` is the one exception: there the bug a guard exists for **is** the
+specification, and [`tests/CLAUDE.md`](tests/CLAUDE.md) says so.

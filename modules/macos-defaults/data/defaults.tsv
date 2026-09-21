@@ -1,10 +1,10 @@
-# The macOS preferences this module writes: domain, key, defaults type,
-# value, why. Tab-separated, one write per line.
+# The macOS preferences this module writes: domain, key, defaults type, value,
+# why. Tab-separated, one write per line.
 #
-# Three readers, one truth: apply.sh writes every row, doctor.sh compares
-# every row, remove.sh derives the domain list it warns about from column 1.
-# A value that needs a config setting or validation is NOT here -- it stays
-# in apply.sh, where it can be refused.
+# Three readers, one truth: apply.sh writes every row, doctor.sh compares every
+# row, remove.sh derives from column 1 the domain list it warns about. A value
+# that needs a config setting or validation is NOT here -- it stays in
+# apply.sh, where it can be refused.
 
 # --- Dock ---
 com.apple.dock	autohide-delay	float	0	no reveal wait

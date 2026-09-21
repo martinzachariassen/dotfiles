@@ -24,13 +24,13 @@ alphabetically and cannot depend on each other.
 ## Two shapes, one contract
 
 - **Tool modules** manage a tool's config: `home/`, hooks, or both.
-- **Package sets** are a Brewfile and nothing else (`apps`, `work-apps`,
+- **Package sets** are a Brewfile and nothing else (`work-apps`,
   `dotfiles-dev`). Their `description` starts with `Packages:`.
 
 The split is a reading aid, not a flag the driver knows about, so it is only
-true while the directory says so. `dev-cli` was listed as a package set until
-it grew a `home/` and three hooks; a `Packages:` description on a module that
-links a file is a label contradicting the listing next to it.
+true while the directory says so. A module that grows a `home/` or a hook has
+crossed the line, and the honest move is to drop the `Packages:` label rather
+than keep a description that contradicts the listing next to it.
 
 **A module that owns a tool's config owns its Brewfile line.** Repeating a
 `brew` line across modules is fine (`brew bundle` is idempotent) and is the only

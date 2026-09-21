@@ -33,7 +33,7 @@ reports the ones that never were:
     open -a Raycast, then turn on its own "launch at login"
 ```
 
-Three rules keep it from becoming a permanently yellow line:
+Four rules keep it from becoming a permanently yellow line:
 
 - **Only apps that do nothing until running.** Chrome and VS Code are opened
   when you want them; they are not listed.

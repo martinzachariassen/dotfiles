@@ -11,7 +11,7 @@ data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
 
 # Both guards come before $want, the first line that runs jq: uninstall.sh
 # calls every remove.sh, enabled or not, and jq comes from this module's own
-# Brewfile -- computing $want first made the whole uninstall unrunnable.
+# Brewfile.
 [[ -f $dest ]] || exit 0
 command -v jq >/dev/null 2>&1 || {
   warn 'left alone' "${dest/#$HOME/\~} -- jq is not installed"
@@ -34,13 +34,11 @@ fi
 
 # Must match doctor.sh (tests/contract.bats). objs() prunes only the objects
 # this module itself emptied -- deepest first, so a parent sees its child gone.
-# chmod: mktemp is 0600 and `mv` carries that onto the destination, so a
-# settings.json the user kept at 0644 came back private. apply.sh does the same.
+# chmod: mktemp is 0600 and `mv` carries that onto the destination.
 tmp="$(mktemp "${dest}.XXXXXX")"
 chmod "$(stat -f '%Lp' "$dest")" "$tmp"
 
-# `if`, never `jq ... && mv`: set -e ignores a non-final member of an && list,
-# so a jq that died mid-rewrite printed success, exited 0 and left the temp file.
+# `if`, never `jq ... && mv`: set -e ignores a non-final member of an && list.
 if jq --argjson want "$want" '
   def leaves($p): to_entries[] | ($p + [.key]) as $q | if (.value|type) == "object" then (.value|leaves($q)) else $q end;
   def objs($p):   to_entries[] | ($p + [.key]) as $q | if (.value|type) == "object" then $q, (.value|objs($q)) else empty end;

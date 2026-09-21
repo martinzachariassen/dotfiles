@@ -81,7 +81,7 @@ Sourced, never executed. **7 files, no subdirectories.**
 - **`ui.sh` is the only file that emits colour or a glyph, and the only one that
   decides where a column starts.** `contract.bats` holds both. A printer takes
   `LABEL MESSAGE`, or `MESSAGE` alone; a call site that pads its own label is
-  the drift this replaced.
+  a second owner of the width.
 - **Colour is settled when the library is sourced**, which is the last moment
   stdout is still the terminal. `bin/dot`'s transcript strips on the way into
   the file instead, with one `sed` doing both writes -- a plain `tee` put every
@@ -91,7 +91,7 @@ Sourced, never executed. **7 files, no subdirectories.**
   A locale that does not say UTF-8 gets one-column ASCII glyphs, so the label
   column starts in the same place either way.
 - **Records are what let a report collapse.** A hook is a separate process, so
-  its exit status used to be all a driver could see. With `DOT_UI_RECORDS` the
+  its exit status is otherwise all a driver can see. With `DOT_UI_RECORDS` the
   printers emit `sev/label/message` instead of a rendered line, the driver
   captures the stream, and `ui_group` renders one green line for a module that
   reported nothing wrong. Anything in that stream **without** the marker is
@@ -102,8 +102,8 @@ Sourced, never executed. **7 files, no subdirectories.**
   however many findings the hook recorded. So `fold_status` brackets its child
   with `foldopen`/`foldshut` records carrying what it counted, and `ui_group`
   adds that child's findings and takes the roll-up back **when that same child
-  named the problem** -- never because something else in the group failed, which
-  used to eat the only line naming a hook that died silently.
+  named the problem** -- never because something else in the group failed,
+  which would eat the only line naming a hook that died silently.
 - **The verdict's "in X of Y modules" is earned, not assumed.** It is appended
   only when `DOT_PROBLEMS` accounts for every counted finding; orphan links and
   anything `apply`/`remove` prints live outside all groups.
