@@ -72,6 +72,54 @@ remove then cannot take its keys back out of.
 - **`if`, never `jq … && mv`.** `set -e` ignores a non-final member of an `&&`
   list, so a `jq` that died mid-merge printed the success line and exited `0`.
 
+## The one thing no key can settle
+
+Every managed key is merged whether or not Claude Code can reach Anthropic, so
+a machine this module reports as perfect is still one `claude` run away from a
+login prompt. `doctor.sh` says so instead, and names `claude auth login`.
+
+The token is not a file. It is a **login keychain item**, which is why no
+amount of comparing `~/.claude/settings.json` could have caught it — and why
+the check reads item *attributes* and never `security find-generic-password
+-w`. Decrypting the secret is what raises a keychain authorisation dialog, and
+a read-only check may not block on a human.
+
+**Logging in is only one of the ways.** Every one of these is a machine that
+works, and a check that knew only the login flow would warn forever at each of
+them — which says exactly as little as a line that is green on a broken
+machine. They are asked before the keychain, because Claude Code prefers them
+to it:
+
+| | |
+|---|---|
+| `ANTHROPIC_API_KEY` | a key instead of an account |
+| `ANTHROPIC_AUTH_TOKEN` | a bearer token, usually a gateway in front of the API |
+| `CLAUDE_CODE_USE_BEDROCK` | AWS carries the credentials |
+| `CLAUDE_CODE_USE_VERTEX` | GCP carries them |
+
+The service name belongs to Anthropic, not to this repo, so it is the fragile
+half — and the warning names it, rather than leaving a machine where it changed
+warning forever with nothing on screen to say why. `DOT_CLAUDE_KEYCHAIN` is the
+input that follows it: a machine where the name changed keeps its check instead
+of waiting for this repo, and `tests/claude-code.bats` holds the override to
+reaching `security` itself and not only the message.
+
+## Settings
+
+| Key | Default | Notes |
+|---|---|---|
+| `auth_check` | `true` | not written at all — only whether the check above speaks |
+
+```toml
+[settings.claude-code]
+auth_check = true
+```
+
+The last resort behind the table above: a route nobody here thought of, or the
+day Anthropic renames the keychain item. Everything this repo reports and
+cannot fix has one — `touch_id_sudo` and `browser` are the same shape — because
+a permanently yellow line is a line nobody reads.
+
 ## Managed keys
 
 The current set lives in [`data/settings.json`](data/settings.json): the status

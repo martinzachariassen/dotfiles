@@ -34,13 +34,15 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
 - **Runs per-module hooks** for what a symlink cannot do: macOS `defaults`, a
   generated git include, a `jq` merge into `~/.claude/settings.json`.
 - **Reports drift** with `dot doctor`, which changes nothing. A module with
-  nothing wrong is one line; one with something wrong expands to say what.
+  nothing wrong is one line; one with something wrong expands to say what. It
+  also looks the other way, and names the packages installed by hand that no
+  `Brewfile` would put on the next machine.
 - **Takes it all back** with [`uninstall.sh`](docs/uninstall.md).
 
 ```
 ── Checking ─────────────────────────────────────────────── core + 9 modules
   ✓ core           the repo, the shim, the config
-  ✓ apps           Packages: GUI apps and fonts, installed as Homebrew casks
+  ✓ apps           GUI apps and fonts as casks, plus an opened-once check
   ✓ claude-code    Claude Code CLI and its status line
   ✓ cmux           cmux terminal config -- Option key stays native macOS input
   ✓ containers     Docker via colima (a Linux VM, no Docker Desktop)
@@ -50,6 +52,12 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
   ✓ ssh            SSH client config; keys come from the 1Password agent
   ✓ zsh            zsh with XDG layout, aliases, PATH and prompt
   ✓ orphans        none
+  → unmanaged      4 packages no Brewfile names
+        Formula fd
+        Formula goreleaser
+        Formula poppler
+        Cask curseforge
+        add one to a module Brewfile and the next machine gets it too.
 
 ── Result ──────────────────────────────────────────────────────────────────
   ✓ Everything looks right.
@@ -111,19 +119,19 @@ a module is never half-enabled.
 |---|---|
 | `git` | [config, aliases, and a generated machine-local include](modules/git/README.md) |
 | `ssh` | [client config; keys stay in 1Password's agent](docs/modules.md#ssh-and-commit-signing) |
-| `zsh` | XDG layout, aliases, PATH, `$EDITOR`, starship |
+| `zsh` | [XDG layout, aliases, PATH, `$EDITOR`, starship](modules/zsh/README.md), and API keys as 1Password references |
 | `cmux` | the terminal, plus the Ghostty config it reads: Option stays native for Æ/Ø/Å |
 | `claude-code` | [the CLI, and keys merged into `~/.claude/settings.json`](modules/claude-code/README.md) |
 | `containers` | [Docker via colima](modules/containers/README.md), no Docker Desktop |
 | `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
-| `macos-defaults` | [Dock, Finder, keyboard, screenshots](modules/macos-defaults/README.md) — imperative, no files at all |
+| `macos-defaults` | [Dock, Finder, keyboard, screenshots, locale units](modules/macos-defaults/README.md) — imperative, no files at all |
+| `apps` | [GUI casks and fonts](modules/apps/README.md): Raycast, Chrome, VS Code, … — and which of them have never been opened |
 
 **Package sets** are a Brewfile and nothing else: a shopping list for tools this
 repo installs but does not configure.
 
 | Package set | What it installs |
 |---|---|
-| `apps` | GUI casks and fonts: Raycast, Chrome, VS Code, … |
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
 | `dotfiles-dev` | the toolchain `make check` runs, for a machine you develop *this repo* on |
 

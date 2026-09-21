@@ -133,6 +133,89 @@ outright that the module leaves nothing else behind.
 A module therefore only needs a `remove.sh` for what the sweep structurally
 cannot see. The four kinds are listed in [modules.md](modules.md#removesh).
 
+## Looking the other way: packages nothing names
+
+Every check above asks whether the repo made it onto the machine. One asks the
+opposite, and it is the only one that does: **what does this machine have that
+no `Brewfile` names?**
+
+```
+  ✓ orphans        none
+  → unmanaged      4 packages no Brewfile names
+        Formula fd
+        Formula goreleaser
+        Formula poppler
+        Cask curseforge
+        add one to a module Brewfile and the next machine gets it too.
+```
+
+That is `brew leaves --installed-on-request` and `brew list --cask`, minus
+every package named by **any** `Brewfile` in the repo — enabled or not, since
+`dot add work-apps` still brings back what a disabled module names, and reading
+only the enabled list would make a machine with one module switched off report
+that module's whole `Brewfile`. What is left exists nowhere but on this disk,
+and a rebuild would silently do without it.
+
+It is `info`, never `warn`, and bumps no tally. Installing something by hand is
+not a defect and never becomes one; a line that is yellow on every machine
+forever is the same bug as a summary that is green on a broken one. Like the
+orphan scan it sits outside every module group, because it is about the machine
+and not about any one module.
+
+`brew leaves` is what "by hand" means to Homebrew: it drops dependencies, so a
+tool is named and its tree is not. The blind spot it inherits is a formula that
+*later* becomes something else's dependency — it falls out of the list, and
+finding it again would mean reading the install receipt of every keg.
+
+## Installed is not set up
+
+There is a third question, and it is the one a fresh Mac actually fails. The
+checks above ask whether the repo reached the machine; the one before it asks
+what the machine has that the repo does not. Neither notices that `gh` is
+installed and signed in to nothing, that Claude Code has every managed key and
+no credentials, that the SSH agent is serving a socket and no keys, or that
+Raycast is in `/Applications` and has never been opened.
+
+Each of those is a machine `dot apply` finishes green on and that does not
+work, with the symptom arriving hours later as a 401, a login prompt or a
+hotkey that does nothing. They are spread across the modules that own the
+tools:
+
+| Where | Asks |
+|---|---|
+| `core` | the Command Line Tools are still there, and the developer directory is not a dead path |
+| `dev-cli` | `gh`, `gcloud` and `firebase` have credentials on disk |
+| `claude-code` | the CLI can authenticate at all — keychain item, API key, token, Bedrock or Vertex |
+| `ssh` | the 1Password agent is live **and** holds a key |
+| `apps` | the menu bar apps have been opened at least once |
+| `zsh` | the account's login shell is zsh, so any of it is read |
+| `macos-defaults` | FileVault, the firewall, Touch ID, the update switches, the default browser |
+
+Four rules keep this from becoming noise, and they are the same four
+everywhere:
+
+- **The evidence is on disk, never the tool's own answer.** `gcloud auth list`
+  and `firebase login:list` create their config directory on a machine that has
+  none, which would make a read-only check write to the thing it is checking.
+  For the same reason the login shell is read from the account's directory
+  record and not from `$SHELL`, which answers for the running window.
+  On disk is not the same as *present*, though: a credential store outlives the
+  login that filled it, so each row names the pattern a login actually writes
+  rather than asking whether the file has bytes in it.
+- **A row is silent when the thing is not installed.** Dropping the package or
+  the cask is how you decline a tool, and the Brewfile is what `contract.bats`
+  holds the tables against.
+- **A question that could not be asked is a warning**, never a green line — the
+  three-state rule `brew_missing` keeps. `defaults read` is where this is
+  easiest to get wrong: it fails the same way for a key macOS never wrote and
+  for a domain that cannot be read, and the first of those is a healthy machine.
+  So the domain is asked as well, and only a domain that will not answer warns.
+- **Anything reported and not fixable from here has an off switch.** A check
+  that cannot be satisfied and cannot be silenced goes yellow on every run
+  forever, which says exactly as little as a summary that is green on a broken
+  machine. `touch_id_sudo`, `macos_auto_update`, `browser` and `auth_check` are
+  that switch; for the table-driven checks the Brewfile line is.
+
 ## Your files stay yours
 
 **Nothing here deletes a real file.** Symlinks and provably-generated files
@@ -144,6 +227,12 @@ the leaves still holding exactly what was written are ever taken back.
 `config.toml` is the same trade: `dot add` and `dot remove` splice one line
 into one array and copy every other byte through, comments and spacing
 included.
+
+A file the repo *generates* is the same trade read the other way. `config.local`
+and `allowed_signers` both sit at conventional paths, so both carry a header
+saying this repo wrote them — and `apply.sh` checks it before writing exactly as
+`remove.sh` checks it before deleting. A file already there without the header
+belongs to whoever wrote it, and a run says so and leaves it untouched.
 
 The proof is the array's shape. `dot config --init` writes one `"name",` per
 line, and that is the only shape these will edit. Reformat it by hand —

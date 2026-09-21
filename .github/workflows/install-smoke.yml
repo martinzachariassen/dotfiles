@@ -1,19 +1,10 @@
 name: install-smoke
 
 # `install.sh` is the headline command in the README and the least covered path
-# in the repo: tests/install.bats stops at the three guards on purpose, and
-# every command past them is a tripwire that fails by design. This runs the
-# real thing, once, on a machine that is not the author's.
+# in the repo: tests/install.bats stops at the three guards on purpose. This
+# runs the real thing, once, on a machine that is not the author's.
 #
-# Its own workflow, for the reason brew-audit has one: it needs the network and
-# Homebrew, so it must never fail a pull request about something else. It runs
-# on the pull requests that touch the bootstrap -- where it IS the thing under
-# review -- plus main and a weekly clock.
-#
-# What it CANNOT cover: steps 1 and 2. A hosted runner already has the Command
-# Line Tools and Homebrew, so both take their "already installed" branch. The
-# CLT polling loop and the Homebrew install with its sudo keep-alive need a
-# genuinely clean macOS, which no hosted runner is. Those stay a hand test.
+# Why it is its own workflow, and what it cannot cover: docs/development.md.
 on:
   push:
     branches: [main]

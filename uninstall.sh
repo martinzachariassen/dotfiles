@@ -42,7 +42,6 @@ export DOT_DRY_RUN
 [[ $(uname -s) == Darwin ]] || die 'This is macOS only.'
 (($(id -u) != 0)) || die 'Do not run this as root.'
 
-# --- Confirmation ------------------------------------------------------------
 # The preview is this script under --dry-run, not a hand-written summary that
 # could drift from it.
 if [[ $DOT_DRY_RUN != 1 ]]; then
@@ -58,7 +57,6 @@ if [[ $DOT_DRY_RUN != 1 ]]; then
   [[ $answer == remove ]] || die 'Nothing was changed.'
 fi
 
-# --- Modules ------------------------------------------------------------------
 # Every module, enabled or not: a module switched off last month still left
 # its files behind.
 heading 'Modules' 'every one, enabled or not'
@@ -70,7 +68,6 @@ while IFS= read -r name; do
   ui_unnest
 done < <(modules_all)
 
-# --- Links ---------------------------------------------------------------------
 # The orphan scan with nothing enabled: every link into the repo is unclaimed.
 heading 'Links'
 mapfile -t links < <(fs_repo_links)
@@ -82,10 +79,9 @@ else
   say links 'none found'
 fi
 
-# --- The CLI shim ---------------------------------------------------------------
-# Generated, not linked, so the sweep cannot see it. The baked-in DOT_ROOT line
-# is the proof of ownership; core/doctor.sh greps the same line. -f, not -x: a
-# shim that lost its executable bit is still ours to remove.
+# The shim is generated, not linked, so the sweep cannot see it. The baked-in
+# DOT_ROOT line is the proof of ownership; core/doctor.sh greps the same line.
+# -f, not -x: a shim that lost its executable bit is still ours to remove.
 heading 'CLI'
 shim="$HOME/.local/bin/dot"
 if [[ -f $shim ]]; then
@@ -98,7 +94,6 @@ else
   say dot 'not installed'
 fi
 
-# --- Config ----------------------------------------------------------------------
 heading 'Config'
 if [[ -f $DOT_CONFIG ]]; then
   fs_discard "$DOT_CONFIG"
@@ -108,7 +103,6 @@ else
   say config 'none found'
 fi
 
-# --- Logs -------------------------------------------------------------------------
 # Before Backups, which removes $DOT_STATE itself and refuses while anything
 # unexpected is still inside it.
 heading 'Logs'
@@ -121,7 +115,6 @@ else
   say logs 'none found'
 fi
 
-# --- Backups -----------------------------------------------------------------------
 heading 'Backups'
 if [[ -n $(find "$DOT_STATE/backups" -mindepth 1 -print -quit 2>/dev/null) ]]; then
   # A warning about something KEPT: the only copy of your replaced files.
@@ -130,9 +123,9 @@ if [[ -n $(find "$DOT_STATE/backups" -mindepth 1 -print -quit 2>/dev/null) ]]; t
   dim 'Delete them yourself once you have looked.'
 else
   say backups 'none to keep'
-  # rmdir, never rm -rf: a file nothing in this repo created keeps the directory
-  # alive. Tested up front so a dry run prints the real run's words; logs/ is
-  # excluded because a dry run has not removed it yet.
+  # rmdir, never rm -rf: a file nothing in this repo created keeps the
+  # directory alive. Tested up front so a dry run prints the real run's words;
+  # logs/ is excluded because a dry run has not removed it yet.
   if [[ -d $DOT_STATE ]]; then
     if [[ -n $(find "$DOT_STATE" -mindepth 1 -not -path "$DOT_STATE/backups" -not -path "$DOT_STATE/logs*" -print -quit 2>/dev/null) ]]; then
       warn 'left alone' "${DOT_STATE/#$HOME/\~} holds files this repo did not create"
@@ -143,7 +136,6 @@ else
   fi
 fi
 
-# --- Applications ---------------------------------------------------------------
 # Homebrew MOVES a cask's .app into /Applications and its uninstaller deletes
 # only the prefix, so casks must go by name while brew still works or every GUI
 # app is stranded. Same for `brew services` and its launchd plists.
@@ -219,7 +211,6 @@ brew_headcount() {
   return $rc
 }
 
-# --- Handoff --------------------------------------------------------------------------
 heading 'Homebrew and the repo'
 
 # Everything above, `dot apply` can put back; nothing below can be.

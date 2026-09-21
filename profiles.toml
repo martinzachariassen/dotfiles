@@ -1,10 +1,8 @@
-# Wizard presets. Read only by `dot config --init`, which copies the pick into
-# config.toml; `dot apply` never reads this file. The wizard also offers
-# `none`, which writes an empty list.
+# Wizard presets. Read only by `dot config --init`; `dot apply` never reads
+# this file. See docs/configuration.md.
 
 # Copied into config.toml, never asked: none of it varies by machine. The
-# signing key is the PUBLIC half (GitHub serves it at github.com/<user>.keys);
-# the private half never leaves 1Password. Empty means no signing.
+# signing key is the PUBLIC half; empty means no signing.
 #
 # Forked this repo? Edit the three values below first -- the wizard writes
 # them as-is, so an unedited fork authors commits as Martin and turns on

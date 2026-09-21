@@ -1,10 +1,10 @@
-# The macOS preferences this module writes: domain, key, defaults type,
-# value, why. Tab-separated, one write per line.
+# The macOS preferences this module writes: domain, key, defaults type, value,
+# why. Tab-separated, one write per line.
 #
-# Three readers, one truth: apply.sh writes every row, doctor.sh compares
-# every row, remove.sh derives the domain list it warns about from column 1.
-# A value that needs a config setting or validation is NOT here -- it stays
-# in apply.sh, where it can be refused.
+# Three readers, one truth: apply.sh writes every row, doctor.sh compares every
+# row, remove.sh derives from column 1 the domain list it warns about. A value
+# that needs a config setting or validation is NOT here -- it stays in
+# apply.sh, where it can be refused.
 
 # --- Dock ---
 com.apple.dock	autohide-delay	float	0	no reveal wait
@@ -12,6 +12,7 @@ com.apple.dock	autohide-time-modifier	float	0	no slide-in
 com.apple.dock	show-recents	bool	false	recents are not a workflow
 com.apple.dock	mru-spaces	bool	false	ctrl-N is stable
 com.apple.dock	minimize-to-application	bool	true	minimized windows live in the app icon
+com.apple.dock	expose-animation-duration	float	0.1	Mission Control arrives, it does not travel
 
 # --- Finder ---
 com.apple.finder	AppleShowAllFiles	bool	true	dotfiles are the point
@@ -24,6 +25,7 @@ com.apple.finder	FXEnableExtensionChangeWarning	bool	false	renaming is not dange
 com.apple.finder	WarnOnEmptyTrash	bool	false	emptying is not dangerous
 com.apple.finder	_FXShowPosixPathInTitle	bool	true	full path, next to the terminal
 com.apple.finder	QuitMenuItem	bool	true	Cmd-Q actually quits Finder
+com.apple.finder	NewWindowTarget	string	PfHm	a new window opens at home, not in Recents
 NSGlobalDomain	AppleShowAllExtensions	bool	true	the extension is the file type
 com.apple.desktopservices	DSDontWriteNetworkStores	bool	true	no .DS_Store on shares
 com.apple.desktopservices	DSDontWriteUSBStores	bool	true	no .DS_Store on USB sticks
@@ -44,11 +46,23 @@ NSGlobalDomain	AppleKeyboardUIMode	int	3	Tab reaches buttons
 NSGlobalDomain	NSAutomaticQuoteSubstitutionEnabled	bool	false	straight quotes
 NSGlobalDomain	NSAutomaticDashSubstitutionEnabled	bool	false	plain hyphens
 NSGlobalDomain	NSAutomaticSpellingCorrectionEnabled	bool	false	no autocorrect in code
+NSGlobalDomain	NSAutomaticCapitalizationEnabled	bool	false	a shell command is not a sentence
+NSGlobalDomain	NSAutomaticPeriodSubstitutionEnabled	bool	false	two spaces are two spaces
 
 # --- Documents and windows ---
 com.apple.WindowManager	EnableStandardClickToShowDesktop	bool	false	wallpaper click
 NSGlobalDomain	NSNavPanelExpandedStateForSaveMode	bool	true	full save sheet
 NSGlobalDomain	NSDocumentSaveNewDocumentsToCloud	bool	false	save locally by default
+NSGlobalDomain	PMPrintingExpandedStateForPrint	bool	true	full print sheet
 
 # --- Screenshots ---
 com.apple.screencapture	disable-shadow	bool	true	no drop shadow around windows
+com.apple.screencapture	show-thumbnail	bool	false	the file is written now, not when a thumbnail times out
+
+# --- Locale and units ---
+# Written out rather than inherited from the region: a machine rebuilt from
+# this repo must not depend on which country the installer was answered with.
+NSGlobalDomain	AppleICUForce24HourTime	bool	true	13:00, never 1 PM
+NSGlobalDomain	AppleMetricUnits	bool	true	metric
+NSGlobalDomain	AppleMeasurementUnits	string	Centimeters	the string half of the same answer
+NSGlobalDomain	AppleTemperatureUnit	string	Celsius	degrees Celsius

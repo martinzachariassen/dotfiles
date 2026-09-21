@@ -9,10 +9,10 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
 
-# One pass, two answers, both derived so neither can go stale. `domains` is what
-# the warning lists; typed out it goes stale the first time apply.sh gains one.
-# `in_force` is whether to warn at all -- uninstall.sh runs every remove.sh,
-# enabled or not, and a machine that never ran this module must hear nothing.
+# One pass, two answers, both derived so neither can go stale. `domains` is
+# what the warning lists. `in_force` is whether to warn at all -- uninstall.sh
+# runs every remove.sh, enabled or not, and a machine that never ran this
+# module must hear nothing.
 domains=''
 in_force=0
 while IFS=$'\t' read -r domain key type value _; do
@@ -26,9 +26,10 @@ while IFS=$'\t' read -r domain key type value _; do
   fi
 done < <(grep -v '^[[:space:]]*\(#\|$\)' "$data" 2>/dev/null)
 
-# Tested before the warning, never inside it: an unreadable table would print the
-# "cannot be put back" line with no domains under it. A process substitution, not
-# `<"$data"`, so a missing file arrives here rather than as a crash.
+# Tested before the warning, never inside it: an unreadable table would print
+# the "cannot be put back" line with no domains under it. A process
+# substitution, not `<"$data"`, so a missing file arrives here as this message
+# rather than as a crash.
 [[ -n $domains ]] ||
   die "cannot read ${data#"$DOT_ROOT"/}, which names the domains this warning is about"
 ((in_force)) || exit 0

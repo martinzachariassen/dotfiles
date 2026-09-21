@@ -1,0 +1,14 @@
+# Menu bar apps that do nothing whatsoever until opened once, and which every
+# other check in this repo therefore reports as healthy. Why each column is
+# shaped the way it is: modules/apps/README.md.
+#
+# app (the bundle under /Applications), the Brewfile cask that installs it,
+# the preferences domain macOS creates on first launch, what you lose.
+# Tab-separated, one app per line.
+#
+# Column 4 completes "installed but never opened -- no ...", so it carries no
+# article of its own. Column 2 is checked against Brewfile by contract.bats.
+
+Raycast	raycast	com.raycast.macos	launcher, and no hotkey to reach it
+Thaw	thaw	com.stonerl.Thaw	menu bar manager
+Stats	stats	eu.exelban.Stats	resource monitor in the menu bar

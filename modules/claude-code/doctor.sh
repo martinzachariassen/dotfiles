@@ -35,3 +35,35 @@ else
     done <<<"$drift"
   fi
 fi
+
+# Every key above is merged whether or not Claude Code can reach Anthropic, so
+# a machine this module reports as perfect is still one run away from a login
+# prompt. Nothing under ~/.claude answers it: the token is a login keychain
+# item.
+#
+# Attributes only, never `-w`. Reading the secret raises a keychain
+# authorisation dialog, and a read-only check may not block on a human. The
+# service name is Anthropic's, so it is named in the warning rather than only
+# here, and `auth_check = false` is the way out on the day it changes.
+keychain=${DOT_CLAUDE_KEYCHAIN:-Claude Code-credentials}
+
+# Signing in is one of several ways to authenticate, and every other one is a
+# machine that works. The env vars are asked first because Claude Code itself
+# prefers them to the keychain.
+if module_setting_bool claude-code auth_check true; then
+  if [[ -n ${ANTHROPIC_API_KEY:-} ]]; then
+    ok auth 'ANTHROPIC_API_KEY is set'
+  elif [[ -n ${ANTHROPIC_AUTH_TOKEN:-} ]]; then
+    ok auth 'ANTHROPIC_AUTH_TOKEN is set'
+  elif [[ -n ${CLAUDE_CODE_USE_BEDROCK:-} && ${CLAUDE_CODE_USE_BEDROCK:-0} != 0 ]]; then
+    ok auth 'pointed at Bedrock, which brings its own credentials'
+  elif [[ -n ${CLAUDE_CODE_USE_VERTEX:-} && ${CLAUDE_CODE_USE_VERTEX:-0} != 0 ]]; then
+    ok auth 'pointed at Vertex AI, which brings its own credentials'
+  elif security find-generic-password -s "$keychain" >/dev/null 2>&1; then
+    ok auth 'signed in'
+  else
+    warn auth 'never signed in on this machine -- run: claude auth login'
+    dim "no \"$keychain\" item in the login keychain"
+    dim 'a machine that authenticates another way sets auth_check = false'
+  fi
+fi

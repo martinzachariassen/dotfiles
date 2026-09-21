@@ -6,9 +6,8 @@
 # replaces the flag defaults instead of merging: with sshConfig alone, colima
 # 0.10.3 starts with cpu 0, disk 0, memory 0. Removing a line zeroes it.
 #
-# cpu and memory are the deliberate exception: the stock 2 GiB runs a
-# container but cannot build one (buildkit OOM-killed with no mention of
-# memory). Raise per machine with `colima start --cpu 6 --memory 12`.
+# cpu and memory are the deliberate exception -- see
+# modules/containers/README.md.
 
 cpu: 4
 disk: 100

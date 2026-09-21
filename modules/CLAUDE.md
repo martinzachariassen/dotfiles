@@ -24,13 +24,13 @@ alphabetically and cannot depend on each other.
 ## Two shapes, one contract
 
 - **Tool modules** manage a tool's config: `home/`, hooks, or both.
-- **Package sets** are a Brewfile and nothing else (`apps`, `work-apps`,
+- **Package sets** are a Brewfile and nothing else (`work-apps`,
   `dotfiles-dev`). Their `description` starts with `Packages:`.
 
 The split is a reading aid, not a flag the driver knows about, so it is only
-true while the directory says so. `dev-cli` was listed as a package set until
-it grew a `home/` and three hooks; a `Packages:` description on a module that
-links a file is a label contradicting the listing next to it.
+true while the directory says so. A module that grows a `home/` or a hook has
+crossed the line, and the honest move is to drop the `Packages:` label rather
+than keep a description that contradicts the listing next to it.
 
 **A module that owns a tool's config owns its Brewfile line.** Repeating a
 `brew` line across modules is fine (`brew bundle` is idempotent) and is the only
@@ -85,6 +85,20 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 - Read a module's **own** settings through `module_setting` only -- it is what
   gets the bracket syntax right. The shared `[user]` table is not a module
   setting; `git/apply.sh` reads it with `cfg_get`, and that is the exception.
+  Every key read this way is named in the module's `README.md` and in
+  `docs/configuration.md`; `contract.bats` holds all three together.
+- **A check for something this repo cannot fix needs an off switch.** Touch ID
+  for `sudo`, the macOS version bump, the default browser and Claude Code's
+  sign-in each need root, a GUI confirmation or a login no hook can perform, so
+  each takes a setting; a table-driven check (`dev-cli`, `apps`) uses its
+  Brewfile line instead, and the row goes quiet when the tool is gone. A check
+  that can neither be satisfied nor silenced is yellow on every run forever,
+  which says exactly as little as a summary green on a broken machine.
+- **A question that could not be asked is a `warn`, never silence** -- the
+  three-state rule `brew_missing` keeps. And the tool it asks is an input with
+  its real path as the default (`DOT_SOCKETFILTERFW`, `DOT_SSH_ADD`,
+  `DOT_DSCL_BIN`), or the branch a test needs is the one the machine running it
+  never takes.
 - **Validate values yourself.** `defaults`, dasel and git config accept
   anything and exit 0.
 - `fail` over `die` for one bad setting, so the rest still runs.

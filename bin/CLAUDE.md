@@ -25,11 +25,16 @@ existing verb can reach -- not a convenience.
   `brew bundle` that takes two minutes has to be visible while it runs. The
   capture is a redirect in the **current** shell, never `$(...)`: the tallies
   are shell variables and a subshell would drop them.
-- **`doctor` may give a count now.** It used not to, because a hook's three
-  problems came back as one rolled-up exit status and a summary may not
-  contradict the lines above it. `ui_group` reads the hook's own records, so
-  the number and the lines are the same evidence. `--verbose` prints every
-  check, including the ones that passed.
+- **`doctor`'s count is the count of the lines under it.** A summary may not
+  contradict what is above it, and `ui_group` reads a hook's own records rather
+  than its rolled-up exit status, so the number and the lines are the same
+  evidence. `--verbose` prints every check, including the ones that passed.
+- **`__orphan_report` and `__unmanaged_report` sit outside every group**, and
+  outside `ui_verdict`'s "in X of Y modules" qualifier with them: both are
+  about the machine rather than any one module. `__unmanaged_report` is
+  `info` and bumps no tally -- installing something by hand is not a defect,
+  and a line yellow on every machine forever is the same bug as a summary
+  green on a broken one.
 - **`modules_preflight` runs after validation and before the first link.**
   Everything above it only reads.
 - **The transcript writer must be drained.** `__transcript_start` sets fds 3/4

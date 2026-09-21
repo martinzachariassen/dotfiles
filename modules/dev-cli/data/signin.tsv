@@ -1,0 +1,14 @@
+# The CLIs in this module's Brewfile that are useless until you log in once.
+# What each column is for: modules/dev-cli/README.md.
+#
+# command, the Brewfile package that provides it, the file that proves a login
+# (under $HOME), an ERE that proves it, the command that puts it there, what
+# it costs. Tab-separated, one CLI per line.
+#
+# Column 4 exists because a file that exists, or merely holds bytes, is not a
+# credential: every one of these stores outlives the login that filled it.
+# Column 2 is checked against Brewfile by contract.bats.
+
+gh	gh	.config/gh/hosts.yml	(oauth_token|users?):	gh auth login	gh pr, gh repo, and the push that asks for a password
+gcloud	gcloud-cli	.config/gcloud/configurations/config_default	^account[[:space:]]*=[[:space:]]*[^[:space:]]	gcloud auth login	every gcloud call, and the ADC other SDKs read
+firebase	firebase-cli	.config/configstore/firebase-tools.json	"(tokens|user)"	firebase login	deploys, and the emulators that check a project

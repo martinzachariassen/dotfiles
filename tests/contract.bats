@@ -177,8 +177,10 @@ teardown() { teardown_sandbox; }
       *.toml) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
       # A row that lost its tabs reads as a domain with no key: `defaults write`
-      # would then be called with too few arguments, or the wrong ones.
-      *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 5 { exit 1 }' "$f" || bad+=("$f -- not a 4/5-column TSV") ;;
+      # would then be called with too few arguments, or the wrong ones. The
+      # range is the generic half only -- each table's exact arity is pinned by
+      # its own module's test, which is where the meaning of column 5 lives.
+      *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 6 { exit 1 }' "$f" || bad+=("$f -- not a 4-to-6-column TSV") ;;
       # Every git command on the machine reads this file, and a malformed line
       # makes all of them fail. doctor.sh checks the GENERATED config.local and
       # never the tracked one next to it, which is the bigger of the two.
@@ -429,6 +431,62 @@ EOF
   [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
 }
 
+@test "dev-cli: every sign-in row names a package this module installs" {
+  # A row is a claim that THIS module puts the CLI on the machine, and that is
+  # what makes `command -v` a fair skip rather than a check quietly never
+  # running. A tool another module owns belongs in that module's doctor.sh --
+  # "a module that owns a tool's config owns its Brewfile line".
+  local dir="$DOT_ROOT/modules/dev-cli"
+  local cmd pkg rest missing=() rows=0
+  while IFS=$'\t' read -r cmd pkg rest; do
+    [[ -n $cmd && $cmd != '#'* ]] || continue
+    ((++rows))
+    grep -qE "^(brew|cask) \"$pkg\"" "$dir/Brewfile" || missing+=("$cmd -> $pkg")
+  done <"$dir/data/signin.tsv"
+
+  # A count of DATA rows, not a size: the file ships with a comment header, so
+  # `-s` holds for a table whose every row has been deleted -- and this test
+  # would then pass over nothing forever, which is the regression it exists to
+  # catch.
+  [ "$rows" -gt 0 ] || {
+    echo 'data/signin.tsv has no rows, only comments'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'signin.tsv names a package modules/dev-cli/Brewfile does not:\n'
+    printf '  %s\n' "${missing[@]}"
+    return 1
+  }
+}
+
+@test "apps: every launch row names a cask this module installs" {
+  # Same claim as dev-cli's sign-in table, one layer up: a row asserts that
+  # THIS module puts the app on the machine, and that is what makes "not in
+  # /Applications, say nothing" a fair skip rather than a check that quietly
+  # never runs. It is also the documented escape hatch -- dropping the cask is
+  # how you decline an app -- and an escape hatch nothing enforces is prose.
+  local dir="$DOT_ROOT/modules/apps"
+  local app cask rest missing=() rows=0
+  while IFS=$'\t' read -r app cask rest; do
+    [[ -n $app && $app != '#'* ]] || continue
+    ((++rows))
+    grep -qE "^cask \"$cask\"" "$dir/Brewfile" || missing+=("$app -> $cask")
+  done <"$dir/data/launch.tsv"
+
+  # A count of DATA rows, not a size: the comment header alone satisfies `-s`,
+  # so an emptied table would leave the escape hatch above untested -- prose
+  # again, which is what this test exists not to be.
+  [ "$rows" -gt 0 ] || {
+    echo 'data/launch.tsv has no rows, only comments'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'launch.tsv names a cask modules/apps/Brewfile does not:\n'
+    printf '  %s\n' "${missing[@]}"
+    return 1
+  }
+}
+
 @test "dev-cli: doctor.sh never invokes mise" {
   # `mise ls` CREATES ~/.local/share/mise and ~/.local/state/mise on a machine
   # that has neither -- the check would write to the $HOME it is checking, the
@@ -484,6 +542,29 @@ EOF
 # Each of these is a rule whose whole content is "these files must agree", and
 # each was on the honour system until one of them had already drifted: the
 # bash-5 list said four places while uninstall.sh had quietly become a fifth.
+
+# op_env_bad_lines FILE -- line numbers of everything that is not a comment,
+# blank, or NAME=op://... Numbers only: printing the line would print the secret.
+op_env_bad_lines() {
+  awk '/^#/ || !NF { next } !/^[A-Z][A-Z0-9_]*=op:\/\/[^ \t]+$/ { printf "%s ", NR }' "$1"
+}
+
+@test "zsh: the op env file holds references, never a value" {
+  # Tracked, so a pasted key is a leaked one.
+  local bad
+  bad=$(op_env_bad_lines "$DOT_ROOT/modules/zsh/home/.config/op/env")
+  [ -z "$bad" ] || {
+    printf 'op/env line %sis not NAME=op://...; the file holds references only\n' "$bad"
+    return 1
+  }
+}
+
+@test "zsh: the op env probe can actually see a value" {
+  # A check that cannot fail is not one.
+  local f="$DOT_TMP/env"
+  printf '# c\n\nOK=op://V/I/credential\nBAD=sk-abc123\n' >"$f"
+  [ "$(op_env_bad_lines "$f")" = "4 " ]
+}
 
 @test "bash 5: every place that guards it is named by all the others" {
   # install.sh installs it, core/Brewfile keeps brew from cleaning it up, and
@@ -613,6 +694,39 @@ EOF
   [ ${#missing[@]} -eq 0 ] || {
     printf 'the README does not mention: %s\n' "${missing[*]}"
     printf 'add it to the tool-module or package-set table under "## Modules"\n'
+    return 1
+  }
+}
+
+@test "every setting a hook reads is documented where a reader looks" {
+  # CLAUDE.md's table says a module's settings land in that module's README and
+  # in docs/configuration.md. Both are hand-maintained prose, and a setting is
+  # exactly the kind of thing that ships working and undocumented -- the hook
+  # reads it, the default hides it, and nobody can discover it exists.
+  #
+  # The hook calls are the one truth: `module_setting NAME KEY` is a key, and a
+  # reader who cannot find it has no way to set it.
+  local mod key call missing=() seen=0
+  while IFS= read -r call; do
+    seen=$((seen + 1))
+    mod=$(awk '{print $2}' <<<"$call")
+    key=$(awk '{print $3}' <<<"$call")
+    grep -qF "\`$key\`" "$DOT_ROOT/modules/$mod/README.md" 2>/dev/null ||
+      missing+=("modules/$mod/README.md: $key")
+    grep -qF "\`$key\`" "$DOT_ROOT/docs/configuration.md" ||
+      missing+=("docs/configuration.md: $key")
+  done < <(grep -rhoE 'module_setting(_bool)? [a-z-]+ [a-z_]+' \
+    "$DOT_ROOT"/modules/*/apply.sh "$DOT_ROOT"/modules/*/doctor.sh \
+    "$DOT_ROOT"/modules/*/remove.sh 2>/dev/null | sort -u)
+
+  # A renamed helper would make this pass over nothing, forever.
+  [ "$seen" -gt 0 ] || {
+    echo 'no module_setting call was found at all'
+    return 1
+  }
+  [ ${#missing[@]} -eq 0 ] || {
+    printf 'a setting a hook reads is named nowhere a reader would look:\n'
+    printf '  %s\n' "${missing[@]}"
     return 1
   }
 }

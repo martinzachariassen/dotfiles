@@ -26,10 +26,11 @@ link to it. Two copies of one rule is the pair that stops agreeing.
 | A limit in the table below | that table, `docs/development.md`, `contract.bats` |
 | A rule the driver enforces | the `CLAUDE.md` of the directory it lives in |
 
-`contract.bats` catches three of those and no more: a module the README never
-names, a verb missing from `usage()` or the README, and prose in `docs/` naming
-a verb count `bin/dot` no longer has. The rest is a hand check, so a doc claim
-worth keeping is worth a test in `contract.bats`.
+`contract.bats` catches four of those and no more: a module the README never
+names, a verb missing from `usage()` or the README, prose in `docs/` naming a
+verb count `bin/dot` no longer has, and a setting a hook reads that neither the
+module's `README.md` nor `docs/configuration.md` mentions. The rest is a hand
+check, so a doc claim worth keeping is worth a test in `contract.bats`.
 
 **Sample output is pasted from a real run**, never sketched: regenerate it with
 `DOT_COLUMNS=76 dot doctor` or `bash uninstall.sh --dry-run` rather than
@@ -118,28 +119,43 @@ deliberately. That friction is the point.
   the handoff. Irreversible summaries state counts, not categories.
 - **Never end a loop with `cmd && printf`.** A false last test leaves status 1
   and `set -e` kills the caller. Use `if`.
+- **No secret value enters the repo.** API keys are `op://` references in
+  `modules/zsh/home/.config/op/env`, resolved by `op run`; a line is added only
+  once its 1Password item exists, or every run reading the file aborts. See
+  [`modules/zsh/README.md`](modules/zsh/README.md#api-keys).
 - **Quote user input** before it reaches TOML, git config or `defaults`. Those
   tools accept garbage and exit 0.
 - **Dry run and real run print the same words.** Announce intent before acting.
 
 ## Comments
 
-The bar is high and the default is **no comment**. Code that needs prose to be
-readable should be rewritten instead. Three things earn one:
+**The default is no comment.** A comment is a second copy of the truth, and the
+copy is the one that goes stale when the code under it changes. Code that needs
+prose to be readable gets rewritten instead -- a clearer name, a smaller
+function, an early return -- and the prose deleted with it.
 
-1. A landmine that looks fine.
-2. An invariant a future edit would break -- name the other place that must
-   agree.
-3. A road not taken.
+Two things still earn one, and nothing else does:
 
-One to three lines, and never more than a short paragraph at the top of a file.
-Explain **why this decision**, never what bash does.
+1. **A landmine that looks fine.** Code that is right for a reason the next
+   reader would undo.
+2. **An invariant that spans files.** Name the other place that must agree --
+   and only where `contract.bats` holds the two together, or the comment is
+   decoration.
 
-Cut on sight:
+One line where one will do, three at the outside, and never a paragraph. Say
+**why this decision**, never what bash does.
+
+Delete on sight, in code that already exists as much as in new code:
 
 - **History.** No "used to", "the old version did", "once", "was found by".
   Git has it. A rule stands on its reason, not on the bug that produced it.
 - **Restating the code.** A comment that paraphrases the line under it.
 - **Section banners** that only name what is obviously below.
+- **A second copy of `docs/` or a `CLAUDE.md`.** The reasoning lives in one of
+  those; a comment restating it is the copy that stops agreeing first. Link
+  rather than repeat, or say nothing.
 - **A promise no test keeps.** If a comment says two files must agree, either
   `contract.bats` holds them together or the comment is decoration.
+
+`tests/` is the one exception: there the bug a guard exists for **is** the
+specification, and [`tests/CLAUDE.md`](tests/CLAUDE.md) says so.

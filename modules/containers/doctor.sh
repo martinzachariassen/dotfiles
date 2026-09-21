@@ -6,8 +6,8 @@
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
-# `colima status` is NOT read-only: it creates ~/.colima/_lima on a machine that
-# never started a VM. Only asked once the profile directory exists -- not
+# `colima status` is NOT read-only: it creates ~/.colima/_lima on a machine
+# that never started a VM. Only asked once the profile directory exists -- not
 # ~/.colima, which this module's template link makes exist. remove.sh agrees.
 if ! command -v colima >/dev/null 2>&1; then
   fail colima 'not installed (run: dot apply)'
@@ -30,8 +30,7 @@ fi
 
 # DOCKER_HOST and TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE come from ~/.zshenv
 # (the zsh module), computed fresh on every shell start -- so a process that
-# predates the link just hasn't opened a new shell yet, the same reasoning as
-# core/doctor.sh's PATH check.
+# predates the link just hasn't opened a new shell yet.
 if [[ -d $HOME/.colima/default ]]; then
   want_host="unix://$HOME/.colima/default/docker.sock"
   want_override='/var/run/docker.sock'

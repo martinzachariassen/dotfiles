@@ -16,6 +16,50 @@ setup() {
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\n' "$CALLS" >"$BIN/defaults"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN/killall"
   chmod +x "$BIN/defaults" "$BIN/killall"
+
+  # The three checks doctor.sh makes that are not `defaults` keys at all. Each
+  # reads real system state, so each is shadowed -- and shadowed to a HEALTHY
+  # machine by default, so every other test in this file says only what it is
+  # about. The tests that vary them vary one at a time.
+  FW="$DOT_TMP/socketfilterfw"
+  SUDO_LOCAL="$DOT_TMP/sudo_local"
+
+  # The two software-update domains, pointed inside the sandbox. doctor.sh asks
+  # whether the DOMAIN answers to tell an unwritten key from an unreadable one,
+  # and the real /Library/Preferences is neither writable by a test nor the
+  # same on two machines -- so a suite that left these alone would be deciding
+  # a branch from whatever the developer's Mac happens to hold.
+  SU_DOMAIN="$DOT_TMP/SoftwareUpdate"
+  COMMERCE_DOMAIN="$DOT_TMP/commerce"
+  with_filevault 'FileVault is On.'
+  with_firewall 'Firewall is enabled. (State = 1)'
+  with_touch_id 'auth       sufficient     pam_tid.so'
+}
+
+# with_filevault TEXT / with_firewall TEXT -- a tool that answers TEXT. The
+# answer goes in a file the stub cats, not into the generated script: these
+# strings carry parentheses and quotes, and escaping them into a heredoc is a
+# second thing to get wrong.
+with_filevault() {
+  printf '%s\n' "$1" >"$DOT_TMP/filevault-answer"
+  printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/filevault-answer" >"$BIN/fdesetup"
+  chmod +x "$BIN/fdesetup"
+}
+
+with_firewall() {
+  printf '%s\n' "$1" >"$DOT_TMP/firewall-answer"
+  printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/firewall-answer" >"$FW"
+  chmod +x "$FW"
+}
+
+# with_touch_id LINE -- the contents of pam.d/sudo_local. An empty LINE means
+# no file at all, which is what macOS actually ships.
+with_touch_id() {
+  if [[ -z $1 ]]; then
+    rm -f "$SUDO_LOCAL"
+  else
+    printf '%s\n' "$1" >"$SUDO_LOCAL"
+  fi
 }
 
 teardown() { teardown_sandbox; }
@@ -35,6 +79,8 @@ apply() {
 doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    DOT_SOCKETFILTERFW="$FW" DOT_SUDO_LOCAL="$SUDO_LOCAL" \
+    DOT_SOFTWAREUPDATE_PREFS="$SU_DOMAIN" DOT_COMMERCE_PREFS="$COMMERCE_DOMAIN" \
     "$BASH" "$DOT_ROOT/modules/macos-defaults/doctor.sh"
 }
 
@@ -54,9 +100,15 @@ rows() { grep -v '^[[:space:]]*\(#\|$\)' "$TSV"; }
 # the exact translation doctor.sh has to get right.
 with_store() {
   export DEFAULTS_STORE="$DOT_TMP/defaults-store"
+  # Answers that do not fit on one line: the store is key<TAB>value, and
+  # LSHandlers is a plist array. A file per key rather than a second store, so
+  # the stub stays one `case` and any key can be given either shape.
+  export DEFAULTS_DIR="$DOT_TMP/defaults-answers"
   : >"$DEFAULTS_STORE"
+  mkdir -p "$DEFAULTS_DIR"
   cat >"$BIN/defaults" <<'STUB'
 #!/usr/bin/env bash
+key_file() { printf '%s/%s' "$DEFAULTS_DIR" "$(printf '%s %s' "$1" "$2" | tr -c '[:alnum:]' '_')"; }
 case $1 in
   write)
     value=$5
@@ -66,10 +118,111 @@ case $1 in
     esac
     printf '%s %s\t%s\n' "$2" "$3" "$value" >>"$DEFAULTS_STORE"
     ;;
-  read) awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE" ;;
+  read)
+    f=$(key_file "$2" "$3")
+    if [[ -f $f ]]; then cat "$f"; exit 0; fi
+    # A read with no key is a read of the whole DOMAIN, which doctor.sh makes
+    # to tell "this key was never written" from "this domain did not answer".
+    # It succeeds when the store knows the domain at all, in either shape.
+    if [[ -z $3 ]]; then
+      p=$(printf '%s' "$2" | tr -c '[:alnum:]' '_')
+      compgen -G "$DEFAULTS_DIR/${p}_*" >/dev/null && exit 0
+      awk -F'\t' -v d="$2 " 'index($1, d) == 1 { f = 1 } END { exit !f }' "$DEFAULTS_STORE"
+      exit
+    fi
+    awk -F'\t' -v k="$2 $3" '$1 == k { v = $2 } END { if (v == "") exit 1; print v }' "$DEFAULTS_STORE"
+    ;;
 esac
 STUB
   chmod +x "$BIN/defaults"
+
+  # A healthy machine by default, so every test that is about something else
+  # says only that. The same rule setup() follows for FileVault and the
+  # firewall -- these reads reach /Library/Preferences and the LaunchServices
+  # database, neither of which a fake $HOME can hold.
+  with_updates AutomaticCheckEnabled 1
+  with_updates AutomaticDownload 1
+  with_updates CriticalUpdateInstall 1
+  with_updates ConfigDataInstall 1
+  with_updates_domain "$COMMERCE_DOMAIN" AutoUpdate 1
+  # Written, not left out: all six keys ship ON, so the healthy machine for the
+  # one the repo wants OFF is an explicit 0. Leaving it unwritten here would
+  # make every test in this file carry that warning.
+  with_updates AutomaticallyInstallMacOSUpdates 0
+  with_browser com.google.chrome
+}
+
+# with_updates KEY VALUE -- one software update switch on the system domain.
+with_updates() {
+  with_updates_domain "$SU_DOMAIN" "$1" "$2"
+}
+
+with_updates_domain() {
+  printf '%s %s\t%s\n' "$1" "$2" "$3" >>"$DEFAULTS_STORE"
+}
+
+# without_updates KEY -- a key macOS never wrote, which is not the same as one
+# written to 0 and is the whole point of the two tests that use it.
+without_updates() {
+  grep -v "^$SU_DOMAIN $1	" \
+    "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
+  mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
+}
+
+# unreadable_domain DOMAIN -- a domain that exists and does not answer: the
+# store forgets every key it had, and a plist is left beside it. That is the
+# only shape `defaults` gives to tell a permission or parse failure from a key
+# macOS simply never wrote.
+unreadable_domain() {
+  grep -v "^$1 " "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
+  mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
+  : >"$1.plist"
+}
+
+# with_browser BUNDLE -- the LaunchServices handler list as `defaults` prints
+# it, BUNDLE handling https. The "-" inside LSHandlerPreferredVersions is not
+# decoration: it sorts before LSHandlerRoleAll and is the thing doctor.sh's
+# awk has to skip, so a stub without it would pass over the bug.
+with_browser() {
+  local f
+  f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
+  cat >"$f" <<EOF
+(
+        {
+        LSHandlerPreferredVersions =         {
+            LSHandlerRoleAll = "-";
+        };
+        LSHandlerRoleAll = "$1";
+        LSHandlerURLScheme = https;
+    }
+)
+EOF
+}
+
+# with_browser_after BUNDLE -- BUNDLE claiming a content type in an EARLIER
+# array element, and the https element carrying no LSHandlerRoleAll of its own.
+# A real LSHandlers list is a mix of both shapes, and an awk that carried its
+# last-seen role across elements would answer https with BUNDLE.
+with_browser_after() {
+  local f
+  f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
+  cat >"$f" <<EOF
+(
+        {
+        LSHandlerContentType = "public.html";
+        LSHandlerRoleAll = "$1";
+    },
+        {
+        LSHandlerRoleViewer = "com.apple.Safari";
+        LSHandlerURLScheme = https;
+    }
+)
+EOF
+}
+
+# with_no_browser -- a Mac nobody ever answered the "make default?" sheet on.
+with_no_browser() {
+  rm -f "$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
 }
 
 wrote() { grep -qF "$1" "$CALLS"; }
@@ -337,4 +490,404 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$status" -ne "$DOT_STATUS_WARN" ]
   [[ $output == *"cannot read"* ]]
   [[ $output != *"cannot be put back"* ]]
+}
+
+# --- what the module can only report -----------------------------------------
+#
+# FileVault, the firewall and Touch ID for sudo are not `defaults` keys: each
+# needs root to change and two need a GUI, so apply.sh cannot write them and
+# data/defaults.tsv must not list them. doctor.sh reports them anyway, because
+# this is the module for macOS system state and nothing else in the repo would
+# ever look at a machine with the firewall off.
+
+@test "system: FileVault on is one green line" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says filevault 'on'
+}
+
+@test "system: FileVault off is a warning that says what is at stake" {
+  # The only one of the three that cannot be fixed after the laptop is gone.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_filevault 'FileVault is Off.'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"FileVault"* ]] || [[ $output == *"filevault"* ]]
+  [[ $output == *"Privacy & Security"* ]]
+}
+
+@test "system: an fdesetup that answers nothing is never read as healthy" {
+  # A question that could not be asked is not a green answer -- the same
+  # three-state rule brew_missing exists to keep.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_filevault ''
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+}
+
+@test "system: the firewall blocking everything still counts as on" {
+  # State 2 is "on, and block all incoming". Matching only 1 would nag the
+  # most locked-down machine there is.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_firewall 'Firewall is enabled. (State = 2)'
+  doctor
+  [ "$status" -eq 0 ]
+  says firewall 'on'
+}
+
+@test "system: the firewall off names the command that turns it on" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_firewall 'Firewall is disabled. (State = 0)'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"--setglobalstate on"* ]]
+}
+
+@test "system: no socketfilterfw at all says so, rather than nothing" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  rm -f "$FW"
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"cannot be checked"* ]]
+}
+
+@test "system: Touch ID for sudo is the uncommented line, not the file" {
+  # macOS ships sudo_local.template with pam_tid commented out. Copying it and
+  # changing nothing is the most likely half-done state there is, and testing
+  # for the file alone would call it finished.
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_touch_id '#auth       sufficient     pam_tid.so'
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"does not unlock sudo"* ]]
+}
+
+@test "system: no sudo_local at all is the same answer" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  with_touch_id ''
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"does not unlock sudo"* ]]
+}
+
+@test "system: touch_id_sudo = false says nothing at all about it" {
+  # A taste, not a baseline. Without the setting a machine that does not want
+  # it stays yellow forever, which is the bug a permanently green line is.
+  with_settings 'touch_id_sudo = false'
+  with_store
+  apply
+  with_touch_id ''
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output != *"sudo"* ]]
+}
+
+@test "system: none of the three is in the table apply.sh writes" {
+  # data/defaults.tsv is the list of what this module WRITES, and remove.sh
+  # derives the domains it warns about from column 1. A row here would make
+  # apply.sh run `defaults write` against a setting that is not one.
+  ! grep -qiE 'filevault|socketfilterfw|pam_tid|com\.apple\.alf' "$TSV"
+}
+
+# --- software update ----------------------------------------------------------
+#
+# Six switches macOS does not treat as one, split here the same way: five that
+# have a right answer, and the one that installs a whole new major version.
+# This machine went from macOS 26 to 27 on its own and the only way anyone
+# would have known is that the check exists.
+
+@test "updates: every switch on is one green line" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: a switch turned off is named, one line each" {
+  with_settings '# nothing set'
+  with_store
+  with_updates CriticalUpdateInstall 0
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"security responses"* ]]
+  [[ $output == *"Software Update"* ]]
+}
+
+@test "updates: a key macOS never wrote is not read as off" {
+  # The trap this check had to avoid. All six ship ON, so a Mac whose owner
+  # never opened the pane has no key at all -- and calling that "off" sends
+  # you to a checkbox that is already ticked.
+  with_settings '# nothing set'
+  with_store
+  # A store holding nothing but the browser answer: no update key exists. The
+  # sixth is written back, because the same rule points the other way for it
+  # and the test below is the one about that.
+  : >"$DEFAULTS_STORE"
+  with_updates AutomaticallyInstallMacOSUpdates 0
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: an unwritten version-bump key is the fresh Mac, not a quiet one" {
+  # The same rule as the five above, pointing the other way: this key ships ON
+  # too, so a Mac whose owner never opened the pane IS set to install whole
+  # versions unasked. Reading the missing key as "off" made the default answer
+  # green on exactly the machine the row exists for -- a fresh install, which
+  # is the machine this whole check was written for.
+  with_settings '# nothing set'
+  with_store
+  without_updates AutomaticallyInstallMacOSUpdates
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"including major ones"* ]]
+  # And only that: the five are still green beside it.
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macos_auto_update = true is green on a Mac that never wrote it" {
+  # The mirror of the test above, and what keeps the two branches from
+  # disagreeing about what an unwritten key means: ON either way. Getting this
+  # pair to disagree is what made the default answer green on a fresh install.
+  with_settings 'macos_auto_update = true'
+  with_store
+  without_updates AutomaticallyInstallMacOSUpdates
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'macOS updates install automatically'
+}
+
+@test "updates: macOS installing its own versions is a warning by default" {
+  # The expensive failure, and the reason the default is off: a major version
+  # that arrives on its own cannot be undone without erasing the disk.
+  with_settings '# nothing set'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"including major ones"* ]]
+  [[ $output == *"AutomaticallyInstallMacOSUpdates -bool false"* ]]
+}
+
+@test "updates: turning the version bump off leaves the other five alone" {
+  # The whole point of splitting them. The fix named above must not be a fix
+  # that costs you security patches, so the five stay green beside it.
+  with_settings '# nothing set'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macos_auto_update = true wants the opposite, and says so" {
+  # A setting is only a setting if both answers are checked. With it on, a
+  # machine NOT installing macOS updates is the one that has drifted.
+  with_settings 'macos_auto_update = true'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 0
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"macos_auto_update"* ]]
+}
+
+@test "updates: a domain that does not answer warns instead of passing" {
+  # `defaults read` fails the same way for a key macOS never wrote and for a
+  # domain this process cannot read, and reading both as "unwritten" makes the
+  # five baseline switches GREEN on a machine nobody could ask -- a summary
+  # green on a broken machine, which is the failure this whole file exists for.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$SU_DOMAIN"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output != *"security-patched automatically"* ]]
+}
+
+@test "updates: one unreadable domain does not speak for the other" {
+  # App Store updates live in com.apple.commerce. A machine that answers about
+  # five switches and not the sixth must say exactly that.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$COMMERCE_DOMAIN"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output == *"App Store apps"* ]]
+}
+
+@test "updates: an unreadable version-bump key is not read as on, or as off" {
+  # The setting decides which answer is wanted; neither answer is available
+  # here, and both branches of it have to say so rather than pick one.
+  with_settings '# nothing set'
+  with_store
+  unreadable_domain "$SU_DOMAIN"
+  apply
+  doctor
+  [[ $output == *"could not be read -- whether macOS installs new versions"* ]]
+  [[ $output != *"including major ones"* ]]
+  [[ $output != *"waits for you"* ]]
+}
+
+@test "updates: a domain that answers with no key at all is still the default" {
+  # The other half of the pair, and the reason the two are told apart at all:
+  # a domain that READS and simply has no such key is a machine sitting at
+  # every shipped default, which is green and must stay green.
+  with_settings '# nothing set'
+  with_store
+  without_updates AutomaticCheckEnabled
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'checked, downloaded and security-patched automatically'
+}
+
+@test "updates: macos_auto_update = true is green when macOS does install them" {
+  with_settings 'macos_auto_update = true'
+  with_store
+  with_updates AutomaticallyInstallMacOSUpdates 1
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says updates 'macOS updates install automatically'
+}
+
+# --- default browser ----------------------------------------------------------
+#
+# Installing a browser and being sent to it are two things, and `apps` only
+# does the first. No script may do the second: the confirmation sheet is the
+# whole point of it.
+
+@test "browser: the browser the setting names passes" {
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  says browser 'com.google.chrome opens https links'
+}
+
+@test "browser: a Mac nobody answered the sheet on still opens Safari" {
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"Safari"* ]]
+}
+
+@test "browser: a different browser is named, not just called wrong" {
+  # Both halves, because "not chrome" does not tell you what you are looking
+  # at -- an installer you forgot running is a different problem to a sheet
+  # you never answered.
+  with_settings '# nothing set'
+  with_store
+  with_browser com.brave.browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"com.brave.browser"* ]]
+  [[ $output == *"com.google.chrome"* ]]
+}
+
+@test "browser: the placeholder inside LSHandlerPreferredVersions is skipped" {
+  # `defaults` prints dict keys alphabetically, so that nested LSHandlerRoleAll
+  # = "-" arrives BEFORE the real one. An awk that took the last value seen
+  # without the guard would report every machine as handing https to "-".
+  with_settings '# nothing set'
+  with_store
+  apply
+  doctor
+  [[ $output != *'"-"'* ]]
+  [[ $output != *'browser - '* ]]
+}
+
+@test "browser: a role from an earlier entry is not the https answer" {
+  # LSHandlers is an array, and the handler for https is whatever THAT element
+  # says. An awk keeping its last-seen LSHandlerRoleAll across elements would
+  # report the content-type entry above it -- a confident wrong name, which
+  # reads as a browser you forgot installing rather than as a sheet you never
+  # answered. Cleared at each bare `{`, which a nested `KEY = {` is not.
+  with_settings '# nothing set'
+  with_store
+  with_browser_after com.google.chrome
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"still open in Safari"* ]]
+}
+
+@test "browser: a LaunchServices database that does not answer says so" {
+  # The `|| true` this replaced turned a failed read into an empty handler
+  # list, which prints as "https links still open in Safari" -- a confident
+  # answer to a question nobody could ask, sending you to a confirmation sheet
+  # you may well have answered years ago.
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  # A domain that exists and will not answer: the plist is beside it, and the
+  # stub knows no key for it.
+  mkdir -p "$HOME/Library/Preferences/com.apple.LaunchServices"
+  : >"$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"could not be read"* ]]
+  [[ $output != *"still open in Safari"* ]]
+}
+
+@test "browser: a Mac with no handler list at all is the fresh one, not a mute one" {
+  # The half that must NOT warn about a read: nothing has ever overridden a
+  # handler on this machine, which is Safari and is the answer the check wants
+  # to give. An absent LSHandlers key is that machine.
+  with_settings '# nothing set'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"still open in Safari"* ]]
+  [[ $output != *"could not be read"* ]]
+}
+
+@test "browser: an empty setting says nothing at all" {
+  # The escape hatch, and the same shape as touch_id_sudo: a machine that
+  # wants Safari must not stay yellow forever.
+  with_settings 'browser = ""'
+  with_store
+  with_no_browser
+  apply
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output != *"browser"* ]]
 }

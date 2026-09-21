@@ -57,10 +57,13 @@ Each is a thing the driver reads, so widening one changes what the repo *is*,
 and each means editing `contract.bats` to do it. That friction is the point.
 
 `contract.bats` also holds the cross-file invariants — the rules whose whole
-content is "these files must agree", which nothing else can catch. Several are
+content is "these files must agree", which nothing else can catch. Four are
 about the documentation: it fails if a module goes unmentioned in the README,
-if a verb is missing from the command list there, or if prose anywhere in
-`docs/` names a verb count that `bin/dot` no longer has.
+if a verb is missing from `usage()` or from the command list there, if prose
+anywhere in `docs/` names a verb count that `bin/dot` no longer has, or if a
+setting a hook reads is named in neither that module's `README.md` nor
+`docs/configuration.md`. Everything else is a hand check, so a doc claim worth
+keeping is worth a test here.
 
 ## Layout
 
@@ -80,7 +83,7 @@ A crash prints one line — file, line, command, status — whether it happened 
 `dot` or inside a module hook run as its own process:
 
 ```
-  ✗ modules/macos-defaults/apply.sh:24: defaults write com.apple.dock autohide -bool true (exit 1)
+  ✗ modules/macos-defaults/apply.sh:35: defaults write com.apple.dock autohide -bool true (exit 1)
 ```
 
 When one line is not enough, hooks are ordinary scripts:

@@ -1,0 +1,6 @@
+# Without this file the agent offers only keys in the built-in Personal/Private
+# vault. Naming a vault REPLACES that default, so a key moved to another vault
+# stops signing until it is named here. modules/ssh/doctor.sh reports the result
+# as "holds no keys".
+[[ssh-keys]]
+vault = "Development"

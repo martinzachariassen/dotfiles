@@ -21,13 +21,10 @@ __wizard_fzf_opts() {
     --color='border:dim,header:italic,marker:green,pointer:blue'
 }
 
-# wizard_preview NAME -- what a module would actually do, shown beside the
-# picker. Its own process per keystroke, which is why it sources the library
-# rather than being handed anything.
-#
-# Through `say` and `ui_nest` like everything else: a pane that pads its own
-# label column is a second owner of the width, and the one place that would not
-# follow when ui.sh moves it.
+# wizard_preview NAME -- what a module would do, shown beside the picker. Its
+# own process per keystroke, which is why it sources the library rather than
+# being handed anything. Through `say` and `ui_nest` like everything else: a
+# pane that pads its own label column is a second owner of the width.
 wizard_preview() {
   local name=$1 dir file n
   dir=$(modules_dir "$name")

@@ -1,11 +1,6 @@
 # GUI apps and fonts. Things with a window or menu bar item; CLIs go in
-# dev-cli.
-#
-# A cask whose absence would BREAK another module's shipped config ships from
-# that module instead (cmux, claude-code, ssh, git, zsh): enabling `apps` must
-# never be the undeclared requirement that makes a different module work, and
-# module.toml has no field to say so. A cask a module merely prefers stays
-# here -- git and zsh both fall back in the open when VS Code is absent.
+# dev-cli. A cask whose absence would BREAK another module's shipped config
+# ships from that module instead -- see modules/apps/README.md.
 
 cask "raycast"
 cask "claude"

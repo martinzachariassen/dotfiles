@@ -46,13 +46,19 @@ writing the one line of `module.toml`.
 
 The split is descriptive, not enforced — the shapes are identical to the driver
 and differ only to the reader — so it is only true while the directory says so.
-`dev-cli` was listed as a package set until it grew a `home/` and three hooks;
-a `Packages:` description on a module that links a file is a label
-contradicting the listing next to it. A module can cross the line by growing,
-and the honest move is then to relabel it.
+`dev-cli` was listed as a package set until it grew a `home/` and three hooks,
+and `apps` until it grew a `doctor.sh`; a `Packages:` description on a module
+that links a file or runs a hook is a label contradicting the listing next to
+it. A module can cross the line by growing, and the honest move is then to
+relabel it.
 
-`dotfiles-dev` is the odd package set: the other two are software you use, and
-it is software the repo's own tests need. It sits here rather than in
+`apps` is the narrowest crossing there is: it still links nothing and installs
+nothing but casks, and grew one read-only hook because a menu bar app that was
+never opened is invisible to every other check in the repo. It is a tool module
+because it runs a hook, not because it manages a config file.
+
+`dotfiles-dev` is the odd package set: `work-apps` is software you use, and it
+is software the repo's own tests need. It sits here rather than in
 `core/Brewfile` because a machine that merely *uses* the dotfiles should not
 carry a linter.
 
@@ -135,6 +141,21 @@ That path is the same on every Mac — `2BUA8C4S2C` is AgileBits' Apple team ID,
 not something per-user — which is why it can be tracked rather than generated.
 The machine-local override `~/.ssh/config.local` is `Include`d **first**, so
 anything in it wins: ssh takes the first value it obtains for each keyword.
+
+Which keys the agent offers is a second file, `~/.config/1Password/ssh/agent.toml`,
+also tracked in `modules/ssh`:
+
+```toml
+[[ssh-keys]]
+vault = "Development"
+```
+
+Without it the agent offers only keys in the built-in Personal/Private vault.
+Naming a vault **replaces** that default, so the key has to live in the vault
+the file names. Move the key to another vault and the agent still answers, with
+no keys — pushes fail with `Permission denied (publickey)` and every commit
+signature fails, while nothing else looks wrong. `dot doctor` reports it as
+"holds no keys".
 
 Commit signing rides on the same agent and is set up by
 [`modules/git`](../modules/git/README.md).
