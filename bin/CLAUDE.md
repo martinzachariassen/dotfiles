@@ -66,6 +66,10 @@ existing verb can reach -- not a convenience.
   run as the tail of `apply`, where a second transcript would nest inside the
   first. Never under `--dry-run`. `uninstall.sh` removes `logs/` and must keep
   agreeing they are ours.
+- **A question is a line.** The transcript's `sed` holds a partial line until it
+  ends, so `read -p` shows nothing until the answer arrives. Ask through `say`,
+  then a bare `read`; `contract.bats` refuses `read -p` under `lib/`, `bin/`,
+  `core/` and `modules/`.
 - **`__transcript_start` comes after the argument parse**, never before:
   `--dry-run` is settled there, and a dry run opens no transcript.
 - **One file per run, `<timestamp>-<verb>.log`, twenty kept.** Not one per day

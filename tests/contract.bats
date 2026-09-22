@@ -318,6 +318,28 @@ EOF
   [ -z "$(LC_ALL=C tr -d '\11\12\40-\176' <"$probe")" ]
 }
 
+@test "nothing bin/dot runs prompts with read -p" {
+  # bin/dot's transcript is a line-buffered sed. A prompt has no newline, so it
+  # is held back until the answer supplies one: the run waits on a question
+  # nobody can see. Ask as a line through `say`, then `read` with no prompt.
+  #
+  # uninstall.sh is outside the glob on purpose: it removes the logs and opens
+  # no transcript, so its own prompt reaches the terminal.
+  local pattern='read[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-[a-zA-Z]*p'
+  grep -qE "$pattern" <<<'read -r -p "Write? " reply'
+  grep -qE "$pattern" <<<'read -rp "Write? " reply'
+  ! grep -qE "$pattern" <<<'read -r -d "" src'
+
+  local hits
+  hits=$(grep -rnE --include='*.sh' --include=dot "$pattern" \
+    "$DOT_ROOT/lib" "$DOT_ROOT/bin" "$DOT_ROOT/core" "$DOT_ROOT/modules" |
+    grep -vE ':[0-9]+:[[:space:]]*#' || true)
+  [ -z "$hits" ] || {
+    printf 'read -p under the transcript:\n%s\n' "$hits"
+    return 1
+  }
+}
+
 @test "a transcript carries no escape sequences" {
   # lib/ui.sh settles colour while stdout is still the terminal, which is the
   # only moment it can. The transcript therefore has to strip on the way into
