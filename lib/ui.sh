@@ -187,13 +187,43 @@ step() {
     "$__C_DIM" "$note" "$__C_RESET"
 }
 
+# ui_elapsed SECONDS -- "45s", "3m20s". Pure formatting, so the heartbeat
+# below is the only caller that needs a clock.
+ui_elapsed() {
+  local s=$1
+  if ((s >= 60)); then
+    printf '%dm%02ds' $((s / 60)) $((s % 60))
+  else
+    printf '%ds' "$s"
+  fi
+}
+
 # ui_quote -- another program's output, indented and dimmed. It keeps
 # streaming, because a `brew bundle` that takes two minutes has to be visible
 # while it runs. The caller keeps the status: ${PIPESTATUS[0]}.
+#
+# A large cask or a source build downloads through curl with no tty, which
+# brew prints nothing about until it finishes -- silence indistinguishable
+# from a hang. `read -t` stands in a line of our own every DOT_UI_HEARTBEAT
+# seconds until the child's next line arrives, through `dim` like any other
+# aside.
+#
+# The read is an `if`'s condition, never a bare statement: every caller here
+# runs under `set -e`, and a bare `read -t` failing -- on a timeout as much as
+# on the EOF that ends the loop -- would exit the caller instead of the loop.
 ui_quote() {
-  local line
-  while IFS= read -r line || [[ -n $line ]]; do
-    printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+  local line status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
+  while true; do
+    line=''
+    if IFS= read -r -t "$beat" line; then status=0; else status=$?; fi
+    if ((status > 128)); then
+      idle=$((idle + beat))
+      dim "no output for $(ui_elapsed "$idle") -- still running"
+      continue
+    fi
+    idle=0
+    [[ -z $line ]] || printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+    ((status == 0)) || break
   done
 }
 

@@ -359,6 +359,30 @@ EOF
   [[ $output == *'no trailing newline'* ]]
 }
 
+@test "elapsed: formats under and over a minute" {
+  run bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_elapsed 45"
+  [ "$output" = 45s ]
+  run bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_elapsed 200"
+  [ "$output" = 3m20s ]
+}
+
+@test "quoted output: a silent child gets a heartbeat before its first line" {
+  # DOT_UI_HEARTBEAT is the input that makes this reachable without the real
+  # 15s default -- tests/CLAUDE.md rules out pacing a test with a long sleep.
+  # The short one below times the heartbeat itself, the same trade fs.bats
+  # makes for fs_backup_used.
+  run env DOT_UI_HEARTBEAT=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; { sleep 1.2; printf 'done\n'; } | ui_quote"
+  [[ $output == *'still running'* ]]
+  [[ $output == *'done'* ]]
+}
+
+@test "quoted output: a child that keeps talking gets no heartbeat" {
+  run env DOT_UI_HEARTBEAT=5 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; printf 'a\nb\nc\n' | ui_quote"
+  [[ $output != *'still running'* ]]
+}
+
 @test "die prints a leftover argument rather than dropping it" {
   run bash -c "source '$DOT_ROOT/lib/ui.sh'; die 'went wrong' next 'do this' 'and this'"
   [ "$status" -eq 1 ]
