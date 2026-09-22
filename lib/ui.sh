@@ -187,8 +187,6 @@ step() {
     "$__C_DIM" "$note" "$__C_RESET"
 }
 
-# ui_elapsed SECONDS -- "45s", "3m20s". Pure formatting, so the heartbeat
-# below is the only caller that needs a clock.
 ui_elapsed() {
   local s=$1
   if ((s >= 60)); then
