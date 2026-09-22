@@ -383,6 +383,20 @@ EOF
   [[ $output != *'still running'* ]]
 }
 
+@test "quoted output: a line split by a heartbeat prints whole, not truncated" {
+  # read -t saves what it already read into the variable on a timeout. Losing
+  # that fragment instead of carrying it into the completed line would print
+  # only the half that arrived after the beat.
+  run env DOT_UI_HEARTBEAT=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; { printf 'slow-'; sleep 1.2; printf 'line\n'; } | ui_quote"
+  [[ $output == *'slow-line'* ]]
+}
+
+@test "quoted output: a blank line from the child is not dropped" {
+  run bash -c "source '$DOT_ROOT/lib/ui.sh'; printf 'a\n\nb\n' | ui_quote"
+  [ "$(wc -l <<<"$output" | tr -d ' ')" -eq 3 ]
+}
+
 @test "die prints a leftover argument rather than dropping it" {
   run bash -c "source '$DOT_ROOT/lib/ui.sh'; die 'went wrong' next 'do this' 'and this'"
   [ "$status" -eq 1 ]

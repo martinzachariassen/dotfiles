@@ -202,27 +202,29 @@ ui_elapsed() {
 # streaming, because a `brew bundle` that takes two minutes has to be visible
 # while it runs. The caller keeps the status: ${PIPESTATUS[0]}.
 #
-# A large cask or a source build downloads through curl with no tty, which
-# brew prints nothing about until it finishes -- silence indistinguishable
-# from a hang. `read -t` stands in a line of our own every DOT_UI_HEARTBEAT
-# seconds until the child's next line arrives, through `dim` like any other
-# aside.
-#
 # The read is an `if`'s condition, never a bare statement: every caller here
 # runs under `set -e`, and a bare `read -t` failing -- on a timeout as much as
 # on the EOF that ends the loop -- would exit the caller instead of the loop.
+#
+# A timeout can fire mid-line: bash still saves what it read into the
+# variable. `chunk` accumulates into `line` across timeouts instead of
+# replacing it, so a line split by a heartbeat prints whole, not truncated.
 ui_quote() {
-  local line status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
+  local line='' chunk status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
   while true; do
-    line=''
-    if IFS= read -r -t "$beat" line; then status=0; else status=$?; fi
+    chunk=''
+    if IFS= read -r -t "$beat" chunk; then status=0; else status=$?; fi
+    line+=$chunk
     if ((status > 128)); then
       idle=$((idle + beat))
       dim "no output for $(ui_elapsed "$idle") -- still running"
       continue
     fi
     idle=0
-    [[ -z $line ]] || printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+    if ((status == 0)) || [[ -n $line ]]; then
+      printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+    fi
+    line=''
     ((status == 0)) || break
   done
 }
