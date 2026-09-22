@@ -403,10 +403,43 @@ EOF
   [ "$files" -eq 0 ]
 }
 
+@test "picker: every row is described before fzf starts, so the preset has rows to toggle" {
+  # fzf fires `load` while a list that arrives slowly is still arriving, and
+  # pos(N)+toggle on a row that is not there toggles nothing: the picker opened
+  # with the profile unselected and Enter returned the first row alone. Each
+  # module_desc is a dasel call, so streaming rows as they were described
+  # was exactly that slow list. Counted at the moment the stub starts, not paced
+  # by a sleep.
+  module_desc() {
+    : >"$DOT_TMP/desc-$1"
+    printf 'described\n'
+  }
+  fzf() {
+    find "$DOT_TMP" -name 'desc-*' | wc -l | tr -d ' ' >"$DOT_TMP/described"
+    cat >/dev/null
+  }
+  wizard_pick_modules "$(printf 'git\n')" >/dev/null
+
+  [ "$(cat "$DOT_TMP/described")" -eq "$(modules_all | wc -l | tr -d ' ')" ]
+}
+
+@test "confirm: the question is a line of output, not a read prompt" {
+  # `read -p` prints only when stdin is a terminal, and under bin/dot's
+  # transcript -- a line-buffered sed -- a prompt with no newline is held back
+  # until the answer supplies one. The Review then ended in silence and the run
+  # waited on a question nobody could see.
+  fzf() { printf 'none\n'; }
+  run wizard_run < <(printf 'y\n')
+  [ "$status" -eq 0 ]
+  [[ $output == *'Write this config? [Y/n]'* ]]
+}
+
 # --- Not tested here, and why -------------------------------------------------
 #
 # The picker DRAWING -- the border label, the preview pane, the header -- was
-# checked by hand against a real fzf in a pty, and it draws. It is not a test:
+# checked by hand against a real fzf in a pty, and it draws. So was the preset
+# landing in the picker, and the question above appearing under the transcript.
+# None of it is a test:
 # under bats the pty never gets its EOF and the run hangs, and a test that hangs
 # costs more than the one it replaces. What can be pinned without a terminal is
 # pinned above: every option the real fzf accepts, the preview command surviving

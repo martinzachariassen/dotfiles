@@ -112,6 +112,10 @@ Sourced, never executed. **7 files, no subdirectories.**
   matching when a code is added.
 - `DOT_UI_INDENT` is exported, so a hook's output nests under the step line it
   belongs to. Move it with `ui_nest`/`ui_unnest`, never by hand.
+- **`ui_quote` is a heartbeat, not just a pipe.** A cask download or a source
+  build prints nothing until it finishes, which reads the same as a hang.
+  `DOT_UI_HEARTBEAT` (default 15s) is the input that makes the silent branch
+  reachable in a test without a real wait.
 
 ## Status
 
