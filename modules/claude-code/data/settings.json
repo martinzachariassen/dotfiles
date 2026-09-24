@@ -12,5 +12,10 @@
   "spinnerTipsEnabled": false,
   "theme": "custom:catppuccin-latte",
   "inputNeededNotifEnabled": false,
-  "agentPushNotifEnabled": false
+  "agentPushNotifEnabled": false,
+  "env": {
+    "ANTHROPIC_MODEL": "opusplan",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-5"
+  }
 }
