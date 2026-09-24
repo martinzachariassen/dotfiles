@@ -254,11 +254,14 @@ no_jq() {
   run_hook "$DOT_ROOT/modules/claude-code" doctor.sh
   [ "$status" -eq 0 ]
 
-  # And the next apply leaves the switch standing.
+  # And the next apply leaves the switch standing -- alongside the default
+  # this module does manage, which lives in env.ANTHROPIC_MODEL rather than
+  # the same .model key, and so never fights it.
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
-  run jq -r '.model, .effortLevel' "$HOME/.claude/settings.json"
+  run jq -r '.model, .effortLevel, .env.ANTHROPIC_MODEL' "$HOME/.claude/settings.json"
   [ "$output" = "opus
-low" ]
+low
+opusplan" ]
 }
 
 @test "claude-code apply refuses a settings.json that is not JSON" {
