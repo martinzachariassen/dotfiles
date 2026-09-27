@@ -48,6 +48,11 @@ with `feat`, `fix`, `refactor`, `test`, `docs` and `chore` the types in use.
 The subject says what changed; the body says why, at whatever length the reason
 needs.
 
+A pull request fills in
+[`.github/pull_request_template.md`](.github/pull_request_template.md),
+titled the way the commit is; drop a section with nothing to say, as the
+template itself asks, but never skip the file.
+
 `make brew-audit` is separate on purpose: it asks Homebrew whether the
 Brewfiles still resolve, so it needs the network and its verdict changes when
 Homebrew does -- it must never fail a pull request about something else. CI
