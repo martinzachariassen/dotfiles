@@ -37,13 +37,6 @@ read_only = " 󰌾"
 read_only_style = "red"
 format = "[$path]($style)[$read_only]($read_only_style) "
 
-[directory.substitutions]
-"Documents" = "󰈙 "
-"Downloads" = " "
-"Music" = "󰝚 "
-"Pictures" = " "
-"Developer" = "󰲋 "
-
 [git_branch]
 symbol = " "
 style = "lavender"
