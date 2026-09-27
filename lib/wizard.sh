@@ -72,11 +72,17 @@ wizard_pick_modules() {
     grep -qxF -- "$name" <<<"$preset" && preselect+="pos($i)+toggle+"
   done
 
+  # The whole list before fzf starts: fzf fires `load` while a slowly streamed
+  # list is still arriving, and pos(N) on a row that is not there toggles nothing.
+  local rows='' row
   for name in "${names[@]}"; do
     mark=' '
     grep -qxF -- "$name" <<<"$preset" && mark='*'
-    printf '%s\t%s %-20s %s\n' "$name" "$mark" "$name" "$(module_desc "$name")"
-  done |
+    printf -v row '%s\t%s %-20s %s\n' "$name" "$mark" "$name" "$(module_desc "$name")"
+    rows+=$row
+  done
+
+  printf '%s' "$rows" |
     fzf "${opts[@]}" --multi --prompt='Modules > ' \
       --delimiter=$'\t' --with-nth=2 \
       --border-label=' Step 2 of 3 -- what goes on this machine ' \
@@ -147,10 +153,12 @@ wizard_run() {
   say config "${DOT_CONFIG/#$HOME/\~}"
   dim 'Nothing has been written yet. `dot apply` is what installs and links.'
 
+  # A line, not `read -p`: the transcript's sed holds a partial line back.
   # `|| cancel`: a bare read trips errexit on Ctrl-D, and falling through would
   # read end-of-input as yes.
   printf '\n'
-  read -r -p "  ${__C_BOLD}Write this config?${__C_RESET} [Y/n]: " reply || __wizard_cancel
+  say 'Write this config? [Y/n]'
+  read -r reply || __wizard_cancel
   [[ ${reply:-y} == [Yy]* ]] || __wizard_cancel
 
   config_generate "$name" "$email" "$modules" "$signingkey"

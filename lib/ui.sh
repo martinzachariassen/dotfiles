@@ -187,13 +187,43 @@ step() {
     "$__C_DIM" "$note" "$__C_RESET"
 }
 
+ui_elapsed() {
+  local s=$1
+  if ((s >= 60)); then
+    printf '%dm%02ds' $((s / 60)) $((s % 60))
+  else
+    printf '%ds' "$s"
+  fi
+}
+
 # ui_quote -- another program's output, indented and dimmed. It keeps
 # streaming, because a `brew bundle` that takes two minutes has to be visible
 # while it runs. The caller keeps the status: ${PIPESTATUS[0]}.
+#
+# The read is an `if`'s condition, never a bare statement: every caller here
+# runs under `set -e`, and a bare `read -t` failing -- on a timeout as much as
+# on the EOF that ends the loop -- would exit the caller instead of the loop.
+#
+# A timeout can fire mid-line: bash still saves what it read into the
+# variable. `chunk` accumulates into `line` across timeouts instead of
+# replacing it, so a line split by a heartbeat prints whole, not truncated.
 ui_quote() {
-  local line
-  while IFS= read -r line || [[ -n $line ]]; do
-    printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+  local line='' chunk status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
+  while true; do
+    chunk=''
+    if IFS= read -r -t "$beat" chunk; then status=0; else status=$?; fi
+    line+=$chunk
+    if ((status > 128)); then
+      idle=$((idle + beat))
+      dim "no output for $(ui_elapsed "$idle") -- still running"
+      continue
+    fi
+    idle=0
+    if ((status == 0)) || [[ -n $line ]]; then
+      printf '%s      %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$line" "$__C_RESET"
+    fi
+    line=''
+    ((status == 0)) || break
   done
 }
 

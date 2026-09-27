@@ -266,7 +266,15 @@ reports nothing wrong collapses to a single line. One that does expands,
 showing only what needs attention, and the run ends by repeating those findings
 rather than telling you to scroll. Applying streams instead of collapsing: a
 `brew bundle` that takes two minutes has to be visible while it runs, not
-afterwards.
+afterwards. A cask download or a source build prints nothing of its own while
+it works, which reads the same as a hang, so the streamed line becomes `no
+output for 45s -- still running` every `DOT_UI_HEARTBEAT` seconds (15 by
+default) until the child speaks again.
+
+A question the wizard needs answered — `Write this config? [Y/n]` — is a line
+of output followed by a bare `read`, never a `read -p` prompt: the transcript
+is a line-buffered `sed`, and a prompt with no trailing newline sits in its
+buffer until the answer supplies one.
 
 The count in that last line is the count of the lines under it: a hook is a
 separate process, so its findings reach the driver as records rather than as an

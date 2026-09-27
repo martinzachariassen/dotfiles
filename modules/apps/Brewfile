@@ -5,6 +5,7 @@
 cask "raycast"
 cask "claude"
 cask "bruno" # API client; local files, no account
+cask "zennotes/tap/zennotes" # notes app
 cask "google-chrome"
 cask "spotify"
 cask "visual-studio-code" # $EDITOR (modules/zsh/home/.zshenv) and git's editor
