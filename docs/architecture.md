@@ -189,7 +189,7 @@ tools:
 | `ssh` | the 1Password agent is live **and** holds a key |
 | `apps` | the menu bar apps have been opened at least once |
 | `zsh` | the account's login shell is zsh, so any of it is read |
-| `macos-defaults` | FileVault, the firewall, Touch ID, the update switches, the default browser |
+| `macos-defaults` | FileVault, the firewall, the update switches, the default browser |
 
 Four rules keep this from becoming noise, and they are the same four
 everywhere:
@@ -213,8 +213,8 @@ everywhere:
 - **Anything reported and not fixable from here has an off switch.** A check
   that cannot be satisfied and cannot be silenced goes yellow on every run
   forever, which says exactly as little as a summary that is green on a broken
-  machine. `touch_id_sudo`, `macos_auto_update`, `browser` and `auth_check` are
-  that switch; for the table-driven checks the Brewfile line is.
+  machine. `macos_auto_update`, `browser` and `auth_check` are that switch; for
+  the table-driven checks the Brewfile line is.
 
 ## Your files stay yours
 

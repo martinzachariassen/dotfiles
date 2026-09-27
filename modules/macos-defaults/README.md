@@ -53,7 +53,6 @@ can be refused. The file holds only what a reader could not argue with.
 | `dock_autohide` | `true` | normalised to a literal `true`/`false` |
 | `dock_tilesize` | `48` | must be a positive integer — `defaults -int` stores non-numeric as `0`, and tilesize `0` is a Dock with no icons |
 | `screenshot_dir` | `Pictures/Screenshots` | relative to `$HOME` unless absolute; a leading `~` is expanded, not taken literally |
-| `touch_id_sudo` | `true` | not written at all — only *checked*; see below |
 | `macos_auto_update` | `false` | not written at all — only *checked*; see below |
 | `browser` | `"com.google.chrome"` | not written at all — only *checked*; `""` silences it |
 
@@ -62,7 +61,6 @@ can be refused. The file holds only what a reader could not argue with.
 dock_autohide     = true
 dock_tilesize     = 48
 screenshot_dir    = "Pictures/Screenshots"
-touch_id_sudo     = true
 macos_auto_update = false
 browser           = "com.google.chrome"
 ```
@@ -88,8 +86,7 @@ checked.
 
 ## What it reports and cannot write
 
-FileVault, the application firewall, Touch ID for `sudo`, the software update
-switches and the default browser are not `defaults` keys this module may
+FileVault and the application firewall are not `defaults` keys this module may
 write. Each needs root or a GUI confirmation, so `apply.sh` cannot set them —
 and they are deliberately **not** in `data/defaults.tsv`, which is the list of
 what this module writes and what `remove.sh` derives its domains from. A row
@@ -98,24 +95,12 @@ a preference at all.
 
 `doctor.sh` reports them anyway, because this is the module for macOS system
 state and a Mac with the firewall off is otherwise something nothing in this
-repo ever looks at. Reading all three needs no root and no unlock:
+repo ever looks at. Reading both needs no root and no unlock:
 
 | Checked with | Green when |
 |---|---|
 | `fdesetup status` | `FileVault is On.` |
 | `socketfilterfw --getglobalstate` | `State = 1` or `2` — 2 is on *and* blocking all incoming |
-| `/etc/pam.d/sudo_local` | it holds an **uncommented** `pam_tid.so` auth line |
-
-The last one is the subtle one. macOS ships `sudo_local.template` with the
-`pam_tid` line commented out, so copying the template and changing nothing is
-the most likely half-done state there is — and a check for the file alone would
-call it finished.
-
-Touch ID is also the only one of the three with a setting. FileVault and the
-firewall are baselines; wanting `sudo` to keep asking for a password is a
-taste, and without `touch_id_sudo = false` a machine that holds it would stay
-yellow forever — which says exactly as little as a machine that is always
-green.
 
 A tool that answers nothing is a **warning**, never silence: a question that
 could not be asked is not a healthy answer, the same three-state rule
@@ -188,8 +173,8 @@ and is exactly what the check wants to report. A LaunchServices database that
 It lives here rather than in `apps` because it is macOS system state, not
 something that module installs — the same reason FileVault is here.
 
-The paths are inputs — `DOT_SOCKETFILTERFW`, `DOT_SUDO_LOCAL` and the two
-software-update domains, `DOT_SOFTWAREUPDATE_PREFS` and `DOT_COMMERCE_PREFS` —
+The paths are inputs — `DOT_SOCKETFILTERFW` and the two software-update
+domains, `DOT_SOFTWAREUPDATE_PREFS` and `DOT_COMMERCE_PREFS` —
 because otherwise the branch a test needs is the one the machine running it
 never takes. A test may not write to `/Library/Preferences` at all, which is
 what leaves the unreadable-domain branch unreachable without them.

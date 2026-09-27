@@ -121,7 +121,7 @@ auth_check = true
 
 The last resort behind the table above: a route nobody here thought of, or the
 day Anthropic renames the keychain item. Everything this repo reports and
-cannot fix has one — `touch_id_sudo` and `browser` are the same shape — because
+cannot fix has one — `browser` is the same shape — because
 a permanently yellow line is a line nobody reads.
 
 ## Managed keys

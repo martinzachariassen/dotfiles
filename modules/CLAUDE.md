@@ -87,10 +87,10 @@ source "${DOT_ROOT:?}/lib/dot.sh"
   setting; `git/apply.sh` reads it with `cfg_get`, and that is the exception.
   Every key read this way is named in the module's `README.md` and in
   `docs/configuration.md`; `contract.bats` holds all three together.
-- **A check for something this repo cannot fix needs an off switch.** Touch ID
-  for `sudo`, the macOS version bump, the default browser and Claude Code's
-  sign-in each need root, a GUI confirmation or a login no hook can perform, so
-  each takes a setting; a table-driven check (`dev-cli`, `apps`) uses its
+- **A check for something this repo cannot fix needs an off switch.** The
+  macOS version bump, the default browser and Claude Code's sign-in each need
+  root, a GUI confirmation or a login no hook can perform, so each takes a
+  setting; a table-driven check (`dev-cli`, `apps`) uses its
   Brewfile line instead, and the row goes quiet when the tool is gone. A check
   that can neither be satisfied nor silenced is yellow on every run forever,
   which says exactly as little as a summary green on a broken machine.

@@ -17,12 +17,11 @@ setup() {
   printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN/killall"
   chmod +x "$BIN/defaults" "$BIN/killall"
 
-  # The three checks doctor.sh makes that are not `defaults` keys at all. Each
+  # The two checks doctor.sh makes that are not `defaults` keys at all. Each
   # reads real system state, so each is shadowed -- and shadowed to a HEALTHY
   # machine by default, so every other test in this file says only what it is
   # about. The tests that vary them vary one at a time.
   FW="$DOT_TMP/socketfilterfw"
-  SUDO_LOCAL="$DOT_TMP/sudo_local"
 
   # The two software-update domains, pointed inside the sandbox. doctor.sh asks
   # whether the DOMAIN answers to tell an unwritten key from an unreadable one,
@@ -33,7 +32,6 @@ setup() {
   COMMERCE_DOMAIN="$DOT_TMP/commerce"
   with_filevault 'FileVault is On.'
   with_firewall 'Firewall is enabled. (State = 1)'
-  with_touch_id 'auth       sufficient     pam_tid.so'
 }
 
 # with_filevault TEXT / with_firewall TEXT -- a tool that answers TEXT. The
@@ -50,16 +48,6 @@ with_firewall() {
   printf '%s\n' "$1" >"$DOT_TMP/firewall-answer"
   printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/firewall-answer" >"$FW"
   chmod +x "$FW"
-}
-
-# with_touch_id LINE -- the contents of pam.d/sudo_local. An empty LINE means
-# no file at all, which is what macOS actually ships.
-with_touch_id() {
-  if [[ -z $1 ]]; then
-    rm -f "$SUDO_LOCAL"
-  else
-    printf '%s\n' "$1" >"$SUDO_LOCAL"
-  fi
 }
 
 teardown() { teardown_sandbox; }
@@ -79,7 +67,7 @@ apply() {
 doctor() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
-    DOT_SOCKETFILTERFW="$FW" DOT_SUDO_LOCAL="$SUDO_LOCAL" \
+    DOT_SOCKETFILTERFW="$FW" \
     DOT_SOFTWAREUPDATE_PREFS="$SU_DOMAIN" DOT_COMMERCE_PREFS="$COMMERCE_DOMAIN" \
     "$BASH" "$DOT_ROOT/modules/macos-defaults/doctor.sh"
 }
@@ -494,8 +482,8 @@ wrote() { grep -qF "$1" "$CALLS"; }
 
 # --- what the module can only report -----------------------------------------
 #
-# FileVault, the firewall and Touch ID for sudo are not `defaults` keys: each
-# needs root to change and two need a GUI, so apply.sh cannot write them and
+# FileVault and the firewall are not `defaults` keys: each needs root to
+# change and one needs a GUI, so apply.sh cannot write them and
 # data/defaults.tsv must not list them. doctor.sh reports them anyway, because
 # this is the module for macOS system state and nothing else in the repo would
 # ever look at a machine with the firewall off.
@@ -565,46 +553,11 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [[ $output == *"cannot be checked"* ]]
 }
 
-@test "system: Touch ID for sudo is the uncommented line, not the file" {
-  # macOS ships sudo_local.template with pam_tid commented out. Copying it and
-  # changing nothing is the most likely half-done state there is, and testing
-  # for the file alone would call it finished.
-  with_settings '# nothing set'
-  with_store
-  apply
-  with_touch_id '#auth       sufficient     pam_tid.so'
-  doctor
-  [ "$status" -eq "$DOT_STATUS_WARN" ]
-  [[ $output == *"does not unlock sudo"* ]]
-}
-
-@test "system: no sudo_local at all is the same answer" {
-  with_settings '# nothing set'
-  with_store
-  apply
-  with_touch_id ''
-  doctor
-  [ "$status" -eq "$DOT_STATUS_WARN" ]
-  [[ $output == *"does not unlock sudo"* ]]
-}
-
-@test "system: touch_id_sudo = false says nothing at all about it" {
-  # A taste, not a baseline. Without the setting a machine that does not want
-  # it stays yellow forever, which is the bug a permanently green line is.
-  with_settings 'touch_id_sudo = false'
-  with_store
-  apply
-  with_touch_id ''
-  doctor
-  [ "$status" -eq 0 ]
-  [[ $output != *"sudo"* ]]
-}
-
-@test "system: none of the three is in the table apply.sh writes" {
+@test "system: none of the two is in the table apply.sh writes" {
   # data/defaults.tsv is the list of what this module WRITES, and remove.sh
   # derives the domains it warns about from column 1. A row here would make
   # apply.sh run `defaults write` against a setting that is not one.
-  ! grep -qiE 'filevault|socketfilterfw|pam_tid|com\.apple\.alf' "$TSV"
+  ! grep -qiE 'filevault|socketfilterfw|com\.apple\.alf' "$TSV"
 }
 
 # --- software update ----------------------------------------------------------
@@ -881,7 +834,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: an empty setting says nothing at all" {
-  # The escape hatch, and the same shape as touch_id_sudo: a machine that
+  # The escape hatch, and the same shape as macos_auto_update: a machine that
   # wants Safari must not stay yellow forever.
   with_settings 'browser = ""'
   with_store

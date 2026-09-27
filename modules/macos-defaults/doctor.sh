@@ -48,7 +48,6 @@ fi
 # Inputs, so the branches below are reachable in a test: a domain under
 # /Library/Preferences is not something a test may write.
 fw=${DOT_SOCKETFILTERFW:-/usr/libexec/ApplicationFirewall/socketfilterfw}
-sudo_local=${DOT_SUDO_LOCAL:-/etc/pam.d/sudo_local}
 
 case $(fdesetup status 2>/dev/null) in
   *'FileVault is On'*) ok filevault 'on' ;;
@@ -72,20 +71,6 @@ if [[ -x $fw ]]; then
   esac
 else
   warn firewall "cannot be checked -- $fw is not there"
-fi
-
-if module_setting_bool macos-defaults touch_id_sudo true; then
-  # macOS ships sudo_local.template with its pam_tid line commented out, so
-  # the file existing proves nothing -- an uncommented auth line is the whole
-  # evidence.
-  if [[ -f $sudo_local ]] &&
-    grep -qE '^[[:space:]]*auth[[:space:]].*pam_tid\.so' "$sudo_local"; then
-    ok touch-id 'unlocks sudo'
-  else
-    warn touch-id 'does not unlock sudo'
-    dim "add an uncommented pam_tid.so auth line to $sudo_local"
-    dim "macOS ships the starting point at $sudo_local.template"
-  fi
 fi
 
 su=${DOT_SOFTWAREUPDATE_PREFS:-/Library/Preferences/com.apple.SoftwareUpdate}
