@@ -420,6 +420,11 @@ run_checks() {
 
   if [[ -z $note ]]; then note="core + $(ui_count "${#names[@]}" module)"; fi
   heading "$title" "$note"
+
+  local -a brewfiles=("$DOT_ROOT/core/Brewfile")
+  for name in "${names[@]}"; do brewfiles+=("$(modules_dir "$name")/Brewfile"); done
+  brew_check_prefetch "${brewfiles[@]}"
+
   __check_group core 'the repo, the shim, the config' __core_checks
 
   for name in "${names[@]}"; do
@@ -427,6 +432,7 @@ run_checks() {
     __check_group "$name" "$(module_desc "$name")" module_doctor "$name"
   done
   rm -f "$__checks_sink"
+  brew_check_forget
 
   # Both of these sit outside every group: they are about the machine rather
   # than any one module, and ui_verdict drops its "in X of Y modules"
