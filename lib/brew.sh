@@ -78,6 +78,44 @@ brew_bundle() {
   return 1
 }
 
+# brew_check_prefetch FILE... -- ask brew_missing about every FILE at once, so
+# brew_check reads answers instead of paying ~1s of Ruby start-up per Brewfile
+# in turn. brew_check_forget drops them; anything not prefetched is asked live.
+__BREW_CHECKS=''
+brew_check_prefetch() {
+  local file rcfile pids=()
+  brew_load || return 0
+  __BREW_CHECKS=$(mktemp -d "${TMPDIR:-/tmp}/dot-brew.XXXXXX")
+  for file in "$@"; do
+    [[ -f $file ]] || continue
+    rcfile="$__BREW_CHECKS/${file//\//_}"
+    (
+      rc=0
+      brew_missing "$file" >"$rcfile.out" || rc=$?
+      printf '%s\n' "$rc" >"$rcfile.rc"
+    ) &
+    pids+=($!)
+  done
+  # The pids, never a bare `wait`: apply's transcript writer is a background
+  # job too, and it only ends when the run does.
+  if ((${#pids[@]})); then wait "${pids[@]}"; fi
+}
+
+brew_check_forget() {
+  if [[ -n $__BREW_CHECKS ]]; then rm -rf "$__BREW_CHECKS"; fi
+  __BREW_CHECKS=''
+}
+
+__brew_check_answer() {
+  local rcfile="$__BREW_CHECKS/${1//\//_}" rc
+  if [[ -n $__BREW_CHECKS && -f $rcfile.rc ]]; then
+    rc=$(<"$rcfile.rc")
+    cat "$rcfile.out"
+    return "${rc:-2}"
+  fi
+  brew_missing "$1"
+}
+
 # brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle.
 # Without it a half-installed module reports green: doctor would be looking at
 # nothing but symlinks.
@@ -89,10 +127,10 @@ brew_check() {
   [[ -f $file ]] || return 0
   if ! brew_load; then
     fail packages "Homebrew is not installed -- cannot check $label"
-    return 1
+    return 0
   fi
 
-  missing=$(brew_missing "$file") || status=$?
+  missing=$(__brew_check_answer "$file") || status=$?
   case $status in
     0) ok packages 'all installed' ;;
     1) while IFS= read -r line; do

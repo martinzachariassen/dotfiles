@@ -1,7 +1,11 @@
+# First: brew shellenv puts Homebrew's site-functions on $fpath, which compinit
+# below only sees if it is already there.
+source "$ZDOTDIR/path.zsh"
+
 HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
 HISTSIZE=50000
 SAVEHIST=50000
-mkdir -p "${HISTFILE:h}"
+[[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
 
 setopt SHARE_HISTORY
 setopt HIST_IGNORE_ALL_DUPS
@@ -14,9 +18,12 @@ setopt AUTO_PUSHD
 setopt PUSHD_IGNORE_DUPS
 setopt INTERACTIVE_COMMENTS
 
-# -C skips the per-startup security check, the usual reason a shell opens slowly.
+# -C trusts the dump and never rescans $fpath, so a newly installed formula's
+# completions would never appear; a dump older than a day is rebuilt instead.
 autoload -Uz compinit
-compinit -C -d "${XDG_STATE_HOME:-$HOME/.local/state}/zsh/zcompdump"
+() {
+  if [[ -n $2 ]]; then compinit -d "$1"; else compinit -C -d "$1"; fi
+} "${XDG_STATE_HOME:-$HOME/.local/state}/zsh/zcompdump" "${XDG_STATE_HOME:-$HOME/.local/state}"/zsh/zcompdump(N.mh+24)
 
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' # case-insensitive
 zstyle ':completion:*' menu select
@@ -26,7 +33,6 @@ bindkey -e
 bindkey '^[[A' history-search-backward # Up: search on what you typed
 bindkey '^[[B' history-search-forward
 
-source "$ZDOTDIR/path.zsh"
 source "$ZDOTDIR/aliases.zsh"
 
 command -v starship >/dev/null && eval "$(starship init zsh)"

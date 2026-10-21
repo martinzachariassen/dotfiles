@@ -603,6 +603,21 @@ staged_git() {
   says packages 'stay installed. Removing those is `brew uninstall`, yours to run.'
 }
 
+@test "remove: a link at a shipped path that points elsewhere is left alone" {
+  # fs_unlink once checked only -L, so `dot remove git` deleted a user's own
+  # link to a synced config sitting at the same path as the module's file.
+  listing git
+  pass_core_checks
+  mkdir -p "$HOME/.config/git" "$DOT_TMP/synced"
+  printf '[user]\n' >"$DOT_TMP/synced/config"
+  ln -s "$DOT_TMP/synced/config" "$HOME/.config/git/config"
+
+  run "$DOT_ROOT/bin/dot" remove git
+  [ "$status" -eq 0 ]
+  [ "$(readlink "$HOME/.config/git/config")" = "$DOT_TMP/synced/config" ]
+  [[ $output == *"left alone"* ]]
+}
+
 @test "remove: a module already out of the list is still swept" {
   # What a hand-edited config leaves behind, which is the state `doctor`
   # reports as orphaned links. The verb has to be able to finish that job.

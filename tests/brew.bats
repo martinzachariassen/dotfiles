@@ -284,9 +284,25 @@ teardown() { teardown_sandbox; }
   brew_load() { return 1; }
 
   run brew_check "$DOT_TMP/Brewfile" demo
-  [ "$status" -eq 1 ]
   [[ $output == *"Homebrew is not installed"* ]]
   [[ $output == *demo* ]]
+
+  brew_check "$DOT_TMP/Brewfile" demo >/dev/null 2>&1
+  [ "$DOT_FAILURES" -eq 1 ]
+}
+
+@test "check: no Homebrew does not kill a caller running under set -e" {
+  # bin/dot calls brew_check bare inside a captured group. A `return 1` after
+  # the fail ended the whole doctor run there, and the one line naming the
+  # cause went to a temp file nobody printed.
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  run "$BASH" -c 'set -e
+    source "$1/lib/dot.sh"
+    brew_load() { return 1; }
+    brew_check "$2" demo
+    echo reached' _ "$DOT_ROOT" "$DOT_TMP/Brewfile"
+  [[ $output == *"Homebrew is not installed"* ]]
+  [[ $output == *reached* ]]
 }
 
 @test "check: the label defaults to the module directory name" {
@@ -324,6 +340,63 @@ teardown() { teardown_sandbox; }
   # One failure per package, not one for the batch: the tally is the exit code.
   brew_check "$DOT_TMP/Brewfile" demo >/dev/null 2>&1
   [ "$DOT_FAILURES" -eq 2 ]
+}
+
+# --- brew_check_prefetch ----------------------------------------------------
+#
+# One `brew bundle check` per Brewfile in turn was most of doctor's runtime.
+# Prefetching asks them all at once; what it must never change is the answer.
+
+@test "prefetch: brew_check reads the prefetched answer instead of asking again" {
+  printf 'brew "jq"\n' >"$DOT_TMP/a"
+  printf 'brew "fd"\n' >"$DOT_TMP/b"
+  brew_load() { return 0; }
+  brew_missing() {
+    printf '%s\n' "$1" >>"$DOT_TMP/asked"
+    if [[ $1 == */b ]]; then
+      printf 'Formula fd\n'
+      return 1
+    fi
+  }
+
+  brew_check_prefetch "$DOT_TMP/a" "$DOT_TMP/b" "$DOT_TMP/absent"
+  [ "$(wc -l <"$DOT_TMP/asked")" -eq 2 ]
+
+  brew_check "$DOT_TMP/a" a >/dev/null 2>&1
+  run brew_check "$DOT_TMP/b" b
+  [[ $output == *"Formula fd is not installed"* ]]
+  [ "$(wc -l <"$DOT_TMP/asked")" -eq 2 ]
+
+  brew_check_forget
+  [ -z "$__BREW_CHECKS" ]
+}
+
+@test "prefetch: a check that could not answer still warns, never passes" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew_missing() { return 2; }
+
+  brew_check_prefetch "$DOT_TMP/Brewfile"
+  brew_check "$DOT_TMP/Brewfile" demo >/dev/null 2>&1
+  [ "$DOT_WARNINGS" -eq 1 ]
+  [ "$DOT_FAILURES" -eq 0 ]
+  brew_check_forget
+}
+
+@test "prefetch: waits for its own checks, not every background job" {
+  # apply's transcript writer is a background job that lives as long as the
+  # run; a bare `wait` would block on it forever.
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew_missing() { return 0; }
+  sleep 30 &
+  local sleeper=$!
+
+  SECONDS=0
+  brew_check_prefetch "$DOT_TMP/Brewfile"
+  kill "$sleeper"
+  ((SECONDS < 10))
+  brew_check_forget
 }
 
 # --- brew_unmanaged ---------------------------------------------------------

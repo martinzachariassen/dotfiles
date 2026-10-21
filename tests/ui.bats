@@ -194,6 +194,14 @@ record() {
   [[ $output == *'a line from somewhere else'* ]]
 }
 
+@test "a last line with no trailing newline is still shown" {
+  # A hook ending in a bare `printf` leaves its final line unterminated, and a
+  # plain `while read` dropped it -- often the line saying what went wrong.
+  record eval 'ok packages "all installed"; printf "no newline at the end"'
+  run ui_group demo 'a demo module' "$SINK"
+  [[ $output == *'no newline at the end'* ]]
+}
+
 @test "a warning colours the group without making it a failure" {
   record eval 'warn colima "not running"'
   run ui_group demo 'a demo module' "$SINK"

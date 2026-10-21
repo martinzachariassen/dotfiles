@@ -66,11 +66,14 @@ Sourced, never executed. **7 files, no subdirectories.**
   file deleted from the repo takes its directory out of the declared set, and
   the link it left would sit where nothing looks. `$HOME` stays at one level:
   its children belong to every tool on the machine.
-- `fs_unlink` tests `-L`, `fs_discard` tests `-f`. The guard is in the helper,
-  never the caller.
+- `fs_unlink` tests `-L`, and given a source, that the link points at it;
+  `fs_discard` tests `-f`. The guard is in the helper, never the caller.
 - **Nothing can memoise.** `modules_enabled` is read in subshells; hooks are
   separate processes. Once-per-run work lives in `bin/dot`. Cross-process state
-  is an exported input (`DOT_RUN_ID`), not a remembered value.
+  is an exported input (`DOT_RUN_ID`), not a remembered value. The one answer
+  kept is `brew_check_prefetch`'s, and only for the driver shell that asked:
+  `bin/dot` prefetches and forgets inside one `run_checks`, and anything not
+  prefetched is asked live, so `brew_check` alone behaves exactly as before.
 - `lib/dot.sh` refuses a checkout path containing `"`, backtick, `$` or `\`.
   Three places bake it into generated script or `grep -F` for it:
   `core/apply.sh` and the `uninstall.sh` handoff bake, `core/doctor.sh` and

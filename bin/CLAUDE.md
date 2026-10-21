@@ -48,6 +48,9 @@ existing verb can reach -- not a convenience.
 - **Once-per-run work lives here.** Nothing inside `modules_enabled` can
   memoise, so validation (`cfg_parse_problems`, then `modules_require_known`)
   runs here, once, before anything is touched. `doctor` reports both instead.
+  `run_checks` asks `brew bundle check` about every Brewfile at once up front
+  (`brew_check_prefetch`) -- run in turn they were most of doctor's runtime --
+  and forgets the answers before it returns, so the next run asks again.
 - **`add` and `remove` gate before they touch anything.** `__module_gate`
   checks the config is editable *first*: unlinking a module and then finding
   the list cannot be updated leaves the machine and the file disagreeing.

@@ -238,11 +238,12 @@ cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
 # __cfg_write_lines -- give the user's file back the way it came. mktemp is 0600
 # and `mv` carries that onto the destination, so a config kept at 0644 would come
 # back private. Validated before the swap: after `mv` there is nothing to roll
-# back to.
+# back to. Swapped at the resolved path, or a symlinked config becomes a copy.
 __cfg_write_lines() {
-  local tmp taplo=${DOT_TAPLO_BIN:-taplo}
-  tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")
-  chmod "$(stat -f '%Lp' "$DOT_CONFIG")" "$tmp"
+  local tmp target taplo=${DOT_TAPLO_BIN:-taplo}
+  target=$(realpath "$DOT_CONFIG") || return 1
+  tmp=$(mktemp "${target}.XXXXXX")
+  chmod "$(stat -f '%Lp' "$target")" "$tmp"
 
   if ! printf '%s\n' "$@" >"$tmp"; then
     rm -f "$tmp"
@@ -253,7 +254,7 @@ __cfg_write_lines() {
     return 1
   fi
   # `if`, never `... && mv`: set -e ignores a non-final member of an && list.
-  if mv "$tmp" "$DOT_CONFIG"; then
+  if mv "$tmp" "$target"; then
     return 0
   fi
   rm -f "$tmp"

@@ -42,6 +42,20 @@ claim_one() {
   [[ $output != *kept.conf* ]]
 }
 
+@test "orphans: a scan root that is itself a symlink is still walked" {
+  # BSD find does not follow a starting path that is a link, so a synced
+  # ~/.config/demo pointing elsewhere hid every link under it: doctor said
+  # "none" and uninstall left them all behind to dangle.
+  mkdir -p "$HOME/.config" "$DOT_TMP/synced/demo"
+  ln -s "$DOT_TMP/synced/demo" "$HOME/.config/demo"
+  claim_one
+  ln -s "$MODULE/home/.config/demo/deleted.conf" "$HOME/.config/demo/stale.conf"
+
+  run fs_orphans
+  [ "$status" -eq 0 ]
+  [[ $output == *stale.conf* ]]
+}
+
 @test "orphans: a link pointing outside the repo is left alone" {
   claim_one
   printf 'x\n' >"$DOT_TMP/elsewhere.txt"
