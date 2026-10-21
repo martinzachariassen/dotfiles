@@ -324,9 +324,9 @@ cmd_remove() {
   ui_nest
   module_remove "$name"
 
-  local dst
-  while IFS=$'\t' read -r _ dst; do
-    fs_unlink "$dst"
+  local src dst
+  while IFS=$'\t' read -r src dst; do
+    fs_unlink "$dst" "$src"
   done < <(fs_pairs "$(modules_dir "$name")")
   ui_unnest
 

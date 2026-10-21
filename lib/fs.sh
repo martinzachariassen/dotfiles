@@ -118,10 +118,15 @@ fs_link_tree() {
 # Two helpers, not one "delete this path": a link is recognised by where it
 # points, a generated file by its header. The guard lives here, not the caller.
 
-# fs_unlink DST -- symlinks only. A real file at a path we once owned stays.
+# fs_unlink DST [SRC] -- symlinks only. A real file at a path we once owned
+# stays, and so does a link at a shipped path that points anywhere but SRC.
 fs_unlink() {
-  local dst=$1
+  local dst=$1 src=${2:-}
   [[ -L $dst ]] || return 0
+  if [[ -n $src && $(readlink "$dst") != "$src" ]]; then
+    warn 'left alone' "${dst/#$HOME/\~} -- points somewhere else"
+    return 0
+  fi
   info unlink "${dst/#$HOME/\~}"
   [[ $DOT_DRY_RUN == 1 ]] || rm -f "$dst"
 }
