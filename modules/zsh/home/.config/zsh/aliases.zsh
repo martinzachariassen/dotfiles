@@ -5,7 +5,6 @@ alias ll='eza -l --group-directories-first --git'
 alias la='eza -la --group-directories-first --git'
 alias tree='eza --tree'
 alias cat='bat --paging=never'
-alias grep='rg'
 
 alias g='git'
 alias gs='git status --short --branch'
