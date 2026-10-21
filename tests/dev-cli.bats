@@ -220,6 +220,36 @@ with_runtimes() {
   done <"$DOT_ROOT/modules/dev-cli/data/signin.tsv"
 }
 
+@test "doctor: no mise still runs every sign-in check" {
+  # A missing mise used to fail and exit on the spot, so a machine without it
+  # never heard that gh and gcloud were signed in to nothing either. The PATH
+  # is the real one with mise's directory replaced by links to everything
+  # else in it, so dasel and the rest stay reachable.
+  local dir f path='' nomise="$DOT_TMP/nomise" dirs
+  mkdir -p "$nomise"
+  IFS=: read -ra dirs <<<"$PATH"
+  for dir in "${dirs[@]}"; do
+    if [[ -x $dir/mise ]]; then
+      for f in "$dir"/*; do
+        if [[ ${f##*/} != mise ]]; then ln -sf "$f" "$nomise/"; fi
+      done
+    else
+      path+=":$dir"
+    fi
+  done
+  stub widget
+  fixture_devcli "${WIDGET_ROW[@]}"
+
+  run env PATH="$BIN:$nomise$path" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    XDG_DATA_HOME="$HOME/.local/share" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" \
+    DOT_MODULE=dev-cli DOT_MODULE_DIR="$MODULE_DIR" \
+    "$BASH" "$DOT_ROOT/modules/dev-cli/doctor.sh"
+  [ "$status" -eq 1 ]
+  [[ $output == *"mise"*"not installed"* ]]
+  [[ $output == *"widget login"* ]]
+}
+
 @test "doctor: a CLI with no credentials names the login command" {
   # The deliverable. "not signed in" alone sends you to a man page; the exact
   # command is what makes doctor a checklist you can work down.
