@@ -119,7 +119,6 @@ IFS=$'\037' read -r \
 SESSION_ID=${SESSION_ID:-default}
 PCT=${PCT:-0} LINES_ADDED=${LINES_ADDED:-0} LINES_REMOVED=${LINES_REMOVED:-0} CTX_SIZE=${CTX_SIZE:-0}
 
-# --- line 1: identity -------------------------------------------------------
 LINE1="${CYAN}${BOLD}${MODEL}${RESET}"
 [[ -n $EFFORT ]] && LINE1+=" ${DIM}$(effort_label "$EFFORT")${RESET}"
 
@@ -189,7 +188,6 @@ if [[ -n $PR_NUMBER ]]; then
   LINE1+="${SEP}${PR_TEXT}"
 fi
 
-# --- line 2: budget ---------------------------------------------------------
 BAR_WIDTH=14
 FILLED=$((PCT * BAR_WIDTH / 100))
 ((FILLED > BAR_WIDTH)) && FILLED=$BAR_WIDTH
