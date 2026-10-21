@@ -89,7 +89,7 @@ brew_check() {
   [[ -f $file ]] || return 0
   if ! brew_load; then
     fail packages "Homebrew is not installed -- cannot check $label"
-    return 1
+    return 0
   fi
 
   missing=$(brew_missing "$file") || status=$?

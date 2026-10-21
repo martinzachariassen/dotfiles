@@ -284,9 +284,25 @@ teardown() { teardown_sandbox; }
   brew_load() { return 1; }
 
   run brew_check "$DOT_TMP/Brewfile" demo
-  [ "$status" -eq 1 ]
   [[ $output == *"Homebrew is not installed"* ]]
   [[ $output == *demo* ]]
+
+  brew_check "$DOT_TMP/Brewfile" demo >/dev/null 2>&1
+  [ "$DOT_FAILURES" -eq 1 ]
+}
+
+@test "check: no Homebrew does not kill a caller running under set -e" {
+  # bin/dot calls brew_check bare inside a captured group. A `return 1` after
+  # the fail ended the whole doctor run there, and the one line naming the
+  # cause went to a temp file nobody printed.
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  run "$BASH" -c 'set -e
+    source "$1/lib/dot.sh"
+    brew_load() { return 1; }
+    brew_check "$2" demo
+    echo reached' _ "$DOT_ROOT" "$DOT_TMP/Brewfile"
+  [[ $output == *"Homebrew is not installed"* ]]
+  [[ $output == *reached* ]]
 }
 
 @test "check: the label defaults to the module directory name" {
