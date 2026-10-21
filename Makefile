@@ -6,9 +6,11 @@
 #   make fmt         rewrite files to the project's formatting
 #   make brew-audit  ask Homebrew whether the Brewfiles still resolve
 
+STATUSLINE := modules/claude-code/home/.claude/statusline.sh
 SHIPPED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh \
-	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh
-FORMATTED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh modules/*/*.sh tests/helper.bash
+	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh $(STATUSLINE)
+FORMATTED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh modules/*/*.sh \
+	$(STATUSLINE) tests/helper.bash
 
 SHFMT_FLAGS := -i 2 -ci
 

@@ -19,7 +19,7 @@ data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/defaults.tsv"
 relogin='log out and back in for keyboard and text-substitution changes to fully apply'
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info defaults 'write the Dock, Finder and keyboard keys, and restart those apps'
+  info defaults 'write the Dock, Finder, input and screenshot keys, and restart those apps'
   dim "$relogin"
   exit 0
 fi
@@ -55,5 +55,5 @@ for app in Dock Finder SystemUIServer WindowManager; do
   killall "$app" >/dev/null 2>&1 || true
 done
 
-ok defaults 'written'
+if ((DOT_FAILURES == 0)); then ok defaults 'written'; fi
 dim "$relogin"

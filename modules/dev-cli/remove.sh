@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 #
-# Nothing to delete, and that is the point: apply.sh downloads into directories
-# full of other projects' toolchains, so this reports what is left rather than
-# guessing which of it was ours.
-#
-# Silent when the directory does not exist: uninstall.sh runs every module's
-# remove.sh, and a machine that never enabled dev-cli must hear nothing.
+# Reports, never deletes, and stays silent with no tree: see README.md,
+# "Removal deletes nothing".
 
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"

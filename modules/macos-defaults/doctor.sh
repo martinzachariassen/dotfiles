@@ -179,7 +179,7 @@ if [[ -n $want_browser ]]; then
            /LSHandlerRoleAll = /{ r = $0; sub(/.*= "?/, "", r); sub(/"?;$/, "", r); if (r != "-") role = r }
            /LSHandlerURLScheme = https/{ print role; exit }'); then
       # A dump that arrived and did not parse is the third state too: the shape
-      # of this output is `defaults`' own, and it has changed before.
+      # of this output is `defaults`' own, not a contract.
       warn browser 'could not be read -- the LaunchServices dump did not parse'
     elif [[ $have_browser == "$want_browser" ]]; then
       ok browser "$want_browser opens https links"

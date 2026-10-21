@@ -3,4 +3,4 @@
 # `brew bundle` is idempotent.
 
 cask "claude-code@latest"
-brew "jq" # statusline.sh parses its stdin with it
+brew "jq" # every hook and statusline.sh parse JSON with it

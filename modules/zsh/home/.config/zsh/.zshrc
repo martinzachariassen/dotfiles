@@ -1,6 +1,3 @@
-# Interactive shell. Order: path.zsh, aliases.zsh, tools, local.zsh, then
-# syntax highlighting last (it wraps the line editor).
-
 HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
 HISTSIZE=50000
 SAVEHIST=50000
@@ -37,7 +34,7 @@ command -v zoxide   >/dev/null && eval "$(zoxide init zsh)"
 command -v mise     >/dev/null && eval "$(mise activate zsh)"
 
 # $HOMEBREW_PREFIX comes from `brew shellenv` in path.zsh; `$(brew --prefix)`
-# is a subprocess per call and cost ~139 ms of startup.
+# is a subprocess per call on every shell startup.
 if [[ -r $HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
   source "$HOMEBREW_PREFIX/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 fi

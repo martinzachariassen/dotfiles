@@ -48,7 +48,7 @@ tool built for someone else's. Fork it freely — pull requests aren't expected.
   ✓ containers     Docker via colima (a Linux VM, no Docker Desktop)
   ✓ dev-cli        Development CLI tools, plus mise-managed language runtimes
   ✓ git            Git config, aliases, and a machine-local include
-  ✓ macos-defaults macOS system preferences (Dock, Finder, keyboard)
+  ✓ macos-defaults macOS preferences: Dock, Finder, input, screenshots
   ✓ ssh            SSH client config; keys come from the 1Password agent
   ✓ zsh            zsh with XDG layout, aliases, PATH and prompt
   ✓ orphans        none

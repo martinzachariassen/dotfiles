@@ -13,8 +13,8 @@ brew "bats-core"  # make test
 brew "shellcheck" # make lint
 brew "shfmt"      # make fmt, make fmt-check
 
-# jq: tests/helper.bash parses every shipped .json with it, and contract.bats
-# has no skip guard for it the way it does for zsh and brew. Easy to miss,
-# because macOS ships /usr/bin/jq from 15 on and MACOS_FLOOR is 14. The
-# modules that need jq at RUNTIME name it themselves (claude-code, dev-cli).
+# jq: json_parses in tests/helper.bash reads every shipped .json with it and
+# has no skip guard, unlike the zsh and brew tests. Easy to miss, because macOS
+# ships /usr/bin/jq from 15 on and MACOS_FLOOR is 14. claude-code names its own
+# jq for runtime.
 brew "jq"

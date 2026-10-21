@@ -26,11 +26,10 @@ A recursive merge, so every key this module does not name survives — including
 Two rules keep that honest:
 
 - **Manage only keys nothing else writes.** `/model` and the effort picker write
-  back into this file; managing those would fight you on every apply. The
-  default model is set through `env.ANTHROPIC_MODEL` instead of `.model` for
-  the same reason: the env var outranks `.model` in Claude Code's own
-  precedence, so `opusplan` holds as the default without fighting a `/model`
-  switch, which only ever touches `.model`.
+  back into this file; managing those would fight you on every apply. No model
+  is set at all — not `.model`, not `env.ANTHROPIC_MODEL` — so Claude Code's
+  own current default applies until `/model` says otherwise, and no pinned
+  version goes stale on the next release.
 - **Take back only what is still ours.** `remove.sh` walks the managed *leaves*
   — `.permissions.defaultMode` is ours, `.permissions` as a whole is not —
   deletes each one still holding exactly what apply wrote, then prunes only the
@@ -128,7 +127,5 @@ a permanently yellow line is a line nobody reads.
 
 The current set lives in [`data/settings.json`](data/settings.json): the status
 line, theme, output style, cleanup period, notification toggles,
-`permissions.defaultMode` and the default model (`opusplan` — Sonnet, Opus in
-plan mode — pinned to concrete versions by `env.ANTHROPIC_DEFAULT_OPUS_MODEL`
-and `env.ANTHROPIC_DEFAULT_SONNET_MODEL`). Add one there and all three hooks
+and `permissions.defaultMode`. Add one there and all three hooks
 pick it up — there is no second list to update, and no count here to go stale.

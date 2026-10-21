@@ -25,7 +25,7 @@ jobs:
       # which a pull request controls, under a token with issues: write.
       # Nothing here pushes, so there is no reason for that token to sit in
       # .git/config where PR-controlled code could read it.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
