@@ -231,7 +231,7 @@ fs_repo_links() {
       [[ -z ${seen[$link]:-} ]] || continue
       seen[$link]=1
       printf '%s\n' "$link"
-    done < <(find "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null)
+    done < <(find -H "$dir" -maxdepth "$depth" -type l -print0 2>/dev/null)
   done
 }
 
