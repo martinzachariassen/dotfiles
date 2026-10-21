@@ -476,6 +476,22 @@ EOF
   [ "$(stat -f '%Lp' "$DOT_CONFIG")" = "644" ]
 }
 
+@test "enabled: a symlinked config stays a link, and its target is what changes" {
+  # The swap replaced the link itself: a config kept in another repo was
+  # silently forked into a copy, at the link's own 0755.
+  generated_config
+  mkdir -p "$DOT_TMP/elsewhere"
+  mv "$DOT_CONFIG" "$DOT_TMP/elsewhere/config.toml"
+  chmod 644 "$DOT_TMP/elsewhere/config.toml"
+  ln -s "$DOT_TMP/elsewhere/config.toml" "$DOT_CONFIG"
+
+  cfg_module_add cmux
+
+  [ -L "$DOT_CONFIG" ]
+  grep -q '"cmux",' "$DOT_TMP/elsewhere/config.toml"
+  [ "$(stat -f '%Lp' "$DOT_TMP/elsewhere/config.toml")" = "644" ]
+}
+
 @test "taplo: exit 1 means the file is invalid, and says so" {
   # The answer taplo documents for a file with syntax errors.
   generated_config
