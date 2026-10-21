@@ -25,7 +25,7 @@ check() {
   if [[ $got != "$want" ]]; then drift+=("$domain $key is $got, expected $want"); fi
 }
 
-while IFS=$'\t' read -r domain key type value _; do
+while IFS=$'\t' read -r domain key type value _ || [[ -n $domain ]]; do
   if [[ -z $domain || $domain == '#'* ]]; then continue; fi
   check "$domain" "$key" "$type" "$value"
 done <"$data"

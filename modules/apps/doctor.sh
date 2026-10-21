@@ -16,7 +16,7 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 apps_dir=${DOT_APPS_DIR:-/Applications}
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/launch.tsv"
 
-while IFS=$'\t' read -r app _ domain lost; do
+while IFS=$'\t' read -r app _ domain lost || [[ -n $app ]]; do
   if [[ -z $app || $app == '#'* ]]; then continue; fi
 
   # Not installed says nothing. The cask may have been dropped on purpose, and

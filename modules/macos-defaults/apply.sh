@@ -24,7 +24,7 @@ if [[ $DOT_DRY_RUN == 1 ]]; then
   exit 0
 fi
 
-while IFS=$'\t' read -r domain key type value _; do
+while IFS=$'\t' read -r domain key type value _ || [[ -n $domain ]]; do
   if [[ -z $domain || $domain == '#'* ]]; then continue; fi
   defaults write "$domain" "$key" "-$type" "$value"
 done <"$data"

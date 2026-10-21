@@ -249,7 +249,7 @@ ui_group() {
   local worst='ok'
   local in_fold=0 fold_fail=0 fold_warn=0 add_fail=0 add_warn=0
 
-  while IFS= read -r line; do
+  while IFS= read -r line || [[ -n $line ]]; do
     if [[ $line != "$__UI_RS"* ]]; then
       # Not ours: another program's output. It never reported itself healthy,
       # so it also keeps the group from collapsing over it.

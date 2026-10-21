@@ -354,6 +354,22 @@ wrote() { grep -qF "$1" "$CALLS"; }
   done < <(rows)
 }
 
+@test "table: a last row with no trailing newline is still written" {
+  # `read` returns 1 on an unterminated line while still filling the fields,
+  # so a plain `while read` drops exactly the row an editor left unterminated.
+  mkdir -p "$DOT_TMP/mod/data"
+  cp "$DOT_ROOT/modules/macos-defaults/apply.sh" "$DOT_TMP/mod/"
+  printf 'com.example.demo\tlastkey\tbool\ttrue' >"$DOT_TMP/mod/data/defaults.tsv"
+  with_settings '# nothing set'
+
+  run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
+    DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN=0 \
+    DOT_MODULE=macos-defaults DOT_MODULE_DIR="$DOT_TMP/mod" \
+    "$BASH" "$DOT_TMP/mod/apply.sh"
+
+  wrote 'com.example.demo lastkey -bool true'
+}
+
 @test "table: the type column is one defaults understands" {
   # `defaults write x y -bogus 1` exits 1 and changes nothing, but apply.sh
   # writes 25 keys and would carry on past it.

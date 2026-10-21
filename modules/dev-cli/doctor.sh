@@ -36,7 +36,7 @@ fi
 # `gcloud auth list` and `firebase login:list` CREATE their config directory on
 # a machine that has none. The columns are documented in the module README.
 signin="${DOT_MODULE_DIR:-$(dirname "$0")}/data/signin.tsv"
-while IFS=$'\t' read -r cmd _ rel pattern login costs; do
+while IFS=$'\t' read -r cmd _ rel pattern login costs || [[ -n $cmd ]]; do
   if [[ -z $cmd || $cmd == '#'* ]]; then continue; fi
   if ! command -v "$cmd" >/dev/null 2>&1; then continue; fi
 
