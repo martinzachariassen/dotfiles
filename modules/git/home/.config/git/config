@@ -10,12 +10,23 @@
 [push]
 	default = current
 	autoSetupRemote = true
+	followTags = true
 
 [fetch]
 	prune = true
+	pruneTags = true
 
 [rebase]
 	autoStash = true
+	autoSquash = true
+	updateRefs = true
+
+[rerere]
+	enabled = true
+	autoupdate = true
+
+[commit]
+	verbose = true
 
 [diff]
 	algorithm = histogram
@@ -32,6 +43,12 @@
 
 [branch]
 	sort = -committerdate
+
+[tag]
+	sort = version:refname
+
+[help]
+	autocorrect = prompt
 
 [alias]
 	s = status --short --branch
