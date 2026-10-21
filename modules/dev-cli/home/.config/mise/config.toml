@@ -1,7 +1,7 @@
 [tools]
 java = "temurin-25"
 python = "latest"
-node = "latest"
+node = "lts"
 bun = "latest"
 maven = "latest"
 gradle = "latest"
