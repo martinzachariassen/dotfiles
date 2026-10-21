@@ -235,6 +235,15 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$output" = "0" ]
 }
 
+@test "tilesize: a refused field is not followed by a claim that all was written" {
+  # The fail line and an unconditional `ok written` printed back to back, so
+  # the output contradicted itself even though the exit status was right.
+  with_settings 'dock_tilesize = "big"'
+  apply
+  [ "$status" -ne 0 ]
+  [[ $output != *written* ]]
+}
+
 @test "tilesize: 0 is refused as well" {
   with_settings 'dock_tilesize = 0'
   apply
@@ -322,7 +331,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 
   apply 1
   [ "$status" -eq 0 ]
-  says defaults "write the Dock, Finder and keyboard keys, and restart those apps"
+  says defaults "write the Dock, Finder, input and screenshot keys, and restart those apps"
   [ ! -f "$CALLS" ]
   [ "$(home_snapshot)" = "$before" ]
 }
