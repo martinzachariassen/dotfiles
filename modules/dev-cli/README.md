@@ -38,8 +38,8 @@ none.
 
 ## The sign-ins a fresh machine still owes you
 
-Installing `gh`, `gcloud` and `firebase` is one `dot apply`. Being able to
-*use* them is three more commands, and nothing says so — the run finishes
+Installing `gh` and `gcloud` is one `dot apply`. Being able to
+*use* them is two more commands, and nothing says so — the run finishes
 green and the first 401 arrives an hour later. So `doctor.sh` reads
 `data/signin.tsv` and reports each one:
 
@@ -53,16 +53,15 @@ green and the first 401 arrives an hour later. So `doctor.sh` reads
 | 6 | what it costs — printed under the warning, and the reason to act on it |
 
 It looks for the **credential store on disk** and never asks the tool.
-`gcloud auth list` and `firebase login:list` create their config directory on a
-machine that has none — a check writing to the `$HOME` it is checking, the same
+`gcloud auth list` creates its config directory on a machine that has none —
+a check writing to the `$HOME` it is checking, the same
 trap `mise ls` sets above.
 
 **A file is not a credential, and neither is a file with bytes in it.** That is
 what column 4 is for: every one of these stores outlives the login that filled
 it. `credentials.db` is still a SQLite database once its rows are revoked,
-`firebase-tools.json` keeps its client id and usage counters after a logout,
 and `gh` writes an empty `hosts.yml` the first time it merely *reads* a config.
-A size test calls all three signed in. The pattern names what a login actually
+A size test calls both signed in. The pattern names what a login actually
 writes, and `gcloud`'s row points at `configurations/config_default` rather
 than the database precisely because `account = …` is a line a revoke clears and
 a SQLite page is not.

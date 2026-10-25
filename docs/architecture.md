@@ -184,7 +184,7 @@ tools:
 | Where | Asks |
 |---|---|
 | `core` | the Command Line Tools are still there, and the developer directory is not a dead path |
-| `dev-cli` | `gh`, `gcloud` and `firebase` have credentials on disk |
+| `dev-cli` | `gh` and `gcloud` have credentials on disk |
 | `claude-code` | the CLI can authenticate at all — keychain item, API key, token, Bedrock or Vertex |
 | `ssh` | the 1Password agent is live **and** holds a key |
 | `apps` | the menu bar apps have been opened at least once |
@@ -195,8 +195,8 @@ Four rules keep this from becoming noise, and they are the same four
 everywhere:
 
 - **The evidence is on disk, never the tool's own answer.** `gcloud auth list`
-  and `firebase login:list` create their config directory on a machine that has
-  none, which would make a read-only check write to the thing it is checking.
+  creates its config directory on a machine that has none, which would make a
+  read-only check write to the thing it is checking.
   For the same reason the login shell is read from the account's directory
   record and not from `$SHELL`, which answers for the running window.
   On disk is not the same as *present*, though: a credential store outlives the

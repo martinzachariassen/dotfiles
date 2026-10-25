@@ -30,11 +30,11 @@ else
   fail mise 'not installed (run: dot apply)'
 fi
 
-# Installing these is one command; signing in to each is three more, and a
+# Installing these is one command; signing in to each is two more, and a
 # fresh machine says nothing until something fails hours later with a 401.
 # Answered from the credential store on disk, never by asking the tool:
-# `gcloud auth list` and `firebase login:list` CREATE their config directory on
-# a machine that has none. The columns are documented in the module README.
+# `gcloud auth list` CREATES its config directory on a machine that
+# has none. The columns are documented in the module README.
 signin="${DOT_MODULE_DIR:-$(dirname "$0")}/data/signin.tsv"
 while IFS=$'\t' read -r cmd _ rel pattern login costs; do
   if [[ -z $cmd || $cmd == '#'* ]]; then continue; fi

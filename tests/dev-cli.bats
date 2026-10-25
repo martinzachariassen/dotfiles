@@ -160,9 +160,9 @@ with_runtimes() {
 
 @test "doctor: a store that survived a logout is not a sign-in" {
   # The reason column 4 exists. Every one of these stores keeps existing after
-  # a logout, and two of them keep holding bytes: gcloud's credentials.db is
-  # still a SQLite database once its rows are revoked, and firebase-tools.json
-  # keeps its client id and usage counters. A size test calls both signed in.
+  # a logout, and some keep holding bytes: gcloud's credentials.db is
+  # still a SQLite database once its rows are revoked. A size test calls it
+  # signed in.
   with_mise 'exit 0'
   with_runtimes
   stub widget
