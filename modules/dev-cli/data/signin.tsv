@@ -11,4 +11,3 @@
 
 gh	gh	.config/gh/hosts.yml	(oauth_token|users?):	gh auth login	gh pr, gh repo, and the push that asks for a password
 gcloud	gcloud-cli	.config/gcloud/configurations/config_default	^account[[:space:]]*=[[:space:]]*[^[:space:]]	gcloud auth login	every gcloud call, and the ADC other SDKs read
-firebase	firebase-cli	.config/configstore/firebase-tools.json	"(tokens|user)"	firebase login	deploys, and the emulators that check a project
