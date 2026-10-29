@@ -1,6 +1,7 @@
 [tools]
 java = "temurin-25"
 go = "latest"
+golangci-lint = "latest"
 python = "latest"
 node = "latest"
 bun = "latest"
@@ -8,4 +9,3 @@ maven = "latest"
 gradle = "latest"
 just = "latest"
 terraform = "latest"
-golangci-lint = "2.14.0"
