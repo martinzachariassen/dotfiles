@@ -15,9 +15,6 @@ alias gl='git log --oneline --graph --decorate -20'
 alias ..='cd ..'
 alias ...='cd ../..'
 
-# install.sh's default checkout path; edit if you cloned elsewhere.
-alias dotup='git -C "$HOME/Developer/personal/dotfiles" pull --ff-only && dot apply'
-
 # Plain `exec zsh` inherits this shell's ZDOTDIR, so the new process looks for
 # .zshenv in $ZDOTDIR instead of ~/.zshenv -- finds none there, and silently
 # skips ~/.zshenv (and everything it exports, DOCKER_HOST included) entirely.

@@ -76,6 +76,7 @@ usage() {
 
   heading 'Commands'
   say apply 'Install packages, link config files, run module hooks.'
+  __under '--pull      fast-forward this repo first'
   __under '--dry-run   show every intended change, make none'
   say add 'Enable one module and apply it.'
   __under '<module> [--dry-run]'
@@ -95,15 +96,44 @@ usage() {
   printf '\n'
 }
 
+# __pull ARGS... -- fast-forward the checkout, then hand over to the pulled
+# bin/dot: bash reads this file as it runs, and lib/ is already sourced.
+__pull() {
+  local repo=${DOT_ROOT/#$HOME/\~} dirty
+  info pull "git pull --ff-only in $repo"
+  if [[ $DOT_DRY_RUN == 1 ]]; then return 0; fi
+
+  dirty=$(git -C "$DOT_ROOT" status --porcelain) ||
+    die 'pull: the repo is not a git checkout' repo "$repo"
+  [[ -z $dirty ]] ||
+    die 'pull: the repo has uncommitted changes -- not pulling over them' \
+      see "git -C $repo status"
+
+  if ! git -C "$DOT_ROOT" pull --ff-only 2>&1 | ui_quote; then
+    die 'pull: git could not fast-forward -- nothing was applied' \
+      inspect "git -C $repo log --oneline --graph -20"
+  fi
+
+  exec "$BASH" "$DOT_ROOT/bin/dot" apply "$@"
+}
+
 cmd_apply() {
+  local pull=0
+  local -a pass=()
   # Anything unknown is fatal: `dot apply --dry` must not apply for real.
   while (($#)); do
     case $1 in
-      --dry-run) export DOT_DRY_RUN=1 ;;
-      *) die "apply: unknown option '$1'" next 'dot apply [--dry-run]' ;;
+      --dry-run)
+        export DOT_DRY_RUN=1
+        pass+=("$1")
+        ;;
+      --pull) pull=1 ;;
+      *) die "apply: unknown option '$1'" next 'dot apply [--pull] [--dry-run]' ;;
     esac
     shift
   done
+
+  if ((pull)); then __pull "${pass[@]}"; fi
 
   # After the parse, never before: --dry-run opens no transcript.
   __transcript_start apply
