@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Claude Code status line, two lines.
-#   1: model + effort · dir · session tag · git · session diff · PR
-#   2: context gauge | 5h/7d quota + reset countdown
-#
-# ANSI-16 colours only, so the bar follows the terminal theme. Icons are Nerd
-# Font glyphs; the branch icon is the one starship.toml uses for git_branch.
 set -euo pipefail
 
 input="$(cat)"
@@ -15,17 +9,16 @@ BLUE=$'\033[34m' MAGENTA=$'\033[35m' CYAN=$'\033[36m'
 SEP=" ${DIM}·${RESET} "
 DIVIDER=" ${DIM}|${RESET} "
 
-I_DIR=$''           # fa-folder
-I_BRANCH=$''        # pl-branch
-I_TAG=$''           # fa-tag
-I_DIFF=$''          # oct-diff -- keeps session +N distinct from git's +N
-I_PR=$''            # oct-git_pull_request
-I_OK=$''            # fa-check
-I_NO=$''            # fa-times
-I_CTX=$'\U000f035b' # md-memory
-I_RESET_ICO=$''     # fa-refresh
+I_DIR=$''
+I_BRANCH=$''
+I_TAG=$''
+I_DIFF=$''
+I_PR=$''
+I_OK=$''
+I_NO=$''
+I_CTX=$'\U000f035b'
+I_RESET_ICO=$''
 
-# 1234 -> 1k, 1000000 -> 1.0M.
 fmt_tokens() {
   local n=$1
   if ((n >= 1000000)); then
@@ -37,7 +30,6 @@ fmt_tokens() {
   fi
 }
 
-# Sub-minute collapses to "<1m" so the countdown stops flickering.
 fmt_eta() {
   local s=$1
   if ((s < 0)); then s=0; fi
@@ -56,7 +48,6 @@ fmt_eta() {
   fi
 }
 
-# Same 70/90 split as starship, so yellow means the same thing everywhere.
 pct_color() {
   if (($1 >= 90)); then
     printf '%s' "$RED"
@@ -79,16 +70,13 @@ trunc() {
   if ((${#s} > max)); then printf '%s…' "${s:0:max-1}"; else printf '%s' "$s"; fi
 }
 
-# OSC 8 hyperlink.
 osc8() {
   local esc=$'\033' st=$'\033\\'
   printf '%s]8;;%s%s%s%s]8;;%s' "$esc" "$1" "$st" "$2" "$esc" "$st"
 }
 
-# One jq call (its startup dominates runtime), joined on \037, which cannot
-# appear in the values once control characters are stripped. Written as the jq
-# escape \u001f, never a literal byte: editors and formatters silently drop it,
-# and the whole record then lands in MODEL. The IFS below must stay in sync.
+# The jq escape, never a literal \037 byte: editors silently drop it, and the
+# whole record lands in MODEL. The IFS below must match.
 fields="$(jq -r '
     def clean: if . == null then "" else tostring | gsub("[[:cntrl:]]"; " ") end;
     def num: if . == null then 0 else . end;
@@ -132,7 +120,6 @@ if [[ -n $SESSION_NAME ]]; then
   LINE1+="${SEP}${DIM}${I_TAG}${RESET} ${DIM}${S}${RESET}"
 fi
 
-# Cached per session for a few seconds: the bar re-renders on every keystroke.
 if [[ -n $DIR ]] && git -C "$DIR" rev-parse --git-dir >/dev/null 2>&1; then
   cache="${TMPDIR:-/tmp}/claude-statusline-git-${SESSION_ID}"
   age=999

@@ -1,15 +1,7 @@
 # shellcheck shell=bash
-#
-# Reading config.toml. There is no general writer: every TOML writer drops
-# comments, so the file is generated once and never rewritten.
-#
-# dasel v3: input on stdin, -i is the INPUT format, a missing key exits 1.
-# Everything is read as -o yaml so __cfg_unquote has one set of rules to undo.
 
 cfg_exists() { [[ -f $DOT_CONFIG ]]; }
 
-# Bump only when the file's shape changes enough that an older `dot` would
-# misread a newer config, or the reverse.
 DOT_CONFIG_SCHEMA=1
 
 # Only "" and '' are undone: a \t rule would corrupt literal backslashes.
@@ -29,7 +21,6 @@ __cfg_unquote() {
   printf '%s\n' "$v"
 }
 
-# toml_get FILE KEY [DEFAULT] -- one reader for config.toml and module.toml.
 toml_get() {
   local file=$1 key=$2 default=${3:-} raw
   [[ -f $file ]] || {
@@ -43,7 +34,6 @@ toml_get() {
   fi
 }
 
-# toml_list FILE KEY -- one element per line.
 toml_list() {
   local file=$1 key=$2 line
   [[ -f $file ]] || return 0
@@ -59,11 +49,9 @@ cfg_list() { toml_list "$DOT_CONFIG" "$1"; }
 
 DOT_CFG_UNCHECKED=0
 
-# Only meaningful after cfg_parse_problems has run in this process.
 cfg_unchecked() { ((DOT_CFG_UNCHECKED)); }
 
-# __cfg_taplo -- 0 valid, 1 invalid, 2 could not check, 3 not installed yet.
-# Only taplo's documented 1 means invalid; a panic exits 101.
+# Only taplo's documented exit 1 means invalid; a panic exits 101.
 __cfg_taplo() {
   local taplo=${DOT_TAPLO_BIN:-taplo} status=0
   command -v "$taplo" >/dev/null 2>&1 || return 3
@@ -75,9 +63,7 @@ __cfg_taplo() {
   esac
 }
 
-# cfg_parse_problems -- one line per sign the config did not parse whole.
-# dasel stops at a malformed line and exits 0, so taplo asks first; the
-# heuristics are for before phase 1 and miss a typo in the last table.
+# dasel stops at a malformed line and exits 0, so taplo is asked first.
 cfg_parse_problems() {
   local -A seen=()
   local name status=0
@@ -93,25 +79,23 @@ cfg_parse_problems() {
     2) DOT_CFG_UNCHECKED=1 ;;
   esac
 
+  # Names are only compared, never built into a selector: dasel reads `-` as
+  # subtraction.
   while IFS= read -r name; do
     seen[$name]=1
   done < <(dasel -i toml -o yaml 'keys()' <"$DOT_CONFIG" 2>/dev/null | sed 's/^- //')
 
-  # Names are only compared, never turned into a selector: dasel reads `-` as
-  # subtraction.
   while IFS= read -r name; do
     if [[ -z ${seen[$name]:-} ]]; then
       printf 'declares [%s] but the parser cannot see it -- syntax error above that line\n' "$name"
     fi
   done < <(sed -n 's/^\[\[*\([A-Za-z0-9_-]\{1,\}\)[].].*/\1/p' "$DOT_CONFIG" | sort -u)
 
-  # `enabled = []` is legal; a key that cannot be read is a truncated file.
   if [[ -n ${seen[modules]:-} ]] &&
     ! dasel -i toml -o yaml 'modules.enabled' <"$DOT_CONFIG" >/dev/null 2>&1; then
     printf 'has a [modules] table with no readable `enabled` list\n'
   fi
 
-  # Reported rather than migrated: config.toml is the user's file.
   local schema
   schema=$(toml_get "$DOT_CONFIG" 'schema' '')
   if [[ -z $schema ]]; then
@@ -122,8 +106,7 @@ cfg_parse_problems() {
   fi
 }
 
-# __cfg_quote VALUE -- a TOML basic string. Every user-supplied value goes
-# through here: one stray `"` makes dasel drop every table below it.
+# One stray `"` in a value makes dasel drop every table below it.
 __cfg_quote() {
   local v=$1
   v=${v//\\/\\\\}
@@ -131,8 +114,6 @@ __cfg_quote() {
   printf '"%s"' "$v"
 }
 
-# config_generate NAME EMAIL MODULES [SIGNINGKEY] -- the one writer. Refuses
-# to clobber; after this the file belongs to the user.
 config_generate() {
   local name=$1 email=$2 modules=$3 signingkey=${4:-} line
 
@@ -187,11 +168,6 @@ FOOTER
   ok config "wrote ${DOT_CONFIG/#$HOME/\~}"
 }
 
-# The one exception to "written once": a line of `enabled` at a time, every
-# other byte copied through. A hand-reshaped array makes these refuse.
-
-# __cfg_enabled_span -- "first last" line indices of the array body. Fails when
-# the array was reformatted by hand, and the caller must then say so.
 __cfg_enabled_span() {
   local -a lines
   local i n start=0 end=0
@@ -211,7 +187,6 @@ __cfg_enabled_span() {
       end=$i
       break
     }
-    # An entry, a comment or a blank; anything else and an edit could lose data.
     [[ ${lines[i]} =~ ^\ \ \"[^\"]+\",$ || ${lines[i]} =~ ^[[:space:]]*(#.*)?$ ]] ||
       return 1
   done
@@ -222,11 +197,10 @@ __cfg_enabled_span() {
 
 cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
 
-# __cfg_write_lines -- validated before the `mv`, which cannot be rolled back.
-# The mode is copied: mktemp's 0600 would otherwise replace the user's.
 __cfg_write_lines() {
   local tmp taplo=${DOT_TAPLO_BIN:-taplo}
   tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")
+  # mktemp creates 0600, and `mv` would carry that onto the user's file.
   chmod "$(stat -f '%Lp' "$DOT_CONFIG")" "$tmp"
 
   if ! printf '%s\n' "$@" >"$tmp"; then
@@ -245,8 +219,6 @@ __cfg_write_lines() {
   return 1
 }
 
-# cfg_module_add NAME -- alphabetical, the order config_generate wrote and every
-# report prints. Comments keep their place; a duplicate is the caller's problem.
 cfg_module_add() {
   local name=$1 start end i at
   local -a lines
@@ -264,8 +236,6 @@ cfg_module_add() {
   __cfg_write_lines "${lines[@]:0:at}" "  \"$name\"," "${lines[@]:at}"
 }
 
-# cfg_module_remove NAME -- drops the one line, inside the array body only. A
-# string that looks like an entry anywhere else in the file is not one.
 cfg_module_remove() {
   local name=$1 start end i
   local -a lines out=()

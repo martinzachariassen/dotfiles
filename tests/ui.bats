@@ -1,7 +1,4 @@
 #!/usr/bin/env bats
-#
-# lib/ui.sh: the label column, the two alphabets, and the collapse that lets a
-# report of forty green lines be read at a glance.
 
 setup() {
   load helper
@@ -11,33 +8,22 @@ setup() {
 
 teardown() { teardown_sandbox; }
 
-# Records, the way a driver collects them: the printers write to a file and
-# ui_group reads it back.
 record() {
   export DOT_UI_RECORDS=1
   "$@" >"$SINK" 2>&1
   unset DOT_UI_RECORDS
 }
 
-# --- The column -------------------------------------------------------------
-
 @test "the label column is the same width whoever wrote the line" {
-  # ASCII and no colour so a byte offset IS the column: a glyph is three bytes
-  # in the other alphabet, and an escape is several more that a terminal never
-  # draws. Both lines carry the same prefix either way, but a number that means
-  # what it says is worth the two variables.
   run env NO_COLOR=1 DOT_ASCII=1 bash -c \
     "source '$DOT_ROOT/lib/ui.sh'; ok a 'one'; ok longerlabel 'two'"
   local first second
   first=$(sed -n '1p' <<<"$output" | grep -bo 'one' | cut -d: -f1)
   second=$(sed -n '2p' <<<"$output" | grep -bo 'two' | cut -d: -f1)
 
-  # The comparison is the test: a label three times longer may not push its own
-  # message right, which is what every call site padding for itself used to do.
   [ -n "$first" ]
   [ -n "$second" ]
   [ "$first" -eq "$second" ]
-  # And the column is ui.sh's, not the width the caller happened to type.
   [ "$first" -ge 12 ]
 }
 
@@ -47,25 +33,17 @@ record() {
   [[ $output == *'just a message'* ]]
 }
 
-# --- Colour and alphabet ----------------------------------------------------
-
 @test "NO_COLOR leaves no escape sequence behind" {
   run env NO_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ok a b; fail c d; heading 'Title'"
   [[ $output != *$'\033'* ]]
 }
 
 @test "DOT_COLOR=1 turns colour on even with no terminal attached" {
-  # The branch the transcript depends on: stdout is a pipe by the time apply
-  # prints anything, and colour still has to reach the terminal.
   run env DOT_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ok a b"
   [[ $output == *$'\033'* ]]
 }
 
 @test "colour: every line closes what it opened" {
-  # An unclosed sequence does not stay on its own line: it bleeds into the next
-  # one, and the last one bleeds into the shell prompt after the run. Nothing
-  # here can see what a terminal paints, but this is the property that decides
-  # whether what it paints stays inside the line.
   run env DOT_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'
     ok packages 'all installed'
     fail files 'not linked'
@@ -81,8 +59,6 @@ record() {
   while IFS= read -r line; do
     [[ $line == *$'\033'* ]] || continue
     coloured=$((coloured + 1))
-    # `wc -l`, not `grep -c`: -c counts matching LINES, and every sequence here
-    # is on the same one.
     opens=$(grep -o $'\033\[[0-9;]*m' <<<"$line" | grep -v $'\033\[0m' | wc -l | tr -d ' ')
     resets=$(grep -o $'\033\[0m' <<<"$line" | wc -l | tr -d ' ')
     [ "$opens" -eq "$resets" ] || {
@@ -92,13 +68,10 @@ record() {
     }
   done <<<"$output"
 
-  # A test that found no colour at all would pass for the wrong reason.
   [ "$coloured" -ge 6 ]
 }
 
 @test "colour: each severity gets its own code, and they stay distinct" {
-  # Green for ok and red for fail is not a detail: it is the whole reason the
-  # eye finds the three red lines among forty.
   run env DOT_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ok a b"
   [[ $output == *$'\033[32m'* ]]
   run env DOT_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; fail a b"
@@ -122,7 +95,6 @@ record() {
 
 @test "a narrow terminal does not widen the rule past it" {
   run env DOT_COLUMNS=40 NO_COLOR=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; heading 'Title'"
-  # Measured in characters, not bytes: the rule is drawn with a three-byte glyph.
   local line longest=0
   while IFS= read -r line; do
     if ((${#line} > longest)); then longest=${#line}; fi
@@ -130,24 +102,18 @@ record() {
   [ "$longest" -le 40 ]
 }
 
-# --- Steps and nesting -------------------------------------------------------
-
 @test "a step carries its counter, and drops it when there is not one" {
   run bash -c "source '$DOT_ROOT/lib/ui.sh'; step 3 9 containers 'Docker via colima'"
   [[ $output == *"[3/9]"* ]]
   [[ $output == *containers* ]]
   [[ $output == *"Docker via colima"* ]]
 
-  # core is a phase, not one of the numbered modules.
   run bash -c "source '$DOT_ROOT/lib/ui.sh'; step '' '' core 'the repo itself'"
   [[ $output != *"["* ]]
   [[ $output == *core* ]]
 }
 
 @test "the indent reaches a hook, which is a separate process" {
-  # Without the export, everything a hook printed climbed back out to the left
-  # margin under the step line it belonged to. A subshell is not the test: the
-  # hook is exec'd, so only the environment carries this.
   local hook="$DOT_TMP/hook.sh"
   printf '#!/usr/bin/env bash\nsource "%s/lib/ui.sh"\nok inner deep\n' \
     "$DOT_ROOT" >"$hook"
@@ -163,8 +129,6 @@ record() {
     printf '[%s]\n' \"\$DOT_UI_INDENT\""
   [[ $output == *"[]"* ]]
 }
-
-# --- Groups -----------------------------------------------------------------
 
 @test "a group where everything passed collapses to one line" {
   record eval 'ok packages "all installed"; ok files "all linked"'
@@ -187,8 +151,6 @@ record() {
 }
 
 @test "output from another program is never hidden by the collapse" {
-  # brew, defaults, a bare echo in a hook: nothing that did not report itself
-  # healthy may disappear into a green line.
   record eval 'ok packages "all installed"; echo "a line from somewhere else"'
   run ui_group demo 'a demo module' "$SINK"
   [[ $output == *'a line from somewhere else'* ]]
@@ -201,8 +163,6 @@ record() {
 }
 
 @test "a hook's own records reach the driver, not just its exit status" {
-  # The whole reason for the record protocol: before it, three problems in one
-  # hook came back as a single rolled-up failure and could not be counted.
   local hook="$DOT_TMP/doctor.sh"
   cat >"$hook" <<EOF
 #!/usr/bin/env bash
@@ -217,9 +177,6 @@ EOF
 }
 
 @test "a hook's findings are counted one by one, not as one exit status" {
-  # fold_status sees a number, and a hook with three problems exits once. The
-  # tally said "1 problem" and the list underneath it said three, which is the
-  # one thing the summary may not do.
   local hook="$DOT_TMP/doctor.sh"
   cat >"$hook" <<EOF
 #!/usr/bin/env bash
@@ -238,9 +195,6 @@ EOF
 }
 
 @test "a roll-up survives beside a failure that is not its own" {
-  # The drop used to be decided by the failure count of the WHOLE group, so a
-  # package check that failed silenced the only line naming a hook that died
-  # before it could print anything. Each roll-up now answers for its own child.
   local hook="$DOT_TMP/doctor.sh"
   printf '#!/usr/bin/env bash\nexit 9\n' >"$hook"
   record eval "fail packages 'colima is not installed'
@@ -266,8 +220,6 @@ EOF
   [ "${#DOT_PROBLEMS[@]}" -eq 1 ]
 }
 
-# --- The verdict ------------------------------------------------------------
-
 @test "the count in the verdict is the count of the lines above it" {
   record eval 'fail a "first"; fail b "second"'
   ui_group demo 'a demo module' "$SINK"
@@ -290,20 +242,13 @@ EOF
   [[ $output != *'1 problems'* ]]
 }
 
-# --- Counting ---------------------------------------------------------------
-
 @test "a count of one is singular, everywhere it is said" {
-  # "core + 1 modules" shipped once. ui_count is the single answer to it, so
-  # what is checked here is the helper rather than each of its callers.
   [ "$(ui_count 1 module)" = "1 module" ]
   [ "$(ui_count 0 module)" = "0 modules" ]
   [ "$(ui_count 2 module)" = "2 modules" ]
 }
 
 @test "the verdict blames modules only when every finding came from one" {
-  # doctor prints orphan links outside every group. Counting those into "in X
-  # of Y modules" produced "1 warning in 0 of 1 module", which is a summary
-  # arguing with itself.
   record eval 'ok packages "all installed"'
   ui_group demo 'a demo module' "$SINK"
   DOT_WARNINGS=1
@@ -314,9 +259,6 @@ EOF
 }
 
 @test "the verdict's group total is singular too" {
-  # Through a real group rather than by setting the counters: the qualifier is
-  # now allowed only when the repeated list accounts for every finding, so a
-  # hand-set tally with nothing behind it no longer describes any run.
   record eval 'fail files "not linked"'
   ui_group demo 'a demo module' "$SINK"
   run ui_verdict 'All good.' module
@@ -324,11 +266,7 @@ EOF
   [[ $output != *"of 1 modules"* ]]
 }
 
-# --- The repeated list ------------------------------------------------------
-
 @test "a finding is not labelled with the name of its own group" {
-  # modules/zsh/doctor.sh labels its lines "zsh", and the repeat already says
-  # which module it is: "zsh  zsh: ZDOTDIR is ..." said it twice.
   record eval 'warn zsh "ZDOTDIR is somewhere else"'
   ui_group zsh 'the zsh module' "$SINK"
   DOT_WARNINGS=1
@@ -344,8 +282,6 @@ EOF
   run ui_verdict 'All good.' module
   [[ $output == *'files: not linked'* ]]
 }
-
-# --- Edges ------------------------------------------------------------------
 
 @test "a heading longer than the terminal still ends in one line" {
   run env DOT_COLUMNS=40 NO_COLOR=1 bash -c \
@@ -367,10 +303,6 @@ EOF
 }
 
 @test "quoted output: a silent child gets a heartbeat before its first line" {
-  # DOT_UI_HEARTBEAT is the input that makes this reachable without the real
-  # 15s default -- CLAUDE.md rules out pacing a test with a long sleep.
-  # The short one below times the heartbeat itself, the same trade fs.bats
-  # makes for fs_backup_used.
   run env DOT_UI_HEARTBEAT=1 bash -c \
     "source '$DOT_ROOT/lib/ui.sh'; { sleep 1.2; printf 'done\n'; } | ui_quote"
   [[ $output == *'still running'* ]]
@@ -384,9 +316,6 @@ EOF
 }
 
 @test "quoted output: a line split by a heartbeat prints whole, not truncated" {
-  # read -t saves what it already read into the variable on a timeout. Losing
-  # that fragment instead of carrying it into the completed line would print
-  # only the half that arrived after the beat.
   run env DOT_UI_HEARTBEAT=1 bash -c \
     "source '$DOT_ROOT/lib/ui.sh'; { printf 'slow-'; sleep 1.2; printf 'line\n'; } | ui_quote"
   [[ $output == *'slow-line'* ]]

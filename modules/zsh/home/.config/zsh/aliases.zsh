@@ -1,5 +1,3 @@
-# Every replacement here is a package in this module's Brewfile.
-
 alias ls='eza --group-directories-first'
 alias ll='eza -l --group-directories-first --git'
 alias la='eza -la --group-directories-first --git'
@@ -15,7 +13,5 @@ alias gl='git log --oneline --graph --decorate -20'
 alias ..='cd ..'
 alias ...='cd ../..'
 
-# Plain `exec zsh` inherits this shell's ZDOTDIR, so the new process looks for
-# .zshenv in $ZDOTDIR instead of ~/.zshenv -- finds none there, and silently
-# skips ~/.zshenv (and everything it exports, DOCKER_HOST included) entirely.
+# Plain `exec zsh` inherits ZDOTDIR and silently skips ~/.zshenv.
 alias reload='exec env -u ZDOTDIR zsh -l'

@@ -1,8 +1,4 @@
 #!/usr/bin/env bats
-#
-# modules/macos-defaults/apply.sh. `defaults` is shadowed on PATH: it talks to
-# cfprefsd, which ignores $HOME, so the real one would rewrite the developer's
-# settings. The stub records every call and doubles as the assertion.
 
 load helper
 
@@ -17,27 +13,14 @@ setup() {
   printf '#!/usr/bin/env bash\nexit 0\n' >"$BIN/killall"
   chmod +x "$BIN/defaults" "$BIN/killall"
 
-  # The two checks doctor.sh makes that are not `defaults` keys at all. Each
-  # reads real system state, so each is shadowed -- and shadowed to a HEALTHY
-  # machine by default, so every other test in this file says only what it is
-  # about. The tests that vary them vary one at a time.
   FW="$DOT_TMP/socketfilterfw"
 
-  # The two software-update domains, pointed inside the sandbox. doctor.sh asks
-  # whether the DOMAIN answers to tell an unwritten key from an unreadable one,
-  # and the real /Library/Preferences is neither writable by a test nor the
-  # same on two machines -- so a suite that left these alone would be deciding
-  # a branch from whatever the developer's Mac happens to hold.
   SU_DOMAIN="$DOT_TMP/SoftwareUpdate"
   COMMERCE_DOMAIN="$DOT_TMP/commerce"
   with_filevault 'FileVault is On.'
   with_firewall 'Firewall is enabled. (State = 1)'
 }
 
-# with_filevault TEXT / with_firewall TEXT -- a tool that answers TEXT. The
-# answer goes in a file the stub cats, not into the generated script: these
-# strings carry parentheses and quotes, and escaping them into a heredoc is a
-# second thing to get wrong.
 with_filevault() {
   printf '%s\n' "$1" >"$DOT_TMP/filevault-answer"
   printf '#!/usr/bin/env bash\ncat "%s"\n' "$DOT_TMP/filevault-answer" >"$BIN/fdesetup"
@@ -52,7 +35,6 @@ with_firewall() {
 
 teardown() { teardown_sandbox; }
 
-# with_settings BODY -- a config whose [settings.macos-defaults] table is BODY.
 with_settings() {
   printf 'schema = 1\n\n[modules]\nenabled = ["macos-defaults"]\n\n[settings.macos-defaults]\n%s\n' \
     "$1" >"$DOT_CONFIG"
@@ -78,19 +60,10 @@ remove() {
     "$BASH" "$DOT_ROOT/modules/macos-defaults/remove.sh"
 }
 
-# rows -- the data rows of the table, comments and blanks dropped. The same
-# expression remove.sh uses; a test that re-derives it is not a second copy of
-# the DATA, which is the thing that must not be duplicated.
 rows() { grep -v '^[[:space:]]*\(#\|$\)' "$TSV"; }
 
-# A `defaults` that remembers, so apply.sh and doctor.sh can be pointed at one
-# machine. cfprefsd stores -bool as 1/0 and `read` prints it back that way --
-# the exact translation doctor.sh has to get right.
 with_store() {
   export DEFAULTS_STORE="$DOT_TMP/defaults-store"
-  # Answers that do not fit on one line: the store is key<TAB>value, and
-  # LSHandlers is a plist array. A file per key rather than a second store, so
-  # the stub stays one `case` and any key can be given either shape.
   export DEFAULTS_DIR="$DOT_TMP/defaults-answers"
   : >"$DEFAULTS_STORE"
   mkdir -p "$DEFAULTS_DIR"
@@ -124,23 +97,15 @@ esac
 STUB
   chmod +x "$BIN/defaults"
 
-  # A healthy machine by default, so every test that is about something else
-  # says only that. The same rule setup() follows for FileVault and the
-  # firewall -- these reads reach /Library/Preferences and the LaunchServices
-  # database, neither of which a fake $HOME can hold.
   with_updates AutomaticCheckEnabled 1
   with_updates AutomaticDownload 1
   with_updates CriticalUpdateInstall 1
   with_updates ConfigDataInstall 1
   with_updates_domain "$COMMERCE_DOMAIN" AutoUpdate 1
-  # Written, not left out: all six keys ship ON, so the healthy machine for the
-  # one the repo wants OFF is an explicit 0. Leaving it unwritten here would
-  # make every test in this file carry that warning.
   with_updates AutomaticallyInstallMacOSUpdates 0
   with_browser com.google.chrome
 }
 
-# with_updates KEY VALUE -- one software update switch on the system domain.
 with_updates() {
   with_updates_domain "$SU_DOMAIN" "$1" "$2"
 }
@@ -149,28 +114,18 @@ with_updates_domain() {
   printf '%s %s\t%s\n' "$1" "$2" "$3" >>"$DEFAULTS_STORE"
 }
 
-# without_updates KEY -- a key macOS never wrote, which is not the same as one
-# written to 0 and is the whole point of the two tests that use it.
 without_updates() {
   grep -v "^$SU_DOMAIN $1	" \
     "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
   mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
 }
 
-# unreadable_domain DOMAIN -- a domain that exists and does not answer: the
-# store forgets every key it had, and a plist is left beside it. That is the
-# only shape `defaults` gives to tell a permission or parse failure from a key
-# macOS simply never wrote.
 unreadable_domain() {
   grep -v "^$1 " "$DEFAULTS_STORE" >"$DEFAULTS_STORE.new" || true
   mv "$DEFAULTS_STORE.new" "$DEFAULTS_STORE"
   : >"$1.plist"
 }
 
-# with_browser BUNDLE -- the LaunchServices handler list as `defaults` prints
-# it, BUNDLE handling https. The "-" inside LSHandlerPreferredVersions is not
-# decoration: it sorts before LSHandlerRoleAll and is the thing doctor.sh's
-# awk has to skip, so a stub without it would pass over the bug.
 with_browser() {
   local f
   f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
@@ -187,10 +142,6 @@ with_browser() {
 EOF
 }
 
-# with_browser_after BUNDLE -- BUNDLE claiming a content type in an EARLIER
-# array element, and the https element carrying no LSHandlerRoleAll of its own.
-# A real LSHandlers list is a mix of both shapes, and an awk that carried its
-# last-seen role across elements would answer https with BUNDLE.
 with_browser_after() {
   local f
   f="$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
@@ -208,36 +159,29 @@ with_browser_after() {
 EOF
 }
 
-# with_no_browser -- a Mac nobody ever answered the "make default?" sheet on.
 with_no_browser() {
   rm -f "$DEFAULTS_DIR/$(printf '%s %s' com.apple.LaunchServices/com.apple.launchservices.secure LSHandlers | tr -c '[:alnum:]' '_')"
 }
 
 wrote() { grep -qF "$1" "$CALLS"; }
 
-# --- dock_tilesize -------------------------------------------------------------
-
 @test "tilesize: a number is passed through" {
   with_settings 'dock_tilesize = 64'
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
   wrote 'com.apple.dock tilesize -int 64'
 }
 
 @test "tilesize: garbage is refused instead of silently becoming 0" {
-  # `defaults write ... -int big` exits 0 and stores 0: a Dock with no icons.
   with_settings 'dock_tilesize = "big"'
   apply
   [ "$status" -ne 0 ]
   [[ $output == *"dock_tilesize"* ]]
-  # Refusing must mean the old value survives.
   run grep -c 'tilesize' "$CALLS"
   [ "$output" = "0" ]
 }
 
 @test "tilesize: a refused field is not followed by a claim that all was written" {
-  # The fail line and an unconditional `ok written` printed back to back, so
-  # the output contradicted itself even though the exit status was right.
   with_settings 'dock_tilesize = "big"'
   apply
   [ "$status" -ne 0 ]
@@ -259,12 +203,10 @@ wrote() { grep -qF "$1" "$CALLS"; }
   wrote 'NSGlobalDomain KeyRepeat -int 2'
 }
 
-# --- screenshot_dir ------------------------------------------------------------
-
 @test "screenshots: a relative path is taken from \$HOME" {
   with_settings 'screenshot_dir = "Pictures/Shots"'
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
   wrote "com.apple.screencapture location -string $HOME/Pictures/Shots"
   [ -d "$HOME/Pictures/Shots" ]
 }
@@ -272,16 +214,15 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "screenshots: an absolute path is used as given, not nested under \$HOME" {
   with_settings "screenshot_dir = \"$DOT_TMP/shots\""
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
   wrote "com.apple.screencapture location -string $DOT_TMP/shots"
   [ ! -d "$HOME$DOT_TMP" ]
 }
 
 @test "screenshots: a leading ~ is expanded, not taken literally" {
-  # A tilde in a TOML string is just a character.
   with_settings 'screenshot_dir = "~/Shots"'
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
   wrote "com.apple.screencapture location -string $HOME/Shots"
   [ ! -e "$HOME/~" ]
 }
@@ -289,18 +230,11 @@ wrote() { grep -qF "$1" "$CALLS"; }
 @test "screenshots: the default lands in Pictures/Screenshots" {
   with_settings '# nothing set'
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
   wrote "com.apple.screencapture location -string $HOME/Pictures/Screenshots"
 }
 
-# --- dry run --------------------------------------------------------------------
-
 @test "apply: the logout note is a note, and both runs close on it" {
-  # As a `warn` it exited DOT_STATUS_WARN on every run, so `dot apply` could
-  # never reach "Done" on a machine with this module enabled -- a summary that
-  # is always yellow says as little as one that is always green. The dry run
-  # stopped before it, so a preview and a real run closed on different words.
-  # One string in apply.sh is what keeps the two from drifting apart again.
   with_settings '# nothing set'
   apply 1
   [ "$status" -eq 0 ]
@@ -313,9 +247,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "apply: a real run says what it did, in the same column as everything else" {
-  # The hook runs for real here, against the `defaults` stub. What was never
-  # checked is the line it closes on: a module whose whole job is invisible
-  # changes has nothing else to show for itself.
   with_settings 'dock_tilesize = 64'
 
   apply
@@ -336,14 +267,10 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$(home_snapshot)" = "$before" ]
 }
 
-# --- data/defaults.tsv ---------------------------------------------------------
-
 @test "table: every row reaches defaults write, with its own type" {
-  # The file is the module's only statement of what it changes. A row that is
-  # read but not written would be a promise doctor.sh then reports as drift.
   with_settings '# nothing set'
   apply
-  [ "$status" -eq 0 ] # the logout reminder is a note, not a warning
+  [ "$status" -eq 0 ]
 
   local domain key type value
   while IFS=$'\t' read -r domain key type value _; do
@@ -355,8 +282,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "table: the type column is one defaults understands" {
-  # `defaults write x y -bogus 1` exits 1 and changes nothing, but apply.sh
-  # writes 25 keys and would carry on past it.
   local type bad=()
   while IFS=$'\t' read -r _ _ type _ _; do
     case $type in
@@ -370,11 +295,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
   }
 }
 
-# --- doctor.sh -----------------------------------------------------------------
-
 @test "doctor: a machine apply.sh just wrote to has no drift" {
-  # The round trip is what the shared file buys: apply writes -bool true,
-  # `defaults read` says 1, and doctor has to call that a match.
   with_store
   with_settings 'dock_tilesize = 64'
   apply
@@ -384,8 +305,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "doctor: a reverted key is named, including one no sample would cover" {
-  # KeyRepeat was not among the six keys the old doctor checked. Full coverage
-  # of the table is the point of reading it instead of restating it.
   with_store
   with_settings '# nothing set'
   apply
@@ -397,7 +316,7 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "doctor: a key nothing ever wrote reads as unset, not as a match" {
-  with_store # empty: no apply
+  with_store
   with_settings '# nothing set'
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
@@ -421,24 +340,14 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$(home_snapshot)" = "$before" ]
 }
 
-# --- remove.sh -----------------------------------------------------------------
-
 @test "remove: warns about exactly the domains the table names" {
-  # The list is the user's only record of an irreversible change, so it is cut
-  # from the table rather than typed. Proving it covers every domain is what
-  # stops apply.sh from gaining one this warning never mentions. apply first:
-  # the warning is now conditional on the table actually being in force.
   with_store
   with_settings '# nothing set'
   apply
   remove
   [ "$status" -eq "$DOT_STATUS_WARN" ]
-  # As many listed lines as the table has domains, so neither a blank line nor
-  # a repeat can slip in: both read as a change to something never touched.
   local want listed
   want=$(rows | cut -f1 | sort -u | wc -l | tr -d ' ')
-  # A domain is the only thing here that is one bare token on its own line, so
-  # counting those pins the list without pinning how far in ui.sh indents it.
   listed=$(grep -cE '^[[:space:]]+[^[:space:]]+$' <<<"$output" || true)
   [ "$listed" -eq "$want" ]
 
@@ -452,10 +361,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "remove: says nothing on a machine that never ran this module" {
-  # uninstall.sh calls every module's remove.sh, enabled or not. With no row of
-  # the table in force there is nothing irreversible to report, and the warning
-  # would be a lie about a change that never happened -- the same silence
-  # dev-cli/remove.sh keeps. An empty store: every `defaults read` misses.
   with_store
   with_settings '# nothing set'
   remove
@@ -471,10 +376,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "remove: an unreadable table is refused, never warned about emptily" {
-  # The warning IS the deliverable here -- apply.sh cannot be undone, so the
-  # domain list is all the user gets. A missing table used to print the
-  # "cannot be put back" line with nothing under it and still exit as a plain
-  # warning: the exact lie remove.sh's header comment forbids.
   mkdir -p "$DOT_TMP/nodata"
   cp "$DOT_ROOT/modules/macos-defaults/remove.sh" "$DOT_TMP/nodata/"
 
@@ -489,14 +390,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [[ $output != *"cannot be put back"* ]]
 }
 
-# --- what the module can only report -----------------------------------------
-#
-# FileVault and the firewall are not `defaults` keys: each needs root to
-# change and one needs a GUI, so apply.sh cannot write them and
-# data/defaults.tsv must not list them. doctor.sh reports them anyway, because
-# this is the module for macOS system state and nothing else in the repo would
-# ever look at a machine with the firewall off.
-
 @test "system: FileVault on is one green line" {
   with_settings '# nothing set'
   with_store
@@ -507,7 +400,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "system: FileVault off is a warning that says what is at stake" {
-  # The only one of the three that cannot be fixed after the laptop is gone.
   with_settings '# nothing set'
   with_store
   apply
@@ -519,8 +411,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "system: an fdesetup that answers nothing is never read as healthy" {
-  # A question that could not be asked is not a green answer -- the same
-  # three-state rule brew_missing exists to keep.
   with_settings '# nothing set'
   with_store
   apply
@@ -531,8 +421,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "system: the firewall blocking everything still counts as on" {
-  # State 2 is "on, and block all incoming". Matching only 1 would nag the
-  # most locked-down machine there is.
   with_settings '# nothing set'
   with_store
   apply
@@ -563,18 +451,8 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "system: none of the two is in the table apply.sh writes" {
-  # data/defaults.tsv is the list of what this module WRITES, and remove.sh
-  # derives the domains it warns about from column 1. A row here would make
-  # apply.sh run `defaults write` against a setting that is not one.
   ! grep -qiE 'filevault|socketfilterfw|com\.apple\.alf' "$TSV"
 }
-
-# --- software update ----------------------------------------------------------
-#
-# Six switches macOS does not treat as one, split here the same way: five that
-# have a right answer, and the one that installs a whole new major version.
-# This machine went from macOS 26 to 27 on its own and the only way anyone
-# would have known is that the check exists.
 
 @test "updates: every switch on is one green line" {
   with_settings '# nothing set'
@@ -597,14 +475,8 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: a key macOS never wrote is not read as off" {
-  # The trap this check had to avoid. All six ship ON, so a Mac whose owner
-  # never opened the pane has no key at all -- and calling that "off" sends
-  # you to a checkbox that is already ticked.
   with_settings '# nothing set'
   with_store
-  # A store holding nothing but the browser answer: no update key exists. The
-  # sixth is written back, because the same rule points the other way for it
-  # and the test below is the one about that.
   : >"$DEFAULTS_STORE"
   with_updates AutomaticallyInstallMacOSUpdates 0
   apply
@@ -614,11 +486,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: an unwritten version-bump key is the fresh Mac, not a quiet one" {
-  # The same rule as the five above, pointing the other way: this key ships ON
-  # too, so a Mac whose owner never opened the pane IS set to install whole
-  # versions unasked. Reading the missing key as "off" made the default answer
-  # green on exactly the machine the row exists for -- a fresh install, which
-  # is the machine this whole check was written for.
   with_settings '# nothing set'
   with_store
   without_updates AutomaticallyInstallMacOSUpdates
@@ -626,14 +493,10 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output == *"including major ones"* ]]
-  # And only that: the five are still green beside it.
   says updates 'checked, downloaded and security-patched automatically'
 }
 
 @test "updates: macos_auto_update = true is green on a Mac that never wrote it" {
-  # The mirror of the test above, and what keeps the two branches from
-  # disagreeing about what an unwritten key means: ON either way. Getting this
-  # pair to disagree is what made the default answer green on a fresh install.
   with_settings 'macos_auto_update = true'
   with_store
   without_updates AutomaticallyInstallMacOSUpdates
@@ -644,8 +507,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: macOS installing its own versions is a warning by default" {
-  # The expensive failure, and the reason the default is off: a major version
-  # that arrives on its own cannot be undone without erasing the disk.
   with_settings '# nothing set'
   with_store
   with_updates AutomaticallyInstallMacOSUpdates 1
@@ -657,8 +518,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: turning the version bump off leaves the other five alone" {
-  # The whole point of splitting them. The fix named above must not be a fix
-  # that costs you security patches, so the five stay green beside it.
   with_settings '# nothing set'
   with_store
   with_updates AutomaticallyInstallMacOSUpdates 1
@@ -668,8 +527,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: macos_auto_update = true wants the opposite, and says so" {
-  # A setting is only a setting if both answers are checked. With it on, a
-  # machine NOT installing macOS updates is the one that has drifted.
   with_settings 'macos_auto_update = true'
   with_store
   with_updates AutomaticallyInstallMacOSUpdates 0
@@ -680,10 +537,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: a domain that does not answer warns instead of passing" {
-  # `defaults read` fails the same way for a key macOS never wrote and for a
-  # domain this process cannot read, and reading both as "unwritten" makes the
-  # five baseline switches GREEN on a machine nobody could ask -- a summary
-  # green on a broken machine, which is the failure this whole file exists for.
   with_settings '# nothing set'
   with_store
   unreadable_domain "$SU_DOMAIN"
@@ -695,8 +548,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: one unreadable domain does not speak for the other" {
-  # App Store updates live in com.apple.commerce. A machine that answers about
-  # five switches and not the sixth must say exactly that.
   with_settings '# nothing set'
   with_store
   unreadable_domain "$COMMERCE_DOMAIN"
@@ -708,8 +559,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: an unreadable version-bump key is not read as on, or as off" {
-  # The setting decides which answer is wanted; neither answer is available
-  # here, and both branches of it have to say so rather than pick one.
   with_settings '# nothing set'
   with_store
   unreadable_domain "$SU_DOMAIN"
@@ -721,9 +570,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "updates: a domain that answers with no key at all is still the default" {
-  # The other half of the pair, and the reason the two are told apart at all:
-  # a domain that READS and simply has no such key is a machine sitting at
-  # every shipped default, which is green and must stay green.
   with_settings '# nothing set'
   with_store
   without_updates AutomaticCheckEnabled
@@ -742,12 +588,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
   [ "$status" -eq 0 ]
   says updates 'macOS updates install automatically'
 }
-
-# --- default browser ----------------------------------------------------------
-#
-# Installing a browser and being sent to it are two things, and `apps` only
-# does the first. No script may do the second: the confirmation sheet is the
-# whole point of it.
 
 @test "browser: the browser the setting names passes" {
   with_settings '# nothing set'
@@ -769,9 +609,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: a different browser is named, not just called wrong" {
-  # Both halves, because "not chrome" does not tell you what you are looking
-  # at -- an installer you forgot running is a different problem to a sheet
-  # you never answered.
   with_settings '# nothing set'
   with_store
   with_browser com.brave.browser
@@ -783,9 +620,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: the placeholder inside LSHandlerPreferredVersions is skipped" {
-  # `defaults` prints dict keys alphabetically, so that nested LSHandlerRoleAll
-  # = "-" arrives BEFORE the real one. An awk that took the last value seen
-  # without the guard would report every machine as handing https to "-".
   with_settings '# nothing set'
   with_store
   apply
@@ -795,11 +629,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: a role from an earlier entry is not the https answer" {
-  # LSHandlers is an array, and the handler for https is whatever THAT element
-  # says. An awk keeping its last-seen LSHandlerRoleAll across elements would
-  # report the content-type entry above it -- a confident wrong name, which
-  # reads as a browser you forgot installing rather than as a sheet you never
-  # answered. Cleared at each bare `{`, which a nested `KEY = {` is not.
   with_settings '# nothing set'
   with_store
   with_browser_after com.google.chrome
@@ -810,15 +639,9 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: a LaunchServices database that does not answer says so" {
-  # The `|| true` this replaced turned a failed read into an empty handler
-  # list, which prints as "https links still open in Safari" -- a confident
-  # answer to a question nobody could ask, sending you to a confirmation sheet
-  # you may well have answered years ago.
   with_settings '# nothing set'
   with_store
   with_no_browser
-  # A domain that exists and will not answer: the plist is beside it, and the
-  # stub knows no key for it.
   mkdir -p "$HOME/Library/Preferences/com.apple.LaunchServices"
   : >"$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
   apply
@@ -829,9 +652,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: a Mac with no handler list at all is the fresh one, not a mute one" {
-  # The half that must NOT warn about a read: nothing has ever overridden a
-  # handler on this machine, which is Safari and is the answer the check wants
-  # to give. An absent LSHandlers key is that machine.
   with_settings '# nothing set'
   with_store
   with_no_browser
@@ -843,8 +663,6 @@ wrote() { grep -qF "$1" "$CALLS"; }
 }
 
 @test "browser: an empty setting says nothing at all" {
-  # The escape hatch, and the same shape as macos_auto_update: a machine that
-  # wants Safari must not stay yellow forever.
   with_settings 'browser = ""'
   with_store
   with_no_browser

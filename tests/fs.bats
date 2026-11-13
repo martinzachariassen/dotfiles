@@ -1,13 +1,9 @@
 #!/usr/bin/env bats
-#
-# The symlink engine: the only code that moves and deletes files in $HOME.
 
 load helper
 
 setup() { setup_sandbox; }
 teardown() { teardown_sandbox; }
-
-# --- fs_classify ------------------------------------------------------------
 
 @test "classify: missing when nothing is there" {
   run fs_classify /some/src "$HOME/.gitconfig"
@@ -37,7 +33,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "classify: broken beats ok for a dangling link to src" {
-  # The file was deleted from the repo; "ok" would hide the only interesting fact.
   local src="$DOT_TMP/gone"
   echo x >"$src"
   ln -s "$src" "$HOME/f"
@@ -45,8 +40,6 @@ teardown() { teardown_sandbox; }
   run fs_classify "$src" "$HOME/f"
   [ "$output" = "broken" ]
 }
-
-# --- fs_link ----------------------------------------------------------------
 
 @test "link: creates the link and any missing parent directories" {
   local m
@@ -73,8 +66,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "link: touches nothing on the second run, and says it did nothing" {
-  # fs_link is silent per file; the TREE says one line so a converged module
-  # does not print an empty section.
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".config/git/config"
@@ -85,7 +76,6 @@ teardown() { teardown_sandbox; }
 
   [[ $output == *"all 1 already linked"* ]]
 
-  # `run` is a subshell, so re-do it here for the tallies.
   DOT_N_LINKED=0 DOT_N_UNCHANGED=0
   fs_link_tree "$m"
   [ "$DOT_N_LINKED" -eq 0 ]
@@ -118,7 +108,6 @@ teardown() { teardown_sandbox; }
   [ "$(cat "$HOME/.gitconfig")" = "from-repo" ]
   [ "$DOT_N_BACKED_UP" -eq 1 ]
 
-  # The original still exists, exactly once, under the backup tree.
   run bash -c "grep -rl precious '$DOT_STATE/backups' | wc -l | tr -d ' '"
   [ "$output" = "1" ]
 }
@@ -134,11 +123,9 @@ teardown() { teardown_sandbox; }
   [[ $output == *"real directory in the way"* ]]
   [[ $output != *"real file in the way"* ]]
 
-  # `run` is a subshell, but its writes to disk are real.
   [ -L "$HOME/.gitconfig" ]
   [ "$(cat "$HOME/.gitconfig")" = "from-repo" ]
 
-  # The directory went in whole: its contents are still there, exactly once.
   run bash -c "grep -rl mine '$DOT_STATE/backups' | wc -l | tr -d ' '"
   [ "$output" = "1" ]
 }
@@ -156,13 +143,11 @@ teardown() { teardown_sandbox; }
 }
 
 @test "backup: a hook's backup is reported by the driver that ran it" {
-  # A hook is a separate process; containers/apply.sh calls fs_link directly.
   local m
   m=$(fixture_module hooked)
   fixture_file "$m" "target.txt" "from-repo"
   echo precious >"$HOME/target.txt"
 
-  # The hook, run the way module_run_hook runs one: its own process.
   cat >"$DOT_TMP/hook.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -171,7 +156,6 @@ fs_link "$m/home/target.txt" "\$HOME/target.txt"
 EOF
   "$BASH" "$DOT_TMP/hook.sh"
 
-  # This process backed up nothing, and still knows where the file went.
   [ "$DOT_N_BACKED_UP" -eq 0 ]
   fs_backup_used
   run fs_report
@@ -180,8 +164,6 @@ EOF
 }
 
 @test "backup: a dry run names the directory it would have used" {
-  # fs_backup_used answers from the filesystem, and a dry run puts nothing
-  # there; the tally half must cover it.
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig" "from-repo"
@@ -209,8 +191,6 @@ EOF
 }
 
 @test "backup: one run uses one directory, even across a second boundary" {
-  # A per-collision `date` would scatter one run's backups across directories.
-  # The sleep is the point of the test.
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig" "from-repo"
@@ -274,11 +254,7 @@ EOF
   [ -L "$HOME/.config/some app/my config.toml" ]
 }
 
-# --- dry run ----------------------------------------------------------------
-
 @test "dry run: reports the same intent a real run would, and changes nothing" {
-  # fs_link prints its intent BEFORE the dry-run guard; moving it below has to
-  # fail here.
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig"
@@ -287,7 +263,6 @@ EOF
   run fs_link_tree "$m"
   says link "~/.gitconfig"
 
-  # `run` is a subshell, so re-do it here for the tally.
   fs_link_tree "$m"
   [ ! -e "$HOME/.gitconfig" ]
   [ "$DOT_N_LINKED" -eq 1 ]
@@ -297,7 +272,7 @@ EOF
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig" "from-repo"
-  echo precious >"$HOME/.gitconfig" # forces the noisiest branch
+  echo precious >"$HOME/.gitconfig"
 
   DOT_DRY_RUN=1 run fs_link_tree "$m"
   local dry=$output
@@ -320,8 +295,6 @@ EOF
   [ ! -d "$DOT_STATE/backups" ]
 }
 
-# --- fs_check_tree ----------------------------------------------------------
-
 @test "check: clean tree reports no drift" {
   local m
   m=$(fixture_module git)
@@ -342,12 +315,10 @@ EOF
 
   run fs_check_tree "$m"
   [ "$status" -eq 1 ]
-  # doctor is read-only: the file must be exactly as we left it
   [ "$(cat "$HOME/.gitconfig")" = "replaced" ]
 }
 
 @test "check: a directory in the way is reported as a directory" {
-  # doctor has its own copy of the label, separate from fs_link's.
   local m
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig" "from-repo"
@@ -367,13 +338,11 @@ EOF
 }
 
 @test "check: every classify state has a report line of its own" {
-  # Each of the five arms must print its own sentence, or could be deleted
-  # with the suite still green.
   local m
   m=$(fixture_module many)
-  fixture_file "$m" "gone.conf"     # will point elsewhere
-  fixture_file "$m" "dangling.conf" # will point at nothing
-  fixture_file "$m" "absent.conf"   # will not be linked at all
+  fixture_file "$m" "gone.conf"
+  fixture_file "$m" "dangling.conf"
+  fixture_file "$m" "absent.conf"
 
   echo elsewhere >"$DOT_TMP/elsewhere"
   ln -s "$DOT_TMP/elsewhere" "$HOME/gone.conf"
@@ -387,15 +356,13 @@ EOF
 }
 
 @test "check: drift in one file is drift, even with clean files around it" {
-  # An early `return 1` -- the obvious refactor -- would leave the remaining
-  # files unreported. A single-file fixture cannot tell the two apart.
   local m
   m=$(fixture_module mixed)
   fixture_file "$m" "a.conf"
   fixture_file "$m" "b.conf"
   fixture_file "$m" "c.conf"
   fs_link_tree "$m"
-  rm "$HOME/b.conf" # the middle one, so order cannot mask it
+  rm "$HOME/b.conf"
 
   run fs_check_tree "$m"
   [ "$status" -eq 1 ]
@@ -403,7 +370,6 @@ EOF
 }
 
 @test "check: warnings from a doctor pass reach the tally" {
-  # Deliberately not `run`: a subshell would throw the counter away.
   local m before
   m=$(fixture_module git)
   fixture_file "$m" ".gitconfig"
@@ -413,8 +379,6 @@ EOF
 
   [ "$DOT_WARNINGS" -gt "$before" ]
 }
-
-# --- fs_pairs ---------------------------------------------------------------
 
 @test "pairs: maps home/ onto \$HOME literally" {
   local m
@@ -432,10 +396,7 @@ EOF
   [ -z "$output" ]
 }
 
-# --- fs_report --------------------------------------------------------------
-
 @test "report: several tallies are joined with a comma AND a space" {
-  # ${arr[*]} joins on only the FIRST character of IFS.
   DOT_N_LINKED=3
   DOT_N_BACKED_UP=2
   run fs_report
@@ -455,8 +416,6 @@ EOF
 }
 
 @test "pairs: Finder's metadata is not a file this repo links" {
-  # .DS_Store is gitignored, so CI never sees one; Finder writes it into any
-  # module home/ you open. Without the filter `dot apply` linked it into $HOME.
   local dir
   dir=$(fixture_module one)
   fixture_file "$dir" '.config/real.conf'

@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-#
-# PreToolUse hook on Bash: denies the git commands the skills promise never to
-# run -- force-push, --no-verify, a push to main or master, reset --hard,
-# clean -f. Claude Code reads the decision as JSON on stdout.
 set -euo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0

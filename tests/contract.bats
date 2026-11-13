@@ -1,7 +1,4 @@
 #!/usr/bin/env bats
-#
-# The module contract and the structural limits. Walks the same glob the driver
-# walks, so no module is exempt. Changing a limit means editing this file.
 
 load helper
 
@@ -47,7 +44,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "home/ contains no symlinks" {
-  # A committed symlink would be linked to: a link to a link.
   local name found
   while IFS= read -r name; do
     found=$(find "$DOT_ROOT/modules/$name" -path '*/home/*' -type l 2>/dev/null)
@@ -79,8 +75,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "no doctor.sh changes anything in \$HOME" {
-  # `colima status` created ~/.colima/_lima just by being asked. Snapshotting
-  # around every hook is the only way this stays caught generically.
   local name before after
   before=$(home_snapshot)
   while IFS= read -r name; do
@@ -110,7 +104,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "every script with a shebang is executable" {
-  # The shim exec's bin/dot directly; a missing +x reads as a shim error.
   local found
   found=$(find "$DOT_ROOT" -path "$DOT_ROOT/.git" -prune -o \
     \( -name '*.sh' -o -name 'dot' \) -type f -print |
@@ -129,8 +122,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "a module contains no file the driver would ignore" {
-  # modules/ssh/config once sat outside home/: looked installed, was inert,
-  # and nothing caught it. The names below are the whole vocabulary.
   local stray=()
   for path in "$DOT_ROOT"/modules/*/*; do
     case ${path##*/} in
@@ -150,8 +141,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "data/ is module-private: nothing links it into \$HOME" {
-  # The whole point of the directory. A config file for the USER goes under
-  # home/ at its path in $HOME; data/ is what a module's own hooks read.
   local name found
   while IFS= read -r name; do
     [ -d "$DOT_ROOT/modules/$name/data" ] || continue
@@ -164,29 +153,14 @@ teardown() { teardown_sandbox; }
 }
 
 @test "every shipped config file parses" {
-  # starship.toml, the mise config, cmux.json and the theme had no check of any
-  # kind: linked into $HOME and read by a tool that fails quietly. zsh.bats and
-  # ssh.bats do this for their own files; doing it generically here is what
-  # stops the next module from shipping an unparseable one.
   local f fm bad=()
   while IFS= read -r f; do
     case $f in
       *.json) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
-      # taplo, not dasel: dasel stops at a malformed line, keeps what it read
-      # and exits 0 -- the exact reason cfg_parse_problems exists.
       *.toml | */mise.lock) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
-      # A row that lost its tabs reads as a domain with no key: `defaults write`
-      # would then be called with too few arguments, or the wrong ones. The
-      # range is the generic half only -- each table's exact arity is pinned by
-      # its own module's test, which is where the meaning of column 5 lives.
       *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 6 { exit 1 }' "$f" || bad+=("$f -- not a 4-to-6-column TSV") ;;
-      # Every git command on the machine reads this file, and a malformed line
-      # makes all of them fail. doctor.sh checks the GENERATED config.local and
-      # never the tracked one next to it, which is the bigger of the two.
       */git/config) git config --file "$f" --list >/dev/null 2>&1 || bad+=("$f -- git cannot parse it") ;;
-      # A skill whose frontmatter does not parse is not an error anywhere: it
-      # simply never appears, which is the quiet failure this test is for.
       */skills/*/SKILL.md)
         fm=$(awk 'NR==1 && $0=="---"{f=1;next} f && $0=="---"{exit} f' "$f")
         if ! printf '%s\n' "$fm" | dasel -i yaml -o json '' >/dev/null 2>&1; then
@@ -208,9 +182,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "no remove.sh changes anything in \$HOME under --dry-run" {
-  # claude-code/remove.sh rewrote settings.json during `uninstall.sh --dry-run`,
-  # so the preview mutated the thing it was previewing. Snapshotting around
-  # every hook is the only way this stays caught generically.
   local name before after
   before=$(home_snapshot)
   while IFS= read -r name; do
@@ -228,7 +199,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "every alias replacement is installed by the zsh module" {
-  # `alias ls=eza` with no eza is a shell where ls is command-not-found.
   local cmd
   for cmd in eza bat rg; do
     case $cmd in rg) pkg=ripgrep ;; *) pkg=$cmd ;; esac
@@ -239,19 +209,12 @@ teardown() { teardown_sandbox; }
   done
 }
 
-# --- hard limits (root CLAUDE.md) --------------------------------------------
-
 @test "limit: lib/ has exactly 7 files and no subdirectories" {
   [ "$(find "$DOT_ROOT/lib" -mindepth 1 -maxdepth 1 -type f -name '*.sh' | wc -l | tr -d ' ')" -eq 7 ]
   [ -z "$(find "$DOT_ROOT/lib" -mindepth 1 -type d)" ]
 }
 
 @test "limit: bin/dot has exactly five verbs" {
-  # Raised from three, deliberately and once: `add` and `remove` are the only
-  # path that switches a module OFF. `apply` walks only the enabled list and
-  # `uninstall.sh` is all-or-nothing, so without them a module you stopped
-  # wanting kept its defaults and generated files forever. A sixth needs the
-  # same argument -- a capability no existing verb can reach.
   [ "$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")" -eq 5 ]
   local verb
   for verb in apply add remove config doctor; do
@@ -260,21 +223,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "only lib/ui.sh emits colour or glyphs" {
-  # CLAUDE.md has said this since lib/ was written, and nothing held it.
-  # A printf with an escape or a glyph anywhere else is a second place that
-  # decides what output looks like, and the first one to disagree with NO_COLOR
-  # or with an ASCII locale.
-  #
-  # Two greps, because the two halves hide in different places. Shell source
-  # never holds a raw ESC byte -- an escape is written $'\033' and stays six
-  # characters until bash reads it -- so the colour half is a search for those
-  # spellings. A glyph, on the other hand, IS in the file, and every one of them
-  # is non-ASCII: any byte outside printable ASCII is the whole alphabet at once
-  # and needs no list to keep up to date.
-  #
-  # Shipped shell that bin/dot runs: tests/ builds fixtures out of escapes, and
-  # modules/*/home/ and modules/*/data/ are other programs' files that this repo
-  # only links into place.
   local file offenders=()
   while IFS= read -r file; do
     [[ $file == */lib/ui.sh ]] && continue
@@ -293,24 +241,18 @@ teardown() { teardown_sandbox; }
 }
 
 @test "the colour-and-glyph contract can actually see an offender" {
-  # The version this replaced looked for a raw ESC byte and so passed on every
-  # file in the repo, including one printing a literal glyph. A contract that
-  # cannot fail is not one, so the detection is checked against both halves.
   local probe="$DOT_TMP/probe.sh"
 
-  # Colour, written the only way shell source can write it.
   cat >"$probe" <<'EOF'
 red=$'\033[31m'
 EOF
   grep -qE '\\(033|e\[|x1[bB])' "$probe"
 
-  # A glyph, which is in the file as itself.
   cat >"$probe" <<'EOF'
 printf '  ✗ broke\n'
 EOF
   [ -n "$(LC_ALL=C tr -d '\11\12\40-\176' <"$probe")" ]
 
-  # And plain ASCII, which is neither.
   cat >"$probe" <<'EOF'
 printf '  x broke\n'
 EOF
@@ -319,12 +261,6 @@ EOF
 }
 
 @test "nothing bin/dot runs prompts with read -p" {
-  # bin/dot's transcript is a line-buffered sed. A prompt has no newline, so it
-  # is held back until the answer supplies one: the run waits on a question
-  # nobody can see. Ask as a line through `say`, then `read` with no prompt.
-  #
-  # uninstall.sh is outside the glob on purpose: it removes the logs and opens
-  # no transcript, so its own prompt reaches the terminal.
   local pattern='read[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*-[a-zA-Z]*p'
   grep -qE "$pattern" <<<'read -r -p "Write? " reply'
   grep -qE "$pattern" <<<'read -rp "Write? " reply'
@@ -341,10 +277,6 @@ EOF
 }
 
 @test "a transcript carries no escape sequences" {
-  # lib/ui.sh settles colour while stdout is still the terminal, which is the
-  # only moment it can. The transcript therefore has to strip on the way into
-  # the file, or every log is unreadable in an editor -- and the log is the
-  # whole point of the line that names it.
   config_generate "A" "a@b.c" ""
   mkdir -p "$HOME/.local/bin"
   printf '#!/usr/bin/env bash\nexport DOT_ROOT="%s"\n' "$DOT_ROOT" >"$HOME/.local/bin/dot"
@@ -355,15 +287,10 @@ EOF
   local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
   ! grep -q $'\033' "$log"
-  # The tail is there too: a stripper that loses the last lines is worse than
-  # none, since those are the ones naming what went wrong.
   grep -q 'Summary' "$log"
 }
 
 @test "a transcript keeps the lines of the run that died" {
-  # The whole reason the EXIT trap drains the writer. A run that ends in `die`
-  # is exactly the one whose log gets read, and the message naming the cause is
-  # the last thing printed -- so it is the first thing a buffer loses.
   config_generate "A" "a@b.c" "$(printf 'git\nno-such-module\n')"
 
   DOT_COLOR=1 run "$DOT_ROOT/bin/dot" apply
@@ -372,35 +299,25 @@ EOF
   local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
   grep -q 'no-such-module' "$log"
-  # The labelled block under it too, not just the headline.
   grep -q 'available' "$log"
   ! grep -q $'\033' "$log"
 }
 
 @test "claude-code: all three hooks derive \$want from data/settings.json alike" {
-  # Replaces the old allow/deny literal check: the literals are gone, and the
-  # only thing left to keep in step is how each hook reads the data file.
   local dir="$DOT_ROOT/modules/claude-code" key
   for key in '^data=' '^want='; do
     [ "$(grep "$key" "$dir/apply.sh")" = "$(grep "$key" "$dir/doctor.sh")" ]
     [ "$(grep "$key" "$dir/apply.sh")" = "$(grep "$key" "$dir/remove.sh")" ]
   done
-  # doctor reports the leaves remove deletes; a drifted definition would let
-  # doctor call a machine clean that remove would then not clean up.
   [ "$(grep 'def leaves' "$dir/doctor.sh" | tr -d ' ')" \
     = "$(grep 'def leaves' "$dir/remove.sh" | tr -d ' ')" ]
 
-  # And all three agree on what an acceptable settings.json IS. One hook left
-  # on `jq -e .` would go back to calling `null` a syntax error, or would let
-  # apply merge into an array that remove then cannot take its keys back out of.
   local hook
   for hook in apply.sh doctor.sh remove.sh; do
     if ! grep -q "jq -r 'type'" "$dir/$hook"; then
       echo "$hook does not ask jq for the type of settings.json"
       return 1
     fi
-    # Comments stripped: apply.sh's own comment explains why `jq -e .` is wrong.
-    # `if`, not `grep && return`: a false last test is a failing test (docs/development.md).
     if grep -v '^[[:space:]]*#' "$dir/$hook" | grep -q 'jq -e \.'; then
       echo "$hook still uses \`jq -e .\`, which rejects null and false"
       return 1
@@ -409,17 +326,12 @@ EOF
 }
 
 @test "macos-defaults: all three hooks read data/defaults.tsv alike" {
-  # apply writes every row, doctor compares every row, remove warns about the
-  # domains in column 1. Pointing one of them somewhere else would let doctor
-  # call a machine clean that apply never wrote to.
   local dir="$DOT_ROOT/modules/macos-defaults"
   [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/doctor.sh")" ]
   [ "$(grep '^data=' "$dir/apply.sh")" = "$(grep '^data=' "$dir/remove.sh")" ]
 }
 
 @test "macos-defaults: remove.sh names no domain by hand" {
-  # The list is what the user is told was changed irreversibly. Typed out, it
-  # goes stale the first time apply.sh gains a domain, and nothing says so.
   run grep -nE '(com\.apple\.[a-zA-Z]+|NSGlobalDomain)' "$DOT_ROOT/modules/macos-defaults/remove.sh"
   [ "$status" -ne 0 ] || {
     echo "remove.sh hardcodes a domain; cut it from data/defaults.tsv instead:"
@@ -429,10 +341,6 @@ EOF
 }
 
 @test "macos-defaults: doctor.sh and remove.sh read a bool row alike" {
-  # The TSV writes true/false; `defaults read` prints 1/0. Two hooks compare
-  # against that column now, and one of them drifting is either a doctor that
-  # reports drift on a clean Mac or a remove.sh that stays silent about a
-  # machine it did change irreversibly.
   local dir="$DOT_ROOT/modules/macos-defaults" f
   for f in doctor.sh remove.sh; do
     grep -qE 'bool:true\)[^;]*=1 ;;' "$dir/$f" || {
@@ -447,17 +355,11 @@ EOF
 }
 
 @test "dev-cli: doctor.sh and remove.sh resolve mise's data dir alike" {
-  # mise does not expose its default data dir for scripting, so both hooks
-  # rebuild it. One of them drifting is a check looking where nothing lands.
   local dir="$DOT_ROOT/modules/dev-cli"
   [ "$(grep '^mise_data=' "$dir/doctor.sh")" = "$(grep '^mise_data=' "$dir/remove.sh")" ]
 }
 
 @test "dev-cli: every sign-in row names a package this module installs" {
-  # A row is a claim that THIS module puts the CLI on the machine, and that is
-  # what makes `command -v` a fair skip rather than a check quietly never
-  # running. A tool another module owns belongs in that module's doctor.sh --
-  # "a module that owns a tool's config owns its Brewfile line".
   local dir="$DOT_ROOT/modules/dev-cli"
   local cmd pkg rest missing=() rows=0
   while IFS=$'\t' read -r cmd pkg rest; do
@@ -466,10 +368,6 @@ EOF
     grep -qE "^(brew|cask) \"$pkg\"" "$dir/Brewfile" || missing+=("$cmd -> $pkg")
   done <"$dir/data/signin.tsv"
 
-  # A count of DATA rows, not a size: the file ships with a comment header, so
-  # `-s` holds for a table whose every row has been deleted -- and this test
-  # would then pass over nothing forever, which is the regression it exists to
-  # catch.
   [ "$rows" -gt 0 ] || {
     echo 'data/signin.tsv has no rows, only comments'
     return 1
@@ -482,11 +380,6 @@ EOF
 }
 
 @test "apps: every launch row names a cask this module installs" {
-  # Same claim as dev-cli's sign-in table, one layer up: a row asserts that
-  # THIS module puts the app on the machine, and that is what makes "not in
-  # /Applications, say nothing" a fair skip rather than a check that quietly
-  # never runs. It is also the documented escape hatch -- dropping the cask is
-  # how you decline an app -- and an escape hatch nothing enforces is prose.
   local dir="$DOT_ROOT/modules/apps"
   local app cask rest missing=() rows=0
   while IFS=$'\t' read -r app cask rest; do
@@ -495,9 +388,6 @@ EOF
     grep -qE "^cask \"$cask\"" "$dir/Brewfile" || missing+=("$app -> $cask")
   done <"$dir/data/launch.tsv"
 
-  # A count of DATA rows, not a size: the comment header alone satisfies `-s`,
-  # so an emptied table would leave the escape hatch above untested -- prose
-  # again, which is what this test exists not to be.
   [ "$rows" -gt 0 ] || {
     echo 'data/launch.tsv has no rows, only comments'
     return 1
@@ -510,16 +400,6 @@ EOF
 }
 
 @test "dev-cli: doctor.sh never invokes mise" {
-  # `mise ls` CREATES ~/.local/share/mise and ~/.local/state/mise on a machine
-  # that has neither -- the check would write to the $HOME it is checking, the
-  # same trap `colima status` set in modules/containers. The generic doctor.sh
-  # snapshot above only catches this on a machine that HAS mise, and CI has none.
-  #
-  # A stub rather than a grep: the question is whether the hook RUNS mise, and
-  # a grep also hits the word inside its own output strings. `command -v` only
-  # resolves the file, so a passing hook never executes this.
-  # The stub records to a FILE, not stderr: `mise ls >/dev/null 2>&1` would
-  # swallow anything it printed, and that is exactly the call being guarded.
   local stub="$DOT_TMP/bin" ran="$DOT_TMP/mise_ran"
   mkdir -p "$stub"
   cat >"$stub/mise" <<EOF
@@ -540,9 +420,6 @@ EOF
 }
 
 @test "containers: apply.sh and remove.sh agree on the docker plugins" {
-  # remove.sh only unlinks what it names, so a plugin apply.sh gains and this
-  # list does not is a link left behind in a $HOME the sweep cannot see. The
-  # whole list, not a substring: appending a name has to be what fails.
   local dir="$DOT_ROOT/modules/containers" list
   list() { sed -n 's/.*for plugin in \(.*\); do.*/\1/p' "$1"; }
   [ -n "$(list "$dir/apply.sh")" ]
@@ -550,29 +427,17 @@ EOF
 }
 
 @test "containers: doctor.sh and remove.sh agree on the colima VM path" {
-  # ~/.colima, not ~/.colima/default, and `colima status` creates the VM
-  # directory it was asked about. Both hooks say so in a comment; this is the
-  # check the comments promise.
   local dir="$DOT_ROOT/modules/containers"
   [ "$(grep -c 'HOME/\.colima/default' "$dir/doctor.sh")" -ge 1 ]
   [ "$(grep -c 'HOME/\.colima/default' "$dir/remove.sh")" -ge 1 ]
   [ -z "$(grep -oE 'HOME/\.colima[a-z/._-]*' "$dir/remove.sh" | grep -v 'HOME/\.colima/default' || true)" ]
 }
 
-# --- invariants that span files (root CLAUDE.md) -----------------------------
-#
-# Each of these is a rule whose whole content is "these files must agree", and
-# each was on the honour system until one of them had already drifted: the
-# bash-5 list said four places while uninstall.sh had quietly become a fifth.
-
-# op_env_bad_lines FILE -- line numbers of everything that is not a comment,
-# blank, or NAME=op://... Numbers only: printing the line would print the secret.
 op_env_bad_lines() {
   awk '/^#/ || !NF { next } !/^[A-Z][A-Z0-9_]*=op:\/\/[^ \t]+$/ { printf "%s ", NR }' "$1"
 }
 
 @test "zsh: the op env file holds references, never a value" {
-  # Tracked, so a pasted key is a leaked one.
   local bad
   bad=$(op_env_bad_lines "$DOT_ROOT/modules/zsh/home/.config/op/env")
   [ -z "$bad" ] || {
@@ -582,20 +447,15 @@ op_env_bad_lines() {
 }
 
 @test "zsh: the op env probe can actually see a value" {
-  # A check that cannot fail is not one.
   local f="$DOT_TMP/env"
   printf '# c\n\nOK=op://V/I/credential\nBAD=sk-abc123\n' >"$f"
   [ "$(op_env_bad_lines "$f")" = "4 " ]
 }
 
 @test "bash 5: every place that guards it is named by all the others" {
-  # install.sh installs it, core/Brewfile keeps brew from cleaning it up, and
-  # three scripts refuse to run without it. A new guard that no comment mentions
-  # is the drift this catches; so is a comment that still says "four".
   local -a places=(install.sh uninstall.sh bin/dot lib/dot.sh core/Brewfile)
   local f found
 
-  # Every file in the list really does guard bash 5.
   for f in "${places[@]}"; do
     case $f in
       core/Brewfile) grep -q '^brew "bash"' "$DOT_ROOT/$f" ;;
@@ -607,7 +467,6 @@ op_env_bad_lines() {
     }
   done
 
-  # And no OTHER shipped file has grown a guard without joining the list.
   found=$(grep -rl 'BASH_VERSINFO\[0\] < 5' \
     "$DOT_ROOT"/install.sh "$DOT_ROOT"/uninstall.sh "$DOT_ROOT"/bin/dot \
     "$DOT_ROOT"/lib "$DOT_ROOT"/core "$DOT_ROOT"/modules 2>/dev/null |
@@ -623,7 +482,6 @@ op_env_bad_lines() {
     return 1
   }
 
-  # The prose count must match the list. A stale number reads as a check.
   grep -q 'Bash 5 in five places' "$DOT_ROOT/CLAUDE.md" || {
     echo "root CLAUDE.md does not say five places; ${#places[@]} guard it"
     return 1
@@ -631,11 +489,6 @@ op_env_bad_lines() {
 }
 
 @test "install.sh shares nothing: it runs before the repo has a library" {
-  # Phase 0 is fetched by curl and runs before the clone exists. A `source` of
-  # anything under lib/ would work on the developer's machine and fail on every
-  # fresh one -- the single case CI cannot reproduce.
-  # Comments stripped: they are allowed to NAME the library, and one of them
-  # has to -- the bash-5 sibling list above is written in exactly these files.
   local code
   code=$(grep -vE '^[[:space:]]*#' "$DOT_ROOT/install.sh")
 
@@ -654,11 +507,6 @@ op_env_bad_lines() {
 }
 
 @test "CI installs every quality gate, and nothing this repo does not declare" {
-  # Two sets have to be there. modules/dotfiles-dev/Brewfile says it must stay
-  # in step with ci.yml -- a gate CI omits is a suite that only runs where
-  # someone happened to have the tool. And core/Brewfile, because the suite
-  # runs `dot doctor`, which checks core's packages: CI was red for weeks over
-  # a missing fzf, and nothing here said which package or why.
   local ci="$DOT_ROOT/.github/workflows/ci.yml" f missing=() undeclared=()
   local -a installed declared
 
@@ -691,8 +539,6 @@ op_env_bad_lines() {
 }
 
 @test "the Makefile is the only copy of the check commands" {
-  # CI, the README and CLAUDE.md all say `make check`. A workflow that inlined
-  # `shellcheck ...` would be a second copy, free to disagree with the first.
   local found
   found=$(grep -rnE '^[[:space:]-]*(run:)?[[:space:]]*(shellcheck|shfmt|bats)[[:space:]]' \
     "$DOT_ROOT/.github/workflows" || true)
@@ -704,10 +550,6 @@ op_env_bad_lines() {
 }
 
 @test "the README names every module" {
-  # Two hand-maintained tables enumerate the modules, and nothing kept them in
-  # step with the directory listing: adding modules/dotfiles-dev left both
-  # stale, and only a reader would ever have noticed. The registry is the
-  # filesystem; this is the one place that has to be told about it.
   local name missing=()
   while IFS= read -r name; do
     grep -qF "\`$name\`" "$DOT_ROOT/README.md" || missing+=("$name")
@@ -721,13 +563,6 @@ op_env_bad_lines() {
 }
 
 @test "every setting a hook reads is documented where a reader looks" {
-  # CLAUDE.md's table says a module's settings land in that module's README and
-  # in docs/configuration.md. Both are hand-maintained prose, and a setting is
-  # exactly the kind of thing that ships working and undocumented -- the hook
-  # reads it, the default hides it, and nobody can discover it exists.
-  #
-  # The hook calls are the one truth: `module_setting NAME KEY` is a key, and a
-  # reader who cannot find it has no way to set it.
   local mod key call missing=() seen=0
   while IFS= read -r call; do
     seen=$((seen + 1))
@@ -741,7 +576,6 @@ op_env_bad_lines() {
     "$DOT_ROOT"/modules/*/apply.sh "$DOT_ROOT"/modules/*/doctor.sh \
     "$DOT_ROOT"/modules/*/remove.sh 2>/dev/null | sort -u)
 
-  # A renamed helper would make this pass over nothing, forever.
   [ "$seen" -gt 0 ] || {
     echo 'no module_setting call was found at all'
     return 1
@@ -754,11 +588,6 @@ op_env_bad_lines() {
 }
 
 @test "no apply.sh changes anything in \$HOME under --dry-run" {
-  # The counterpart to the remove.sh snapshot above, and the more important
-  # half: apply.sh is the hook that WRITES. Every one of them gates on
-  # DOT_DRY_RUN or delegates to fs_link, which does -- but "or a preview
-  # becomes a run" (CLAUDE.md) was a rule only remove.sh had a
-  # generic test for.
   local name before after
   before=$(home_snapshot)
   while IFS= read -r name; do
@@ -777,10 +606,6 @@ op_env_bad_lines() {
 }
 
 @test "dry run: a hook that MERGES into an existing file still writes nothing" {
-  # The generic snapshots above run against an empty sandbox $HOME, so every
-  # hook that starts with `[[ -f $dest ]] || exit 0` returns before it reaches
-  # the code that writes. claude-code is the one that rewrites a file already
-  # there -- the case the dry-run rule exists for -- so it gets the file.
   command -v jq >/dev/null 2>&1 || skip 'no jq on this machine'
 
   local dest="$HOME/.claude/settings.json"
@@ -804,9 +629,6 @@ op_env_bad_lines() {
 }
 
 @test "home_snapshot sees an in-place rewrite, not just a new path" {
-  # The guard on the guard. Every dry-run and read-only test above is only as
-  # strong as this: a path listing alone called an overwritten settings.json
-  # unchanged, which is how the rewrite it was written to catch got through.
   local before after
   mkdir -p "$HOME/.claude"
   printf '{"a":1}\n' >"$HOME/.claude/settings.json"
@@ -821,22 +643,14 @@ op_env_bad_lines() {
 }
 
 @test "every verb is named in the usage text and in the README" {
-  # bin/dot's dispatch is the one truth; the usage heredoc and the README only
-  # describe it, and nothing stopped them drifting from it. When `add` and
-  # `remove` arrived, five places still said "three verbs" and every one of
-  # them had to be found by hand. This is the guard that would have found them.
   local -a verbs no_usage=() no_readme=()
   mapfile -t verbs < <(sed -n 's/^cmd_\([a-z][a-z]*\)() {$/\1/p' "$DOT_ROOT/bin/dot")
 
-  # Non-empty first, or a rename makes this pass over nothing forever.
   [ "${#verbs[@]}" -gt 0 ] || {
     echo 'no cmd_* functions found in bin/dot'
     return 1
   }
 
-  # The usage function alone, not the whole file: `cmd_add`'s own comments say
-  # "add", and matching those would let a verb usage never lists slip through.
-  # The verb is the label argument, which is what puts it in the column.
   local usage verb
   usage=$(sed -n '/^usage() {$/,/^}$/p' "$DOT_ROOT/bin/dot")
 
@@ -854,14 +668,6 @@ op_env_bad_lines() {
 }
 
 @test "the verb count in the docs is the count bin/dot actually has" {
-  # The other half of the same drift: prose that names a NUMBER. Several files
-  # say it one way or another, and a fifth verb made four of them wrong at once.
-  # docs/ is globbed rather than listed: a new page there must be covered by
-  # this the day it is written, not the day someone remembers to add it.
-  #
-  # The map runs word -> number, never the reverse: asked to find the word for
-  # a count it does not know, this would have to skip, and a guard that skips
-  # on the very change it exists to catch is not one.
   local n
   n=$(grep -c '^cmd_[a-z]*() {' "$DOT_ROOT/bin/dot")
 
@@ -878,8 +684,6 @@ op_env_bad_lines() {
     esac
   }
 
-  # Newlines collapsed: prose wraps, and "Not a sixth\n  verb" is the same claim
-  # as "not a sixth verb". `[^.]` keeps a match from spanning two sentences.
   local -a stale=() files=(bin/dot CLAUDE.md README.md uninstall.sh)
   local file claim num flat doc
   while IFS= read -r doc; do
@@ -895,23 +699,18 @@ op_env_bad_lines() {
     done < <(grep -oiE '(one|two|three|four|five|six|seven) verbs' <<<"$flat" |
       awk '{print $1}')
 
-    # "capped at three" -- the same claim without the word `verbs` after it,
-    # which is how README.md kept saying three long after there were five.
     while IFS= read -r claim; do
       num=$(word_num "$claim")
       ((num == n)) || stale+=("$file says 'capped at $claim'")
     done < <(grep -oiE 'capped at +(one|two|three|four|five|six|seven)' <<<"$flat" |
       awk '{print $NF}')
 
-    # And an ORDINAL naming the next verb that does not exist -- "a fourth
-    # verb", "not a sixth verb". That one has to be n+1, not n.
     while IFS= read -r claim; do
       num=$(word_num "$claim")
       ((num == n + 1)) || stale+=("$file says '$claim verb'; the next one is $((n + 1))")
     done < <(grep -oiE '(first|second|third|fourth|fifth|sixth|seventh)[^.]{0,24}verb' \
       <<<"$flat" | awk '{print $1}')
 
-    # And the digit in the limits table.
     while IFS= read -r claim; do
       ((claim == n)) || stale+=("$file says 'bin/dot | $claim verbs'")
     done < <(sed -n 's/.*| `bin\/dot` | \([0-9][0-9]*\) verbs.*/\1/p' "$DOT_ROOT/$file")

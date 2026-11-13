@@ -131,7 +131,7 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
 - **Nothing that runs before `brew bundle --file core/Brewfile` may use a tool
   listed in it.**
 - **A package belongs in `core/Brewfile` only if the machinery runs it or every
-  machine needs it.** Name the file that runs it, in a comment.
+  machine needs it.**
 - **The shim `~/.local/bin/dot` is generated, not linked.** Through a link,
   `BASH_SOURCE` would point at `~/.local/bin`.
 - **Doctor checks only what fails silently.** Use `dim`, not `warn`, for
@@ -169,8 +169,6 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
   constants.**
 - **Guards must fire.** That matters more than the happy path.
 - **No test needs a terminal or a sleep.**
-- **In tests, the bug a guard exists for is the specification.** Write it down;
-  the history ban below does not apply here.
 
 ## Limits
 
@@ -205,15 +203,12 @@ is a hand check. Sample output is pasted from a real run, never sketched.
 ## Comments
 
 The default is no comment. Code that needs prose to be readable gets rewritten
-instead. Only two things earn a comment:
-
-1. **A landmine:** code that is right for a reason the next reader would undo.
-2. **A cross-file invariant**, naming the other place that must agree. Write it
-   only where `contract.bats` holds the two together.
+instead. Only a landmine earns a comment: code that is right for a reason the
+next reader would undo. That holds for `tests/`, data files and configs too; a
+test's name carries its intent.
 
 Keep it to one line, three at most. Say why, never what. No history, no
 paraphrase of the code, no section banners, no copy of `docs/` or of this file.
-`tests/` is the exception for history, as above.
 
 ## Commits and pull requests
 

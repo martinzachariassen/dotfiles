@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-#
-# Merge this module's settings into ~/.claude/settings.json -- a file Claude
-# Code writes to itself, so it is merged into rather than linked. See
-# modules/claude-code/README.md.
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
@@ -18,22 +14,19 @@ fi
 mkdir -p "$(dirname "$dest")"
 [[ -f $dest ]] || printf '{}\n' >"$dest"
 
-# `jq -r type`, not `jq -e .`: -e reports `null` and `false` as unparseable,
-# and object is the real requirement anyway. All three hooks ask this question.
+# `jq -r type`, not `jq -e .`: -e reports `null` and `false` as unparseable.
 kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'
 if [[ $kind != object ]]; then
   fail settings "${dest/#$HOME/\~} is $kind, not a JSON object -- fix it or move it aside, then: dot apply"
   exit 1
 fi
 
-# chmod: mktemp is 0600 and `mv` carries that onto the destination, so a
-# settings.json the user kept at 0644 would come back private.
 tmp="$(mktemp "${dest}.XXXXXX")"
+# mktemp creates 0600, and `mv` would carry that onto the user's file.
 chmod "$(stat -f '%Lp' "$dest")" "$tmp"
 
-# `if`, never `jq ... && mv`: set -e ignores a non-final member of an && list,
-# so a jq that dies mid-merge prints the success line and exits 0. The temp
-# file is ours, so `rm` is right where a user's file would need fs_discard.
+# `if`, never `jq ... && mv` alone: set -e ignores a non-final member of an
+# && list, so a jq that dies mid-merge would report success.
 if jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"; then
   ok settings "$(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
 else

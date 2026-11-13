@@ -1,8 +1,5 @@
 # shellcheck shell=bash
-#
-# Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
-# install.sh keeps its own copy of this path: it shares nothing.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
@@ -13,7 +10,6 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package not installed.
 # 0 satisfied, 1 missing, 2 could not check -- never read 2 as installed.
 brew_missing() {
   local file=$1 out status=0
@@ -31,7 +27,6 @@ brew_missing() {
   return 1
 }
 
-# brew_bundle FILE [LABEL] -- a missing Brewfile is success: modules need none.
 brew_bundle() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}
@@ -47,13 +42,11 @@ brew_bundle() {
     return 0
   fi
 
-  # --no-upgrade: upgrading is `brew upgrade`, on the user's schedule.
   brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
   if ((PIPESTATUS[0] == 0)); then return 0; fi
 
   fail packages "brew bundle failed for $label"
 
-  # brew's output is far above by now; name what is still missing.
   local missing status=0
   missing=$(brew_missing "$file") || status=$?
   case $status in
@@ -68,7 +61,6 @@ brew_bundle() {
   return 1
 }
 
-# brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle.
 brew_check() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}
@@ -90,20 +82,16 @@ brew_check() {
   esac
 }
 
-# brew_unmanaged -- packages installed here that no Brewfile names; answers
-# as brew_missing. Every Brewfile, not just enabled ones: `dot add` brings
-# those back. See docs/architecture.md.
 brew_unmanaged() {
   command -v brew >/dev/null 2>&1 || return 2
 
-  # LC_ALL=C: comm compares bytes. Two lists, never one: `brew "docker"` must
-  # not vouch for a hand-installed `cask "docker"`.
+  # Two lists, never one: `brew "docker"` must not vouch for a hand-installed
+  # `cask "docker"`.
   local files named_brew named_cask formulae casks out
   files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
   named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
   named_cask=$(sed -n -E 's/^cask "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
 
-  # No Brewfile read at all is a broken checkout, not a finding.
   [[ -n $named_brew || -n $named_cask ]] || return 2
 
   formulae=$(HOMEBREW_NO_AUTO_UPDATE=1 brew leaves --installed-on-request 2>/dev/null) || return 2

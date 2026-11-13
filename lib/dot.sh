@@ -1,27 +1,21 @@
 # shellcheck shell=bash
-#
-# The single entrypoint: everything sources this and gets the whole library.
 
 [[ -n ${__DOT_SH:-} ]] && return 0
 __DOT_SH=1
 
-# Catches the entry points that bypass bin/dot's re-exec: a hook run by hand,
-# and bats.
 if ((BASH_VERSINFO[0] < 5)); then
   printf 'dotfiles needs bash 5 or newer; this is %s. Run: brew install bash\n' \
     "$BASH_VERSION" >&2
   exit 1
 fi
 
-# An inherited DOT_ROOT wins: the shim exports it and every hook inherits it.
 if [[ -z ${DOT_ROOT:-} ]]; then
   DOT_ROOT=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 fi
 export DOT_ROOT
 
-# core/apply.sh and uninstall.sh bake this path into generated script;
-# core/doctor.sh and uninstall.sh grep -F for it. Refusing once here beats
-# escaping in each of them.
+# core/apply.sh and uninstall.sh bake this path into generated scripts; refusing
+# once here beats escaping in each of them.
 if [[ $DOT_ROOT != "${DOT_ROOT//[\"\`\$\\]/}" || $DOT_ROOT == *$'\n'* ]]; then
   printf 'dotfiles: the repo path contains a character that cannot be quoted safely:\n  %s\nMove the checkout somewhere with no " ` $ \\ or newline in its path.\n' \
     "$DOT_ROOT" >&2
@@ -37,8 +31,6 @@ export DOT_CONFIG DOT_STATE
 DOT_DRY_RUN=${DOT_DRY_RUN:-0}
 export DOT_DRY_RUN
 
-# Exported, not memoised: every process in a run must compute the same backup
-# directory (fs_backup_dir), and hooks are separate processes.
 DOT_RUN_ID=${DOT_RUN_ID:-$(date +%Y%m%d-%H%M%S)}
 export DOT_RUN_ID
 
@@ -51,19 +43,16 @@ source "$DOT_ROOT/lib/wizard.sh"
 
 __DOT_REPORTED=0
 __dot_on_err() {
-  # Captured before the guards below overwrite BASH_COMMAND.
+  # Captured first: the guards below overwrite BASH_COMMAND.
   local status=$? cmd=$BASH_COMMAND src=${BASH_SOURCE[1]} line=${BASH_LINENO[0]}
-  # errtrace fires inside $( ) too, where toml_get probes for missing keys.
   ((BASH_SUBSHELL == 0)) || return 0
   ((__DOT_REPORTED)) && return 0
   __DOT_REPORTED=1
-  # __ui_render, not fail: a crash is not a tallied finding, and a record here
-  # would be swallowed by a collapse instead of naming what broke.
   __ui_render fail '' "${src#"$DOT_ROOT"/}:$line: $cmd (exit $status)" >&2
   return 0
 }
 
-# bats installs its own ERR trap; stomping on it hides the failing assertion.
+# bats installs its own ERR trap; replacing it hides the failing assertion.
 if [[ -z $(trap -p ERR) ]]; then
   set -o errtrace
   trap __dot_on_err ERR
@@ -72,8 +61,7 @@ fi
 __dot_on_exit() {
   local status=$?
 
-  # bin/dot's __transcript_start set these. Drained here so `die` is covered too,
-  # or the log loses the lines naming the failure.
+  # Drained here so `die` is covered too, or the transcript loses its last lines.
   if [[ -n ${__DOT_TEE_PID:-} ]]; then
     exec 1>&3 2>&4
     wait "$__DOT_TEE_PID" 2>/dev/null || true

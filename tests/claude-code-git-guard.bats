@@ -1,9 +1,4 @@
 #!/usr/bin/env bats
-#
-# modules/claude-code/home/.claude/hooks/git-guard.sh -- the PreToolUse hook
-# that turns the skills' "never force-push, never --no-verify" from prose into
-# a refusal. A guard that misses is invisible until the damage, and one that
-# fires on ordinary work gets switched off, so both directions are pinned.
 
 load helper
 
@@ -18,7 +13,6 @@ setup() {
 
 teardown() { teardown_sandbox; }
 
-# decide COMMAND [CWD] -- what Claude Code would be told: "deny", or nothing.
 decide() {
   run "$BASH" -c 'jq -nc --arg c "$1" --arg d "$2" "{tool_input: {command: \$c}, cwd: \$d}" | "$3"' \
     _ "$1" "${2:-$FEATURE}" "$SCRIPT"
@@ -46,8 +40,6 @@ allowed() {
 @test "git-guard: every spelling of a force-push is denied" {
   denied 'git push --force'
   denied 'git push -f origin feat/x'
-  # Combined short flags were the first miss: -[a-zA-Z]*f* needs a letter
-  # before the f, so -f and -fu both slipped through.
   denied 'git push -fu origin feat/x'
   denied 'git push origin +feat/x'
   denied 'git -C . push --force'
@@ -75,7 +67,6 @@ allowed() {
 
 @test "git-guard: a bare push from main is denied, --tags from main is not" {
   denied 'git push' "$MAIN"
-  # HEAD names the current branch, so on main it is a push to main.
   denied 'git push -u origin HEAD' "$MAIN"
   allowed 'git push --tags' "$MAIN"
 }
@@ -97,7 +88,6 @@ allowed() {
 }
 
 @test "git-guard: quoted text and heredoc bodies are data, not commands" {
-  # A commit message may name the very flags the guard refuses.
   allowed "git commit -m 'never use --no-verify'"
   allowed 'git commit -m "explain git push --force"'
   allowed "$(printf '%s\n' "git commit -F - <<'EOF'" 'fix: x' '' 'git push --force is banned' 'EOF')"
