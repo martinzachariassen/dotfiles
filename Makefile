@@ -6,11 +6,12 @@
 #   make fmt         rewrite files to the project's formatting
 #   make brew-audit  ask Homebrew whether the Brewfiles still resolve
 
-STATUSLINE := modules/claude-code/home/.claude/statusline.sh
+CLAUDE_SCRIPTS := modules/claude-code/home/.claude/statusline.sh \
+	modules/claude-code/home/.claude/hooks/git-guard.sh
 SHIPPED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh \
-	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh $(STATUSLINE)
+	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh $(CLAUDE_SCRIPTS)
 FORMATTED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh modules/*/*.sh \
-	$(STATUSLINE) tests/helper.bash
+	$(CLAUDE_SCRIPTS) tests/helper.bash
 
 SHFMT_FLAGS := -i 2 -ci
 
