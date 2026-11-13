@@ -17,6 +17,7 @@ The skills follow a change from the working tree to a release:
 |---|---|
 | `ship` | uncommitted changes to a pull request |
 | `ci-fix` | a red CI run back to green, fixing the cause rather than the check |
+| `review-fix` | a pull request's review threads, each changed, answered or pushed back on |
 | `tidy` | back on the default branch after a merge, merged branches deleted |
 | `release` | commits since the last tag to a version, changelog and GitHub release |
 | `readme` | a root README shaped to a private, public or work audience |
@@ -29,7 +30,8 @@ Next to the skills, linked the same way:
 
 | File | Does |
 |---|---|
-| `agents/check-runner.md` | runs a project's checks in its own context on a small model and returns only the failures; `ship`, `ci-fix` and `release` hand their check step to it |
+| `CLAUDE.md` | the global instructions every session reads: language, code style, verification, git; a project's own `CLAUDE.md` overrides it |
+| `agents/check-runner.md` | runs a project's checks in its own context on a small model and returns only the failures; `ship`, `ci-fix`, `review-fix` and `release` hand their check step to it |
 | `hooks/git-guard.sh` | a `PreToolUse` hook that denies force-push, `--no-verify`, a push to `main` or `master`, `reset --hard` and `clean -f` |
 
 The skills only *say* they never force-push; the guard is what makes it true
