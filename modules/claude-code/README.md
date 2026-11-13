@@ -31,7 +31,6 @@ Next to the skills, linked the same way:
 |---|---|
 | `agents/check-runner.md` | runs a project's checks in its own context on a small model and returns only the failures; `ship`, `ci-fix` and `release` hand their check step to it |
 | `hooks/git-guard.sh` | a `PreToolUse` hook that denies force-push, `--no-verify`, a push to `main` or `master`, `reset --hard` and `clean -f` |
-| `rules/context7.md` | fetch library docs through Context7 rather than answer from memory |
 
 The skills only *say* they never force-push; the guard is what makes it true
 for every session, skill or not. It reads the command with quoted strings and
