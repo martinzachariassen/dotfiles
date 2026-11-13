@@ -10,5 +10,4 @@
 # article of its own. Column 2 is checked against Brewfile by contract.bats.
 
 Raycast	raycast	com.raycast.macos	launcher, and no hotkey to reach it
-Thaw	thaw	com.stonerl.Thaw	menu bar manager
 Stats	stats	eu.exelban.Stats	resource monitor in the menu bar
