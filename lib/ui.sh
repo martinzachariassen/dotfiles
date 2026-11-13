@@ -3,8 +3,7 @@
 # Terminal output. The only file that emits colour or glyphs, and the only one
 # that decides where a column starts; tests/contract.bats holds both.
 
-# Settled here, when the library is sourced, because that is the last moment
-# stdout is still the terminal: bin/dot's transcript puts a pipe in the way.
+# Settled at source time, the last moment stdout is still the terminal.
 if [[ ${DOT_COLOR:-} == 1 ]]; then
   __ui_colour=1
 elif [[ ${DOT_COLOR:-} == 0 || -n ${NO_COLOR:-} || ! -t 1 ]]; then
@@ -26,14 +25,10 @@ else
 fi
 unset __ui_colour
 
-# For bin/dot's transcript, which runs it inside a redirect where there is no
-# shell left to call a function. It lives here because what colour looks like
-# is this file's knowledge, and a second spelling is the one that stops
-# matching when a code is added.
+# For bin/dot's transcript sed. Here, so colour is spelled in one file only.
 __UI_STRIP_SGR="s/$(printf '\033')\[[0-9;]*m//g"
 
-# Every glyph is one column wide in both alphabets, so the label column starts
-# in the same place either way. An unset LANG is the normal case under cron.
+# One column wide in both alphabets, so the label column never moves.
 __ui_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-}}}
 if [[ ${DOT_ASCII:-} == 1 ]] ||
   [[ $__ui_locale != *UTF-8* && $__ui_locale != *UTF8* && $__ui_locale != *utf8* ]]; then
@@ -43,8 +38,7 @@ else
 fi
 unset __ui_locale
 
-# tput needs a terminal; under the transcript's pipe there is none. Clamped,
-# because a rule drawn across a 210-column window is decoration.
+# tput needs a terminal, and the transcript's pipe is not one.
 if [[ -n ${DOT_COLUMNS:-} ]]; then
   __UI_COLS=$DOT_COLUMNS
 elif [[ -n ${COLUMNS:-} ]]; then
@@ -56,13 +50,11 @@ fi
 ((__UI_COLS >= 40)) || __UI_COLS=40
 ((__UI_COLS <= 100)) || __UI_COLS=100
 
-# The label column, in one place. Every caller passes a bare label and this
-# pads it. The wider one is for a group's own line, whose label is a module.
+# The label column. Callers pass a bare label; the wider one is for groups.
 __UI_LABEL_W=12
 __UI_GROUP_W=14
 
-# Exported: a module hook is its own process, and without this everything it
-# printed would climb back out to the left margin.
+# Exported, so a hook's output nests under its step line.
 DOT_UI_INDENT=${DOT_UI_INDENT:-}
 export DOT_UI_INDENT
 
@@ -79,17 +71,11 @@ ui_unnest() {
 DOT_FAILURES=0
 DOT_WARNINGS=0
 
-# 3, not 2: bash owns 2 for syntax errors, so a hook that never ran must not
-# read as "finished with a note".
+# 3, not 2: bash owns 2 for syntax errors.
 DOT_STATUS_WARN=3
 
-# The record protocol, which is what lets a report collapse -- see
-# lib/CLAUDE.md. With DOT_UI_RECORDS set the printers emit
-# "<RS>sev<FS>label<FS>message" instead of a rendered line and the driver
-# renders it; anything in the stream WITHOUT the marker is another program's
-# output and is never hidden. `foldopen`/`foldshut` are the protocol talking to
-# itself: fold_status brackets one child with them so ui_group can reconcile
-# the child's exit status against the findings it recorded.
+# Records: with DOT_UI_RECORDS the printers emit "<RS>sev<FS>label<FS>message"
+# for the driver to render. See docs/architecture.md#records.
 __UI_RS=$'\036'
 __UI_FS=$'\037'
 
@@ -131,9 +117,7 @@ __ui_render() {
     body=$msg
   fi
 
-  # dim and say carry no marker -- an aside must not get the weight the caller
-  # withheld -- but they leave the slot empty rather than absent, or their
-  # label would sit two columns left of every other line in the block.
+  # No marker for dim and say, but the slot stays, or their label shifts left.
   if [[ $sev == dim ]]; then
     printf '%s    %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$body" "$__C_RESET"
   elif [[ $sev == say ]]; then
@@ -196,17 +180,9 @@ ui_elapsed() {
   fi
 }
 
-# ui_quote -- another program's output, indented and dimmed. It keeps
-# streaming, because a `brew bundle` that takes two minutes has to be visible
-# while it runs. The caller keeps the status: ${PIPESTATUS[0]}.
-#
-# The read is an `if`'s condition, never a bare statement: every caller here
-# runs under `set -e`, and a bare `read -t` failing -- on a timeout as much as
-# on the EOF that ends the loop -- would exit the caller instead of the loop.
-#
-# A timeout can fire mid-line: bash still saves what it read into the
-# variable. `chunk` accumulates into `line` across timeouts instead of
-# replacing it, so a line split by a heartbeat prints whole, not truncated.
+# ui_quote -- another program's output, streamed, indented and dimmed, with a
+# heartbeat while it is silent. `read -t` sits in an `if` so set -e survives a
+# timeout; `chunk` accumulates because a timeout can split a line.
 ui_quote() {
   local line='' chunk status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
   while true; do
@@ -227,21 +203,14 @@ ui_quote() {
   done
 }
 
-# Filled by ui_group so the run can end by repeating its problems instead of
-# telling the reader to scroll up.
+# Filled by ui_group, repeated under the verdict.
 DOT_PROBLEMS=()
 DOT_GROUPS_CLEAN=0
 DOT_GROUPS_TOTAL=0
 
-# ui_group NAME NOTE FILE -- render the captured stream in FILE as one group,
-# collapsed to a single line when every record in it is ok, and reconcile the
-# tallies with what the stream says.
-#
-# The reconciliation is here because nowhere else can see both halves. A fold
-# scope (fold_status's two markers, around one child) is read as: every finding
-# inside it is added here, and the one fold_status counted for the exit status
-# is taken back whenever the child named the problem itself. Records outside
-# every fold scope were printed by THIS shell, which counted them already.
+# ui_group NAME NOTE FILE -- one group, collapsed to a line when all is ok.
+# The only place that sees both a child's status and its findings, so the
+# tallies are reconciled here. See docs/architecture.md#records.
 ui_group() {
   local name=$1 note=$2 file=$3
   local line sev label msg rest entry counted raw=0
@@ -251,8 +220,7 @@ ui_group() {
 
   while IFS= read -r line; do
     if [[ $line != "$__UI_RS"* ]]; then
-      # Not ours: another program's output. It never reported itself healthy,
-      # so it also keeps the group from collapsing over it.
+      # Another program's output: never hidden, so the group cannot collapse.
       if [[ -n $line ]]; then
         detail+=("raw$__UI_FS$__UI_FS$line")
         raw=1
@@ -263,8 +231,7 @@ ui_group() {
     sev=${rest%%"$__UI_FS"*}
     rest=${rest#*"$__UI_FS"}
 
-    # Flat by assumption: fold_status is a driver's call, and the hooks it runs
-    # do not run hooks of their own. The day one needs to, this needs a stack.
+    # Flat: hooks do not run hooks. If one ever does, this needs a stack.
     case $sev in
       foldopen)
         in_fold=1 fold_fail=0 fold_warn=0
@@ -275,10 +242,8 @@ ui_group() {
         msg=${rest#*"$__UI_FS"}
         case $counted in
           fail)
-            # Only THIS child's records may cancel the roll-up. A failure
-            # recorded elsewhere in the group explains nothing about this one,
-            # and dropping the roll-up over it loses the only line naming a
-            # hook that died before it could print anything.
+            # Only this child's own records cancel its roll-up, or a hook that
+            # died silently loses the one line naming it.
             if ((fold_fail > 0)); then
               DOT_FAILURES=$((DOT_FAILURES - 1))
             else
@@ -318,8 +283,7 @@ ui_group() {
     label=${rest%%"$__UI_FS"*}
     msg=${rest#*"$__UI_FS"}
 
-    # The repeated line already carries the group's name, so a label that IS
-    # that name would say it twice ("zsh  zsh: ZDOTDIR is ...").
+    # The line already carries the group's name; do not say it twice.
     if [[ $label == "$name" ]]; then label=''; fi
 
     case $sev in
@@ -343,8 +307,7 @@ ui_group() {
   fi
 }
 
-# Only the lines that earned the space: a check that passed inside a module
-# that did not is noise unless asked for.
+# Passed checks in a failing group only under --verbose.
 __ui_detail() {
   local entry sev label msg
   ui_nest
@@ -368,9 +331,8 @@ __ui_detail() {
   ui_unnest
 }
 
-# ui_problems -- what the groups found, repeated under the verdict. Failures
-# first, and capped: a list long enough to scroll is the thing this exists to
-# replace. The cap is on the repeat only; every line is still up there in full.
+# ui_problems -- the groups' findings under the verdict, failures first. The
+# cap is on the repeat only; every line is still printed above.
 __UI_PROBLEM_CAP=10
 
 ui_problems() {
@@ -401,15 +363,13 @@ ui_problems() {
   ui_unnest
 }
 
-# ui_count N NOUN -- "1 module", "9 modules". Every count in the output goes
-# through it, so "core + 1 modules" cannot come back.
+# ui_count N NOUN -- "1 module", "9 modules"; every count goes through it.
 ui_count() {
   if (($1 == 1)); then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi
 }
 
-# ui_verdict GOOD-NEWS -- the last line a verb prints, and the problems it
-# refers to, repeated. The tallies decide the words, never the record list: a
-# summary that contradicts the lines above it is the one thing this may not do.
+# ui_verdict GOOD-NEWS -- the last line, worded from the tallies, never the
+# record list: it may not contradict the lines above it.
 ui_verdict() {
   local good=$1 unit=${2:-group} line=''
 
@@ -420,10 +380,8 @@ ui_verdict() {
     line=$(ui_count "$DOT_WARNINGS" warning)
   fi
 
-  # "in X of Y modules" is only true when every finding came from a group.
-  # doctor prints orphan links outside all of them, and apply and remove print
-  # everything outside one. DOT_PROBLEMS holds exactly the grouped findings, so
-  # counting it is what proves the qualifier rather than assuming it.
+  # "in X of Y modules" only when DOT_PROBLEMS accounts for every finding:
+  # orphans, and all of apply and remove, print outside any group.
   if ((DOT_GROUPS_TOTAL > 0 && DOT_FAILURES + DOT_WARNINGS > 0)) &&
     ((${#DOT_PROBLEMS[@]} == DOT_FAILURES + DOT_WARNINGS)); then
     line+=" in $((DOT_GROUPS_TOTAL - DOT_GROUPS_CLEAN)) of $(ui_count "$DOT_GROUPS_TOTAL" "$unit")"
@@ -444,14 +402,8 @@ ui_verdict() {
   fi
 }
 
-# fold_status MESSAGE CMD... -- run a child process and fold its exit status
-# back into the tallies. The child has already printed its own detail; MESSAGE
-# only says which hook broke.
-#
-# Under the record protocol it brackets the child with a fold scope instead of
-# printing a roll-up line, and ui_group -- which can see both the status and
-# the findings -- decides what the roll-up should be. Without records there is
-# nobody to reconcile with, and the status is all there is to report.
+# fold_status MESSAGE CMD... -- fold a child's exit status into the tallies.
+# Under records it brackets the child instead, and ui_group decides the roll-up.
 fold_status() {
   local msg=$1 status=0 counted='' records=${DOT_UI_RECORDS:-}
   shift

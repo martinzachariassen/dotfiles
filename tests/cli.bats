@@ -47,6 +47,71 @@ pass_core_checks() {
   [ ! -e "$HOME/.local/bin/dot" ]
 }
 
+# git is shadowed: these tests run against the real checkout, and a real
+# `git pull` there would move the code under test. GIT_DIRTY and GIT_PULL pick
+# the branch; every call is logged so a test can count the pulls.
+with_git() {
+  mkdir -p "$DOT_TMP/stub"
+  cat >"$DOT_TMP/stub/git" <<STUB
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >>"$DOT_TMP/git-calls"
+case "\$*" in
+  *"status --porcelain"*) printf '%s' "${GIT_DIRTY:-}" ;;
+  *"pull --ff-only"*) echo "pulling"; exit ${GIT_PULL:-0} ;;
+esac
+STUB
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/git" "$DOT_TMP/stub/brew"
+}
+
+pull_apply() {
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply "$@"
+}
+
+@test "apply --pull: fast-forwards once, then the pulled bin/dot applies" {
+  config_generate "A" "a@b.c" ""
+  with_git
+
+  pull_apply --pull
+  [ "$status" -eq 0 ]
+  [[ $output == *"pulling"* ]]
+  [[ $output == *"Summary"* ]]
+  # The re-exec must drop --pull, or it pulls again forever.
+  [ "$(grep -c 'pull --ff-only' "$DOT_TMP/git-calls")" -eq 1 ]
+}
+
+@test "apply --pull: uncommitted changes refuse before anything is pulled or applied" {
+  config_generate "A" "a@b.c" ""
+  GIT_DIRTY=' M lib/fs.sh' with_git
+
+  pull_apply --pull
+  [ "$status" -ne 0 ]
+  [[ $output == *"uncommitted changes"* ]]
+  ! grep -q 'pull --ff-only' "$DOT_TMP/git-calls"
+  [[ $output != *"Core packages"* ]]
+}
+
+@test "apply --pull: a pull that cannot fast-forward applies nothing" {
+  config_generate "A" "a@b.c" ""
+  GIT_PULL=1 with_git
+
+  pull_apply --pull
+  [ "$status" -ne 0 ]
+  [[ $output == *"could not fast-forward"* ]]
+  [[ $output != *"Core packages"* ]]
+}
+
+@test "apply --pull --dry-run: announces the pull and never calls git" {
+  config_generate "A" "a@b.c" ""
+  with_git
+
+  pull_apply --pull --dry-run
+  [ "$status" -eq 0 ]
+  says pull 'git pull --ff-only'
+  [ ! -e "$DOT_TMP/git-calls" ]
+  [[ $output == *"Dry run: nothing was changed."* ]]
+}
+
 @test "apply: says which config it read before it changes anything" {
   config_generate "A" "a@b.c" ""
 

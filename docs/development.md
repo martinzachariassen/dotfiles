@@ -18,7 +18,8 @@ brew bundle --file modules/dotfiles-dev/Brewfile
 
 [What CI does not run](#what-ci-does-not-run) ·
 [The structural limits](#the-structural-limits) ·
-[Layout](#layout) · [When something breaks](#when-something-breaks) ·
+[Layout](#layout) · [Writing tests](#writing-tests) ·
+[When something breaks](#when-something-breaks) ·
 [Bash 5](#bash-5)
 
 ## What CI does not run
@@ -67,15 +68,41 @@ keeping is worth a test here.
 
 ## Layout
 
-| Directory | What lives there | Rules |
-|---|---|---|
-| `bin/` | `dot`, the CLI and its five verbs | [`bin/CLAUDE.md`](../bin/CLAUDE.md) |
-| `lib/` | the engine, sourced and never executed | [`lib/CLAUDE.md`](../lib/CLAUDE.md) |
-| `core/` | phase 1: the packages and the shim every machine gets | [`core/CLAUDE.md`](../core/CLAUDE.md) |
-| `modules/` | phase 2, one directory per module | [`modules/CLAUDE.md`](../modules/CLAUDE.md) |
-| `tests/` | bats, one file per unit | [`tests/CLAUDE.md`](../tests/CLAUDE.md) |
+| Directory | What lives there |
+|---|---|
+| `bin/` | `dot`, the CLI and its five verbs |
+| `lib/` | the engine, sourced and never executed |
+| `core/` | phase 1: the packages and the shim every machine gets |
+| `modules/` | phase 2, one directory per module |
+| `tests/` | bats, one file per unit |
 
+The rules for each live in one place, the root [`CLAUDE.md`](../CLAUDE.md).
 English everywhere: code, comments, commits, docs.
+
+## Writing tests
+
+Every test runs against a throwaway `$HOME` from `setup_sandbox`, with
+`XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `DOT_RUN_ID` and the tallies pinned; the
+library itself loads from the real checkout. So does `bin/dot`, which is why a
+tool that reaches outside `$HOME` — `brew`, `defaults`, `mise`, `git` — is
+shadowed by a stub on `PATH` rather than skipped. That is what makes an
+`apply.sh` nobody could run in CI reachable at all, and it keeps `dot apply
+--pull` from pulling the checkout under test.
+
+- **Assert with `home_snapshot` diffs**, not lists of the paths you expect.
+  A dry run is snapshot, run, snapshot.
+- **Properties, not constants.** `DOT_STATUS_WARN` is asserted not to collide
+  with a status bash owns, not to equal 3.
+- **No terminal and no sleeps.** `fzf` is stubbed or run with `--filter`; under
+  bats a pty never gets its EOF and the run hangs (`wizard.bats` ends with a
+  note saying so). A test paced by sleeps fails on a loaded machine.
+- **The bug is the specification.** Shipped code drops the history behind a
+  rule; a test keeps it, because a guard whose reason is not written down is
+  the one the next person deletes.
+
+bats installs its own ERR trap, which `lib/dot.sh` checks for before setting
+one. End `teardown` with `return 0`, and write `found=$(... | while ...; done
+|| true)` — the last iteration usually ends in a false test.
 
 ## When something breaks
 

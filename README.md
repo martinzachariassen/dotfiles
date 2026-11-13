@@ -99,6 +99,7 @@ Two promises hold the rest together:
 
 ```
 dot apply              Install packages, link configs, run module hooks
+dot apply --pull       Fast-forward this repo first, then apply
 dot apply --dry-run    Show every intended change, make none
 dot add <module>       Enable one module and apply it
 dot remove <module>    Undo one module and disable it
@@ -115,10 +116,11 @@ expected.
 <summary><strong>Updating</strong></summary>
 
 ```sh
-git -C ~/Developer/personal/dotfiles pull && dot apply
+dot apply --pull
 ```
 
-This updates the *configuration*, not the packages. `apply` runs `brew bundle
+It refuses over uncommitted changes and only fast-forwards, then hands over to
+the `dot` it just pulled. This updates the *configuration*, not the packages. `apply` runs `brew bundle
 --no-upgrade`, so a package a Brewfile gained arrives and a newer version of one
 you already have does not. Upgrading is `brew upgrade`, on your schedule.
 
@@ -183,9 +185,8 @@ A Brewfile and nothing else: tools this repo installs but does not configure.
 | [Uninstalling](docs/uninstall.md) | What `uninstall.sh` removes, what it keeps, and why casks go first |
 | [Development](docs/development.md) | `make check`, the structural limits CI enforces, and reading a crash |
 
-Design rules for each directory live in its `CLAUDE.md`:
-[`lib/`](lib/CLAUDE.md) · [`bin/`](bin/CLAUDE.md) · [`core/`](core/CLAUDE.md) ·
-[`modules/`](modules/CLAUDE.md) · [`tests/`](tests/CLAUDE.md).
+The rules for changing the repo, for a person or an agent, are in
+[`CLAUDE.md`](CLAUDE.md).
 
 ## Development
 

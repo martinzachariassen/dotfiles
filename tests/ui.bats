@@ -368,7 +368,7 @@ EOF
 
 @test "quoted output: a silent child gets a heartbeat before its first line" {
   # DOT_UI_HEARTBEAT is the input that makes this reachable without the real
-  # 15s default -- tests/CLAUDE.md rules out pacing a test with a long sleep.
+  # 15s default -- CLAUDE.md rules out pacing a test with a long sleep.
   # The short one below times the heartbeat itself, the same trade fs.bats
   # makes for fs_backup_used.
   run env DOT_UI_HEARTBEAT=1 bash -c \
