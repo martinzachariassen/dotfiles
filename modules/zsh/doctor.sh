@@ -59,3 +59,15 @@ if ((${#stray[@]} > 0)); then
 else
   ok zsh "no dead config in ~ (ZDOTDIR is ${zdotdir/#$HOME/\~})"
 fi
+
+# apply.sh sets the same mode; without it `op run` aborts on every reference.
+op_dir="$HOME/.config/op"
+if [[ -d $op_dir ]]; then
+  op_mode=$(stat -f '%Lp' "$op_dir")
+  if [[ $op_mode == 700 ]]; then
+    ok op "${op_dir/#$HOME/\~} is 700, so op will read it"
+  else
+    warn op "${op_dir/#$HOME/\~} is $op_mode -- op refuses it, so every op:// reference fails"
+    dim "fix: dot apply"
+  fi
+fi
