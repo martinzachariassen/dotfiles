@@ -174,7 +174,7 @@ teardown() { teardown_sandbox; }
       *.json) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
       # taplo, not dasel: dasel stops at a malformed line, keeps what it read
       # and exits 0 -- the exact reason cfg_parse_problems exists.
-      *.toml) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
+      *.toml | */mise.lock) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
       # A row that lost its tabs reads as a domain with no key: `defaults write`
       # would then be called with too few arguments, or the wrong ones. The

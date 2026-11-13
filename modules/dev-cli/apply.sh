@@ -7,7 +7,7 @@ set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  info mise 'install the runtimes pinned in ~/.config/mise/config.toml'
+  info mise 'install the runtimes locked in ~/.config/mise/mise.lock'
   exit 0
 fi
 
@@ -18,5 +18,6 @@ if ! command -v mise >/dev/null 2>&1; then
   exit 1
 fi
 
-mise install --yes 2>&1 | ui_quote
+# --locked: a tool the lock does not name fails rather than resolving `latest` here.
+mise install --locked --yes 2>&1 | ui_quote
 ok mise 'runtimes installed'
