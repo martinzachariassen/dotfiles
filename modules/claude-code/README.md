@@ -11,10 +11,19 @@ and skills, and they are symlinked like any other config. The interesting part
 is `~/.claude/settings.json`, which is **not** linked — Claude Code writes to it
 itself.
 
-The skills are `readme` (a root README shaped to a private, public or work
-audience) and `ship` (uncommitted changes to a pull request). Each keeps its
-detail in a `references/` folder next to its `SKILL.md`, read only when a step
-needs it.
+The skills follow a change from the working tree to a release:
+
+| Skill | Does |
+|---|---|
+| `ship` | uncommitted changes to a pull request |
+| `ci-fix` | a red CI run back to green, fixing the cause rather than the check |
+| `tidy` | back on the default branch after a merge, merged branches deleted |
+| `release` | commits since the last tag to a version, changelog and GitHub release |
+| `readme` | a root README shaped to a private, public or work audience |
+
+Each stops for approval before anything leaves the machine. A skill with more
+detail than one page keeps it in a `references/` folder next to its
+`SKILL.md`, read only when a step needs it.
 
 ## Merging into a file you own
 
