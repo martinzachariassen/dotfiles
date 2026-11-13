@@ -121,7 +121,9 @@ On any hit: **stop and ask**. Never commit a suspected secret, and never
 
 ### 6. Run the checks
 
-Find the one command the project treats as "is this green", in this order:
+Hand this step to the `check-runner` agent when it is available: it finds
+and runs the command below in its own context and returns only the
+failures. Otherwise find the one command the project treats as "is this green", in this order:
 
 1. What `CLAUDE.md` / `CONTRIBUTING.md` says to run before committing.
 2. A `Makefile` target `check`, then `test` (`make -n <target>` to confirm it exists).

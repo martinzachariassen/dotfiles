@@ -25,6 +25,21 @@ Each stops for approval before anything leaves the machine. A skill with more
 detail than one page keeps it in a `references/` folder next to its
 `SKILL.md`, read only when a step needs it.
 
+Next to the skills, linked the same way:
+
+| File | Does |
+|---|---|
+| `agents/check-runner.md` | runs a project's checks in its own context on a small model and returns only the failures; `ship`, `ci-fix` and `release` hand their check step to it |
+| `hooks/git-guard.sh` | a `PreToolUse` hook that denies force-push, `--no-verify`, a push to `main` or `master`, `reset --hard` and `clean -f` |
+| `rules/context7.md` | fetch library docs through Context7 rather than answer from memory |
+
+The skills only *say* they never force-push; the guard is what makes it true
+for every session, skill or not. It reads the command with quoted strings and
+heredoc bodies stripped, so a commit message that names `--force` is not a
+force-push. It binds Claude, not you: a push the guard refuses is one you can
+still run yourself. `tests/git-guard.bats` pins both directions -- what it
+must deny, and the ordinary work it must let through.
+
 ## Merging into a file you own
 
 ```mermaid
@@ -86,6 +101,11 @@ remove then cannot take its keys back out of.
 - **`chmod` before `mv`.** `mktemp` is `0600` and `mv` carries that onto the
   destination, so a `settings.json` you kept at `0644` came back private after
   every apply.
+- **`.hooks.PreToolUse` is one leaf.** A leaf stops at the first non-object,
+  and `jq '. * $want'` replaces an array rather than joining it, so apply owns
+  the whole `PreToolUse` list. A hook of your own on that event goes in a
+  project's `.claude/settings.json`; in this file `doctor` reports it as drift
+  and the next apply overwrites it.
 - **`if`, never `jq … && mv`.** `set -e` ignores a non-final member of an `&&`
   list, so a `jq` that died mid-merge printed the success line and exited `0`.
 
@@ -141,5 +161,5 @@ a permanently yellow line is a line nobody reads.
 
 The current set lives in [`data/settings.json`](data/settings.json): the status
 line, theme, output style, cleanup period, notification toggles,
-and `permissions.defaultMode`. Add one there and all three hooks
+`permissions.defaultMode` and the `git-guard` hook. Add one there and all three hooks
 pick it up — there is no second list to update, and no count here to go stale.

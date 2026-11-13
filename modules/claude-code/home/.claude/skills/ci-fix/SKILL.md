@@ -94,7 +94,8 @@ narrowest form: one test file, one package, one lint target.
 
 - Rerun the reproduction from step 4 until it passes, then the project's
   full check command (as `ship` would find it), so the fix breaks nothing
-  else.
+  else. Run that full check through the `check-runner` agent when it is
+  available, so only its failures come back.
 - Commit to the **same branch**, following the repo's commit convention
   (same rules as the `ship` skill: repo convention first, Conventional
   Commits as the fallback, `git commit -s` if the repo uses DCO). The body

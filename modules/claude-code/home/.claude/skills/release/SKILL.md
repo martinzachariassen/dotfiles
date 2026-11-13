@@ -37,7 +37,7 @@ whatever language the conversation is in.
 - [ ] 5. Write the changelog and bump
 - [ ] 6. Run the checks
 - [ ] 7. Show the plan, wait for approval
-- [ ] 8. Commit, tag, push, publish
+- [ ] 8. Release PR, then tag and publish
 ```
 
 ### 1. Check the repo can release
@@ -113,29 +113,45 @@ patch -- name this in the plan. Match the tag format already in use
 
 ### 6. Run the checks
 
-The project's check command (as `ship` finds it). Red: stop and show it.
+The project's check command (as `ship` finds it), run through the
+`check-runner` agent when it is available, so only the failures come back.
+Red: stop and show it.
 
 ### 7. Show the plan, wait for approval
 
 Show: the current and next version and **why** (which commits forced the
-bump), the changelog entry in full, the files bumped, the tag name, and
-where it goes (direct push, or a release PR if the default branch is
-protected). Then **stop and wait for an explicit go-ahead** -- a published
-tag is public and practically permanent.
+bump), the changelog entry in full, the files bumped, the tag name, and the
+release PR it goes through. Then **stop and wait for an explicit go-ahead**
+-- a published tag is public and practically permanent.
 
-### 8. Commit, tag, push, publish
+### 8. Release PR, then tag and publish
+
+The release commit reaches the default branch through a pull request, never
+a direct push (a local `git-guard` hook refuses that push anyway):
 
 ```sh
+git switch -c release/<version>
 git commit -m "chore(release): <version>"   # repo's own convention if it differs
+git push -u origin release/<version>
+gh pr create --title "chore(release): <version>" --body-file - <<'EOF'
+<the changelog entry>
+EOF
+```
+
+Report the PR URL and stop. Once the user says it is merged:
+
+```sh
+git switch <default> && git pull --ff-only
+git log -1 --format=%s                       # must be the release commit
 git tag -a <tag> -m "<tag>"                  # -s if the repo signs tags
-git push origin <branch> <tag>
+git push origin <tag>
 gh release create <tag> --title "<tag>" --notes-file - [--draft] [--prerelease] <<'EOF'
 <the changelog entry>
 EOF
 ```
 
-- The default branch is protected: push the commit on a `release/<version>`
-  branch and open a PR instead (as `ship` does); tag only after it merges.
+- A squash merge rewrites the subject (`... (#42)`): check that HEAD is the
+  merged release PR before tagging, never tag an unrelated commit.
 - A tag-triggered workflow publishes the release (step 2): push the tag
   and skip `gh release create`.
 - Report the release URL.
