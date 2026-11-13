@@ -152,7 +152,7 @@ is never half-enabled.
 | Module | What it manages |
 | --- | --- |
 | `git` | [config, aliases, and a generated machine-local include](modules/git/README.md) |
-| `ssh` | [client config; keys stay in 1Password's agent](docs/modules.md#ssh-and-commit-signing) |
+| `ssh` | [client config; keys stay in 1Password's agent](modules/ssh/README.md) |
 | `zsh` | [XDG layout, aliases, PATH, `$EDITOR`, starship](modules/zsh/README.md), and API keys as 1Password references |
 | `cmux` | the terminal, plus the Ghostty config it reads: Option stays native for Æ/Ø/Å |
 | `claude-code` | [the CLI, and keys merged into `~/.claude/settings.json`](modules/claude-code/README.md) |

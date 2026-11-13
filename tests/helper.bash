@@ -106,3 +106,11 @@ json_parses() {
     perl -0pe 's/,(\s*[}\]])/$1/g' |
     jq -e . >/dev/null 2>&1
 }
+
+# Make the core checks pass so a doctor test isolates one thing. The real
+# generator, not a printf'd lookalike: a hand-written shim is a second
+# definition of the format core/doctor.sh greps for.
+pass_core_checks() {
+  DOT_DRY_RUN=0 bash "$DOT_ROOT/core/apply.sh" >/dev/null
+  export PATH="$HOME/.local/bin:$PATH"
+}

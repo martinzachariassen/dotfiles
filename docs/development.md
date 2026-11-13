@@ -18,7 +18,7 @@ brew bundle --file modules/dotfiles-dev/Brewfile
 
 [What CI does not run](#what-ci-does-not-run) ·
 [The structural limits](#the-structural-limits) ·
-[Layout](#layout) · [Writing tests](#writing-tests) ·
+[Writing tests](#writing-tests) ·
 [When something breaks](#when-something-breaks) ·
 [Bash 5](#bash-5)
 
@@ -65,19 +65,6 @@ anywhere in `docs/` names a verb count that `bin/dot` no longer has, or if a
 setting a hook reads is named in neither that module's `README.md` nor
 `docs/configuration.md`. Everything else is a hand check, so a doc claim worth
 keeping is worth a test here.
-
-## Layout
-
-| Directory | What lives there |
-|---|---|
-| `bin/` | `dot`, the CLI and its five verbs |
-| `lib/` | the engine, sourced and never executed |
-| `core/` | phase 1: the packages and the shim every machine gets |
-| `modules/` | phase 2, one directory per module |
-| `tests/` | bats, one file per unit |
-
-The rules for each live in one place, the root [`CLAUDE.md`](../CLAUDE.md).
-English everywhere: code, comments, commits, docs.
 
 ## Writing tests
 
