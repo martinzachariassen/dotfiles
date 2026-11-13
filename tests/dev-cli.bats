@@ -1,10 +1,4 @@
 #!/usr/bin/env bats
-#
-# modules/dev-cli. apply.sh downloads runtimes into a tree full of other
-# projects' content, so nothing here is deletable -- the warning IS the
-# deliverable, the same trade macos-defaults makes. doctor.sh answers two
-# questions about a fresh machine: are the runtimes down, and are the CLIs
-# logged in.
 
 load helper
 
@@ -19,10 +13,6 @@ remove() {
     "$BASH" "$DOT_ROOT/modules/dev-cli/remove.sh"
 }
 
-# apply.sh was the one hook here with no test: on a real machine it downloads
-# language runtimes, so it never ran in CI and never ran under a reviewer's
-# eye either. `mise` is shadowed on PATH, which makes all three of its paths
-# reachable without fetching a single toolchain.
 apply() {
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="${1:-0}" \
@@ -45,9 +35,6 @@ doctor() {
     "$BASH" "$DOT_ROOT/modules/dev-cli/doctor.sh"
 }
 
-# stub NAME... -- a command that exists on PATH and does nothing. doctor.sh
-# only ever asks `command -v`, so a row's branch is decided by the credential
-# file, never by what the tool would have said.
 stub() {
   BIN=${BIN:-$DOT_TMP/bin}
   mkdir -p "$BIN"
@@ -58,18 +45,6 @@ stub() {
   done
 }
 
-# fixture_devcli [CMD PKG PATH PATTERN LOGIN WHY] -- a copy of the module
-# carrying its own sign-in table, one row, or with no arguments a table holding
-# nothing but a comment and a blank line.
-#
-# DOT_MODULE_DIR is where the hook finds BOTH data files, so a row naming a
-# command no machine has is reachable without building an unreal PATH --
-# doctor.sh needs dasel on it, and a PATH stripped down to stubs takes that
-# away too. The shipped table is held against the Brewfile by contract.bats.
-#
-# The columns are joined here rather than written as a heredoc: a literal tab
-# in this file is one editor away from being spaces, and the row would then
-# parse as a command with a very long name.
 fixture_devcli() {
   MODULE_DIR="$DOT_TMP/dev-cli"
   mkdir -p "$MODULE_DIR/data"
@@ -80,12 +55,8 @@ fixture_devcli() {
   } >"$MODULE_DIR/data/signin.tsv"
 }
 
-# The fixture row every sign-in test uses, so each one says only what it is
-# about. `widget` is a command no machine has unless `stub` put it there.
 WIDGET_ROW=(widget widget .config/widget/creds '"token"' 'widget login' 'every widget you own')
 
-# Every runtime mise's config pins, present in the install tree: a sign-in test
-# must not be reading a report about missing runtimes.
 with_runtimes() {
   local tool
   while IFS= read -r tool; do
@@ -98,17 +69,13 @@ with_runtimes() {
 
   apply
   [ "$status" -eq 0 ]
-  # Kept: a download that takes minutes must be visible while it happens.
   [[ $output == *"installing node"* ]]
   [[ $output == *"installing python"* ]]
-  # And set apart from this repo's own lines, which is what makes it skippable.
   [[ $(grep 'installing node' <<<"$output") =~ ^[[:space:]]{4,} ]]
   says mise 'runtimes installed'
 }
 
 @test "apply: mise installs from the lock, never resolving a version itself" {
-  # Without --locked a `latest` in config.toml resolves on the day a machine is
-  # built, and two machines built a month apart disagree.
   with_mise "printf '%s\\n' \"\$*\" >'$DOT_TMP/mise-args'; exit 0"
 
   apply
@@ -130,7 +97,6 @@ with_runtimes() {
 }
 
 @test "apply: a mise that fails takes the hook down with it" {
-  # The output goes through a pipe now, so the status has to survive it.
   with_mise 'echo "could not resolve node@20"; exit 1'
 
   apply
@@ -162,12 +128,6 @@ with_runtimes() {
   [[ $output == *"Brewfile line did not apply"* ]]
 }
 
-# --- sign-ins ---------------------------------------------------------------
-#
-# The gap these close: `dot apply` finishes green on a fresh machine, and every
-# one of these CLIs is still an hour of 401s away from working. Nothing else in
-# the repo knows that installing a tool and being able to use it are two steps.
-
 @test "doctor: a credential store on disk is a CLI that is signed in" {
   with_mise 'exit 0'
   with_runtimes
@@ -182,10 +142,6 @@ with_runtimes() {
 }
 
 @test "doctor: a store that survived a logout is not a sign-in" {
-  # The reason column 4 exists. Every one of these stores keeps existing after
-  # a logout, and some keep holding bytes: gcloud's credentials.db is
-  # still a SQLite database once its rows are revoked. A size test calls it
-  # signed in.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -199,9 +155,6 @@ with_runtimes() {
 }
 
 @test "doctor: the pattern is matched inside a store that is not text" {
-  # credentials.db is SQLite. Without -a, grep declines to read it and answers
-  # the same as an empty file -- a third state the row has no way to say, and
-  # one that would report a signed-in machine as never having logged in.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -216,9 +169,6 @@ with_runtimes() {
 }
 
 @test "doctor: the table has six columns on every row" {
-  # A row that lost a tab shifts every column after it: the pattern becomes the
-  # login command, which matches nothing, and the tool reads as logged out
-  # forever. contract.bats only holds the generic 4-to-6 range.
   local line
   while IFS= read -r line; do
     [[ -n $line && $line != '#'* ]] || continue
@@ -230,9 +180,6 @@ with_runtimes() {
 }
 
 @test "doctor: every shipped row's pattern is an ERE grep accepts" {
-  # A pattern that does not compile makes grep exit 2, which this hook reads as
-  # "not signed in" -- a row that is yellow on every machine, for a reason
-  # nothing on screen would name.
   local cmd pattern
   while IFS=$'\t' read -r cmd _ _ pattern _; do
     [[ -n $cmd && $cmd != '#'* ]] || continue
@@ -244,10 +191,6 @@ with_runtimes() {
 }
 
 @test "doctor: no mise still runs every sign-in check" {
-  # A missing mise used to fail and exit on the spot, so a machine without it
-  # never heard that gh and gcloud were signed in to nothing either. The PATH
-  # is the real one with mise's directory replaced by links to everything
-  # else in it, so dasel and the rest stay reachable.
   local dir f path='' nomise="$DOT_TMP/nomise" dirs
   mkdir -p "$nomise"
   IFS=: read -ra dirs <<<"$PATH"
@@ -274,8 +217,6 @@ with_runtimes() {
 }
 
 @test "doctor: a CLI with no credentials names the login command" {
-  # The deliverable. "not signed in" alone sends you to a man page; the exact
-  # command is what makes doctor a checklist you can work down.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -287,9 +228,6 @@ with_runtimes() {
 }
 
 @test "doctor: what the missing sign-in costs is printed, not just filed" {
-  # Column 6 is the reason to work the list down. A fresh machine gets one of
-  # these per CLI, and "not signed in to gcloud" alone is a line you scroll
-  # past -- the bill for scrolling past it arrives hours later as a 401.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -300,8 +238,6 @@ with_runtimes() {
 }
 
 @test "doctor: every shipped row says what it costs" {
-  # The table is the specification, and a row missing column 6 prints "what it
-  # costs:" with nothing after it -- which reads as a bug in the tool.
   local cmd costs
   while IFS=$'\t' read -r cmd _ _ _ _ costs; do
     [[ -n $cmd && $cmd != '#'* ]] || continue
@@ -313,8 +249,6 @@ with_runtimes() {
 }
 
 @test "doctor: the path it looked at is named, because that is the weak half" {
-  # A tool that moves its credential store would otherwise warn forever with
-  # nothing on screen to say why. Naming the path makes a wrong row readable.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -325,8 +259,6 @@ with_runtimes() {
 }
 
 @test "doctor: a CLI this machine does not have is not a row it must answer" {
-  # The escape hatch: drop the package from the Brewfile and the row goes
-  # quiet, instead of a machine that wants no gcloud staying yellow forever.
   with_mise 'exit 0'
   with_runtimes
   fixture_devcli "${WIDGET_ROW[@]}"
@@ -337,9 +269,6 @@ with_runtimes() {
 }
 
 @test "doctor: an empty credential file is not a sign-in" {
-  # gh writes an empty hosts.yml the first time it reads a config, so -e would
-  # call a machine signed in for having run `gh` once. The pattern answers this
-  # one too, and this test stays because it is the case that came first.
   with_mise 'exit 0'
   with_runtimes
   stub widget
@@ -362,8 +291,6 @@ with_runtimes() {
 }
 
 @test "remove: says nothing on a machine that never enabled the module" {
-  # uninstall.sh runs every module's remove.sh. A hook that warns about a
-  # directory nobody has is noise in the one output an uninstall leaves.
   remove
   [ "$status" -eq 0 ]
   [ -z "$output" ]

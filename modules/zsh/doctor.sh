@@ -1,26 +1,12 @@
 #!/usr/bin/env bash
-#
-# Installers append to $HOME/.zshrc, which ZDOTDIR makes dead: no error, the
-# tool is just absent from every shell. A real file, so neither fs_check_tree
-# nor the orphan scan can see it.
-
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
 zdotdir="$DOT_CONFIG_HOME/zsh"
 
-# Everything below asks what zsh will read, and none of it means anything if
-# zsh is not the shell that starts.
-#
-# `dscl`, not $SHELL: $SHELL is whatever the RUNNING shell was told, so a `zsh`
-# typed into a bash login window answers for the window rather than for the
-# account -- the one case worth catching, answered wrongly. An input, because
-# the branch that matters is the one a Mac set up since Catalina never takes.
+# dscl, not $SHELL: $SHELL describes the running shell, not the account.
 dscl_bin=${DOT_DSCL_BIN:-/usr/bin/dscl}
 if [[ -x $dscl_bin ]]; then
-  # `if`, not a pipeline into sed: under pipefail a dscl that fails takes the
-  # whole assignment down, and the ERR trap turns "could not be read" into a
-  # crash. Never `|| true` -- that loses the distinction being tested.
   if record=$("$dscl_bin" . -read "/Users/$(id -un)" UserShell 2>/dev/null); then
     login_shell=$(sed -n 's/^UserShell: //p' <<<"$record")
   else
@@ -36,11 +22,9 @@ if [[ -x $dscl_bin ]]; then
       ;;
   esac
 else
-  # A question that could not be asked is not a healthy answer.
   warn zsh "login shell cannot be checked -- $dscl_bin is not there"
 fi
 
-# Empty ZDOTDIR means "not observable from here", not "unset".
 if [[ -n ${ZDOTDIR:-} && $ZDOTDIR != "$zdotdir" ]]; then
   warn zsh "ZDOTDIR is $ZDOTDIR, expected ${zdotdir/#$HOME/\~}"
 fi
@@ -60,7 +44,6 @@ else
   ok zsh "no dead config in ~ (ZDOTDIR is ${zdotdir/#$HOME/\~})"
 fi
 
-# apply.sh sets the same mode; without it `op run` aborts on every reference.
 op_dir="$HOME/.config/op"
 if [[ -d $op_dir ]]; then
   op_mode=$(stat -f '%Lp' "$op_dir")

@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-#
-# `dot` -- the dotfiles CLI. Five verbs, hardcoded; full removal is uninstall.sh.
-
-# macOS ships bash 3.2 as /bin/bash; a shell that never sourced Homebrew's
-# shellenv would start this under it.
 if ((BASH_VERSINFO[0] < 5)); then
   if [[ -x /opt/homebrew/bin/bash ]]; then
     exec /opt/homebrew/bin/bash "$0" "$@"
@@ -17,10 +12,8 @@ set -euo pipefail
 # shellcheck source=../lib/dot.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/dot.sh"
 
-# Top level, not a hook: `dot doctor && ...` must survive an orphaned link.
 __DOT_EXIT_WARN=0
 
-# Only apply, add and remove keep one; uninstall.sh deletes logs/ as ours.
 __DOT_LOG=''
 
 __transcript_start() {
@@ -32,15 +25,13 @@ __transcript_start() {
   __DOT_LOG="$DOT_STATE/logs/$DOT_RUN_ID-$verb.log"
   mkdir -p "$DOT_STATE/logs"
 
-  # touch before the redirect, so this run is one of the twenty it keeps.
   touch "$__DOT_LOG"
   while IFS= read -r old; do
     rm -f "$old"
   done < <(find "$DOT_STATE/logs" -maxdepth 1 -type f -name '*.log' | sort -r | tail -n +21)
 
   # lib/dot.sh's EXIT trap restores fd 3/4 and waits on __DOT_TEE_PID, or the
-  # log loses its last lines. One sed, not tee: `w` writes the colourless copy,
-  # `g` gives the terminal its colour back.
+  # log loses its last lines.
   exec 3>&1 4>&2
   exec > >(sed -l -e h -e "$__UI_STRIP_SGR" -e "w $__DOT_LOG" -e g) 2>&1
   __DOT_TEE_PID=$!
@@ -53,7 +44,6 @@ __transcript_end() {
 }
 
 usage() {
-  # Indented, so an option reads as part of the verb above, not a sixth verb.
   __under() {
     ui_nest
     dim "$@"
@@ -78,15 +68,14 @@ usage() {
   __under '--verbose   show every check, not only what needs attention'
 
   heading 'Where things are'
-  # Overridable paths are printed, never baked into a heredoc.
   say config "${DOT_CONFIG/#$HOME/\~}"
   say repo "${DOT_ROOT/#$HOME/\~}"
   say uninstall 'bash uninstall.sh --dry-run   (in the repo; not a verb, on purpose)'
   printf '\n'
 }
 
-# __pull ARGS... -- fast-forward the checkout, then hand over to the pulled
-# bin/dot: bash reads this file as it runs, and lib/ is already sourced.
+# bash reads this file lazily while it runs, so the pulled bin/dot is exec'd
+# rather than continued in this process.
 __pull() {
   local repo=${DOT_ROOT/#$HOME/\~} dirty
   info pull "git pull --ff-only in $repo"
@@ -109,7 +98,6 @@ __pull() {
 cmd_apply() {
   local pull=0
   local -a pass=()
-  # Anything unknown is fatal: `dot apply --dry` must not apply for real.
   while (($#)); do
     case $1 in
       --dry-run)
@@ -124,7 +112,6 @@ cmd_apply() {
 
   if ((pull)); then __pull "${pass[@]}"; fi
 
-  # After the parse, never before: --dry-run opens no transcript.
   __transcript_start apply
 
   local mode=''
@@ -134,7 +121,6 @@ cmd_apply() {
   say config "${DOT_CONFIG/#$HOME/\~}"
   if [[ -n $__DOT_LOG ]]; then say log "${__DOT_LOG/#$HOME/\~}"; fi
 
-  # Phase 1 installs dasel and fzf; nothing below may run before it.
   heading 'Core packages'
   if ! brew_load; then
     die 'Homebrew is not installed' next 'bash install.sh'
@@ -143,7 +129,6 @@ cmd_apply() {
     die 'Core packages did not install' next 'fix the brew errors above, then re-run'
 
   if ! cfg_exists; then
-    # A dry run would ask every question and then discard the answers.
     if [[ $DOT_DRY_RUN == 1 ]]; then
       die 'There is no config yet' \
         config "${DOT_CONFIG/#$HOME/\~}" next 'dot config --init'
@@ -157,17 +142,14 @@ cmd_apply() {
     wizard_run
   fi
 
-  # Before modules_require_known: a truncated config has no `enabled` at all.
   local problems
   problems=$(cfg_parse_problems)
   [[ -z $problems ]] ||
     die 'The config did not parse' \
       problem "$problems" edit "${DOT_CONFIG/#$HOME/\~}"
 
-  # Once, here: modules_enabled is read in subshells and cannot report this.
   modules_require_known
 
-  # Last gate before anything in $HOME moves. Everything above only read.
   modules_preflight
 
   local name i=0
@@ -193,7 +175,6 @@ cmd_apply() {
     ui_unnest
   done
 
-  # Observe rather than report what was attempted. Not on a dry run: all drift.
   if [[ $DOT_DRY_RUN != 1 ]]; then
     run_checks 'Verifying' 'read-only, the same checks as: dot doctor'
   fi
@@ -207,8 +188,8 @@ cmd_apply() {
   return 0
 }
 
-# __module_arg VERB ARGS... -- sets __MODULE_NAME and DOT_DRY_RUN. Never make
-# it print: under `$(...)` the --dry-run export dies and the verb acts for real.
+# Never make it print: under `$(...)` the --dry-run export dies and the verb
+# acts for real.
 __module_arg() {
   local verb=$1
   shift
@@ -229,15 +210,12 @@ __module_arg() {
   [[ -n $__MODULE_NAME ]] || die "$verb: which module?" next "dot $verb <module>"
 }
 
-# Gates first: unlinking and then failing to edit the list leaves the machine
-# and the config disagreeing.
 __module_gate() {
   local verb=$1 name=$2 available problems
   cfg_exists ||
     die 'There is no config yet' \
       config "${DOT_CONFIG/#$HOME/\~}" next 'dot config --init'
 
-  # dasel reads a truncated file as valid; splicing into it loses the rest.
   problems=$(cfg_parse_problems)
   [[ -z $problems ]] ||
     die 'The config did not parse' \
@@ -266,7 +244,6 @@ cmd_add() {
   say config "${DOT_CONFIG/#$HOME/\~}"
   if [[ -n $__DOT_LOG ]]; then say log "${__DOT_LOG/#$HOME/\~}"; fi
 
-  # Phase 1 first, as cmd_apply orders it: `brew_load` alone is not that.
   heading 'Core packages'
   if ! brew_load; then
     die 'Homebrew is not installed' next 'bash install.sh'
@@ -286,7 +263,6 @@ cmd_add() {
       config "${DOT_CONFIG/#$HOME/\~}"
   fi
 
-  # After the config write, so the module being added is among the hooks parsed.
   modules_preflight
 
   heading 'Applying' '1 module'
@@ -316,7 +292,6 @@ cmd_remove() {
   say config "${DOT_CONFIG/#$HOME/\~}"
   if [[ -n $__DOT_LOG ]]; then say log "${__DOT_LOG/#$HOME/\~}"; fi
 
-  # A hand-edited config leaves exactly this state; sweep it anyway.
   if modules_enabled | grep -qxF -- "$name"; then
     enabled_now=1
   else
@@ -326,8 +301,8 @@ cmd_remove() {
   heading 'Removing' '1 module'
   step '' '' "$name" "$(module_desc "$name")"
 
-  # Hook before links, as uninstall.sh does: remove.sh may need them in place.
   ui_nest
+  # Hook before links: remove.sh may need them still in place.
   module_remove "$name"
 
   local dst
@@ -336,7 +311,6 @@ cmd_remove() {
   done < <(fs_pairs "$(modules_dir "$name")")
   ui_unnest
 
-  # The config write is the commit point: a failure above leaves it listed.
   if ((enabled_now)); then
     if [[ $DOT_DRY_RUN == 1 ]]; then
       info remove "'$name' from ${DOT_CONFIG/#$HOME/\~}"
@@ -350,7 +324,6 @@ cmd_remove() {
   fi
 
   heading 'Summary'
-  # Every time: "removed" reads as if the packages went too.
   say packages 'stay installed. Removing those is `brew uninstall`, yours to run.'
   ui_verdict 'Done.' module
   __transcript_end
@@ -380,7 +353,7 @@ cmd_config() {
 }
 
 # Captured by a redirect in this shell, never `$(...)`: a subshell drops the
-# tallies. Safe as apply's tail because contract.bats keeps doctor.sh read-only.
+# tallies.
 __checks_sink=''
 
 # Exported, not a `VAR=x fn` prefix: on a function that depends on POSIX mode.
@@ -394,7 +367,6 @@ __check_group() {
 }
 
 __core_checks() {
-  # `fail`: this is exactly what will stop the next apply.
   local unknown
   while IFS= read -r unknown; do
     fail config "lists unknown module '$unknown' -- dot apply will refuse"
@@ -424,13 +396,10 @@ run_checks() {
   done
   rm -f "$__checks_sink"
 
-  # Outside every group: about the machine, so no module takes the blame.
   __orphan_report
   __unmanaged_report
 }
 
-# Reported, never deleted. Grouped by module: for a disabled one `rm` alone is
-# a false all-clear, as its remove.sh never ran. See docs/architecture.md.
 __orphan_report() {
   local mod path found=0 unowned='' repo=${DOT_ROOT/#$HOME/\~}
   local -A bymod=()
@@ -483,7 +452,6 @@ __orphan_report() {
   fi
 }
 
-# `info`, bumping no tally: installing by hand is not a defect.
 __unmanaged_report() {
   local out line status=0
   out=$(brew_unmanaged) || status=$?

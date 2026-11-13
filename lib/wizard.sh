@@ -1,19 +1,12 @@
 # shellcheck shell=bash
-#
-# First-run config generation. Runs after phase 1 has installed fzf, which is
-# why the picker is one call rather than a hand-rolled menu.
 
 DOT_PROFILES="$DOT_ROOT/profiles.toml"
 
-# Esc/Ctrl-C make fzf exit 130 with no output; every picker ends in `|| true`
-# and signals cancellation by printing nothing.
 __wizard_cancel() {
   say 'Cancelled -- no config was written.'
   exit 0
 }
 
-# One look for both pickers. --height, not full screen: the step heading above
-# stays visible, so the picker reads as part of the run rather than a mode.
 __wizard_fzf_opts() {
   printf '%s\n' \
     --reverse --height=70% --border=rounded --info=inline \
@@ -21,8 +14,6 @@ __wizard_fzf_opts() {
     --color='border:dim,header:italic,marker:green,pointer:blue'
 }
 
-# wizard_preview NAME -- a process per keystroke, so it sources the library
-# rather than being handed anything.
 wizard_preview() {
   local name=$1 dir file n
   dir=$(modules_dir "$name")
@@ -55,23 +46,18 @@ wizard_preview() {
   if [[ -n $hooks ]]; then say hooks "${hooks:2}"; fi
 }
 
-# The module name travels as a hidden first field (--with-nth=2), never
-# recovered from the rendered text.
 wizard_pick_modules() {
   local preset=$1 name mark i=0 preselect=''
   local -a names opts
   mapfile -t names < <(modules_all)
   mapfile -t opts < <(__wizard_fzf_opts)
 
-  # `*` is cosmetic to fzf; pos(N)+toggle is what actually selects the preset
-  # rows. Built here, not inside the pipeline, which runs in a subshell.
   for name in "${names[@]}"; do
     i=$((i + 1))
+    # `*` is cosmetic to fzf; pos(N)+toggle is what selects the preset rows.
     grep -qxF -- "$name" <<<"$preset" && preselect+="pos($i)+toggle+"
   done
 
-  # The whole list before fzf starts: fzf fires `load` while a slowly streamed
-  # list is still arriving, and pos(N) on a row that is not there toggles nothing.
   local rows='' row
   for name in "${names[@]}"; do
     mark=' '
@@ -80,6 +66,8 @@ wizard_pick_modules() {
     rows+=$row
   done
 
+  # The whole list before fzf starts: `load` fires while a streamed list is still
+  # arriving, and pos(N) on a row that is not there toggles nothing.
   printf '%s' "$rows" |
     fzf "${opts[@]}" --multi --prompt='Modules > ' \
       --delimiter=$'\t' --with-nth=2 \
@@ -91,8 +79,6 @@ wizard_pick_modules() {
     cut -f1 || true
 }
 
-# How many files and packages the choice adds up to, so Review says something
-# the module list alone does not.
 __wizard_totals() {
   local modules=$1 name files=0 packages=0 n
   while IFS= read -r name; do
@@ -112,7 +98,6 @@ wizard_run() {
   local -a opts
   mapfile -t opts < <(__wizard_fzf_opts)
 
-  # `none` writes an empty list; the config file is the only other route.
   heading 'Profile' 'step 1 of 3'
   say 'A profile is a starting list of modules. You edit it in the next step.'
   profiles=$(printf '%s\nnone\n' "$(toml_list "$DOT_PROFILES" 'profiles.keys()')")
@@ -127,12 +112,10 @@ wizard_run() {
   else
     heading 'Modules' 'step 2 of 3'
     say "Starting from the '$profile' profile. Toggle anything you want changed."
-    # Bracket syntax: dasel reads `work-laptop` as subtraction.
     modules=$(wizard_pick_modules "$(toml_list "$DOT_PROFILES" "profiles[\"$profile\"]")")
     [[ -z $modules ]] && __wizard_cancel
   fi
 
-  # Identity never varies by machine, so it is read from profiles.toml, not asked.
   name=$(toml_get "$DOT_PROFILES" 'user.name')
   email=$(toml_get "$DOT_PROFILES" 'user.email')
   signingkey=$(toml_get "$DOT_PROFILES" 'user.signingkey')
@@ -151,11 +134,10 @@ wizard_run() {
   say config "${DOT_CONFIG/#$HOME/\~}"
   dim 'Nothing has been written yet. `dot apply` is what installs and links.'
 
-  # A line, not `read -p`: the transcript's sed holds a partial line back.
-  # `|| cancel`: a bare read trips errexit on Ctrl-D, and falling through would
-  # read end-of-input as yes.
   printf '\n'
   say 'Write this config? [Y/n]'
+  # A bare read trips errexit on Ctrl-D, and falling through would read
+  # end-of-input as yes.
   read -r reply || __wizard_cancel
   [[ ${reply:-y} == [Yy]* ]] || __wizard_cancel
 

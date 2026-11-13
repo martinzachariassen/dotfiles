@@ -1,18 +1,12 @@
-# GUI apps and fonts. Things with a window or menu bar item; CLIs go in
-# dev-cli. A cask whose absence would BREAK another module's shipped config
-# ships from that module instead -- see modules/apps/README.md.
-
 cask "raycast"
 cask "claude"
-cask "bruno" # API client; local files, no account
-cask "zennotes/tap/zennotes" # notes app
+cask "bruno"
+cask "zennotes/tap/zennotes"
 cask "google-chrome"
 cask "spotify"
 cask "discord"
-cask "visual-studio-code" # $EDITOR (modules/zsh/home/.zshenv) and git's editor
+cask "visual-studio-code"
 
-cask "stats" # resource monitor in the menu bar
+cask "stats"
 
-# The plain build only: it keeps editors on stock metrics. The Nerd Font that
-# starship and ghostty draw with ships from the modules that name its glyphs.
 cask "font-jetbrains-mono"

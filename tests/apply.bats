@@ -1,19 +1,10 @@
 #!/usr/bin/env bats
-#
-# Idempotence. The property the whole design rests on -- "derive, never record"
-# only works if deriving twice lands in the same place -- and the one thing
-# nothing asserted. A second apply that relinks, rewrites or reports drift is a
-# machine whose state nobody can reason about.
 
 load helper
 
 setup() { setup_sandbox; }
 teardown() { teardown_sandbox; }
 
-# A `security` that answers as a signed-in machine does. The login keychain is
-# resolved from $HOME and run_hook gives every hook a throwaway one, so the
-# claude-code sign-in check can otherwise only ever say "not signed in" -- and
-# these tests are about what happens to a user's settings.json, not about auth.
 with_signed_in() {
   mkdir -p "$DOT_TMP/bin"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/bin/security"
@@ -103,8 +94,6 @@ run_hook() {
 }
 
 @test "claude-code: apply, then doctor, then remove returns the file it found" {
-  # The round trip is the promise: nothing this module did to a user's file
-  # survives an uninstall, and nothing the user had is lost to an apply.
   with_signed_in
   mkdir -p "$HOME/.claude"
   printf '%s\n' '{"permissions":{"allow":["Bash(ls*)"]},"theirs":42}' \
@@ -123,9 +112,6 @@ run_hook() {
   [ "$before" = "$(jq -S . "$HOME/.claude/settings.json")" ]
 }
 
-# no_jq -- a PATH with nothing on it at all. lib/dot.sh needs no external
-# command once DOT_ROOT and DOT_RUN_ID are given, so this is the honest shape
-# of a machine that never installed the module whose hook is running.
 no_jq() {
   mkdir -p "$DOT_TMP/empty"
   run env -i PATH="$DOT_TMP/empty" HOME="$HOME" DOT_ROOT="$DOT_ROOT" \
@@ -135,10 +121,6 @@ no_jq() {
 }
 
 @test "claude-code: remove.sh needs no jq when there is nothing of ours to remove" {
-  # uninstall.sh runs EVERY module's remove.sh, enabled or not, and jq comes
-  # from this module's own Brewfile. Deriving $want before the guards killed
-  # the hook on its twelfth line, which failed the preview, which aborted the
-  # whole uninstall -- on any machine that never enabled claude-code.
   [ ! -e "$HOME/.claude/settings.json" ]
   no_jq
   [ "$status" -eq 0 ]
@@ -146,8 +128,6 @@ no_jq() {
 }
 
 @test "claude-code: remove.sh without jq leaves settings.json alone and says why" {
-  # A warning, not a failure: uninstall.sh stops before Homebrew on a failure,
-  # and a few keys left in a file the user still owns is no reason for that.
   mkdir -p "$HOME/.claude"
   printf '{"model":"mine"}\n' >"$HOME/.claude/settings.json"
 
@@ -158,10 +138,6 @@ no_jq() {
 }
 
 @test "claude-code: settings.json that is valid JSON but not an object" {
-  # `jq -e .` accepted [], and every jq program after that guard died on it.
-  # `jq ... && mv` hid the death completely: set -e ignores a non-final member
-  # of an && list, so both hooks printed their success line, exited 0, and left
-  # a half-written temp file next to the file they had not touched.
   mkdir -p "$HOME/.claude"
   printf '[]\n' >"$HOME/.claude/settings.json"
 
@@ -174,14 +150,10 @@ no_jq() {
   [ "$status" -eq "$DOT_STATUS_WARN" ]
   [ "$(cat "$HOME/.claude/settings.json")" = "[]" ]
 
-  # The temp file is the tell: a hook that gave up must leave no litter behind.
   [ "$(ls -A "$HOME/.claude")" = "settings.json" ]
 }
 
 @test "claude-code: the mode of the user's settings.json survives both hooks" {
-  # mktemp is 0600 and `mv` carries that onto the destination, so a file the
-  # user kept group- or world-readable came back private -- once per apply,
-  # silently, to a file this module only ever claimed to merge into.
   mkdir -p "$HOME/.claude"
   printf '{"theirs":1}\n' >"$HOME/.claude/settings.json"
   chmod 644 "$HOME/.claude/settings.json"
@@ -196,11 +168,6 @@ no_jq() {
 }
 
 @test "claude-code: valid JSON of the wrong shape is never called invalid" {
-  # `jq -e .` exits non-zero on `null` and `false`, so all three hooks called
-  # them invalid JSON -- a diagnosis that sends the user hunting for a syntax
-  # error in a file whose syntax is fine. apply and remove name the type they
-  # found; doctor, whose whole advice is "run dot apply", only has to stop
-  # saying the wrong thing.
   mkdir -p "$HOME/.claude"
   local pair shape kind hook
   for pair in 'null:null' 'false:boolean' '42:number'; do
@@ -239,9 +206,6 @@ no_jq() {
 }
 
 @test "claude-code manages no key Claude Code writes back itself" {
-  # `/model` and the effort picker land in this same settings.json. Managed,
-  # they turned doctor red the moment you switched and made the next apply
-  # revert the switch, so a machine that switched has to still read as clean.
   with_signed_in
   mkdir -p "$HOME/.claude"
   printf '{}\n' >"$HOME/.claude/settings.json"
@@ -254,9 +218,6 @@ no_jq() {
   run_hook "$DOT_ROOT/modules/claude-code" doctor.sh
   [ "$status" -eq 0 ]
 
-  # And the next apply leaves the switch standing. A pinned env.ANTHROPIC_MODEL
-  # outranked .model, so every new session undid the switch and the pinned
-  # versions went stale on each release: no model key is managed at all.
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
   run jq -r '.model, .effortLevel, .env.ANTHROPIC_MODEL' "$HOME/.claude/settings.json"
   [ "$output" = "opus
@@ -271,6 +232,5 @@ null" ]
   run_hook "$DOT_ROOT/modules/claude-code" apply.sh
   [ "$status" -ne 0 ]
   [[ $output == *"unparseable text"* ]]
-  # The user's file is theirs; a hook that cannot parse it may not replace it.
   [ "$(cat "$HOME/.claude/settings.json")" = "this is not json" ]
 }

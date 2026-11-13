@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-#
-# Core apply. Near-empty on purpose: core marks the phase boundary.
-
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 
 # A generated shim, not a symlink: through a symlink BASH_SOURCE would point at
-# ~/.local/bin and bin/dot would look for lib/ there. core/doctor.sh and
-# uninstall.sh grep -F the DOT_ROOT line below to recognise it as ours.
+# ~/.local/bin and bin/dot would look for lib/ there.
 bin_dir="$HOME/.local/bin"
 target="$bin_dir/dot"
 

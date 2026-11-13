@@ -1,4 +1,3 @@
-# Latte: the only Catppuccin flavour built for a light pane background.
 "$schema" = 'https://starship.rs/config-schema.json'
 
 palette = "catppuccin_latte"
@@ -16,7 +15,6 @@ $character"""
 add_newline = true
 command_timeout = 2000
 
-# Only for root, or when $USER differs from the login user.
 [username]
 show_always = false
 style_user = "bold red"

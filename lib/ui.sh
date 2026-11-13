@@ -1,7 +1,4 @@
 # shellcheck shell=bash
-#
-# Terminal output. The only file that emits colour or glyphs, and the only one
-# that decides where a column starts; tests/contract.bats holds both.
 
 # Settled at source time, the last moment stdout is still the terminal.
 if [[ ${DOT_COLOR:-} == 1 ]]; then
@@ -25,10 +22,8 @@ else
 fi
 unset __ui_colour
 
-# For bin/dot's transcript sed. Here, so colour is spelled in one file only.
 __UI_STRIP_SGR="s/$(printf '\033')\[[0-9;]*m//g"
 
-# One column wide in both alphabets, so the label column never moves.
 __ui_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-}}}
 if [[ ${DOT_ASCII:-} == 1 ]] ||
   [[ $__ui_locale != *UTF-8* && $__ui_locale != *UTF8* && $__ui_locale != *utf8* ]]; then
@@ -38,7 +33,6 @@ else
 fi
 unset __ui_locale
 
-# tput needs a terminal, and the transcript's pipe is not one.
 if [[ -n ${DOT_COLUMNS:-} ]]; then
   __UI_COLS=$DOT_COLUMNS
 elif [[ -n ${COLUMNS:-} ]]; then
@@ -50,11 +44,9 @@ fi
 ((__UI_COLS >= 40)) || __UI_COLS=40
 ((__UI_COLS <= 100)) || __UI_COLS=100
 
-# The label column. Callers pass a bare label; the wider one is for groups.
 __UI_LABEL_W=12
 __UI_GROUP_W=14
 
-# Exported, so a hook's output nests under its step line.
 DOT_UI_INDENT=${DOT_UI_INDENT:-}
 export DOT_UI_INDENT
 
@@ -74,13 +66,8 @@ DOT_WARNINGS=0
 # 3, not 2: bash owns 2 for syntax errors.
 DOT_STATUS_WARN=3
 
-# Records: with DOT_UI_RECORDS the printers emit "<RS>sev<FS>label<FS>message"
-# for the driver to render. See docs/architecture.md#records.
 __UI_RS=$'\036'
 __UI_FS=$'\037'
-
-# ok|info|warn|fail LABEL MESSAGE  -- the label lands in the aligned column.
-# ok|info|warn|fail MESSAGE        -- no label, message at the column's edge.
 
 __ui_line() {
   local sev=$1 label=''
@@ -97,8 +84,6 @@ __ui_line() {
   __ui_render "$sev" "$label" "$*"
 }
 
-# __ui_render SEV LABEL MESSAGE [WIDTH] -- the single place a status line takes
-# shape. WIDTH is for the group lines, whose label is a module name.
 __ui_render() {
   local sev=$1 label=$2 msg=$3 width=${4:-$__UI_LABEL_W} glyph colour body
 
@@ -117,7 +102,6 @@ __ui_render() {
     body=$msg
   fi
 
-  # No marker for dim and say, but the slot stays, or their label shifts left.
   if [[ $sev == dim ]]; then
     printf '%s    %s%s%s\n' "$DOT_UI_INDENT" "$__C_DIM" "$body" "$__C_RESET"
   elif [[ $sev == say ]]; then
@@ -142,8 +126,6 @@ fail() {
   DOT_FAILURES=$((DOT_FAILURES + 1))
 }
 
-# heading TITLE [NOTE] -- a divider ruled to the terminal width, with the note
-# right-aligned: "── Modules ──────────────────── 9 enabled".
 heading() {
   local title=$1 note=${2:-} left right fill n
 
@@ -159,8 +141,6 @@ heading() {
     "$__C_BOLD" "$left" "$__C_RESET$__C_DIM" "$fill" "$__C_RESET" "$right"
 }
 
-# step CURRENT TOTAL NAME [NOTE] -- "▸ [3/9] containers   Docker via colima".
-# An empty CURRENT drops the counter, for a phase that is not a numbered one.
 step() {
   local i=$1 n=$2 name=$3 note=${4:-} counter=''
   if [[ -n $i ]]; then printf -v counter '[%s/%s] ' "$i" "$n"; fi
@@ -180,13 +160,12 @@ ui_elapsed() {
   fi
 }
 
-# ui_quote -- another program's output, streamed, indented and dimmed, with a
-# heartbeat while it is silent. `read -t` sits in an `if` so set -e survives a
-# timeout; `chunk` accumulates because a timeout can split a line.
 ui_quote() {
   local line='' chunk status idle=0 beat=${DOT_UI_HEARTBEAT:-15}
   while true; do
     chunk=''
+    # `read -t` sits in an `if` so set -e survives a timeout; `chunk` accumulates
+    # because a timeout can split a line.
     if IFS= read -r -t "$beat" chunk; then status=0; else status=$?; fi
     line+=$chunk
     if ((status > 128)); then
@@ -203,14 +182,10 @@ ui_quote() {
   done
 }
 
-# Filled by ui_group, repeated under the verdict.
 DOT_PROBLEMS=()
 DOT_GROUPS_CLEAN=0
 DOT_GROUPS_TOTAL=0
 
-# ui_group NAME NOTE FILE -- one group, collapsed to a line when all is ok.
-# The only place that sees both a child's status and its findings, so the
-# tallies are reconciled here. See docs/architecture.md#records.
 ui_group() {
   local name=$1 note=$2 file=$3
   local line sev label msg rest entry counted raw=0
@@ -220,7 +195,6 @@ ui_group() {
 
   while IFS= read -r line; do
     if [[ $line != "$__UI_RS"* ]]; then
-      # Another program's output: never hidden, so the group cannot collapse.
       if [[ -n $line ]]; then
         detail+=("raw$__UI_FS$__UI_FS$line")
         raw=1
@@ -231,7 +205,6 @@ ui_group() {
     sev=${rest%%"$__UI_FS"*}
     rest=${rest#*"$__UI_FS"}
 
-    # Flat: hooks do not run hooks. If one ever does, this needs a stack.
     case $sev in
       foldopen)
         in_fold=1 fold_fail=0 fold_warn=0
@@ -242,8 +215,6 @@ ui_group() {
         msg=${rest#*"$__UI_FS"}
         case $counted in
           fail)
-            # Only this child's own records cancel its roll-up, or a hook that
-            # died silently loses the one line naming it.
             if ((fold_fail > 0)); then
               DOT_FAILURES=$((DOT_FAILURES - 1))
             else
@@ -283,7 +254,6 @@ ui_group() {
     label=${rest%%"$__UI_FS"*}
     msg=${rest#*"$__UI_FS"}
 
-    # The line already carries the group's name; do not say it twice.
     if [[ $label == "$name" ]]; then label=''; fi
 
     case $sev in
@@ -307,7 +277,6 @@ ui_group() {
   fi
 }
 
-# Passed checks in a failing group only under --verbose.
 __ui_detail() {
   local entry sev label msg
   ui_nest
@@ -331,8 +300,6 @@ __ui_detail() {
   ui_unnest
 }
 
-# ui_problems -- the groups' findings under the verdict, failures first. The
-# cap is on the repeat only; every line is still printed above.
 __UI_PROBLEM_CAP=10
 
 ui_problems() {
@@ -363,13 +330,10 @@ ui_problems() {
   ui_unnest
 }
 
-# ui_count N NOUN -- "1 module", "9 modules"; every count goes through it.
 ui_count() {
   if (($1 == 1)); then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi
 }
 
-# ui_verdict GOOD-NEWS -- the last line, worded from the tallies, never the
-# record list: it may not contradict the lines above it.
 ui_verdict() {
   local good=$1 unit=${2:-group} line=''
 
@@ -380,8 +344,6 @@ ui_verdict() {
     line=$(ui_count "$DOT_WARNINGS" warning)
   fi
 
-  # "in X of Y modules" only when DOT_PROBLEMS accounts for every finding:
-  # orphans, and all of apply and remove, print outside any group.
   if ((DOT_GROUPS_TOTAL > 0 && DOT_FAILURES + DOT_WARNINGS > 0)) &&
     ((${#DOT_PROBLEMS[@]} == DOT_FAILURES + DOT_WARNINGS)); then
     line+=" in $((DOT_GROUPS_TOTAL - DOT_GROUPS_CLEAN)) of $(ui_count "$DOT_GROUPS_TOTAL" "$unit")"
@@ -402,8 +364,6 @@ ui_verdict() {
   fi
 }
 
-# fold_status MESSAGE CMD... -- fold a child's exit status into the tallies.
-# Under records it brackets the child instead, and ui_group decides the roll-up.
 fold_status() {
   local msg=$1 status=0 counted='' records=${DOT_UI_RECORDS:-}
   shift
@@ -430,8 +390,6 @@ fold_status() {
   fi
 }
 
-# die MESSAGE [LABEL VALUE]... -- the pairs land in the same column every other
-# line uses. The last pair should say what to do next.
 die() {
   local msg=$1
   shift
@@ -441,7 +399,6 @@ die() {
     __ui_render dim "$1" "$2" >&2
     shift 2
   done
-  # An odd argument left over is a caller that meant to say something.
   if (($#)); then __ui_render dim '' "$1" >&2; fi
   ui_unnest
   exit 1

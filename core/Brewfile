@@ -1,11 +1,5 @@
-# Phase 1: always installed, machinery only. Nothing that runs before this
-# file may use a tool listed in it.
-
-# One of five places that must agree on bash 5 (install.sh, uninstall.sh,
-# bin/dot, lib/dot.sh). Listed so `brew bundle cleanup` never proposes
-# removing it; tests/contract.bats holds the five together.
 brew "bash"
-brew "dasel" # lib/config.sh reads config.toml and every module.toml with it
-brew "fzf"   # lib/wizard.sh: the first-run module picker is one call to it
-brew "git"   # core/doctor.sh reports on the checkout; install.sh clones with it
-brew "taplo" # lib/config.sh: a real TOML parser; dasel truncates and exits 0
+brew "dasel"
+brew "fzf"
+brew "git"
+brew "taplo"

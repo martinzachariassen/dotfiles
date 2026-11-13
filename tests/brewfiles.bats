@@ -1,15 +1,4 @@
 #!/usr/bin/env bats
-#
-# The Brewfiles against Homebrew itself. A package renamed, deprecated or
-# withdrawn upstream is the one failure this repo cannot prevent and could not
-# see: brew follows a rename through its oldnames table in silence, right up to
-# the day the alias is dropped -- and then a fresh install fails on the one
-# machine with no tooling on it yet.
-#
-# Split in two on purpose. The shape check is offline and runs with `make
-# check`. The audit talks to Homebrew, so it is opt-in (`make brew-audit`) and
-# scheduled in CI: upstream changes without anyone touching this repo, so it
-# must never be able to fail a pull request about something else.
 
 load helper
 
@@ -21,8 +10,6 @@ brewfiles() {
   find "$DOT_ROOT/modules" -name Brewfile -type f | sort
 }
 
-# packages -- "<formula|cask> <name>", the same two line shapes brew bundle
-# reads. Anything else is caught by the shape test below, so this stays a sed.
 packages() {
   local f
   while IFS= read -r f; do
@@ -31,8 +18,6 @@ packages() {
 }
 
 @test "every Brewfile line is brew, cask, tap, a comment or blank" {
-  # packages() would silently drop anything else, and so would this repo's
-  # idea of what it installs.
   local f line bad=()
   while IFS= read -r f; do
     while IFS= read -r line; do
@@ -62,9 +47,6 @@ packages() {
       continue
     fi
 
-    # A rename is the quiet one: brew resolves the old name through its
-    # oldnames table and installs the right thing, so nothing fails until the
-    # alias is dropped. full_name/token is what brew actually resolved to.
     problem=$(jq -r --arg n "$name" '
       (.formulae[0] // .casks[0]) as $p
       | [ (if ($p.full_name // $p.token) != $n

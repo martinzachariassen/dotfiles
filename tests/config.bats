@@ -1,7 +1,4 @@
 #!/usr/bin/env bats
-#
-# Config reading, and the one generator. Several pin surprising dasel v3
-# behaviour; a future dasel changing it shows up here.
 
 load helper
 
@@ -45,7 +42,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "get: a value containing a colon survives the YAML round trip" {
-  # YAML would read `x: y` as a mapping, so dasel single-quotes it.
   printf 'note = "time: 10:30"\n' >"$DOT_CONFIG"
   run cfg_get 'note'
   [ "$output" = "time: 10:30" ]
@@ -71,7 +67,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "setting: reads a dashed module name via bracket syntax" {
-  # dasel parses settings.macos-defaults.x as a subtraction.
   run module_setting macos-defaults dock_tilesize
   [ "$output" = "64" ]
 }
@@ -88,16 +83,9 @@ teardown() { teardown_sandbox; }
   [ "$output" = "fallback" ]
 }
 
-# --- a config that does not parse whole --------------------------------------
-# dasel stops at the first malformed line, keeps what it read, and exits 0.
-# cfg_parse_problems asks taplo first and falls back to two heuristics, so both
-# paths need exercising: the binary is named away the way DOT_BREW_BIN is, or
-# the fallback is unreachable on any machine that has phase 1 installed.
-
 without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 
 @test "parse: dasel really does truncate silently -- rc 0, half a document" {
-  # If a future dasel rejects this outright, cfg_parse_problems is dead weight.
   printf 'schema = 1\n[modules]\nenabled = [ "git" "zsh" ]\n' >"$DOT_CONFIG"
   run dasel -i toml -o yaml 'schema' <"$DOT_CONFIG"
   [ "$status" -eq 0 ]
@@ -116,7 +104,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 
   without_taplo
 
-  # Nothing else in the engine objects to this file.
   run modules_require_known
   [ "$status" -eq 0 ]
   run cfg_list 'modules.enabled'
@@ -128,7 +115,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "parse: an empty enabled list is valid, not a parse failure" {
-  # The `none` profile writes exactly this.
   rm "$DOT_CONFIG"
   config_generate "A" "a@b.c" ""
 
@@ -137,7 +123,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "parse: a [modules] table whose enabled key was eaten is caught" {
-  # [modules] itself parsed and is in keys(); only the list below it was lost.
   printf 'schema = 1\n[modules]\nenabled = [ "git"\n' >"$DOT_CONFIG"
   without_taplo
   run cfg_parse_problems
@@ -175,15 +160,12 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "parse: taplo catches the typo the heuristics structurally cannot" {
-  # A broken LAST table. [settings] is still in dasel's keys(), so check 1 says
-  # nothing and check 2 only ever looks at [modules] -- while `signingkey`
-  # quietly reads as empty and commit signing goes off with no line saying why.
   printf 'schema = 1\n[modules]\nenabled = ["git"]\n\n[settings.git]\nsigningkey = "ssh-ed25519 AAAA\nextra = "x"\n' \
     >"$DOT_CONFIG"
 
   without_taplo
   run cfg_parse_problems
-  [ -z "$output" ] # everything the heuristics alone have to say about it
+  [ -z "$output" ]
   run module_setting git signingkey ''
   [ -z "$output" ]
 
@@ -191,18 +173,10 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
   run cfg_parse_problems
   [[ $output == *"not valid TOML"* ]]
 
-  # And it has to stop the run, not just be printed somewhere.
   run "$DOT_ROOT/bin/dot" apply --dry-run
   [ "$status" -ne 0 ]
   [[ $output == *"did not parse"* ]]
 }
-
-# --- the schema marker ------------------------------------------------------
-#
-# A version marker that guarantees nothing is worse than none, because it looks
-# like a check. These are what make it one. Written as properties of
-# DOT_CONFIG_SCHEMA rather than of the number 1, so a bump does not silently
-# turn them into tests of nothing.
 
 @test "schema: the generator writes the version this checkout speaks" {
   rm -f "$DOT_CONFIG"
@@ -210,7 +184,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 
   run cfg_get 'schema'
   [ "$output" = "$DOT_CONFIG_SCHEMA" ]
-  # And what it wrote is what the reader accepts -- the round trip is the point.
   [ -z "$(cfg_parse_problems)" ]
 }
 
@@ -224,8 +197,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "schema: a config from a NEWER checkout is caught the same way" {
-  # The direction that would otherwise pass: a bigger number is still not one
-  # this checkout knows how to read.
   printf 'schema = %s\n\n[modules]\nenabled = ["git"]\n' \
     "$((DOT_CONFIG_SCHEMA + 1))" >"$DOT_CONFIG"
 
@@ -243,8 +214,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "schema: a mismatch stops apply, it is not merely printed" {
-  # The whole value of the marker is that it refuses. Reported-but-applied is
-  # the same as unchecked.
   printf 'schema = %s\n\n[modules]\nenabled = ["git"]\n' \
     "$((DOT_CONFIG_SCHEMA + 1))" >"$DOT_CONFIG"
 
@@ -252,8 +221,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
   [ "$status" -ne 0 ]
   [[ $output == *"did not parse"* ]]
 }
-
-# --- the generator ----------------------------------------------------------
 
 @test "generate: refuses to overwrite an existing config" {
   run config_generate "A" "a@b.c" "git"
@@ -282,8 +249,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "generate: a quote in the git identity does not truncate the config" {
-  # Written raw, the quote closes the TOML string early and every table below
-  # it vanishes from the parsed document.
   rm "$DOT_CONFIG"
   config_generate 'Martin "Zach" Z' 'a@b.c' "$(printf 'git\n')"
 
@@ -296,7 +261,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
 }
 
 @test "generate: a backslash survives too, and does not eat the next character" {
-  # Backslash must be escaped BEFORE the quote in __cfg_quote.
   rm "$DOT_CONFIG"
   config_generate 'back\slash and "quote"' 'a@b.c' ""
 
@@ -313,12 +277,6 @@ without_taplo() { export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"; }
   [ ! -f "$DOT_CONFIG" ]
 }
 
-# --- Editing `enabled` ------------------------------------------------------
-#
-# The one exception to "written once". Every test here is about what must NOT
-# change: the file is the user's, and only the array is this code's business.
-
-# The generated shape, which is what `dot add`/`dot remove` will edit.
 generated_config() {
   cat >"$DOT_CONFIG" <<'EOF'
 # A comment above everything. It must survive.
@@ -349,7 +307,6 @@ EOF
   cfg_module_add cmux
   after=$(grep -v '^  "' "$DOT_CONFIG")
 
-  # Comments, tables, spacing, the user's note inside the array: all of it.
   [ "$before" = "$after" ]
   [[ $(cat "$DOT_CONFIG") == *'# a note the user left between entries'* ]]
 }
@@ -358,7 +315,6 @@ EOF
   generated_config
   cfg_module_add cmux
 
-  # cmux sorts before git, so it must land first, not appended at the end.
   run cfg_list 'modules.enabled'
   [ "${lines[0]}" = "cmux" ]
   [ "${lines[1]}" = "git" ]
@@ -371,7 +327,6 @@ EOF
 
   run cfg_list 'modules.enabled'
   [ "${lines[2]}" = "zzz" ]
-  # Still parseable: an entry written outside the array would not be.
   [ -z "$(cfg_parse_problems)" ]
 }
 
@@ -386,9 +341,6 @@ EOF
   [[ $(cat "$DOT_CONFIG") == *'signingkey'* ]]
 }
 
-# A config where the exact text of an entry also appears in an array that is
-# none of this code's business, both before and after the one it may edit.
-# Every writer here is line-based, so "looks like an entry" is the whole risk.
 decoyed_config() {
   cat >"$DOT_CONFIG" <<'EOF'
 schema = 1
@@ -419,15 +371,12 @@ EOF
   [ "${#lines[@]}" -eq 1 ]
   [ "${lines[0]}" = "zsh" ]
 
-  # Both decoys untouched: three "git" lines went in, two must remain.
   [ "$(grep -c '^  "git",$' "$DOT_CONFIG")" -eq 2 ]
   [ "$(cfg_list 'before.list')" = "git" ]
   [ "$(cfg_list 'after.list')" = "git" ]
 }
 
 @test "enabled: add ignores a look-alike entry outside the array it may edit" {
-  # The insert point is chosen by scanning the span only. A decoy sorting
-  # around the new name must not be able to pull the line out of the array.
   decoyed_config
   cfg_module_add cmux
 
@@ -443,9 +392,6 @@ EOF
 }
 
 @test "enabled: a hand-formatted array is refused, not reformatted" {
-  # setup's config has `enabled = ["git", "zsh"]` on one line -- legal TOML and
-  # a supported way to write it. Rewriting it would be this code deciding it
-  # knows better about a file it does not own.
   local before
   before=$(cat "$DOT_CONFIG")
 
@@ -458,9 +404,6 @@ EOF
 }
 
 @test "enabled: an entry without its trailing comma is not the shape we wrote" {
-  # config_generate writes a comma on every entry, the last one included.
-  # Without it this is a file someone reformatted, and guessing is how you
-  # lose the line below.
   printf 'schema = 1\n\n[modules]\nenabled = [\n  "git",\n  "zsh"\n]\n' >"$DOT_CONFIG"
 
   run cfg_enabled_editable
@@ -477,7 +420,6 @@ EOF
 }
 
 @test "taplo: exit 1 means the file is invalid, and says so" {
-  # The answer taplo documents for a file with syntax errors.
   generated_config
   printf '#!/bin/sh\nexit 1\n' >"$DOT_TMP/taplo-invalid"
   chmod +x "$DOT_TMP/taplo-invalid"
@@ -489,9 +431,6 @@ EOF
 }
 
 @test "taplo: a crash is a third answer, not a verdict about the file" {
-  # A rust panic exits 101. Read as "invalid", it told you a perfectly good
-  # config was broken -- and, worse, `dot apply` refused over it, so a taplo
-  # that fell over locked the machine out of its own configuration.
   generated_config
   printf '#!/bin/sh\necho "panicked at ..." >&2\nexit 101\n' >"$DOT_TMP/taplo-crash"
   chmod +x "$DOT_TMP/taplo-crash"
@@ -500,13 +439,10 @@ EOF
   run cfg_parse_problems
   [ "$status" -eq 0 ]
   [[ $output != *"not valid TOML"* ]]
-  # Nothing at all: a checker that did not answer is not a problem with the file.
   [ -z "$output" ]
 }
 
 @test "taplo: the crash is still reported, not swallowed" {
-  # Silence would be the opposite mistake: the two heuristics left behind miss
-  # a typo in the last table, so doctor has to say the real check did not run.
   generated_config
   printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
   chmod +x "$DOT_TMP/taplo-crash"
@@ -531,8 +467,6 @@ EOF
 }
 
 @test "taplo: not installed yet is not a crash either" {
-  # The normal state before phase 1 has run. It must not set the flag doctor
-  # warns on, or a fresh machine warns about its own bootstrap order.
   generated_config
   export DOT_TAPLO_BIN="$DOT_TMP/no-such-taplo"
 
@@ -542,8 +476,6 @@ EOF
 }
 
 @test "enabled: an edit that would not parse never replaces the file" {
-  # taplo is asked BEFORE the mv, because after it there is nothing to roll
-  # back to. A stub that always refuses is what makes that branch reachable.
   generated_config
   local before
   before=$(cat "$DOT_CONFIG")
@@ -555,6 +487,5 @@ EOF
   run cfg_module_add cmux
   [ "$status" -ne 0 ]
   [ "$(cat "$DOT_CONFIG")" = "$before" ]
-  # And no debris beside it.
   [ -z "$(find "$(dirname "$DOT_CONFIG")" -name 'config.toml.*' -print -quit)" ]
 }

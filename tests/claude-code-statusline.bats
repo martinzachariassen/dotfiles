@@ -1,9 +1,4 @@
 #!/usr/bin/env bats
-#
-# modules/claude-code/home/.claude/statusline.sh -- Claude Code pipes a JSON
-# record in and shows whatever comes out. A parse slip does not error: the bar
-# just renders blank or shifts every field one slot, so the output is asserted
-# field by field.
 
 load helper
 
@@ -16,7 +11,6 @@ setup() {
 
 teardown() { teardown_sandbox; }
 
-# ANSI colour and OSC 8 links stripped, so the assertions read the text.
 render() {
   run env TMPDIR="$DOT_TMP" "$BASH" -c \
     '"$1" <<<"$2" | sed -E $'"'"'s/\x1b\\[[0-9;]*m//g; s/\x1b\\]8;;[^\x1b]*\x1b\\\\//g'"'" \
@@ -50,8 +44,6 @@ render() {
 }
 
 @test "statusline: a record without rate_limits still renders, with no quota" {
-  # API-key and Vertex sessions carry no rate_limits at all; the quota half
-  # has to vanish, not print empty percentages.
   render '{"model":{"display_name":"Sonnet"},"context_window":{"used_percentage":5}}'
   [ "$status" -eq 0 ]
   [ "${#lines[@]}" -eq 2 ]
@@ -70,8 +62,6 @@ render() {
 }
 
 @test "statusline: a control character in a value cannot shift the fields" {
-  # Fields are joined on \037; one smuggled in through a value would move
-  # every later field one slot to the right.
   render "$(jq -nc '{model: {display_name: "A\u001fB"}, session_name: "x\ny",
     context_window: {used_percentage: 33}}')"
   [ "$status" -eq 0 ]

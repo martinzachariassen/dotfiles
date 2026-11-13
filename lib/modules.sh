@@ -1,6 +1,4 @@
 # shellcheck shell=bash
-#
-# The directory listing is the registry; contract.bats walks the same glob.
 
 modules_dir() { printf '%s\n' "$DOT_ROOT/modules/$1"; }
 module_manifest() { printf '%s\n' "$(modules_dir "$1")/module.toml"; }
@@ -17,8 +15,7 @@ module_exists() { [[ -f $(module_manifest "$1") ]]; }
 
 module_desc() { toml_get "$(module_manifest "$1")" 'description' "$1"; }
 
-# module_setting NAME KEY [DEFAULT] -- brackets, because dasel reads
-# `settings.macos-defaults` as subtraction.
+# Bracket syntax, because dasel reads `settings.macos-defaults` as subtraction.
 module_setting() {
   local name=$1 key=$2 default=${3:-}
   cfg_get "settings[\"$name\"].$key" "$default"
@@ -29,7 +26,6 @@ module_setting_bool() {
 }
 
 # Silent: read in subshells, so a warning would print once per caller.
-# modules_require_known complains, once.
 modules_enabled() {
   local name
   while IFS= read -r name; do
@@ -69,8 +65,6 @@ modules_all_dirs() {
   done < <(modules_all)
 }
 
-# modules_preflight -- `bash -n` every hook this run may execute, before
-# anything in $HOME moves.
 modules_preflight() {
   local dir hook script
   local -a bad=()
@@ -91,7 +85,6 @@ modules_preflight() {
     reproduce "bash -n $DOT_ROOT/${bad[0]}"
 }
 
-# Executed, never sourced: only an exit status leaks back.
 module_run_hook() {
   local name=$1 hook=$2 script
   script="$(modules_dir "$name")/$hook"
@@ -102,7 +95,6 @@ module_run_hook() {
     "$BASH" "$script"
 }
 
-# module_apply NAME -- packages, links, then apply.sh, which relies on that order.
 module_apply() {
   local name=$1 dir packaged=1
   dir=$(modules_dir "$name")
@@ -111,7 +103,6 @@ module_apply() {
     dim 'packages only -- nothing to link, no hook to run'
   fi
 
-  # A failing Brewfile stops this module, not the run.
   brew_bundle "$dir/Brewfile" "$name" || packaged=0
 
   fs_link_tree "$dir"
@@ -123,7 +114,6 @@ module_apply() {
   fi
 }
 
-# module_doctor NAME -- read-only; tallies rather than returns a status.
 module_doctor() {
   local name=$1 dir tracked=''
   dir=$(modules_dir "$name")
@@ -148,7 +138,6 @@ module_doctor() {
   fold_status "$name: doctor.sh reported problems" module_run_hook "$name" doctor.sh
 }
 
-# module_remove NAME -- uninstall.sh calls it for every module, enabled or not.
 module_remove() {
   fold_status "$1: remove.sh failed" module_run_hook "$1" remove.sh
 }

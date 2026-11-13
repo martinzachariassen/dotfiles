@@ -1,8 +1,4 @@
 #!/usr/bin/env bats
-#
-# modules/containers/remove.sh. The docker plugin links point into Homebrew's
-# prefix, so the $DOT_ROOT sweep in uninstall.sh never sees them: this hook is
-# the only thing that will ever mention them.
 
 load helper
 
@@ -22,17 +18,11 @@ remove() {
     "$BASH" "$DOT_ROOT/modules/containers/remove.sh"
 }
 
-# no_brew -- nothing on PATH, and brew_load's absolute fallback pointed at a
-# path that does not exist. Both are needed: the fallback is what makes
-# `bash uninstall.sh` work from a shell that never sourced shellenv.
 no_brew() {
   mkdir -p "$DOT_TMP/empty"
   DOT_BREW_BIN="$DOT_TMP/no-such-brew" remove "$DOT_TMP/empty"
 }
 
-# apply.sh reaches into Homebrew's prefix for two binaries, so on a machine
-# without them it never ran and neither branch was ever seen. A `brew` that
-# answers --prefix with a directory under $DOT_TMP makes both reachable.
 apply() {
   run env PATH="$DOT_TMP/bin:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="${1:-0}" \
@@ -62,8 +52,6 @@ with_prefix() {
 }
 
 @test "apply: a plugin Homebrew never installed is named, not skipped quietly" {
-  # The docker CLI looks in this one directory and nowhere else, so a missing
-  # plugin is a command that does not exist with no explanation anywhere.
   with_prefix
   local dir="$DOT_TMP/brew/lib/docker/cli-plugins"
   printf '#!/bin/sh\n' >"$dir/docker-compose"
@@ -92,8 +80,6 @@ with_prefix() {
 }
 
 @test "apply: no Homebrew at all stops before it guesses a path" {
-  # `$(brew --prefix)` on a machine without brew yields an empty string, and
-  # the hook would then link from /lib/docker/cli-plugins.
   mkdir -p "$DOT_TMP/empty"
   run env PATH="$DOT_TMP/empty" DOT_BREW_BIN="$DOT_TMP/no-such-brew" \
     DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
@@ -132,8 +118,6 @@ with_prefix() {
 }
 
 @test "remove: with no Homebrew to prove ownership, the links are named" {
-  # Silence was the bug. These point outside $DOT_ROOT, so a hook that says
-  # nothing leaves them with nothing left in the world that knows they exist.
   ln -s /somewhere/docker-compose "$PLUGINS/docker-compose"
 
   no_brew
@@ -148,25 +132,11 @@ with_prefix() {
   [ -z "$output" ]
 }
 
-# --- doctor.sh: DOCKER_HOST / TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE ----------
-#
-# The values live in modules/zsh/home/.zshenv, not here -- .zshenv is the one
-# file sourced by every zsh process, interactive or not. These tests hold the
-# two files to the same literals (CLAUDE.md's rule on a duplicated
-# literal) and check what doctor.sh reports about the current process's env.
-
 doctor() {
-  # A stopped `colima`, shadowed onto PATH the way the other stubs here are.
-  # Without it the VM check answers differently on a machine that has colima
-  # than on one that does not -- `fail colima 'not installed'` rather than a
-  # warning -- so the exit status these tests read was the machine's and not
-  # the hook's. That is why they passed on a laptop and failed on CI.
   mkdir -p "$DOT_TMP/bin"
   printf '#!/usr/bin/env bash\nexit 1\n' >"$DOT_TMP/bin/colima"
   chmod +x "$DOT_TMP/bin/colima"
 
-  # `-u` flags in "$@" must precede every NAME=VALUE assignment, HOME and
-  # DOT_ROOT included -- env stops parsing options at the first one it sees.
   run env "$@" HOME="$HOME" DOT_ROOT="$DOT_ROOT" PATH="$DOT_TMP/bin:$PATH" \
     "$BASH" "$DOT_ROOT/modules/containers/doctor.sh"
 }
@@ -240,9 +210,6 @@ doctor() {
   mkdir -p "$(dirname "$HOME/.zshenv")"
   ln -s "$DOT_ROOT/modules/zsh/home/.zshenv" "$HOME/.zshenv"
 
-  # Not a status assertion: the real `colima status`, run against this fake
-  # $HOME by the pre-existing check above, reports "not running" on its own
-  # and warns for an unrelated reason. Only the DOCKER_HOST line is ours here.
   doctor -u DOCKER_HOST -u TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE
   [[ $output == *"next shell"* ]]
   [[ $output != *"not set"* ]]

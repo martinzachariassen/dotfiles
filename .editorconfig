@@ -8,8 +8,6 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# shfmt reads this too; keeps editor format-on-save agreeing with `make fmt -ci`.
-# bin/dot has no extension, so it needs its own pattern.
 [{*.sh,bin/dot}]
 switch_case_indent = true
 
