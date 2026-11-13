@@ -8,9 +8,9 @@ cask "bruno" # API client; local files, no account
 cask "zennotes/tap/zennotes" # notes app
 cask "google-chrome"
 cask "spotify"
+cask "discord"
 cask "visual-studio-code" # $EDITOR (modules/zsh/home/.zshenv) and git's editor
 
-cask "thaw"  # menu bar manager
 cask "stats" # resource monitor in the menu bar
 
 # The plain build only: it keeps editors on stock metrics. The Nerd Font that
