@@ -2,9 +2,7 @@
 #
 # Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
-# The fallback path is an input, so "Homebrew could not be loaded" is reachable
-# on a machine that has it. install.sh keeps its own copy and its own name for
-# it: it shares nothing, including this.
+# install.sh keeps its own copy of this path: it shares nothing.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
@@ -15,12 +13,8 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is
-# not installed. Returns 0 satisfied, 1 missing, 2 the check could not run.
-#
-# 2 is distinct on purpose: a check that could not run must never read as "all
-# installed". `brew bundle check` rather than parsing the Brewfile here -- it
-# is the only reader that agrees with `brew bundle` about what installed means.
+# brew_missing FILE -- "<Formula|Cask> <name>" per package not installed.
+# 0 satisfied, 1 missing, 2 could not check -- never read 2 as installed.
 brew_missing() {
   local file=$1 out status=0
   [[ -f $file ]] || return 0
@@ -30,8 +24,7 @@ brew_missing() {
     status=1
   ((status)) || return 0
 
-  # Matched without the leading arrow: it is a multibyte glyph, and a C locale
-  # would make this silently match nothing.
+  # Not the leading arrow: a multibyte glyph matches nothing under a C locale.
   out=$(sed -n -E 's/^.*(Formula|Cask) ([^ ]+) needs to be installed\.$/\1 \2/p' <<<"$out")
   [[ -n $out ]] || return 2
   printf '%s\n' "$out"
@@ -54,16 +47,13 @@ brew_bundle() {
     return 0
   fi
 
-  # --no-upgrade: apply installs what is missing; upgrading is `brew upgrade`.
-  # Quoted, so brew's hundreds of lines stay visible as they stream but at the
-  # weight of a footnote. The status comes back through PIPESTATUS.
+  # --no-upgrade: upgrading is `brew upgrade`, on the user's schedule.
   brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
   if ((PIPESTATUS[0] == 0)); then return 0; fi
 
   fail packages "brew bundle failed for $label"
 
-  # brew's own output is hundreds of lines above by now, and "failed" alone is
-  # not something a user can act on. Name the packages that are still absent.
+  # brew's output is far above by now; name what is still missing.
   local missing status=0
   missing=$(brew_missing "$file") || status=$?
   case $status in
@@ -79,8 +69,6 @@ brew_bundle() {
 }
 
 # brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle.
-# Without it a half-installed module reports green: doctor would be looking at
-# nothing but symlinks.
 brew_check() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}
@@ -102,33 +90,20 @@ brew_check() {
   esac
 }
 
-# brew_unmanaged -- "<Formula|Cask> <name>" per package this machine has that
-# no Brewfile in the repo names, with the same three answers as brew_missing.
-# The one check that looks the other way: what would the NEXT machine not get?
-# See docs/architecture.md.
-#
-# EVERY Brewfile, not just the enabled ones: `dot add work-apps` still brings
-# back what a disabled module names, so listing those would make a machine with
-# one module switched off report that module's whole Brewfile.
-#
-# `leaves --installed-on-request` is what "by hand" means to brew: it drops
-# dependencies, so a tool is named and its tree is not.
+# brew_unmanaged -- packages installed here that no Brewfile names; answers
+# as brew_missing. Every Brewfile, not just enabled ones: `dot add` brings
+# those back. See docs/architecture.md.
 brew_unmanaged() {
   command -v brew >/dev/null 2>&1 || return 2
 
-  # LC_ALL=C throughout: comm compares bytes, and a sort that collated `-` or
-  # `@` by locale rules instead would make it disagree with its own input.
-  #
-  # Two lists, and never one. `brew "docker"` and `cask "docker"` are different
-  # packages that happen to share a word, so a single set would let a Brewfile
-  # naming either of them vouch for a hand-installed other.
+  # LC_ALL=C: comm compares bytes. Two lists, never one: `brew "docker"` must
+  # not vouch for a hand-installed `cask "docker"`.
   local files named_brew named_cask formulae casks out
   files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
   named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
   named_cask=$(sed -n -E 's/^cask "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
 
-  # No Brewfile read at all would make every package on the machine unmanaged.
-  # That is a broken checkout, not a finding.
+  # No Brewfile read at all is a broken checkout, not a finding.
   [[ -n $named_brew || -n $named_cask ]] || return 2
 
   formulae=$(HOMEBREW_NO_AUTO_UPDATE=1 brew leaves --installed-on-request 2>/dev/null) || return 2

@@ -12,9 +12,7 @@ cfg_exists() { [[ -f $DOT_CONFIG ]]; }
 # misread a newer config, or the reverse.
 DOT_CONFIG_SCHEMA=1
 
-# Only "" and '' need undoing. YAML's other escapes are deliberately absent: no
-# setting here can contain a tab or newline, and a \t rule would corrupt the
-# literal backslashes config_generate supports.
+# Only "" and '' are undone: a \t rule would corrupt literal backslashes.
 __cfg_unquote() {
   local v=$1
   case $v in
@@ -64,11 +62,8 @@ DOT_CFG_UNCHECKED=0
 # Only meaningful after cfg_parse_problems has run in this process.
 cfg_unchecked() { ((DOT_CFG_UNCHECKED)); }
 
-# __cfg_taplo -- four answers: 0 valid, 1 invalid, 2 could not be checked,
-# 3 not installed yet. taplo documents 1 for a file with syntax errors, so
-# anything else is taplo itself falling over (a rust panic exits 101) -- and
-# that must never render as "your config is not valid TOML". Not installed is
-# its own answer because it is the normal state before phase 1.
+# __cfg_taplo -- 0 valid, 1 invalid, 2 could not check, 3 not installed yet.
+# Only taplo's documented 1 means invalid; a panic exits 101.
 __cfg_taplo() {
   local taplo=${DOT_TAPLO_BIN:-taplo} status=0
   command -v "$taplo" >/dev/null 2>&1 || return 3
@@ -81,12 +76,8 @@ __cfg_taplo() {
 }
 
 # cfg_parse_problems -- one line per sign the config did not parse whole.
-#
-# dasel does not validate: on a malformed line it stops, keeps what it read and
-# exits 0. A missing comma in `enabled` drops the whole [modules] table, and
-# with nothing enabled doctor calls every link orphaned. taplo answers outright
-# and so runs first; the two heuristics below are what is left before phase 1
-# has installed it, and they miss a typo in the LAST table.
+# dasel stops at a malformed line and exits 0, so taplo asks first; the
+# heuristics are for before phase 1 and miss a typo in the last table.
 cfg_parse_problems() {
   local -A seen=()
   local name status=0
@@ -114,8 +105,7 @@ cfg_parse_problems() {
     fi
   done < <(sed -n 's/^\[\[*\([A-Za-z0-9_-]\{1,\}\)[].].*/\1/p' "$DOT_CONFIG" | sort -u)
 
-  # `enabled = []` is legal; a key that cannot be read at all is a truncated
-  # file.
+  # `enabled = []` is legal; a key that cannot be read is a truncated file.
   if [[ -n ${seen[modules]:-} ]] &&
     ! dasel -i toml -o yaml 'modules.enabled' <"$DOT_CONFIG" >/dev/null 2>&1; then
     printf 'has a [modules] table with no readable `enabled` list\n'
@@ -197,10 +187,8 @@ FOOTER
   ok config "wrote ${DOT_CONFIG/#$HOME/\~}"
 }
 
-# Editing `enabled` is the one exception to "config.toml is written once", and
-# the narrowest one available: a single array, a line at a time, every other
-# byte copied through. Hand-editing stays supported, so an array that lost the
-# generated shape makes these REFUSE. See lib/CLAUDE.md.
+# The one exception to "written once": a line of `enabled` at a time, every
+# other byte copied through. A hand-reshaped array makes these refuse.
 
 # __cfg_enabled_span -- "first last" line indices of the array body. Fails when
 # the array was reformatted by hand, and the caller must then say so.
@@ -223,8 +211,7 @@ __cfg_enabled_span() {
       end=$i
       break
     }
-    # An entry, or a comment or blank the user put between them. Anything else
-    # and the array is no longer a shape this can edit without losing part of it.
+    # An entry, a comment or a blank; anything else and an edit could lose data.
     [[ ${lines[i]} =~ ^\ \ \"[^\"]+\",$ || ${lines[i]} =~ ^[[:space:]]*(#.*)?$ ]] ||
       return 1
   done
@@ -235,10 +222,8 @@ __cfg_enabled_span() {
 
 cfg_enabled_editable() { __cfg_enabled_span >/dev/null; }
 
-# __cfg_write_lines -- give the user's file back the way it came. mktemp is 0600
-# and `mv` carries that onto the destination, so a config kept at 0644 would come
-# back private. Validated before the swap: after `mv` there is nothing to roll
-# back to.
+# __cfg_write_lines -- validated before the `mv`, which cannot be rolled back.
+# The mode is copied: mktemp's 0600 would otherwise replace the user's.
 __cfg_write_lines() {
   local tmp taplo=${DOT_TAPLO_BIN:-taplo}
   tmp=$(mktemp "${DOT_CONFIG}.XXXXXX")

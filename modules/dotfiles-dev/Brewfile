@@ -1,6 +1,6 @@
 # The quality gates. NOT in core/Brewfile: nothing in lib/, bin/ or core/ runs
 # any of these, so a machine that only uses the dotfiles must not carry them.
-# core/Brewfile is machinery only -- see core/CLAUDE.md.
+# core/Brewfile is machinery only -- see CLAUDE.md.
 #
 # Must stay in step with the install list in .github/workflows/ci.yml: a tool
 # `make check` needs and CI omits is a suite that only runs where someone

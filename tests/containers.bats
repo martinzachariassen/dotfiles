@@ -152,7 +152,7 @@ with_prefix() {
 #
 # The values live in modules/zsh/home/.zshenv, not here -- .zshenv is the one
 # file sourced by every zsh process, interactive or not. These tests hold the
-# two files to the same literals (modules/CLAUDE.md's rule on a duplicated
+# two files to the same literals (CLAUDE.md's rule on a duplicated
 # literal) and check what doctor.sh reports about the current process's env.
 
 doctor() {
