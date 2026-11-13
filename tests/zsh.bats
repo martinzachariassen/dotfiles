@@ -173,3 +173,58 @@ doctor() {
   # Or a rename makes this pass over nothing, forever.
   [ "$checked" -gt 0 ]
 }
+
+# op aborts with "permissions are too broad" on anything but 700, and fs_link
+# creates ~/.config/op under the umask when it links env -- 755 on a new Mac.
+@test "apply: a ~/.config/op that others can open is set to 700" {
+  mkdir -p "$HOME/.config/op"
+  chmod 755 "$HOME/.config/op"
+
+  run "$BASH" "$DOT_ROOT/modules/zsh/apply.sh"
+  [ "$status" -eq 0 ]
+  [[ $output == *"755 -> 700"* ]]
+  [ "$(stat -f '%Lp' "$HOME/.config/op")" = 700 ]
+}
+
+@test "apply: a dry run names the chmod and does not make it" {
+  mkdir -p "$HOME/.config/op"
+  chmod 755 "$HOME/.config/op"
+
+  run env DOT_DRY_RUN=1 "$BASH" "$DOT_ROOT/modules/zsh/apply.sh"
+  [ "$status" -eq 0 ]
+  [[ $output == *"755 -> 700"* ]]
+  [ "$(stat -f '%Lp' "$HOME/.config/op")" = 755 ]
+}
+
+@test "apply: a ~/.config/op already at 700 is left alone, silently" {
+  mkdir -p "$HOME/.config/op"
+  chmod 700 "$HOME/.config/op"
+
+  run "$BASH" "$DOT_ROOT/modules/zsh/apply.sh"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "apply: no ~/.config/op is not created" {
+  run "$BASH" "$DOT_ROOT/modules/zsh/apply.sh"
+  [ "$status" -eq 0 ]
+  [ ! -e "$HOME/.config/op" ]
+}
+
+@test "doctor: a ~/.config/op that op would refuse warns" {
+  mkdir -p "$HOME/.config/op"
+  chmod 755 "$HOME/.config/op"
+
+  doctor
+  [ "$status" -eq "$DOT_STATUS_WARN" ]
+  [[ $output == *"op refuses it"* ]]
+}
+
+@test "doctor: a ~/.config/op at 700 passes" {
+  mkdir -p "$HOME/.config/op"
+  chmod 700 "$HOME/.config/op"
+
+  doctor
+  [ "$status" -eq 0 ]
+  [[ $output == *"op will read it"* ]]
+}
