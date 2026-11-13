@@ -123,8 +123,8 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 - **`remove.sh` reaches a path in `$HOME` through `fs_unlink` or `fs_discard`,
   never `rm`.** The guard lives in the helper.
 
-The full rules, with the reason behind each, are in
-[`modules/CLAUDE.md`](../modules/CLAUDE.md).
+The rest, in one line each, are under "Module hooks" in the root
+[`CLAUDE.md`](../CLAUDE.md#module-hooks).
 
 ## SSH and commit signing
 

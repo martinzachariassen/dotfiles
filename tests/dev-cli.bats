@@ -106,6 +106,29 @@ with_runtimes() {
   says mise 'runtimes installed'
 }
 
+@test "apply: mise installs from the lock, never resolving a version itself" {
+  # Without --locked a `latest` in config.toml resolves on the day a machine is
+  # built, and two machines built a month apart disagree.
+  with_mise "printf '%s\\n' \"\$*\" >'$DOT_TMP/mise-args'; exit 0"
+
+  apply
+  [ "$status" -eq 0 ]
+  [[ $(cat "$DOT_TMP/mise-args") == "install --locked "* ]]
+}
+
+@test "lock: every runtime config.toml asks for is in mise.lock" {
+  local tool missing=()
+  while IFS= read -r tool; do
+    [[ -z $tool ]] && continue
+    grep -qxF "[[tools.$tool]]" "$DOT_ROOT/modules/dev-cli/home/.config/mise/mise.lock" ||
+      missing+=("$tool")
+  done < <(toml_list "$DOT_ROOT/modules/dev-cli/home/.config/mise/config.toml" 'tools.keys()')
+  [ ${#missing[@]} -eq 0 ] || {
+    echo "not in mise.lock: ${missing[*]} -- run: mise lock --global (in the repo)"
+    return 1
+  }
+}
+
 @test "apply: a mise that fails takes the hook down with it" {
   # The output goes through a pipe now, so the status has to survive it.
   with_mise 'echo "could not resolve node@20"; exit 1'
@@ -123,7 +146,7 @@ with_runtimes() {
 
   apply 1
   [ "$status" -eq 0 ]
-  says mise 'install the runtimes pinned in ~/.config/mise/config.toml'
+  says mise 'install the runtimes locked in ~/.config/mise/mise.lock'
   [[ $output != *"SHOULD NOT RUN"* ]]
   [ "$(home_snapshot)" = "$before" ]
 }

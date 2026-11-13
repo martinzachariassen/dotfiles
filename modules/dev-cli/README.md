@@ -20,6 +20,27 @@ flowchart TD
 `mise activate` never installs anything. Linking `config.toml` alone leaves it
 unread until someone runs `mise install` by hand, so this hook runs it.
 
+## Versions are locked
+
+`config.toml` says what to track (`latest`, `temurin-25`); `mise.lock` beside it
+says which build that resolved to, with checksums. `apply.sh` runs
+`mise install --locked`, so a fresh machine gets exactly the runtimes this one
+has, and a tool missing from the lock fails instead of resolving on the spot.
+
+Moving to newer versions is deliberate, and lands as a diff to commit:
+
+```sh
+cd ~/Developer/personal/dotfiles/modules/dev-cli/home/.config/mise
+mise lock --global --bump    # newest within each request; installs nothing
+mise install --locked
+```
+
+`--global` and the directory both matter: `config.toml` is linked from the repo,
+so mise treats it as global config, and run from the repo it writes the lock
+next to the real file rather than into `~/.config/mise`. Adding a runtime to
+`config.toml` means re-running `mise lock --global` there too; a test fails
+until every tool is in the lock.
+
 ## `doctor.sh` never invokes mise
 
 `mise ls` **creates** `~/.local/share/mise` and `~/.local/state/mise` on a

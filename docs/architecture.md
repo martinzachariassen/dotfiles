@@ -8,6 +8,7 @@ How a run is put together, and the four rules the whole design turns on.
 [Your files stay yours](#your-files-stay-yours) ·
 [Dry runs](#dry-runs) ·
 [What a run prints and returns](#what-a-run-prints-and-returns) ·
+[Records](#records) ·
 [Templating](#templating)
 
 ## Three phases
@@ -281,6 +282,36 @@ separate process, so its findings reach the driver as records rather than as an
 exit status, and three problems in one hook are counted as three. `dot doctor
 --verbose` prints every check, passed ones included. `NO_COLOR` turns colour
 off; a locale that is not UTF-8 falls back to ASCII markers of the same width.
+
+## Records
+
+A hook is a separate process, so its exit status is all a driver would
+otherwise see, and one number cannot say which three things went wrong. With
+`DOT_UI_RECORDS` set, the printers in `lib/ui.sh` emit a record instead of a
+rendered line: severity, label and message behind a marker. The driver captures
+a module's whole stream, and `ui_group` renders it as a single green line when
+every record is `ok`, or expanded to the findings when not. A line *without*
+the marker is another program's output; it is shown, never hidden, and it keeps
+the group from collapsing over it.
+
+Reconciling the tallies happens in `ui_group` because only it sees both halves.
+A hook's `fail` and `warn` run in another process and never touch the driver's
+counters, while `fold_status` can add only one failure for a non-zero exit. So
+`fold_status` brackets the child with `foldopen`/`foldshut` records, and
+`ui_group` adds every finding inside that scope and takes the roll-up back
+**when that same child named the problem** — never because something else in
+the group failed, which would eat the only line naming a hook that died before
+it could print.
+
+The verdict's "in X of Y modules" is earned the same way: it is appended only
+when the grouped findings account for every counted one. Orphan links, the
+unmanaged-package report and everything `apply` and `remove` print sit outside
+any group, so they never get blamed on a module.
+
+The transcript sits on top of all of this. `bin/dot` points stdout at one
+line-buffered `sed` that writes a colourless copy to the log and passes the
+coloured line on to the terminal; `lib/dot.sh`'s EXIT trap restores the saved
+file descriptors and waits for it, so even a `die` reaches the log whole.
 
 ## Templating
 

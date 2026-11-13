@@ -174,7 +174,7 @@ teardown() { teardown_sandbox; }
       *.json) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
       # taplo, not dasel: dasel stops at a malformed line, keeps what it read
       # and exits 0 -- the exact reason cfg_parse_problems exists.
-      *.toml) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
+      *.toml | */mise.lock) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
       # A row that lost its tabs reads as a domain with no key: `defaults write`
       # would then be called with too few arguments, or the wrong ones. The
@@ -260,7 +260,7 @@ teardown() { teardown_sandbox; }
 }
 
 @test "only lib/ui.sh emits colour or glyphs" {
-  # lib/CLAUDE.md has said this since the file was written, and nothing held it.
+  # CLAUDE.md has said this since lib/ was written, and nothing held it.
   # A printf with an escape or a glyph anywhere else is a second place that
   # decides what output looks like, and the first one to disagree with NO_COLOR
   # or with an ASCII locale.
@@ -400,7 +400,7 @@ EOF
       return 1
     fi
     # Comments stripped: apply.sh's own comment explains why `jq -e .` is wrong.
-    # `if`, not `grep && return`: a false last test is a failing test (tests/CLAUDE.md).
+    # `if`, not `grep && return`: a false last test is a failing test (docs/development.md).
     if grep -v '^[[:space:]]*#' "$dir/$hook" | grep -q 'jq -e \.'; then
       echo "$hook still uses \`jq -e .\`, which rejects null and false"
       return 1
@@ -757,7 +757,7 @@ op_env_bad_lines() {
   # The counterpart to the remove.sh snapshot above, and the more important
   # half: apply.sh is the hook that WRITES. Every one of them gates on
   # DOT_DRY_RUN or delegates to fs_link, which does -- but "or a preview
-  # becomes a run" (modules/CLAUDE.md) was a rule only remove.sh had a
+  # becomes a run" (CLAUDE.md) was a rule only remove.sh had a
   # generic test for.
   local name before after
   before=$(home_snapshot)
@@ -880,7 +880,7 @@ op_env_bad_lines() {
 
   # Newlines collapsed: prose wraps, and "Not a sixth\n  verb" is the same claim
   # as "not a sixth verb". `[^.]` keeps a match from spanning two sentences.
-  local -a stale=() files=(bin/dot bin/CLAUDE.md CLAUDE.md README.md uninstall.sh)
+  local -a stale=() files=(bin/dot CLAUDE.md README.md uninstall.sh)
   local file claim num flat doc
   while IFS= read -r doc; do
     files+=("${doc#"$DOT_ROOT"/}")

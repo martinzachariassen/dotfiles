@@ -72,10 +72,8 @@ fi
 __dot_on_exit() {
   local status=$?
 
-  # fd 3/4 and __DOT_TEE_PID are the contract with bin/dot's
-  # __transcript_start. Draining here rather than there covers the `die` path;
-  # without it bash exits unreaped and the log loses the lines naming the
-  # failure.
+  # bin/dot's __transcript_start set these. Drained here so `die` is covered too,
+  # or the log loses the lines naming the failure.
   if [[ -n ${__DOT_TEE_PID:-} ]]; then
     exec 1>&3 2>&4
     wait "$__DOT_TEE_PID" 2>/dev/null || true

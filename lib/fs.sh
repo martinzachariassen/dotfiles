@@ -1,36 +1,28 @@
 # shellcheck shell=bash
 #
-# The symlink engine. A bug in here loses files. Two rules:
-#
-#   1. Directories are never symlinked, only traversed.
-#   2. A real file is never destroyed; it is moved to the backup tree.
+# The symlink engine; a bug here loses files. Directories are traversed, never
+# linked, and a real file in the way is moved to the backup tree, never removed.
 
-# The driver's own tallies, and only those: a hook is a separate process, so
-# fs_report undercounts by whatever the hooks did. Adding up across processes
-# would need a state file, which this repo derives instead.
+# The driver's tallies only: a hook's links are another process's count.
 DOT_N_LINKED=0
 DOT_N_RELINKED=0
 DOT_N_BACKED_UP=0
 DOT_N_UNCHANGED=0
 
-# Derived from the exported DOT_RUN_ID, never memoised: a value set here would
-# not survive `$(fs_backup_dir)` nor reach a hook's process.
+# From the exported DOT_RUN_ID, never memoised: hooks are other processes.
 fs_backup_dir() {
   local dir="$DOT_STATE/backups/$DOT_RUN_ID"
   [[ $DOT_DRY_RUN == 1 ]] || mkdir -p "$dir"
   printf '%s\n' "$dir"
 }
 
-# The directory on disk is the only evidence that crosses the process boundary;
-# the tally covers a dry run, where there is none.
+# The directory is what crosses processes; the tally covers a dry run.
 fs_backup_used() {
   ((DOT_N_BACKED_UP)) || [[ -d "$DOT_STATE/backups/$DOT_RUN_ID" ]]
 }
 
-# fs_pairs DIR -- "src<TAB>dst" for every leaf file under DIR/home. The single
-# place that maps a module's home/ onto $HOME. Finder's metadata is filtered
-# here rather than by a test: Finder writes it into the checkout behind your
-# back, and the engine has to be immune.
+# fs_pairs DIR -- "src<TAB>dst" per leaf under DIR/home; the one home/ -> $HOME
+# map. Finder writes .DS_Store into the checkout unasked, so it is filtered here.
 fs_pairs() {
   local dir=$1 home="$1/home" src rel
   [[ -d $home ]] || return 0
@@ -41,8 +33,7 @@ fs_pairs() {
 }
 
 # fs_classify SRC DST -- ok | missing | wrong-target | clobbered | broken.
-# Dangling is checked before target equality: a link at SRC whose file was
-# deleted from the repo must not read as ok.
+# Dangling before target equality: a link to a file the repo deleted is not ok.
 fs_classify() {
   local src=$1 dst=$2
   if [[ -L $dst ]]; then
@@ -71,8 +62,7 @@ fs_link() {
     return 0
   fi
 
-  # Intent is announced before acting, so a dry run and a real run use the same
-  # words (tests/fs.bats pins this).
+  # Intent before acting: dry and real runs print the same words.
   case $state in
     missing) info link "$short" ;;
     wrong-target | broken) info relink "$short" ;;
@@ -100,9 +90,7 @@ fs_link() {
   esac
 }
 
-# fs_link_tree DIR -- speaks only when nothing changed, so a converged module
-# does not print an empty section. Phrased from the pre-state so a dry run and
-# a real run agree.
+# fs_link_tree DIR -- phrased from the pre-state, so dry and real runs agree.
 fs_link_tree() {
   local src dst n=0 before=$DOT_N_UNCHANGED
   while IFS=$'\t' read -r src dst; do
@@ -115,8 +103,7 @@ fs_link_tree() {
   fi
 }
 
-# Two helpers, not one "delete this path": a link is recognised by where it
-# points, a generated file by its header. The guard lives here, not the caller.
+# The guard lives in these two helpers, never in the caller.
 
 # fs_unlink DST -- symlinks only. A real file at a path we once owned stays.
 fs_unlink() {
@@ -180,19 +167,14 @@ fs_report() {
   fi
 }
 
-# fs_repo_links -- every symlink under $HOME that points into this repo. The
-# shared walk for doctor (fs_orphans) and uninstall.sh, so neither gets its own
-# idea of which links are ours. EVERY module, not just enabled ones: a link left
-# by a disabled module is the main thing to find. "Points into $DOT_ROOT" is
-# what makes it safe to delete from; links elsewhere need a remove.sh.
+# fs_repo_links -- every symlink under $HOME pointing into this repo, scanned
+# for every module, enabled or not. The one walk doctor and uninstall.sh share.
 fs_repo_links() {
   local -A roots=() seen=()
   local dir src dst link target depth
   local -a scan
 
-  # Every directory ON THE PATH to a declared file, not just the leaf's own. A
-  # file deleted from the repo takes its directory out of the declared set with
-  # it, and the link it left would then sit where nothing scans.
+  # Every ancestor too: a deleted file takes its directory out of the set.
   while IFS= read -r dir; do
     while IFS=$'\t' read -r src dst; do
       dst=${dst%/*}
@@ -211,18 +193,15 @@ fs_repo_links() {
 
   mapfile -t scan < <(printf '%s\n' "${!roots[@]}" | sort)
 
-  # -maxdepth 2, so a directory that STOPPED being declared is still reached
-  # from the parent an ancestor keeps in the set. $HOME is the exception at 1:
-  # its children belong to every tool on the machine. The residual is pinned in
-  # tests/orphans.bats; walking all of $HOME stays rejected, on cost.
+  # Depth 2 reaches a directory no longer declared; $HOME stays at 1, its
+  # children are every tool's. The boundary is pinned in tests/orphans.bats.
   for dir in "${scan[@]}"; do
     [[ -d $dir ]] || continue
     if [[ $dir == "$HOME" ]]; then depth=1; else depth=2; fi
     while IFS= read -r -d '' link; do
       target=$(readlink "$link") || continue
       [[ $target == "$DOT_ROOT"/* ]] || continue
-      # Overlapping scans: a link is reached from its own directory and again
-      # from that directory's parent.
+      # The scans overlap, so a link can be reached twice.
       [[ -z ${seen[$link]:-} ]] || continue
       seen[$link]=1
       printf '%s\n' "$link"
@@ -230,15 +209,9 @@ fs_repo_links() {
   done
 }
 
-# fs_orphans -- repo links no ENABLED module claims, as "path<TAB>module". The
-# claim stays narrow: letting a disabled module claim its files would hide every
-# orphan the wide scan exists to expose. The name is attribution, not a claim --
-# which module SHIPS the path, so the caller can name its remove.sh -- and is
-# empty when none does.
-#
-# The empty field goes LAST, and that is load-bearing: tab is IFS whitespace, so
-# `read -r a b` on "<TAB>path" would skip a leading empty field and put the path
-# in $a. Trailing, it reads as the empty string it is.
+# fs_orphans -- "path<TAB>module" for repo links no enabled module claims; the
+# module is whoever ships it, or empty. Empty must go last: tab is IFS
+# whitespace, and `read` skips a leading empty field.
 fs_orphans() {
   local -A claimed=() owner=()
   local dir src dst link
@@ -252,9 +225,8 @@ fs_orphans() {
     printf '%s\n' "$DOT_ROOT/core"
   )
 
-  # A second pass, over ALL modules this time, not one map doing both jobs: with
-  # two modules shipping one path, a disabled one would overwrite the enabled
-  # one's claim and the file would read as an orphan.
+  # A second map: with two modules shipping one path, a disabled one would
+  # overwrite the enabled one's claim.
   while IFS= read -r dir; do
     while IFS=$'\t' read -r src dst; do
       owner[$dst]=${dir##*/}

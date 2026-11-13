@@ -1,5 +1,5 @@
 # Phase 1: always installed, machinery only. Nothing that runs before this
-# file may use a tool listed in it. See core/CLAUDE.md.
+# file may use a tool listed in it.
 
 # One of five places that must agree on bash 5 (install.sh, uninstall.sh,
 # bin/dot, lib/dot.sh). Listed so `brew bundle cleanup` never proposes
