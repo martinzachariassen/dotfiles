@@ -38,8 +38,8 @@ The skills only *say* they never force-push; the guard is what makes it true
 for every session, skill or not. It reads the command with quoted strings and
 heredoc bodies stripped, so a commit message that names `--force` is not a
 force-push. It binds Claude, not you: a push the guard refuses is one you can
-still run yourself. `tests/git-guard.bats` pins both directions -- what it
-must deny, and the ordinary work it must let through.
+still run yourself. `tests/claude-code-git-guard.bats` pins both directions --
+what it must deny, and the ordinary work it must let through.
 
 ## Merging into a file you own
 
