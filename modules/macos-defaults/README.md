@@ -70,14 +70,17 @@ the run.
 
 ## Applying
 
-Dock, Finder, SystemUIServer and WindowManager read their preferences at launch
-only, so `apply.sh` restarts them. `NSGlobalDomain` cannot be restarted —
-keyboard and text-substitution changes need a **log out and back in**, which
-both the dry run and the real run say in the same words.
+`apply.sh` reads every key first and writes only the ones that differ, so a Mac
+that already matches costs one line: `45 keys already set`.
 
-That line is `dim`, not `warn`. It is true of every run that reaches it, and as
-a warning it would exit `DOT_STATUS_WARN` every time and `dot apply` could never
-reach "Done".
+Dock, Finder, SystemUIServer and WindowManager read their preferences at launch
+only, so `apply.sh` restarts the ones whose keys it just wrote, and no others.
+`NSGlobalDomain` cannot be restarted — keyboard and text-substitution changes
+need a **log out and back in**, which both the dry run and the real run say in
+the same words, and only when a key in that domain changed.
+
+That line is `dim`, not `warn`. It is true of every run that writes such a key,
+and as a warning it would exit `DOT_STATUS_WARN` on each of them.
 
 `doctor.sh` warns rather than fails on drift: an OS update or a Settings pane
 reverting a key is not a broken install. But it is otherwise invisible — the

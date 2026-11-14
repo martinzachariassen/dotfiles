@@ -312,8 +312,8 @@ bar. The line is a frame: a whole line tagged with an escape sequence that draws
 nothing, moved over by the next with a cursor-up. Whole lines keep their place in
 the transcript's line-buffered stream, and the transcript's `sed` drops any line
 carrying the tag, so the log holds the `installed` line and never the frames.
-Without a terminal, or with `DOT_PROGRESS=0`, there are no frames and the old
-`no output for 45s -- still running` heartbeat comes every `DOT_UI_HEARTBEAT`
+Without a terminal, or with `DOT_PROGRESS=0`, there are no frames; a
+`no output for 45s -- still running` line comes every `DOT_UI_HEARTBEAT`
 seconds (15 by default) instead.
 
 In `dot doctor` a module that reports nothing wrong collapses to one line naming
