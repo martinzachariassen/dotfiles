@@ -86,14 +86,14 @@ hook() {
   [ "$DOT_FAILURES" -eq 2 ]
 }
 
-@test "apply: a packages-only module says so instead of printing nothing" {
+@test "apply: a module with nothing to link or run prints nothing of its own" {
   local m
   m=$(make_module demo)
   rmdir "$m/home"
 
   run module_apply demo
   [ "$status" -eq 0 ]
-  [[ $output == *"packages only"* ]]
+  [ -z "$output" ]
 }
 
 @test "doctor: counting a failure does not abort the caller" {

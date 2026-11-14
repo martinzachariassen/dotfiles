@@ -130,11 +130,23 @@ record() {
   [[ $output == *"[]"* ]]
 }
 
-@test "a group where everything passed collapses to one line" {
+@test "a group where everything passed collapses to one line naming what passed" {
   record eval 'ok packages "all installed"; ok files "all linked"'
-  run ui_group demo 'a demo module' "$SINK"
+  run env DOT_ASCII=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_group demo 'a demo module' '$SINK'"
   [ "$(printf '%s\n' "$output" | grep -c .)" -eq 1 ]
+  says demo 'packages - files'
+}
+
+@test "a clean group with nothing to name keeps its description" {
+  record eval 'dim "an aside"'
+  run ui_group demo 'a demo module' "$SINK"
   says demo 'a demo module'
+}
+
+@test "a clean group is hidden when the caller only wants what failed" {
+  record eval 'ok packages "all installed"'
+  DOT_UI_HIDE_CLEAN=1 run ui_group demo 'a demo module' "$SINK"
+  [ -z "$output" ]
 }
 
 @test "a group with a problem expands, and drops the checks that passed" {
@@ -331,4 +343,143 @@ EOF
   [ "$status" -eq 1 ]
   [[ $output == *'do this'* ]]
   [[ $output == *'and this'* ]]
+}
+
+live() {
+  export DOT_UI_RECORDS=1
+  "$@" >"$SINK" 2>&1
+  unset DOT_UI_RECORDS
+}
+
+@test "live group: nothing but good news is one line, carrying what was said" {
+  live eval 'ok packages "3 packages"; ok files "2 links"; dim "an aside"'
+  run env DOT_ASCII=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_live_group demo 'a demo module' <'$SINK'"
+  [ "$(grep -c . <<<"$output")" -eq 1 ]
+  says demo '3 packages - 2 links'
+  [[ $output =~ [0-9]+\.[0-9]s$ ]]
+  [[ $output != *aside* ]]
+}
+
+@test "live group: a change opens it, and what was held back comes out first" {
+  live eval 'ok packages "3 packages"; info link "~/.demorc"'
+  run ui_live_group demo 'a demo module' <"$SINK"
+  says demo 'a demo module'
+  [[ $output == *"3 packages"*"~/.demorc"* ]]
+  [[ $(tail -n 1 <<<"$output") =~ 1\ change\ +[0-9]+\.[0-9]s$ ]]
+}
+
+@test "live group: a failure closes it as a problem, not as a change" {
+  live eval 'info write "~/.demorc"; fail settings "could not"'
+  run ui_live_group demo 'a demo module' <"$SINK"
+  [[ $(tail -n 1 <<<"$output") == *"1 problem"* ]]
+}
+
+@test "live group: another program's line is shown, and opens the group" {
+  live eval 'ok packages "3 packages"; echo "from somewhere else"'
+  run ui_live_group demo 'a demo module' <"$SINK"
+  [[ $output == *"from somewhere else"* ]]
+  [[ $(tail -n 1 <<<"$output") == *done* ]]
+}
+
+@test "live group: a hook that died without a word is named by its roll-up" {
+  live fold_status 'demo: apply.sh failed' false
+  run ui_live_group demo 'a demo module' <"$SINK"
+  [[ $output == *"demo: apply.sh failed"* ]]
+}
+
+@test "live group: a roll-up is dropped when the hook named its own problem" {
+  live fold_status 'demo: apply.sh failed' bash -c "source '$DOT_ROOT/lib/dot.sh'; fail x 'the cause'; exit 1"
+  run ui_live_group demo 'a demo module' <"$SINK"
+  [[ $output == *"the cause"* ]]
+  [[ $output != *"apply.sh failed"* ]]
+}
+
+@test "live group: each info line is tallied for the summary" {
+  live eval 'info install "cask widget"; info link "~/.a"; info write "~/.b"'
+  __UI_TALLY="$DOT_TMP/tally" run ui_live_group demo 'a demo module' <"$SINK"
+  [ "$(wc -l <"$DOT_TMP/tally" | tr -d ' ')" -eq 3 ]
+  grep -qx $'install\tcask' "$DOT_TMP/tally"
+}
+
+@test "live group: a frame overwrites the one before it, and the next line overwrites the last" {
+  printf '%s\n' "$(record_line info install 'cask widget')" \
+    "${__UI_FRAME}one" "${__UI_FRAME}two" "$(record_line ok installed 'cask widget')" >"$SINK"
+  run ui_live_group demo 'a demo module' <"$SINK"
+  [[ $output == *$'\033[2K'"${__UI_FRAME}one"* ]]
+  [[ $output == *$'\033[F\033[2K'"${__UI_FRAME}two"* ]]
+  [[ $output == *$'\033[F\033[2K'*"installed"* ]]
+}
+
+record_line() {
+  DOT_UI_RECORDS=1 __ui_line "$@"
+}
+
+@test "changes: counted by kind, in one line" {
+  printf 'install\tcask\ninstall\tformula\nlink\t~/.a\nrelink\t~/.b\nwrite\t~/.c\nbackup\t~/.d\nchmod\t~/.e\n' >"$DOT_TMP/tally"
+  run env DOT_ASCII=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_changes '$DOT_TMP/tally'"
+  [ "$output" = $'7\t1 cask - 1 formula - 2 links - 1 file written - 1 moved to backups - 1 chmod' ]
+}
+
+@test "changes: a run that changed nothing has no line at all" {
+  : >"$DOT_TMP/tally"
+  run ui_changes "$DOT_TMP/tally"
+  [ -z "$output" ]
+}
+
+@test "a tab sends the rest of a message flush right" {
+  run env DOT_COLUMNS=60 bash -c "source '$DOT_ROOT/lib/ui.sh'; ok demo \$'left\tright'"
+  [ "${#output}" -eq 60 ]
+  [[ $output == *right ]]
+}
+
+@test "a message too long for its note is cut, never wrapped" {
+  run env DOT_COLUMNS=40 DOT_ASCII=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; ok demo \"\$(printf 'x%.0s' {1..80})\"\$'\t1.0s'"
+  [ "${#output}" -eq 40 ]
+  [[ $output == *'...  1.0s' ]]
+}
+
+@test "progress: a known size draws a bar, a percentage and what is left" {
+  run env DOT_COLUMNS=80 DOT_PROGRESS=1 DOT_ASCII=1 NO_COLOR=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; ui_progress widget 50000000 200000000 10000000 3000000 0"
+  [[ $output == "$__UI_FRAME"* ]]
+  [[ $output == *'#'*'-'* ]]
+  [[ $output == *' 25%  50/200 MB  10 MB/s  ~15s'* ]]
+  [ "$(printf '%s' "${output#"$__UI_FRAME"}" | wc -c | tr -d ' ')" -lt 80 ]
+}
+
+@test "progress: an unknown size counts bytes instead of guessing a bar" {
+  run env DOT_PROGRESS=1 DOT_ASCII=1 NO_COLOR=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; ui_progress jq 3500000 0 1000000 4000000 0"
+  [[ $output == *'downloading  3.5 MB - 1.0 MB/s - 0:04'* ]]
+}
+
+@test "progress: nothing downloading is an install, with its clock" {
+  run env DOT_PROGRESS=1 DOT_ASCII=1 NO_COLOR=1 bash -c \
+    "source '$DOT_ROOT/lib/ui.sh'; ui_progress jq 0 0 0 75000000 0"
+  [[ $output == *'installing  1:15'* ]]
+}
+
+@test "progress: with no terminal there is no frame at all" {
+  run env DOT_PROGRESS=0 bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_progress jq 0 0 0 0 0"
+  [ -z "$output" ]
+}
+
+@test "the transcript drops frames and keeps the line that replaced them" {
+  local log="$DOT_TMP/log"
+  printf '%s\n' "${__UI_FRAME}50%" $'\033[F\033[2K\033[32mdone\033[0m' plain |
+    sed -l -e "$__UI_FRAME_SED" -e h -e "$__UI_STRIP_SGR" -e "w $log" -e g >"$DOT_TMP/screen"
+  [ "$(cat "$log")" = $'done\nplain' ]
+  [ "$(grep -c . "$DOT_TMP/screen")" -eq 3 ]
+}
+
+@test "duration: tenths under a minute, minutes over it" {
+  [ "$(ui_duration 700000)" = "0.7s" ]
+  [ "$(ui_duration 41700000)" = "41.7s" ]
+  [ "$(ui_duration 62000000)" = "1m02s" ]
+}
+
+@test "megabytes: one decimal under ten, none above" {
+  [ "$(ui_megabytes 3456789)" = "3.4 MB" ]
+  [ "$(ui_megabytes 234424393)" = "234 MB" ]
 }

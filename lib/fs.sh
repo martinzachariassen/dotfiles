@@ -88,7 +88,7 @@ fs_link_tree() {
   done < <(fs_pairs "$1")
 
   if ((n > 0 && DOT_N_UNCHANGED - before == n)); then
-    ok files "all $n already linked"
+    ok files "$(ui_count "$n" link)"
   fi
 }
 
@@ -130,20 +130,6 @@ fs_check_tree() {
 }
 
 fs_report() {
-  local parts=() summary
-  ((DOT_N_LINKED)) && parts+=("$DOT_N_LINKED linked")
-  ((DOT_N_RELINKED)) && parts+=("$DOT_N_RELINKED relinked")
-  ((DOT_N_BACKED_UP)) && parts+=("$DOT_N_BACKED_UP backed up")
-  ((DOT_N_UNCHANGED)) && parts+=("$DOT_N_UNCHANGED unchanged")
-
-  if ((${#parts[@]} == 0)); then
-    say files 'none to link'
-  else
-    # printf, not IFS + "${parts[*]}": that joins on the first char of IFS only.
-    summary=$(printf ', %s' "${parts[@]}")
-    say files "${summary:2}"
-  fi
-
   if fs_backup_used; then
     say backups "${DOT_STATE/#$HOME/\~}/backups/$DOT_RUN_ID"
     dim 'Files that were in the way. Nothing else has a copy of them.'

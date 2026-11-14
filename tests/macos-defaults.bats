@@ -262,8 +262,9 @@ wrote() { grep -qF "$1" "$CALLS"; }
 
   apply 1
   [ "$status" -eq 0 ]
-  says defaults "write the Dock, Finder, input and screenshot keys, and restart those apps"
-  [ ! -f "$CALLS" ]
+  [[ $output =~ write\ [0-9]+\ keys\ across ]]
+  says restart 'Dock Finder SystemUIServer WindowManager'
+  ! grep -q '^write' "$CALLS"
   [ "$(home_snapshot)" = "$before" ]
 }
 
@@ -670,4 +671,37 @@ wrote() { grep -qF "$1" "$CALLS"; }
   doctor
   [ "$status" -eq 0 ]
   [[ $output != *"browser"* ]]
+}
+
+@test "apply: a Mac that already matches writes nothing and restarts nothing" {
+  with_store
+  with_settings '# nothing set'
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\n' "$DOT_TMP/killed" >"$BIN/killall"
+  chmod +x "$BIN/killall"
+  apply
+  [ "$status" -eq 0 ]
+  local writes
+  writes=$(wc -l <"$DEFAULTS_STORE")
+  rm -f "$DOT_TMP/killed"
+
+  apply
+  [ "$status" -eq 0 ]
+  [[ $output =~ [0-9]+\ keys\ already\ set ]]
+  [ "$(wc -l <"$DEFAULTS_STORE")" -eq "$writes" ]
+  [ ! -e "$DOT_TMP/killed" ]
+  [[ $output != *"log out"* ]]
+}
+
+@test "apply: one drifted Dock key restarts the Dock and nothing else" {
+  with_store
+  with_settings '# nothing set'
+  apply
+  printf 'com.apple.dock show-recents\t1\n' >>"$DEFAULTS_STORE"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >>"%s"\n' "$DOT_TMP/killed" >"$BIN/killall"
+  chmod +x "$BIN/killall"
+
+  apply
+  [ "$status" -eq 0 ]
+  says defaults 'write show-recents'
+  [ "$(cat "$DOT_TMP/killed")" = "Dock" ]
 }

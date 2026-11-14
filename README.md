@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/banner.svg" alt="dotfiles: my Mac as code. Packages, config files and macOS settings, applied with one command and checked with another." width="100%">
+  <img src=".github/assets/banner.svg" alt="dotfiles: my Mac as code. A terminal shows dot apply installing Discord, with a live progress bar." width="100%">
 </p>
 
 <p align="center">
@@ -10,6 +10,8 @@
 <p align="center">
   <a href="#quick-start"><b>Quick start</b></a>
   &nbsp;·&nbsp;
+  <a href="#commands"><b>Commands</b></a>
+  &nbsp;·&nbsp;
   <a href="#modules"><b>Modules</b></a>
   &nbsp;·&nbsp;
   <a href="#documentation"><b>Documentation</b></a>
@@ -17,13 +19,13 @@
   <a href="docs/uninstall.md"><b>Uninstall</b></a>
 </p>
 
-Homebrew packages, config files symlinked into `$HOME`, and the few macOS
-settings that are not files at all, described in one repo. `dot apply` makes a
-machine match it, and `dot doctor` tells you, without changing anything,
-whether it still does.
+One Mac described as code: Homebrew packages, config files symlinked into
+`$HOME`, and the few macOS settings that are not files at all. `dot apply` makes
+a machine match the repo, and `dot doctor` tells you, without changing
+anything, whether it still does.
 
-This is my own setup. It is public so you can read it, borrow from it, or fork
-it and make it yours.
+It is my own setup, kept public so you can read it, borrow from it, or fork it
+and make it yours.
 
 ## Quick start
 
@@ -45,6 +47,7 @@ From then on, `dot apply` applies it.
 
 **3. Check the result.** `dot doctor` should end with *Everything looks right.*
 
+> [!IMPORTANT]
 > **Forking it?** Edit the `[user]` table in [`profiles.toml`](profiles.toml)
 > first. The wizard copies that name, noreply email and public signing key into
 > your config without asking, so a fork run as-is authors commits as Martin and
@@ -61,39 +64,87 @@ From then on, `dot apply` applies it.
 | **Reports drift** | `dot doctor` is read-only. A healthy module is one line; a broken one expands to say what. It also names packages installed by hand that no `Brewfile` would put on your next machine. |
 | **Takes it back** | [`uninstall.sh`](docs/uninstall.md) removes what the repo added and never a file of yours. |
 
-A healthy machine looks like this:
+`dot apply --dry-run` on a Mac that already matches the repo. A module with
+nothing to do is one line: what it found, and how long it took.
 
 ```
-── Checking ─────────────────────────────────────────────── core + 9 modules
-  ✓ core           the repo, the shim, the config
-  ✓ apps           GUI apps and fonts as casks, plus an opened-once check
-  ✓ claude-code    Claude Code CLI and its status line
-  ✓ cmux           cmux terminal config -- Option key stays native macOS input
-  ✓ containers     Docker via colima (a Linux VM, no Docker Desktop)
-  ✓ dev-cli        Development CLI tools, plus mise-managed language runtimes
-  ✓ git            Git config, aliases, and a machine-local include
-  ✓ macos-defaults macOS preferences: Dock, Finder, input, screenshots
-  ✓ ssh            SSH client config; keys come from the 1Password agent
-  ✓ zsh            zsh with XDG layout, aliases, PATH and prompt
-  ✓ orphans        none
-  → unmanaged      4 packages no Brewfile names
-        Formula fd
-        Formula goreleaser
-        Formula poppler
+── dot apply ──────────────────────────────── DRY RUN -- nothing will change
+    repo         ~/Developer/personal/dotfiles
+    config       ~/.config/dotfiles/config.toml
+  ✓ packages       5 packages                                           0.2s
+  ✓ read           config parses · 10 modules known · 21 hooks parse
+
+── Applying ────────────────────────────────────────────── core + 10 modules
+  ✓ core           shim current                                         0.0s
+  ✓ apps           10 packages                                          0.2s
+  ✓ claude-code    2 packages · 16 links · settings.json holds all 9 …  0.4s
+  ✓ cmux           2 packages · 2 links                                 0.2s
+  ✓ containers     5 packages · 1 link                                  0.2s
+  ✓ dev-cli        10 packages · 2 links · 10 runtimes match mise.lock  0.2s
+  ✓ dotfiles-dev   4 packages                                           0.2s
+  ✓ git            1 package · 2 links · identity: Martin Zachariasse…  0.3s
+  ✓ macos-defaults 45 keys already set                                  0.2s
+  ✓ ssh            2 packages · 2 links                                 0.2s
+  ✓ zsh            7 packages · 6 links                                 0.3s
+
+── Plan ──────────────────────────────────────────────────────────── dry run
+  ✓ changes      none -- this Mac already matches the repo
+    Dry run: nothing was changed.
+```
+
+A module with something to do opens instead, and shows each change as it
+happens: `→ install  cask discord`, then a live bar with speed and time left,
+then `✓ installed  cask discord (118 MB)`. A real run ends on `Done` and the
+same checks `dot doctor` runs.
+
+<details>
+<summary><strong>What a problem looks like</strong></summary>
+
+`dot doctor` on a machine that is missing one cask and has one stale link. A
+healthy module stays one line; a broken one expands, and the result repeats
+what needs attention.
+
+```
+── Checking ────────────────────────────────────────────── core + 10 modules
+  ✓ core           packages · xcode · homebrew · dot · PATH · config · repo
+  ✗ apps           GUI apps and fonts as casks, plus an opened-once check
+      ✗ packages     Cask discord is not installed -- run: dot apply
+  ✓ claude-code    packages · files · settings · auth
+  ✓ cmux           packages · files
+  ✓ containers     packages · files · colima · DOCKER_HOST
+  ✓ dev-cli        packages · files · runtimes · gh · gcloud
+  ✓ dotfiles-dev   packages
+  ✓ git            packages · files
+  ✓ macos-defaults defaults · filevault · firewall · updates · browser
+  ✓ ssh            packages · files
+  ✓ zsh            packages · files · op
+  ▲ orphans        unclaimed -- no module ships these any more:
+        ~/.claude/skills/dotfiles-test/SKILL.md
+        rm them; there is nothing else to undo.
+  → unmanaged      2 packages no Brewfile names
+        Formula firebase-cli
         Cask curseforge
         add one to a module Brewfile and the next machine gets it too.
 
 ── Result ──────────────────────────────────────────────────────────────────
-  ✓ Everything looks right.
+  ✗ 1 problem, 1 warning
+      ✗ apps           packages: Cask discord is not installed -- run: dot apply
+  ✓ 10 modules clean
+    Every check, including the ones that passed: dot doctor --verbose
 ```
 
-Two promises hold the rest together:
+</details>
+
+## Guarantees
 
 - **Nothing deletes a real file.** A file in the way is moved to
   `~/.local/state/dotfiles/backups/`, and that tree is never removed.
 - **Dry run and real run print the same words.** `--dry-run` is the real code
   path with every mutating step turned into a `printf`, so the preview is what
   happens.
+- **Re-running is safe, and quiet.** Every step compares before it writes, so a
+  module with nothing to do is one line and a second `dot apply` ends on
+  `none -- this Mac already matches the repo`.
 
 ## Commands
 
@@ -107,10 +158,11 @@ dot config             Open the config file in $EDITOR
 dot config --init      Create it for the first time (runs the wizard)
 dot doctor             Check this machine; read-only
 dot doctor --verbose   The same, including every check that passed
+dot <command> --help   One command in full; dot --help lists the modules
 ```
 
-`add` and `remove` take `--dry-run` too. Re-running `dot apply` is safe and
-expected.
+`add` and `remove` take `--dry-run` too. While brew downloads a cask, a live
+line shows its progress and the time left; `DOT_PROGRESS=0` turns it off.
 
 <details>
 <summary><strong>Updating</strong></summary>
@@ -120,9 +172,12 @@ dot apply --pull
 ```
 
 It refuses over uncommitted changes and only fast-forwards, then hands over to
-the `dot` it just pulled. This updates the *configuration*, not the packages. `apply` runs `brew bundle
---no-upgrade`, so a package a Brewfile gained arrives and a newer version of one
-you already have does not. Upgrading is `brew upgrade`, on your schedule.
+the `dot` it just pulled.
+
+This updates the *configuration*, not the packages. `apply` runs
+`brew bundle --no-upgrade`, so a package a Brewfile gained arrives and a newer
+version of one you already have does not. Upgrading is `brew upgrade`, on your
+schedule.
 
 </details>
 
@@ -170,7 +225,8 @@ A Brewfile and nothing else: tools this repo installs but does not configure.
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
 | `dotfiles-dev` | the toolchain `make check` runs, for a machine you develop *this repo* on |
 
-> **Heads up:** [`macos-defaults`](modules/macos-defaults/README.md) is the one
+> [!WARNING]
+> [`macos-defaults`](modules/macos-defaults/README.md) is the one
 > module nothing can undo. The old values were never read, so they exist
 > nowhere, and removing the module names the settings it wrote rather than
 > putting them back.

@@ -37,13 +37,23 @@ brew_bundle() {
     return 1
   fi
 
+  local named
+  named=$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$file") || named=0
+
   if [[ $DOT_DRY_RUN == 1 ]]; then
-    info packages "brew bundle --file ${file#"$DOT_ROOT"/}"
+    local planned kind name status=0
+    planned=$(brew_missing "$file") || status=$?
+    case $status in
+      0) ok packages "$(ui_count "$named" package)" ;;
+      1) while read -r kind name; do
+        info install "${kind,,} $name"
+      done <<<"$planned" ;;
+      *) info packages "brew bundle --file ${file#"$DOT_ROOT"/}" ;;
+    esac
     return 0
   fi
 
-  brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
-  if ((PIPESTATUS[0] == 0)); then return 0; fi
+  __brew_follow "$file" "$named" && return 0
 
   fail packages "brew bundle failed for $label"
 
@@ -59,6 +69,136 @@ brew_bundle() {
     2) dim 'brew could not say what is missing -- see its output above' ;;
   esac
   return 1
+}
+
+__brew_kind() {
+  local file=$1 name=$2
+  if grep -qE "^[[:space:]]*cask[[:space:]]+\"([^\"]*/)?$name\"" "$file"; then
+    printf 'cask\n'
+  else
+    printf 'formula\n'
+  fi
+}
+
+# 0 when the server will not say. Only asked for a cask, and only while a
+# terminal is watching: it costs a request, and a bottle's URL needs a token.
+__brew_cask_size() {
+  local url
+  url=$(brew info --cask --json=v2 "$1" 2>/dev/null | dasel -i json -o yaml 'casks[0].url' 2>/dev/null) || url=''
+  url=${url#\"}
+  url=${url%\"}
+  if [[ $url != https://* ]]; then
+    printf '0\n'
+    return 0
+  fi
+  "${DOT_CURL_BIN:-curl}" -sIL --max-time 4 "$url" 2>/dev/null | tr -d '\r' |
+    awk 'tolower($1) == "content-length:" { n = $2 } END { print n + 0 }'
+}
+
+# The newest download brew has open since `since` (epoch seconds), or nothing.
+__brew_partial() {
+  local dir=$1 since=$2 f m best='' newest=0
+  for f in "$dir"/*.incomplete; do
+    [[ -f $f ]] || continue
+    m=$(stat -f '%m' "$f") || continue
+    if ((m >= since && m >= newest)); then
+      best=$f newest=$m
+    fi
+  done
+  if [[ -n $best ]]; then stat -f '%z' "$best"; fi
+}
+
+__brew_finish() {
+  [[ -n $pkg ]] || return 0
+  local size=$total note=''
+  ((size > 0)) || size=$bytes
+  if ((size > 0)); then note=" ($(ui_megabytes "$size"))"; fi
+  ok installed "$kind $pkg$note"$'\t'"$(ui_duration $(($(ui_now) - began)))"
+  installed=$((installed + 1))
+  pkg=''
+}
+
+# brew bundle hides each install's own output and says one line as it starts
+# the next package, so a long silence is a download or a build, never a hang.
+__brew_follow() {
+  local file=$1 named=$2 fd pid status=0 line chunk got
+  local pkg='' kind='' since=0 began=0 total=0 bytes=0 first=0 first_at=0 rate tick=0
+  local using=0 installed=0 idle=0 beat=${DOT_UI_HEARTBEAT:-15} wait_s cache='' live=0
+
+  if ((__UI_LIVE)) && [[ -n ${DOT_UI_RECORDS:-} ]]; then
+    live=1
+    cache="$(brew --cache 2>/dev/null)/downloads"
+  fi
+  wait_s=$beat
+  ((live == 0)) || wait_s=0.25
+
+  exec {fd}< <(brew bundle --file "$file" --no-upgrade 2>&1)
+  pid=$!
+  line=''
+  while true; do
+    chunk=''
+    if IFS= read -r -t "$wait_s" -u "$fd" chunk; then status=0; else status=$?; fi
+    line+=$chunk
+    if ((status > 128)); then
+      if ((live)) && [[ -n $pkg ]]; then
+        tick=$((tick + 1))
+        got=$(__brew_partial "$cache" "$since")
+        rate=0
+        if [[ -n $got ]]; then
+          bytes=$got
+          if ((first_at == 0)); then first=$bytes first_at=$(ui_now); fi
+          if (($(ui_now) - first_at > 500000)); then
+            rate=$(((bytes - first) * 1000000 / ($(ui_now) - first_at)))
+          fi
+        else
+          # Downloaded, or never downloading: either way what is left is the install.
+          got=0
+        fi
+        ui_progress "$pkg" "$got" "$total" "$rate" $(($(ui_now) - began)) "$tick"
+      elif ((live == 0)); then
+        idle=$((idle + beat))
+        dim "no output for $(ui_elapsed "$idle") -- still running"
+      fi
+      continue
+    fi
+    idle=0
+    if ((status != 0)) && [[ -z $line ]]; then break; fi
+
+    case $line in
+      'Using '*) using=$((using + 1)) ;;
+      'Installing '*' has failed!'*)
+        pkg=${line#Installing }
+        pkg=${pkg%% *}
+        fail packages "$(__brew_kind "$file" "$pkg") $pkg did not install"
+        pkg=''
+        ;;
+      'Installing '*)
+        __brew_finish
+        pkg=${line#Installing }
+        pkg=${pkg%% *}
+        kind=$(__brew_kind "$file" "$pkg")
+        info install "$kind $pkg"
+        since=$(date +%s) began=$(ui_now) total=0 bytes=0 first=0 first_at=0 tick=0
+        if ((live)) && [[ $kind == cask ]]; then total=$(__brew_cask_size "$pkg"); fi
+        ((live == 0)) || ui_progress "$pkg" 0 "$total" 0 0 0
+        ;;
+      *'brew bundle'*' complete!'* | 'Homebrew Bundle complete!'*) ;;
+      *) __ui_quoted "$line" ;;
+    esac
+    line=''
+    ((status == 0)) || break
+  done
+  __brew_finish
+  exec {fd}<&-
+  status=0
+  wait "$pid" || status=$?
+  ((status == 0)) || return 1
+
+  if ((installed == 0)); then
+    ((using > 0)) || using=$named
+    ok packages "$(ui_count "$using" package)"
+  fi
+  return 0
 }
 
 brew_check() {

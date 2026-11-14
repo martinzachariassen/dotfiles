@@ -112,7 +112,7 @@ with_runtimes() {
 
   apply 1
   [ "$status" -eq 0 ]
-  says mise 'install the runtimes locked in ~/.config/mise/mise.lock'
+  says runtime 'node '
   [[ $output != *"SHOULD NOT RUN"* ]]
   [ "$(home_snapshot)" = "$before" ]
 }
@@ -328,4 +328,27 @@ with_runtimes() {
   remove 1
   [ "$output" = "$real" ]
   [ "$(home_snapshot)" = "$before" ]
+}
+
+@test "apply: runtimes the lock names, already on disk, are not installed again" {
+  with_mise "printf 'MISE-RAN\\n'; exit 0"
+  local tool version
+  while read -r tool version; do
+    mkdir -p "$HOME/.local/share/mise/installs/$tool/$version"
+  done < <(awk '/^\[\[tools\./ { t = $0; sub(/^\[\[tools\./, "", t); sub(/\]\]$/, "", t); next }
+    t != "" && $1 == "version" { v = $3; gsub(/"/, "", v); print t, v; t = "" }' \
+    "$DOT_ROOT/modules/dev-cli/home/.config/mise/mise.lock")
+
+  XDG_DATA_HOME="$HOME/.local/share" apply
+  [ "$status" -eq 0 ]
+  [[ $output =~ [0-9]+\ runtimes\ match\ mise.lock ]]
+  [[ $output != *MISE-RAN* ]]
+}
+
+@test "apply: mise's lines for runtimes already installed are dropped" {
+  with_mise 'printf "mise node@26 already installed\nmise installing python\n"; exit 0'
+  apply
+  [ "$status" -eq 0 ]
+  [[ $output == *"installing python"* ]]
+  [[ $output != *"already installed"* ]]
 }

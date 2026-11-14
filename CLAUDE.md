@@ -57,8 +57,8 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
 - **A check that could not run is a third answer, never green.** This is the
   three-state shape `brew_missing` uses.
 - **A baked-in path to a binary is an input with that path as its default**
-  (`DOT_BREW_BIN`, `DOT_TAPLO_BIN`, `DOT_SSH_ADD`). Without one, the branch a
-  test needs is the one the machine never takes.
+  (`DOT_BREW_BIN`, `DOT_TAPLO_BIN`, `DOT_SSH_ADD`, `DOT_CURL_BIN`). Without
+  one, the branch a test needs is the one the machine never takes.
 - **Bash 5 in five places that must agree:**
   - `install.sh` installs it;
   - `core/Brewfile` keeps it managed;
@@ -91,6 +91,10 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
   `--dry-run` export dies, and the verb acts for real.
 - **`run_checks` captures by redirect in the current shell, never `$(...)`.**
   The tallies are shell variables.
+- **An apply group renders through a FIFO and a waited-for `&`,** never
+  `> >(...)`. The module runs in the current shell for its tallies, and the
+  next group must not start beside the last one's lines.
+- **Every verb takes `-h`/`--help`** and acts on nothing when it does.
 - **`remove` order:** hook, then links, then config. The config write is the
   commit point.
 - **The transcript:**
@@ -105,6 +109,9 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
 ### `lib/`
 
 - **Seven files, no subdirectories.**
+- **Live frames are whole lines tagged `\e[28m`,** drawn only by the driver
+  with a terminal (`__UI_LIVE`) and only inside a group. The transcript's `sed`
+  drops any tagged line, so a frame never reaches the log.
 - **Nothing memoises.** `modules_enabled` is read in subshells and hooks are
   separate processes. Once-per-run work lives in `bin/dot`. Cross-process state
   is an exported input (`DOT_RUN_ID`).
@@ -148,6 +155,8 @@ bash uninstall.sh --dry-run    # likewise, for docs/uninstall.md
   `source "${DOT_ROOT:?}/lib/dot.sh"`.
 - **`doctor.sh` never writes**, not even through the tool it asks. `mise ls`
   and `colima status` both create directories. Read the evidence on disk.
+- **`apply.sh` announces a change only when there is one.** Compare, then
+  `info` and write; otherwise one short `ok`, which becomes the module's line.
 - **`remove.sh` exists only for what the sweep cannot see.** It reaches `$HOME`
   through `fs_unlink` or `fs_discard`, never `rm`. It stays silent on a machine
   that never ran the module.

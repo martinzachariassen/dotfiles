@@ -26,6 +26,9 @@ unread until someone runs `mise install` by hand, so this hook runs it.
 says which build that resolved to, with checksums. `apply.sh` runs
 `mise install --locked`, so a fresh machine gets exactly the runtimes this one
 has, and a tool missing from the lock fails instead of resolving on the spot.
+It first reads `mise.lock` against `~/.local/share/mise/installs`, and when
+every pinned runtime is already there it says `10 runtimes match mise.lock`
+and runs nothing.
 
 Moving to newer versions is deliberate, and lands as a diff to commit:
 

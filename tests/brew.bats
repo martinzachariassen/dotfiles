@@ -31,16 +31,43 @@ teardown() { teardown_sandbox; }
   [[ $output == *demo* ]]
 }
 
-@test "bundle: a dry run announces the file and installs nothing" {
-  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+@test "bundle: a dry run names each package it would install, and installs none" {
+  printf 'brew "jq"\ncask "widget"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
-  brew() { printf 'BREW-WAS-CALLED\n'; }
+  brew() {
+    printf '%s\n' "$*" >>"$DOT_TMP/brew-calls"
+    printf 'Formula jq needs to be installed.\nCask widget needs to be installed.\n'
+    return 1
+  }
   export DOT_DRY_RUN=1
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 0 ]
-  [[ $output != *BREW-WAS-CALLED* ]]
-  [[ $output == *"brew bundle"* ]]
+  says install 'formula jq'
+  says install 'cask widget'
+  [ "$(grep -vc '^bundle check ' "$DOT_TMP/brew-calls")" -eq 0 ]
+}
+
+@test "bundle: a dry run with everything installed is one good line" {
+  printf 'brew "jq"\ncask "widget"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 0; }
+  export DOT_DRY_RUN=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says packages '2 packages'
+}
+
+@test "bundle: a dry run brew cannot answer names the file instead of guessing" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 1; }
+  export DOT_DRY_RUN=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  [[ $output == *"brew bundle --file"* ]]
 }
 
 @test "bundle: the label defaults to the module directory name" {
@@ -74,10 +101,92 @@ teardown() { teardown_sandbox; }
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 1 ]
-  [[ $output == *"Using jq"* ]]
   [[ $output == *"a second line"* ]]
-  [[ $output =~ ^[[:space:]]{4,}Using\ jq ]] ||
-    [[ $(grep 'Using jq' <<<"$output") =~ ^[[:space:]]{4,} ]]
+  [[ $(grep 'a second line' <<<"$output") =~ ^[[:space:]]{4,} ]]
+}
+
+@test "bundle: a package already installed is counted, not listed" {
+  printf 'brew "jq"\nbrew "fd"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Using jq\nUsing fd\n`brew bundle` complete! 2 Brewfile dependencies now installed.\n'; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says packages '2 packages'
+  [[ $output != *"Using"* ]]
+  [[ $output != *"complete!"* ]]
+}
+
+@test "bundle: each install is announced, then closed with its time" {
+  printf 'cask "widget"\nbrew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing widget\nInstalling jq\n'; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says install 'cask widget'
+  says install 'formula jq'
+  [[ $output =~ installed\ +cask\ widget\ +[0-9]+\.[0-9]s ]]
+  [[ $output =~ installed\ +formula\ jq\ +[0-9]+\.[0-9]s ]]
+  [[ $output != *"2 packages"* ]]
+}
+
+@test "bundle: an install brew reports as failed is a failure, by name" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing jq\nInstalling jq has failed!\n'; return 1; }
+  brew_missing() { return 2; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  says packages 'formula jq did not install'
+  [[ $output != *"installed "*"formula jq"* ]]
+}
+
+@test "bundle: with no terminal, a silent install never draws a frame" {
+  printf 'cask "widget"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing widget\n'; }
+  export DOT_UI_RECORDS=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [[ $output != *$'\033[28m'* ]]
+}
+
+@test "cask size: read from the server's Content-Length, after redirects" {
+  brew() { printf '{"casks":[{"url":"https://example.invalid/widget.dmg"}]}\n'; }
+  printf '#!/usr/bin/env bash\nprintf "HTTP/2 302\\r\\ncontent-length: 0\\r\\n\\r\\nHTTP/2 200\\r\\nContent-Length: 1234\\r\\n\\r\\n"\n' >"$DOT_TMP/curl"
+  chmod +x "$DOT_TMP/curl"
+
+  DOT_CURL_BIN="$DOT_TMP/curl" run __brew_cask_size widget
+  [ "$output" = "1234" ]
+}
+
+@test "cask size: a URL brew will not give is 0, and no request is made" {
+  brew() { return 1; }
+  printf '#!/usr/bin/env bash\ntouch "%s"\n' "$DOT_TMP/curl-called" >"$DOT_TMP/curl"
+  chmod +x "$DOT_TMP/curl"
+
+  DOT_CURL_BIN="$DOT_TMP/curl" run __brew_cask_size widget
+  [ "$output" = "0" ]
+  [ ! -e "$DOT_TMP/curl-called" ]
+}
+
+@test "partial download: the newest .incomplete since the install began" {
+  mkdir -p "$DOT_TMP/dl"
+  head -c 10 /dev/zero >"$DOT_TMP/dl/old.incomplete"
+  touch -t 200001010000 "$DOT_TMP/dl/old.incomplete"
+  head -c 300 /dev/zero >"$DOT_TMP/dl/new.incomplete"
+  head -c 999 /dev/zero >"$DOT_TMP/dl/done.dmg"
+
+  run __brew_partial "$DOT_TMP/dl" $(($(date +%s) - 5))
+  [ "$output" = "300" ]
+}
+
+@test "partial download: nothing in flight is no answer, not zero" {
+  mkdir -p "$DOT_TMP/dl"
+  run __brew_partial "$DOT_TMP/dl" 0
+  [ -z "$output" ]
 }
 
 @test "bundle: a package still missing after a failure is named" {
