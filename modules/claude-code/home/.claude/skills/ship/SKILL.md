@@ -148,8 +148,10 @@ Run it once. Then:
   asking) and open the PR against the upstream repo.
 - `gh pr view --json url,state` on the branch: if an **open PR already
   exists**, this run pushes new commits to it and reports that PR; it does
-  not open a second one, and it does not rewrite the existing body unless
-  asked.
+  not open a second one. Read its title and body (`gh pr view --json
+  number,title,body`) and hold them against the **whole** PR diff
+  (`git diff <base>...HEAD` plus this run's commits), not just the new
+  commits: step 8 decides whether they still describe it.
 
 ### 8. Build the PR
 
@@ -170,6 +172,13 @@ Either way, the title follows the same convention as the commits and
 summarises the PR as a whole, and the attribution footer in context goes at
 the very end.
 
+**An existing PR** gets a verdict instead of a new body: either *still
+accurate*, or a revised title and body. A revision keeps the template's
+sections and everything the user wrote or ticked by hand, and changes only
+what the new commits made untrue or incomplete -- a title that now covers a
+third of the PR, a summary missing a whole concern, a test plan that no longer
+names the checks that ran.
+
 ### 9. Show the plan, wait for approval
 
 Show, compactly:
@@ -178,7 +187,8 @@ Show, compactly:
 - every commit: its message and its files
 - the check command and its result
 - which template was used, or that the default was
-- the full PR title and body
+- the full PR title and body -- or, for an existing PR, the verdict, with
+  any revision shown as old against new
 - anything risky: CI or infra config, migrations, deleted files, dependency
   bumps, a red check run
 
@@ -195,6 +205,9 @@ gh pr create --base <base> --title "<title>" --body-file - [--draft] <<'EOF'
 EOF
 ```
 
+- An existing PR with an approved revision: `git push`, then
+  `gh pr edit <number> --title "<title>" --body-file - <<'EOF'` instead of
+  `gh pr create`.
 - If `gh` is missing or not authenticated (`gh auth status`), or the remote
   is not on GitHub, say so and stop after the push -- give the user the
   title and body to paste. Do not work around it.

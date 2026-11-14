@@ -131,6 +131,11 @@ After approval, in this order:
 4. Review-body and conversation items: one `gh pr comment <pr>` that answers
    them together, not one comment each.
 
+Then hold the PR's title and body against the whole PR, as `ship` step 7
+does: a review fix can change what the PR does. If they no longer describe it,
+draft the revision, show it old against new, and `gh pr edit` only after a
+go-ahead.
+
 Do not re-request review unless the user asks. Report in one line: commits
 pushed, threads replied to, threads resolved, items left open.
 

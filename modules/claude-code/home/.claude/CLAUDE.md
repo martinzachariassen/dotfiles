@@ -30,6 +30,9 @@ A project's own `CLAUDE.md` wins wherever it says something different.
 - Commit, push or open a PR only when I ask. The `ship`, `ci-fix`,
   `review-fix`, `tidy` and `release` skills are the way to do it.
 - Follow the repo's commit convention; Conventional Commits otherwise.
+- After pushing more to an open PR, check that its title and description
+  still describe the whole PR. If they don't, propose the new text and update
+  it with `gh pr edit` once I approve.
 
 ## Talking to me
 
