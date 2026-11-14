@@ -6,20 +6,35 @@ dest="$HOME/.claude/settings.json"
 data="${DOT_MODULE_DIR:-$(dirname "$0")}/data/settings.json"
 want=$(jq --arg home "$HOME" '.statusLine.command = $home + "/.claude/statusline.sh"' "$data")
 
-if [[ $DOT_DRY_RUN == 1 ]]; then
-  info write "${dest/#$HOME/\~} ($(jq -r 'keys_unsorted | join(", ")' <<<"$want"))"
-  exit 0
-fi
-
-mkdir -p "$(dirname "$dest")"
-[[ -f $dest ]] || printf '{}\n' >"$dest"
-
 # `jq -r type`, not `jq -e .`: -e reports `null` and `false` as unparseable.
-kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'
+kind=object
+if [[ -f $dest ]]; then kind=$(jq -r 'type' "$dest" 2>/dev/null) || kind='unparseable text'; fi
+
 if [[ $kind != object ]]; then
+  if [[ $DOT_DRY_RUN == 1 ]]; then
+    info write "${dest/#$HOME/\~} (every managed key)"
+    exit 0
+  fi
   fail settings "${dest/#$HOME/\~} is $kind, not a JSON object -- fix it or move it aside, then: dot apply"
   exit 1
 fi
+
+changed=$(
+  if [[ -f $dest ]]; then cat "$dest"; else printf '{}\n'; fi |
+    jq -r --argjson want "$want" '. as $have | ($have * $want) as $next
+      | [$want | keys_unsorted[] | select($have[.] != $next[.])] | join(", ")'
+)
+
+if [[ -z $changed ]]; then
+  ok settings "settings.json holds all $(jq -r 'keys_unsorted | length' <<<"$want") keys"
+  exit 0
+fi
+
+info write "${dest/#$HOME/\~} ($changed)"
+if [[ $DOT_DRY_RUN == 1 ]]; then exit 0; fi
+
+mkdir -p "$(dirname "$dest")"
+[[ -f $dest ]] || printf '{}\n' >"$dest"
 
 tmp="$(mktemp "${dest}.XXXXXX")"
 # mktemp creates 0600, and `mv` would carry that onto the user's file.
@@ -27,9 +42,7 @@ chmod "$(stat -f '%Lp' "$dest")" "$tmp"
 
 # `if`, never `jq ... && mv` alone: set -e ignores a non-final member of an
 # && list, so a jq that dies mid-merge would report success.
-if jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"; then
-  ok settings "$(jq -r 'keys_unsorted | length' <<<"$want") managed keys applied"
-else
+if ! { jq --argjson want "$want" '. * $want' "$dest" >"$tmp" && mv "$tmp" "$dest"; }; then
   rm -f "$tmp"
   fail settings "jq could not rewrite ${dest/#$HOME/\~} -- it was left as it was"
   exit 1

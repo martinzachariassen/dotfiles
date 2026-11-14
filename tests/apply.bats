@@ -234,3 +234,47 @@ null" ]
   [[ $output == *"unparseable text"* ]]
   [ "$(cat "$HOME/.claude/settings.json")" = "this is not json" ]
 }
+
+@test "git apply.sh announces a write only when the file would change" {
+  config_generate 'Ada Lovelace' 'ada@example.com' 'git' >/dev/null
+
+  run_hook "$DOT_ROOT/modules/git" apply.sh
+  says write '~/.config/git/config.local'
+
+  run_hook "$DOT_ROOT/modules/git" apply.sh
+  [ "$status" -eq 0 ]
+  [[ $output != *write* ]]
+}
+
+@test "claude-code apply.sh names only the keys it would change" {
+  mkdir -p "$HOME/.claude"
+  printf '{}\n' >"$HOME/.claude/settings.json"
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  jq '.theme = "something-else"' "$HOME/.claude/settings.json" >"$DOT_TMP/s" &&
+    mv "$DOT_TMP/s" "$HOME/.claude/settings.json"
+
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  says write '~/.claude/settings.json (theme)'
+}
+
+@test "claude-code apply.sh on a matching file says so and writes nothing" {
+  mkdir -p "$HOME/.claude"
+  printf '{}\n' >"$HOME/.claude/settings.json"
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  local before
+  before=$(stat -f '%m %i' "$HOME/.claude/settings.json")
+
+  run_hook "$DOT_ROOT/modules/claude-code" apply.sh
+  [[ $output == *"settings.json holds all"* ]]
+  [[ $output != *write* ]]
+  [ "$(stat -f '%m %i' "$HOME/.claude/settings.json")" = "$before" ]
+}
+
+@test "core apply.sh leaves a current shim alone and says so" {
+  run_hook "$DOT_ROOT/core" apply.sh
+  says write '~/.local/bin/dot'
+
+  run_hook "$DOT_ROOT/core" apply.sh
+  says dot 'shim current'
+  [[ $output != *write* ]]
+}
