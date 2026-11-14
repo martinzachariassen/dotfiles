@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/banner.svg" alt="dotfiles: my Mac as code. Packages, config files and macOS settings, applied with one command and checked with another." width="100%">
+  <img src=".github/assets/banner.svg" alt="dotfiles: my Mac as code. A terminal shows dot apply installing Discord, with a live progress bar." width="100%">
 </p>
 
 <p align="center">
@@ -60,6 +60,39 @@ From then on, `dot apply` applies it.
 | **Runs module hooks** | For what a symlink cannot do: macOS `defaults`, a generated git include, a `jq` merge into `~/.claude/settings.json`. |
 | **Reports drift** | `dot doctor` is read-only. A healthy module is one line; a broken one expands to say what. It also names packages installed by hand that no `Brewfile` would put on your next machine. |
 | **Takes it back** | [`uninstall.sh`](docs/uninstall.md) removes what the repo added and never a file of yours. |
+
+`dot apply --dry-run` on a Mac that already matches the repo. A module with
+nothing to do is one line: what it found, and how long it took.
+
+```
+── dot apply ──────────────────────────────── DRY RUN -- nothing will change
+    repo         ~/Developer/personal/dotfiles
+    config       ~/.config/dotfiles/config.toml
+  ✓ packages       5 packages                                           0.2s
+  ✓ read           config parses · 10 modules known · 21 hooks parse
+
+── Applying ────────────────────────────────────────────── core + 10 modules
+  ✓ core           shim current                                         0.0s
+  ✓ apps           10 packages                                          0.2s
+  ✓ claude-code    2 packages · 16 links · settings.json holds all 9 …  0.4s
+  ✓ cmux           2 packages · 2 links                                 0.2s
+  ✓ containers     5 packages · 1 link                                  0.2s
+  ✓ dev-cli        10 packages · 2 links · 10 runtimes match mise.lock  0.2s
+  ✓ dotfiles-dev   4 packages                                           0.2s
+  ✓ git            1 package · 2 links · identity: Martin Zachariasse…  0.3s
+  ✓ macos-defaults 45 keys already set                                  0.2s
+  ✓ ssh            2 packages · 2 links                                 0.2s
+  ✓ zsh            7 packages · 6 links                                 0.3s
+
+── Plan ──────────────────────────────────────────────────────────── dry run
+  ✓ changes      none -- this Mac already matches the repo
+    Dry run: nothing was changed.
+```
+
+A module with something to do opens instead, and shows each change as it
+happens: `→ install  cask discord`, then a live bar with speed and time left,
+then `✓ installed  cask discord (118 MB)`. A real run ends on `Done` and the
+same checks `dot doctor` runs.
 
 `dot doctor` on a machine that is missing one cask and has one stale link:
 
