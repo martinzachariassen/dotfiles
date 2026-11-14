@@ -107,7 +107,8 @@ Show: the failing run and step, the cause and its kind, the diff, the
 commands that now pass. Then **stop and wait for an explicit go-ahead** --
 every time. After it: `git push`, and watch the new run with
 `gh run watch <new-id> --exit-status` if the user wants to wait for it.
-Report the result in one line.
+Report the result in one line. If the fix changed what the PR does, not just
+made it pass, check its title and body as `ship` step 7 does.
 
 ## Boundaries
 
