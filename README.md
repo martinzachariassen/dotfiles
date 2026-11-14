@@ -10,6 +10,8 @@
 <p align="center">
   <a href="#quick-start"><b>Quick start</b></a>
   &nbsp;·&nbsp;
+  <a href="#commands"><b>Commands</b></a>
+  &nbsp;·&nbsp;
   <a href="#modules"><b>Modules</b></a>
   &nbsp;·&nbsp;
   <a href="#documentation"><b>Documentation</b></a>
@@ -17,13 +19,13 @@
   <a href="docs/uninstall.md"><b>Uninstall</b></a>
 </p>
 
-Homebrew packages, config files symlinked into `$HOME`, and the few macOS
-settings that are not files at all, described in one repo. `dot apply` makes a
-machine match it, and `dot doctor` tells you, without changing anything,
-whether it still does.
+One Mac described as code: Homebrew packages, config files symlinked into
+`$HOME`, and the few macOS settings that are not files at all. `dot apply` makes
+a machine match the repo, and `dot doctor` tells you, without changing
+anything, whether it still does.
 
-This is my own setup. It is public so you can read it, borrow from it, or fork
-it and make it yours.
+It is my own setup, kept public so you can read it, borrow from it, or fork it
+and make it yours.
 
 ## Quick start
 
@@ -45,6 +47,7 @@ From then on, `dot apply` applies it.
 
 **3. Check the result.** `dot doctor` should end with *Everything looks right.*
 
+> [!IMPORTANT]
 > **Forking it?** Edit the `[user]` table in [`profiles.toml`](profiles.toml)
 > first. The wizard copies that name, noreply email and public signing key into
 > your config without asking, so a fork run as-is authors commits as Martin and
@@ -94,7 +97,12 @@ happens: `→ install  cask discord`, then a live bar with speed and time left,
 then `✓ installed  cask discord (118 MB)`. A real run ends on `Done` and the
 same checks `dot doctor` runs.
 
-`dot doctor` on a machine that is missing one cask and has one stale link:
+<details>
+<summary><strong>What a problem looks like</strong></summary>
+
+`dot doctor` on a machine that is missing one cask and has one stale link. A
+healthy module stays one line; a broken one expands, and the result repeats
+what needs attention.
 
 ```
 ── Checking ────────────────────────────────────────────── core + 10 modules
@@ -125,13 +133,18 @@ same checks `dot doctor` runs.
     Every check, including the ones that passed: dot doctor --verbose
 ```
 
-Two promises hold the rest together:
+</details>
+
+## Guarantees
 
 - **Nothing deletes a real file.** A file in the way is moved to
   `~/.local/state/dotfiles/backups/`, and that tree is never removed.
 - **Dry run and real run print the same words.** `--dry-run` is the real code
   path with every mutating step turned into a `printf`, so the preview is what
   happens.
+- **Re-running is safe, and quiet.** Every step compares before it writes, so a
+  module with nothing to do is one line and a second `dot apply` ends on
+  `none -- this Mac already matches the repo`.
 
 ## Commands
 
@@ -148,10 +161,8 @@ dot doctor --verbose   The same, including every check that passed
 dot <command> --help   One command in full; dot --help lists the modules
 ```
 
-`add` and `remove` take `--dry-run` too. Re-running `dot apply` is safe and
-expected: a module with nothing to do is one line, and a second run ends on
-`none -- this Mac already matches the repo`. While brew downloads a cask, a
-live line shows its progress and the time left; `DOT_PROGRESS=0` turns it off.
+`add` and `remove` take `--dry-run` too. While brew downloads a cask, a live
+line shows its progress and the time left; `DOT_PROGRESS=0` turns it off.
 
 <details>
 <summary><strong>Updating</strong></summary>
@@ -161,9 +172,12 @@ dot apply --pull
 ```
 
 It refuses over uncommitted changes and only fast-forwards, then hands over to
-the `dot` it just pulled. This updates the *configuration*, not the packages. `apply` runs `brew bundle
---no-upgrade`, so a package a Brewfile gained arrives and a newer version of one
-you already have does not. Upgrading is `brew upgrade`, on your schedule.
+the `dot` it just pulled.
+
+This updates the *configuration*, not the packages. `apply` runs
+`brew bundle --no-upgrade`, so a package a Brewfile gained arrives and a newer
+version of one you already have does not. Upgrading is `brew upgrade`, on your
+schedule.
 
 </details>
 
@@ -211,7 +225,8 @@ A Brewfile and nothing else: tools this repo installs but does not configure.
 | `work-apps` | what an employer's machine needs: Intune, Office, Teams, Slack |
 | `dotfiles-dev` | the toolchain `make check` runs, for a machine you develop *this repo* on |
 
-> **Heads up:** [`macos-defaults`](modules/macos-defaults/README.md) is the one
+> [!WARNING]
+> [`macos-defaults`](modules/macos-defaults/README.md) is the one
 > module nothing can undo. The old values were never read, so they exist
 > nowhere, and removing the module names the settings it wrote rather than
 > putting them back.
