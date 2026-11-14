@@ -287,7 +287,7 @@ EOF
   local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
   ! grep -q $'\033' "$log"
-  grep -q 'Summary' "$log"
+  grep -q 'Done' "$log"
 }
 
 @test "a transcript keeps the lines of the run that died" {

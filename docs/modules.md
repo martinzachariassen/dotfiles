@@ -41,7 +41,8 @@ writing the one line of `module.toml`.
   package are never split across two modules, so a module is never
   half-enabled.
 - **Package sets** are a Brewfile and nothing else. Their `description` starts
-  with `Packages:`, and `dot apply` labels them `packages only` as it goes.
+  with `Packages:`, and `dot apply` shows them as one line counting their
+  packages.
 
 The split is descriptive, not enforced — the shapes are identical to the driver
 and differ only to the reader — so it is only true while the directory says so.
@@ -115,6 +116,11 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 - **Honour `DOT_DRY_RUN`, or a preview becomes a run.** Gate on it and `exit 0`
   before the first write, or write through a helper that gates for you
   (`fs_link`, `fs_unlink`, `fs_discard`).
+- **Announce a change only when there is one.** Compare first, then `info` and
+  write; when nothing differs, say so with `ok`. The `ok` messages are what a
+  module's one line shows during `dot apply`, so make them short facts
+  (`shim current`, `45 keys already set`). A hook that announces on every run
+  opens its group on every run.
 - Warn-only hooks exit `DOT_STATUS_WARN`. Never `|| true`.
 - **`doctor.sh` never writes.** `colima status` creates `~/.colima` just by
   being asked, and `mise ls` creates two directories under `~/.local`; both

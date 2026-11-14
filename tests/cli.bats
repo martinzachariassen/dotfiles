@@ -13,11 +13,36 @@ dot() { run "$DOT_ROOT/bin/dot" "$@"; }
   [[ $output == *"usage: dot"* ]]
 }
 
-@test "cli: an unknown command exits 1 and shows the usage" {
+@test "cli: an unknown command exits 1 and points at the help" {
   dot frobnicate
   [ "$status" -eq 1 ]
-  [[ $output == *"unknown command frobnicate"* ]]
-  [[ $output == *"usage: dot"* ]]
+  [[ $output == *"unknown command 'frobnicate'"* ]]
+  [[ $output == *"dot --help"* ]]
+}
+
+@test "cli: every verb answers --help without acting" {
+  local verb
+  for verb in apply add remove config doctor; do
+    dot "$verb" --help
+    [ "$status" -eq 0 ]
+    [[ $output == *"dot $verb"* ]]
+  done
+  [ ! -d "$DOT_STATE/logs" ]
+  [ ! -e "$DOT_CONFIG" ]
+}
+
+@test "cli: help names a verb's page too" {
+  dot help doctor
+  [ "$status" -eq 0 ]
+  [[ $output == *"read-only"* ]]
+}
+
+@test "cli: the usage lists the modules and which are enabled" {
+  config_generate "A" "a@b.c" "git"
+  dot --help
+  [ "$status" -eq 0 ]
+  [[ $output == *"1 of $(modules_all | grep -c .) enabled"* ]]
+  [[ $output == *"$(module_desc git)"* ]]
 }
 
 @test "apply: a mistyped --dry-run is refused, not ignored" {
@@ -61,7 +86,7 @@ pull_apply() {
   pull_apply --pull
   [ "$status" -eq 0 ]
   [[ $output == *"pulling"* ]]
-  [[ $output == *"Summary"* ]]
+  [[ $output == *"Done"* ]]
   [ "$(grep -c 'pull --ff-only' "$DOT_TMP/git-calls")" -eq 1 ]
 }
 
@@ -103,16 +128,25 @@ pull_apply() {
   dot apply --dry-run
   [ "$status" -eq 0 ]
   [[ $output == *"$DOT_CONFIG"* ]]
-  [[ $output == *"dry run -- nothing will be changed"* ]]
+  [[ $output == *"DRY RUN -- nothing will change"* ]]
 }
 
-@test "apply: module headings say how many are left" {
+@test "apply: says what it read and checked before the first write" {
   config_generate "A" "a@b.c" "git"
 
   dot apply --dry-run
   [ "$status" -eq 0 ]
-  [[ $output == *"[1/1]"* ]]
-  says modules "1 applied"
+  [[ $output == *"config parses"*"1 module known"*"hooks parse"* ]]
+}
+
+@test "apply: a dry run ends with the changes it would make, counted" {
+  config_generate "A" "a@b.c" "git"
+
+  dot apply --dry-run
+  [ "$status" -eq 0 ]
+  [[ $output == *"Plan"* ]]
+  [[ $output =~ [0-9]+\ changes?\ +.*written ]]
+  [[ $output == *"To make these changes: dot apply"* ]]
 }
 
 @test "apply: a real run leaves a transcript and names it" {
@@ -126,8 +160,8 @@ pull_apply() {
 
   local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
-  [[ $(cat "$log") == *"Core packages"* ]]
-  [[ $(cat "$log") == *"Summary"* ]]
+  [[ $(cat "$log") == *"packages"* ]]
+  [[ $(cat "$log") == *"Done"* ]]
   [[ $output == *"-apply.log"* ]]
 }
 
@@ -285,8 +319,7 @@ EOF
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" DOT_RUN_ID=second \
     "$DOT_ROOT/bin/dot" apply
   [[ $output != *problem* ]]
-  [[ $output == *unchanged* ]]
-  [[ $output != *"linked,"* ]]
+  [[ $output == *"none -- this Mac already matches the repo"* ]]
 
   local after_second
   after_second=$(home_snapshot)
@@ -384,8 +417,8 @@ EOF
 
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
-  says orphans "none"
-  says dot 'installed'
+  [[ $output == *"Checking"* ]]
+  [[ $output == *"1 of 1 clean"* ]]
 }
 
 @test "apply: a machine the checks reject does not report success" {
@@ -494,7 +527,7 @@ staged_git() {
   staged_git
 
   run "$DOT_ROOT/bin/dot" remove git
-  says packages 'stay installed. Removing those is `brew uninstall`, yours to run.'
+  [[ $output == *'Packages stay installed. Removing those is `brew uninstall`'* ]]
 }
 
 @test "remove: a module already out of the list is still swept" {

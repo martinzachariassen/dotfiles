@@ -61,30 +61,35 @@ From then on, `dot apply` applies it.
 | **Reports drift** | `dot doctor` is read-only. A healthy module is one line; a broken one expands to say what. It also names packages installed by hand that no `Brewfile` would put on your next machine. |
 | **Takes it back** | [`uninstall.sh`](docs/uninstall.md) removes what the repo added and never a file of yours. |
 
-A healthy machine looks like this:
+`dot doctor` on a machine that is missing one cask and has one stale link:
 
 ```
-── Checking ─────────────────────────────────────────────── core + 9 modules
-  ✓ core           the repo, the shim, the config
-  ✓ apps           GUI apps and fonts as casks, plus an opened-once check
-  ✓ claude-code    Claude Code CLI and its status line
-  ✓ cmux           cmux terminal config -- Option key stays native macOS input
-  ✓ containers     Docker via colima (a Linux VM, no Docker Desktop)
-  ✓ dev-cli        Development CLI tools, plus mise-managed language runtimes
-  ✓ git            Git config, aliases, and a machine-local include
-  ✓ macos-defaults macOS preferences: Dock, Finder, input, screenshots
-  ✓ ssh            SSH client config; keys come from the 1Password agent
-  ✓ zsh            zsh with XDG layout, aliases, PATH and prompt
-  ✓ orphans        none
-  → unmanaged      4 packages no Brewfile names
-        Formula fd
-        Formula goreleaser
-        Formula poppler
+── Checking ────────────────────────────────────────────── core + 10 modules
+  ✓ core           packages · xcode · homebrew · dot · PATH · config · repo
+  ✗ apps           GUI apps and fonts as casks, plus an opened-once check
+      ✗ packages     Cask discord is not installed -- run: dot apply
+  ✓ claude-code    packages · files · settings · auth
+  ✓ cmux           packages · files
+  ✓ containers     packages · files · colima · DOCKER_HOST
+  ✓ dev-cli        packages · files · runtimes · gh · gcloud
+  ✓ dotfiles-dev   packages
+  ✓ git            packages · files
+  ✓ macos-defaults defaults · filevault · firewall · updates · browser
+  ✓ ssh            packages · files
+  ✓ zsh            packages · files · op
+  ▲ orphans        unclaimed -- no module ships these any more:
+        ~/.claude/skills/dotfiles-test/SKILL.md
+        rm them; there is nothing else to undo.
+  → unmanaged      2 packages no Brewfile names
+        Formula firebase-cli
         Cask curseforge
         add one to a module Brewfile and the next machine gets it too.
 
 ── Result ──────────────────────────────────────────────────────────────────
-  ✓ Everything looks right.
+  ✗ 1 problem, 1 warning
+      ✗ apps           packages: Cask discord is not installed -- run: dot apply
+  ✓ 10 modules clean
+    Every check, including the ones that passed: dot doctor --verbose
 ```
 
 Two promises hold the rest together:
@@ -107,10 +112,13 @@ dot config             Open the config file in $EDITOR
 dot config --init      Create it for the first time (runs the wizard)
 dot doctor             Check this machine; read-only
 dot doctor --verbose   The same, including every check that passed
+dot <command> --help   One command in full; dot --help lists the modules
 ```
 
 `add` and `remove` take `--dry-run` too. Re-running `dot apply` is safe and
-expected.
+expected: a module with nothing to do is one line, and a second run ends on
+`none -- this Mac already matches the repo`. While brew downloads a cask, a
+live line shows its progress and the time left; `DOT_PROGRESS=0` turns it off.
 
 <details>
 <summary><strong>Updating</strong></summary>

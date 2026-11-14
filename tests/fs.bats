@@ -74,7 +74,7 @@ teardown() { teardown_sandbox; }
   DOT_N_LINKED=0 DOT_N_UNCHANGED=0
   run fs_link_tree "$m"
 
-  [[ $output == *"all 1 already linked"* ]]
+  says files "1 link"
 
   DOT_N_LINKED=0 DOT_N_UNCHANGED=0
   fs_link_tree "$m"
@@ -93,7 +93,7 @@ teardown() { teardown_sandbox; }
   run fs_link_tree "$m"
 
   says link "~/.gitconfig"
-  [[ $output != *"already linked"* ]]
+  [[ $output != *files* ]]
 }
 
 @test "link: a real file is moved to the backup tree, not overwritten" {
@@ -186,7 +186,6 @@ EOF
   fs_link_tree "$m"
   run fs_report
 
-  [[ $output == *"1 backed up"* ]]
   says backups "${DOT_STATE/#$HOME/\~}/backups/$DOT_RUN_ID"
 }
 
@@ -396,23 +395,9 @@ EOF
   [ -z "$output" ]
 }
 
-@test "report: several tallies are joined with a comma AND a space" {
-  DOT_N_LINKED=3
-  DOT_N_BACKED_UP=2
+@test "report: a run that moved nothing aside says nothing" {
   run fs_report
-  [[ $output == *"3 linked, 2 backed up"* ]]
-}
-
-@test "report: a single tally gets no separator" {
-  DOT_N_LINKED=1
-  run fs_report
-  [[ $output == *"1 linked"* ]]
-  [[ $output != *","* ]]
-}
-
-@test "report: nothing done says so" {
-  run fs_report
-  says files "none to link"
+  [ -z "$output" ]
 }
 
 @test "pairs: Finder's metadata is not a file this repo links" {

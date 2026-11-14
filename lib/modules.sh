@@ -65,13 +65,17 @@ modules_all_dirs() {
   done < <(modules_all)
 }
 
+DOT_HOOKS_PARSED=0
+
 modules_preflight() {
   local dir hook script
   local -a bad=()
+  DOT_HOOKS_PARSED=0
   while IFS= read -r dir; do
     for hook in apply.sh doctor.sh remove.sh; do
       script="$dir/$hook"
       [[ -f $script ]] || continue
+      DOT_HOOKS_PARSED=$((DOT_HOOKS_PARSED + 1))
       "$BASH" -n "$script" || bad+=("${script#"$DOT_ROOT"/}")
     done
   done < <(
@@ -98,10 +102,6 @@ module_run_hook() {
 module_apply() {
   local name=$1 dir packaged=1
   dir=$(modules_dir "$name")
-
-  if [[ ! -d $dir/home && ! -f $dir/apply.sh ]]; then
-    dim 'packages only -- nothing to link, no hook to run'
-  fi
 
   brew_bundle "$dir/Brewfile" "$name" || packaged=0
 
