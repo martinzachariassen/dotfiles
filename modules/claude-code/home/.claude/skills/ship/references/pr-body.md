@@ -8,10 +8,18 @@ Use this only when the repo has no pull request template.
   just the first commit.
 - **One concern per PR.** If step 5 had to split unrelated commits, say so in
   the plan and suggest separate PRs instead of papering over it here.
+- **Lead with why.** The first sentence says what problem this solves or what
+  changes for whoever uses the code; the bullets after it say how. A reviewer
+  who reads only that sentence should know whether the PR matters to them.
 - Written for a reviewer with no context: what changed, why, how it was
   verified, what could go wrong. Scannable, factual, no filler, no marketing,
   no restating the title as a sentence.
-- Drop a section that has nothing to say, rather than writing "N/A".
+- Name files, functions and commands in backticks. Do not list the changed
+  files -- the diff does that.
+- Summary and Testing are always there. Drop any other section that has
+  nothing to say, rather than writing "N/A".
+- **Never leave a placeholder in the body.** Anything only the user can supply,
+  such as a screenshot, is raised in the step 9 plan, not left in the PR.
 - Only link issues you actually know about. Never guess a number.
 
 ## Sections
@@ -19,41 +27,58 @@ Use this only when the repo has no pull request template.
 ```markdown
 ## Summary
 
-- <what changed and why, 1-3 bullets>
+<one or two sentences: the problem, and what changes for whoever uses this>
 
-## Test plan
+- <what changed, 1-4 bullets, most important first>
 
-- [x] `<exact command that ran>` -- passes
+## Testing
+
+<what ran and its result, as a sentence: "`make check` passes.">
+
 - [ ] <manual step for the reviewer, if any>
+
+## Review notes
+
+<optional: where to start reading, a deliberate choice that may look wrong,
+what was left out on purpose>
 
 ## Risk
 
-<breaking change, migration, config/infra change, rollback path -- or drop it>
+<optional: breaking change, migration, config or infra change -- and how to
+roll it back>
 
-## Screenshots
+## Output
 
-<only for user-visible or CLI-visible output; a placeholder the user fills in
-if you cannot produce one>
+<optional: for CLI-visible changes, a real run inside <details>; for UI
+changes, a screenshot>
 
 Closes #<n>
 ```
 
 `Closes #n` / `Fixes #n` goes on its own line at the end, so GitHub links and
-closes the issue on merge.
+closes the issue on merge. Leave it out when there is no known issue.
 
 ## Example
 
 ```markdown
 ## Summary
 
-- Measure the status line after the model name is filled in, so long model
-  names no longer push the git branch off the line.
+Long model names pushed the git branch off the end of the status line, so the
+branch was invisible exactly when it mattered most.
+
+- Measure the line after the model name is filled in, not before.
 - Add a test with a 40-character model name.
 
-## Test plan
+## Testing
 
-- [x] `make check` -- passes
+`make check` passes, including the new test.
+
 - [ ] Open Claude Code in a repo on a long branch and check the line by eye
+
+## Review notes
+
+The width calculation in `statusline.sh` is the only real change; the rest is
+the test.
 
 Closes #42
 ```
