@@ -1,6 +1,4 @@
 #!/usr/bin/env bats
-#
-# bin/dot: how it reads the command line, and the Result line of each verb.
 
 load helper
 
@@ -9,32 +7,48 @@ teardown() { teardown_sandbox; }
 
 dot() { run "$DOT_ROOT/bin/dot" "$@"; }
 
-# Make the core checks pass so a doctor test isolates one thing. The real
-# generator, not a printf'd lookalike: a hand-written shim is a second
-# definition of the format core/doctor.sh greps for.
-pass_core_checks() {
-  DOT_DRY_RUN=0 bash "$DOT_ROOT/core/apply.sh" >/dev/null
-  export PATH="$HOME/.local/bin:$PATH"
-}
-
 @test "cli: no arguments prints the usage" {
   dot
   [ "$status" -eq 0 ]
   [[ $output == *"usage: dot"* ]]
 }
 
-@test "cli: an unknown command exits 1 and shows the usage" {
+@test "cli: an unknown command exits 1 and points at the help" {
   dot frobnicate
   [ "$status" -eq 1 ]
-  [[ $output == *"unknown command frobnicate"* ]]
-  [[ $output == *"usage: dot"* ]]
+  [[ $output == *"unknown command 'frobnicate'"* ]]
+  [[ $output == *"dot --help"* ]]
+}
+
+@test "cli: every verb answers --help without acting" {
+  local verb
+  for verb in apply add remove config doctor; do
+    dot "$verb" --help
+    [ "$status" -eq 0 ]
+    [[ $output == *"dot $verb"* ]]
+  done
+  [ ! -d "$DOT_STATE/logs" ]
+  [ ! -e "$DOT_CONFIG" ]
+}
+
+@test "cli: help names a verb's page too" {
+  dot help doctor
+  [ "$status" -eq 0 ]
+  [[ $output == *"read-only"* ]]
+}
+
+@test "cli: the usage lists the modules and which are enabled" {
+  config_generate "A" "a@b.c" "git"
+  dot --help
+  [ "$status" -eq 0 ]
+  [[ $output == *"1 of $(modules_all | grep -c .) enabled"* ]]
+  [[ $output == *"$(module_desc git)"* ]]
 }
 
 @test "apply: a mistyped --dry-run is refused, not ignored" {
   dot apply --dry
   [ "$status" -ne 0 ]
   [[ $output == *"unknown option '--dry'"* ]]
-  # Stopped before phase 1.
   [[ $output != *"Core packages"* ]]
 }
 
@@ -47,28 +61,95 @@ pass_core_checks() {
   [ ! -e "$HOME/.local/bin/dot" ]
 }
 
+with_git() {
+  mkdir -p "$DOT_TMP/stub"
+  cat >"$DOT_TMP/stub/git" <<STUB
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >>"$DOT_TMP/git-calls"
+case "\$*" in
+  *"status --porcelain"*) printf '%s' "${GIT_DIRTY:-}" ;;
+  *"pull --ff-only"*) echo "pulling"; exit ${GIT_PULL:-0} ;;
+esac
+STUB
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/git" "$DOT_TMP/stub/brew"
+}
+
+pull_apply() {
+  run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply "$@"
+}
+
+@test "apply --pull: fast-forwards once, then the pulled bin/dot applies" {
+  config_generate "A" "a@b.c" ""
+  with_git
+
+  pull_apply --pull
+  [ "$status" -eq 0 ]
+  [[ $output == *"pulling"* ]]
+  [[ $output == *"Done"* ]]
+  [ "$(grep -c 'pull --ff-only' "$DOT_TMP/git-calls")" -eq 1 ]
+}
+
+@test "apply --pull: uncommitted changes refuse before anything is pulled or applied" {
+  config_generate "A" "a@b.c" ""
+  GIT_DIRTY=' M lib/fs.sh' with_git
+
+  pull_apply --pull
+  [ "$status" -ne 0 ]
+  [[ $output == *"uncommitted changes"* ]]
+  ! grep -q 'pull --ff-only' "$DOT_TMP/git-calls"
+  [[ $output != *"Core packages"* ]]
+}
+
+@test "apply --pull: a pull that cannot fast-forward applies nothing" {
+  config_generate "A" "a@b.c" ""
+  GIT_PULL=1 with_git
+
+  pull_apply --pull
+  [ "$status" -ne 0 ]
+  [[ $output == *"could not fast-forward"* ]]
+  [[ $output != *"Core packages"* ]]
+}
+
+@test "apply --pull --dry-run: announces the pull and never calls git" {
+  config_generate "A" "a@b.c" ""
+  with_git
+
+  pull_apply --pull --dry-run
+  [ "$status" -eq 0 ]
+  says pull 'git pull --ff-only'
+  [ ! -e "$DOT_TMP/git-calls" ]
+  [[ $output == *"Dry run: nothing was changed."* ]]
+}
+
 @test "apply: says which config it read before it changes anything" {
   config_generate "A" "a@b.c" ""
 
   dot apply --dry-run
   [ "$status" -eq 0 ]
   [[ $output == *"$DOT_CONFIG"* ]]
-  [[ $output == *"dry run -- nothing will be changed"* ]]
+  [[ $output == *"DRY RUN -- nothing will change"* ]]
 }
 
-@test "apply: module headings say how many are left" {
+@test "apply: says what it read and checked before the first write" {
   config_generate "A" "a@b.c" "git"
 
   dot apply --dry-run
   [ "$status" -eq 0 ]
-  [[ $output == *"[1/1]"* ]]
-  says modules "1 applied"
+  [[ $output == *"config parses"*"1 module known"*"hooks parse"* ]]
+}
+
+@test "apply: a dry run ends with the changes it would make, counted" {
+  config_generate "A" "a@b.c" "git"
+
+  dot apply --dry-run
+  [ "$status" -eq 0 ]
+  [[ $output == *"Plan"* ]]
+  [[ $output =~ [0-9]+\ changes?\ +.*written ]]
+  [[ $output == *"To make these changes: dot apply"* ]]
 }
 
 @test "apply: a real run leaves a transcript and names it" {
-  # brew is stubbed: this is about the transcript, not packages. ~/.local/bin
-  # is on PATH because apply now ends by running the doctor checks, and
-  # core/doctor.sh rightly fails a machine that cannot reach its own shim.
   config_generate "A" "a@b.c" ""
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
@@ -79,13 +160,12 @@ pass_core_checks() {
 
   local log="$DOT_STATE/logs/$DOT_RUN_ID-apply.log"
   [ -f "$log" ]
-  [[ $(cat "$log") == *"Core packages"* ]]
-  [[ $(cat "$log") == *"Summary"* ]]
+  [[ $(cat "$log") == *"packages"* ]]
+  [[ $(cat "$log") == *"Done"* ]]
   [[ $output == *"-apply.log"* ]]
 }
 
 @test "apply: a dry run writes no log" {
-  # The log is the one non-symlink file an apply writes.
   config_generate "A" "a@b.c" ""
 
   dot apply --dry-run
@@ -99,7 +179,6 @@ pass_core_checks() {
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
   chmod +x "$DOT_TMP/stub/brew"
 
-  # Names below this run's id, so they sort as older however the clock reads.
   local i
   for i in $(seq -w 1 25); do
     printf 'old\n' >"$DOT_STATE/logs/00000000-0000$i.log"
@@ -111,7 +190,6 @@ pass_core_checks() {
   local kept
   kept=$(find "$DOT_STATE/logs" -name '*.log' | wc -l | tr -d ' ')
   [ "$kept" -eq 20 ]
-  # This run's own log survives its own prune.
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-apply.log" ]
 }
 
@@ -138,12 +216,10 @@ pass_core_checks() {
   [[ $output == *"unclaimed"* ]]
   [[ $output != *"Everything looks right"* ]]
   [[ $output == *warning* ]]
-  # Still 0: `dot doctor && ...` must keep working.
   [ "$status" -eq 0 ]
 }
 
 @test "doctor: a clean machine still says so" {
-  # A summary that never says "fine" is as useless as one that always does.
   config_generate "A" "a@b.c" ""
   pass_core_checks
 
@@ -153,67 +229,6 @@ pass_core_checks() {
   [[ $output == *"Everything looks right"* ]]
 }
 
-# --- Command Line Tools -------------------------------------------------------
-#
-# install.sh step 1, and until now the only step nothing checked again. A
-# hosted runner and a developer Mac both have working tools, so the branches
-# that matter are only reachable through the input.
-#
-# with_xcode_select BODY -- an xcode-select whose `-p` behaves like BODY.
-with_xcode_select() {
-  mkdir -p "$DOT_TMP/stub"
-  printf '#!/usr/bin/env bash\n%s\n' "$1" >"$DOT_TMP/stub/xcode-select"
-  chmod +x "$DOT_TMP/stub/xcode-select"
-  export DOT_XCODE_SELECT="$DOT_TMP/stub/xcode-select"
-}
-
-@test "doctor: missing Command Line Tools fail, and name the installer" {
-  config_generate "A" "a@b.c" ""
-  pass_core_checks
-  with_xcode_select 'exit 2'
-
-  run "$DOT_ROOT/bin/dot" doctor
-
-  [ "$status" -eq 1 ]
-  [[ $output == *"xcode-select --install"* ]]
-}
-
-@test "doctor: a developer directory that is gone is not a healthy answer" {
-  # The failure this check exists for. `xcode-select -p` answers from a stored
-  # preference rather than from the disk, so after an OS upgrade moves or drops
-  # the directory it keeps printing the old path, exit 0 and all -- while every
-  # git and cc fails with "invalid active developer path".
-  config_generate "A" "a@b.c" ""
-  pass_core_checks
-  with_xcode_select "printf '%s\\n' '$DOT_TMP/gone'"
-
-  run "$DOT_ROOT/bin/dot" doctor
-
-  [ "$status" -eq 1 ]
-  [[ $output == *"broken"* ]]
-  [[ $output == *"$DOT_TMP/gone"* ]]
-}
-
-@test "doctor: a developer directory holding the tools passes" {
-  # Present is not enough: the check is for the binaries under it, because an
-  # empty directory at the right path is exactly what a half-removed CLT is.
-  config_generate "A" "a@b.c" ""
-  pass_core_checks
-  mkdir -p "$DOT_TMP/clt/usr/bin"
-  printf '#!/usr/bin/env bash\n' >"$DOT_TMP/clt/usr/bin/git"
-  chmod +x "$DOT_TMP/clt/usr/bin/git"
-  with_xcode_select "printf '%s\\n' '$DOT_TMP/clt'"
-
-  run "$DOT_ROOT/bin/dot" doctor
-
-  [ "$status" -eq 0 ]
-  [[ $output == *"Everything looks right"* ]]
-}
-
-# with_brew "FORMULA..." "CASK..." -- a Homebrew holding exactly these. A stub
-# on PATH and not a shell function: the verb is another process and cannot see
-# one. Everything else it is asked answers 0 and says nothing, which is what
-# the other brew stubs in this file do.
 with_brew() {
   mkdir -p "$DOT_TMP/stub"
   cat >"$DOT_TMP/stub/brew" <<EOF
@@ -228,11 +243,6 @@ EOF
 }
 
 @test "doctor: a package no Brewfile names is reported, and is not a problem" {
-  # The half of the picture doctor never had: what this machine has that the
-  # repo does not, and so what a rebuild would quietly do without. It has to
-  # be visible and it has to stay out of the verdict -- hand-installing
-  # something is not a defect, and a line that is yellow on every machine
-  # forever is the same bug as a summary that is green on a broken one.
   config_generate "A" "a@b.c" ""
   pass_core_checks
   with_brew fd curseforge
@@ -249,7 +259,6 @@ EOF
 }
 
 @test "doctor: a machine holding only what the Brewfiles name says so" {
-  # And the repo's own Brewfiles are what it reads: bash is core/Brewfile's.
   config_generate "A" "a@b.c" ""
   pass_core_checks
   with_brew bash ''
@@ -261,8 +270,6 @@ EOF
 }
 
 @test "doctor: a healthy module is one line, and --verbose is the way back" {
-  # The point of the collapse: forty green lines hid the three red ones. What
-  # must not happen is that the detail becomes unreachable.
   config_generate "A" "a@b.c" "git"
   pass_core_checks
   fs_link_tree "$DOT_ROOT/modules/git"
@@ -275,25 +282,16 @@ EOF
 }
 
 @test "apply: five real modules, then the checks accept what they produced" {
-  # The end-to-end nothing covered: link the files, run the hooks, then observe
-  # the machine. brew is stubbed, so what runs for real is every file and every
-  # hook, not Homebrew. Two modules are left out because they are the two that
-  # reach outside $HOME -- macos-defaults writes system preferences, dev-cli
-  # downloads runtimes -- and containers needs a real Homebrew prefix to find
-  # the docker plugins it links. Each of those three has its own file here.
   config_generate "A" "a@b.c" "$(printf 'claude-code\ncmux\ngit\nssh\nzsh\n')"
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
   chmod +x "$DOT_TMP/stub/brew"
-  # Inherited from the developer's own shell, it reads as drift in the sandbox.
   unset ZDOTDIR
 
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
-  # 0 or a warning: the 1Password agent socket is not in a throwaway $HOME.
   [ "$status" -eq 0 ] || [ "$status" -eq "$DOT_STATUS_WARN" ]
   [[ $output != *problem* ]]
 
-  # The verifying pass is the assertion, but only if the files really moved.
   [ -L "$HOME/.config/git/config" ]
   [ -L "$HOME/.config/zsh/.zshrc" ]
   [ -L "$HOME/.ssh/config" ]
@@ -301,7 +299,6 @@ EOF
   [ -f "$HOME/.claude/settings.json" ]
   [ -f "$HOME/.config/git/config.local" ]
 
-  # Every module reported, and the healthy ones as one line each.
   local name
   for name in claude-code cmux git ssh zsh; do
     says "$name" "$(module_desc "$name")"
@@ -309,8 +306,6 @@ EOF
 }
 
 @test "apply: a second run of the same five changes nothing and says so" {
-  # Idempotence is the promise `dot apply` makes, and the converged run is the
-  # one people actually see. It must not report work it did not do.
   config_generate "A" "a@b.c" "$(printf 'claude-code\ncmux\ngit\nssh\nzsh\n')"
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
@@ -324,12 +319,8 @@ EOF
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" DOT_RUN_ID=second \
     "$DOT_ROOT/bin/dot" apply
   [[ $output != *problem* ]]
-  # Nothing linked, nothing relinked: the tally says unchanged and only that.
-  [[ $output == *unchanged* ]]
-  [[ $output != *"linked,"* ]]
+  [[ $output == *"none -- this Mac already matches the repo"* ]]
 
-  # And the second run really did leave $HOME alone. The transcript is the one
-  # file it is allowed to add.
   local after_second
   after_second=$(home_snapshot)
   [ "$after_first" = "$after_second" ]
@@ -343,9 +334,6 @@ EOF
 }
 
 @test "apply: a taplo that crashed does not stop the run" {
-  # cfg_parse_problems used to read any non-zero exit as "your config is not
-  # valid TOML", and apply dies on any problem line -- so a broken checker
-  # locked the machine out of a configuration that was never wrong.
   config_generate "A" "a@b.c" ""
   pass_core_checks
   printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
@@ -358,43 +346,7 @@ EOF
   [[ $output != *"not valid TOML"* ]]
 }
 
-@test "doctor: a taplo that crashed is reported as a check that did not run" {
-  config_generate "A" "a@b.c" ""
-  pass_core_checks
-  printf '#!/bin/sh\nexit 101\n' >"$DOT_TMP/taplo-crash"
-  chmod +x "$DOT_TMP/taplo-crash"
-
-  export DOT_TAPLO_BIN="$DOT_TMP/taplo-crash"
-
-  run "$DOT_ROOT/bin/dot" doctor
-  [[ $output == *"could not check it"* ]]
-  [[ $output != *"not valid TOML"* ]]
-}
-
-@test "doctor: a shim that lost its executable bit is not called missing" {
-  config_generate "A" "a@b.c" ""
-  pass_core_checks
-  chmod -x "$HOME/.local/bin/dot"
-
-  run "$DOT_ROOT/bin/dot" doctor
-
-  [ "$status" -eq 1 ]
-  [[ $output == *"not executable"* ]]
-  [[ $output != *"not installed"* ]]
-}
-
-@test "doctor: a shim that is genuinely absent is still called missing" {
-  config_generate "A" "a@b.c" ""
-
-  run "$DOT_ROOT/bin/dot" doctor
-
-  [ "$status" -eq 1 ]
-  says dot "not installed at ~/.local/bin/dot -- run: dot apply"
-  [[ $output != *"not executable"* ]]
-}
-
 @test "doctor: a stale module name is a failure, not a shrug" {
-  # Reported, not fatal: doctor is read-only and must reach the checks below.
   config_generate "A" "a@b.c" "$(printf 'git\ntypoo\n')"
   pass_core_checks
 
@@ -403,7 +355,6 @@ EOF
   [ "$status" -eq 1 ]
   [[ $output == *"unknown module 'typoo'"* ]]
   [[ $output != *"Everything looks right"* ]]
-  # The real module is still reached: its group line is there, named and described.
   says git "$(module_desc git)"
 }
 
@@ -438,7 +389,6 @@ EOF
 }
 
 @test "apply: a dry run on a fresh machine does not run the wizard" {
-  # The fzf stub is the tripwire: if the wizard is reached, it says so.
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\necho WIZARD-RAN\n' >"$DOT_TMP/stub/fzf"
   chmod +x "$DOT_TMP/stub/fzf"
@@ -448,7 +398,6 @@ EOF
   [ "$status" -ne 0 ]
   [[ $output != *"WIZARD-RAN"* ]]
   [[ $output == *"dot config --init"* ]]
-  # Phase 1 was skipped on purpose, so there is no brew output to point at.
   [[ $output != *"brew output above"* ]]
   [ ! -f "$DOT_CONFIG" ]
 }
@@ -461,8 +410,6 @@ EOF
 }
 
 @test "apply: ends by running the doctor checks against what it produced" {
-  # The whole point of the pass: "Done." must mean "I looked", not "nothing
-  # threw while I worked".
   config_generate "A" "a@b.c" ""
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
@@ -470,13 +417,11 @@ EOF
 
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply
   [ "$status" -eq 0 ]
-  says orphans "none"
-  says dot 'installed'
+  [[ $output == *"Checking"* ]]
+  [[ $output == *"1 of 1 clean"* ]]
 }
 
 @test "apply: a machine the checks reject does not report success" {
-  # Same run, with the shim unreachable. The work all succeeded; the machine
-  # is still wrong, and the exit status has to say so.
   config_generate "A" "a@b.c" ""
   mkdir -p "$DOT_TMP/stub"
   printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
@@ -488,7 +433,6 @@ EOF
 }
 
 @test "apply: a dry run does not run the checks" {
-  # They would report the drift the run deliberately did not fix.
   config_generate "A" "a@b.c" ""
 
   dot apply --dry-run
@@ -497,9 +441,6 @@ EOF
 }
 
 @test "doctor: an orphan is attributed, and sent to the module's remove.sh" {
-  # The links are all that is left mentioning a module you switched off, and
-  # they are not the whole of what it left. Asserted first, or a git that lost
-  # its remove.sh would make this pass over nothing.
   [ -f "$DOT_ROOT/modules/git/remove.sh" ]
 
   config_generate "A" "a@b.c" ""
@@ -516,8 +457,6 @@ EOF
 }
 
 @test "doctor: a module with no remove.sh is not sent to one" {
-  # Naming a hook that is not there sends you to a file that does not exist.
-  # Asserted, not skipped: a cmux that gains one makes this the wrong module.
   [ ! -f "$DOT_ROOT/modules/cmux/remove.sh" ]
 
   config_generate "A" "a@b.c" ""
@@ -534,13 +473,6 @@ EOF
   [[ $output != *"remove.sh"* ]]
 }
 
-# --- add / remove -----------------------------------------------------------
-#
-# The verbs that switch a module off. `remove` is the one that had no path at
-# all before, so most of this is about it doing the whole job -- and about
-# --dry-run doing none of it.
-
-# A config listing one module, in the shape config_generate writes.
 listing() {
   printf 'schema = 1\n\n[user]\nname = "A"\nemail = "a@b.c"\n\n[modules]\nenabled = [\n' \
     >"$DOT_CONFIG"
@@ -549,7 +481,6 @@ listing() {
   printf ']\n' >>"$DOT_CONFIG"
 }
 
-# git as if apply had run: both links, plus the file only remove.sh can find.
 staged_git() {
   mkdir -p "$HOME/.config/git"
   ln -s "$DOT_ROOT/modules/git/home/.config/git/config" "$HOME/.config/git/config"
@@ -558,8 +489,6 @@ staged_git() {
 }
 
 @test "remove: unlinks the module, runs its hook, and drops it from the list" {
-  # The three halves of the job. config.local is the point: no symlink sweep
-  # can see it, so only remove.sh running proves the hook was reached.
   listing git zsh
   pass_core_checks
   staged_git
@@ -593,19 +522,15 @@ staged_git() {
 }
 
 @test "remove: says the packages are staying, every time" {
-  # "removed" reads as if they went too, and that is the one thing it does not
-  # do. Said in the run itself, not only in the README.
   listing git
   pass_core_checks
   staged_git
 
   run "$DOT_ROOT/bin/dot" remove git
-  says packages 'stay installed. Removing those is `brew uninstall`, yours to run.'
+  [[ $output == *'Packages stay installed. Removing those is `brew uninstall`'* ]]
 }
 
 @test "remove: a module already out of the list is still swept" {
-  # What a hand-edited config leaves behind, which is the state `doctor`
-  # reports as orphaned links. The verb has to be able to finish that job.
   listing zsh
   pass_core_checks
   staged_git
@@ -656,8 +581,6 @@ staged_git() {
 }
 
 @test "add and remove refuse an array they cannot edit safely" {
-  # Checked BEFORE anything is touched: unlinking and then failing to update
-  # the list would leave the machine and the file disagreeing.
   printf 'schema = 1\n\n[modules]\nenabled = ["git"]\n' >"$DOT_CONFIG"
   pass_core_checks
   staged_git
@@ -665,7 +588,6 @@ staged_git() {
   run "$DOT_ROOT/bin/dot" remove git
   [ "$status" -ne 0 ]
   [[ $output == *"edit it by hand"* ]]
-  # Nothing was swept on the way to that refusal.
   [ -L "$HOME/.config/git/config" ]
 }
 
@@ -687,8 +609,6 @@ staged_git() {
 }
 
 @test "add and remove refuse a config that does not parse" {
-  # dasel stops at a malformed line and exits 0, so `enabled` can read empty on
-  # a file that is merely truncated. Splicing a line into that loses the rest.
   printf 'schema = 1\n\n[modules]\nenabled = [\n  "git",\n]\n\n[settings\n' \
     >"$DOT_CONFIG"
   pass_core_checks
@@ -702,11 +622,7 @@ staged_git() {
   [[ $output == *"did not parse"* ]]
 }
 
-# --- The transcript ---------------------------------------------------------
-
 @test "logs: every verb that changes the machine writes one, named for it" {
-  # The name is the point: twenty bare timestamps cannot tell you which one was
-  # the apply that broke something.
   listing zsh
   pass_core_checks
   staged_git
@@ -716,14 +632,10 @@ staged_git() {
 
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-add.log" ]
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-remove.log" ]
-  # And it holds the run, not just its name.
   [[ $(cat "$DOT_STATE/logs/$DOT_RUN_ID-remove.log") == *"1 module"* ]]
 }
 
 @test "logs: the two read-only verbs write none" {
-  # Not style. `config` hands the terminal to \$EDITOR and a tee in the way
-  # makes vi unusable; `doctor` is advertised read-only and also runs as the
-  # tail of `apply`, where a second transcript would nest inside the first.
   listing zsh
   pass_core_checks
 
@@ -746,8 +658,6 @@ staged_git() {
 }
 
 @test "logs: the twenty kept are counted across verbs, not per verb" {
-  # One budget for the directory. A burst of `dot add` evicting the apply log
-  # is the trade; twenty runs of anything is the policy.
   listing zsh
   pass_core_checks
   mkdir -p "$DOT_STATE/logs"

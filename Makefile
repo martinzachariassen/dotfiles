@@ -1,16 +1,9 @@
-# Every check this repo runs. The commands live here and nowhere else, so a
-# workflow cannot grow a second copy free to disagree; contract.bats holds
-# that. Logic belongs in lib/, not here.
-#
-#   make check       lint, fmt-check, test (what CI runs)
-#   make fmt         rewrite files to the project's formatting
-#   make brew-audit  ask Homebrew whether the Brewfiles still resolve
-
-STATUSLINE := modules/claude-code/home/.claude/statusline.sh
+CLAUDE_SCRIPTS := modules/claude-code/home/.claude/statusline.sh \
+	modules/claude-code/home/.claude/hooks/git-guard.sh
 SHIPPED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh \
-	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh $(STATUSLINE)
+	modules/*/apply.sh modules/*/doctor.sh modules/*/remove.sh $(CLAUDE_SCRIPTS)
 FORMATTED := install.sh uninstall.sh bin/dot lib/*.sh core/*.sh modules/*/*.sh \
-	$(STATUSLINE) tests/helper.bash
+	$(CLAUDE_SCRIPTS) tests/helper.bash
 
 SHFMT_FLAGS := -i 2 -ci
 
@@ -34,8 +27,7 @@ test:
 	@echo "==> bats"
 	@bats tests/
 
-# Deliberately NOT part of `check`: it needs the network and its verdict
-# changes when Homebrew does. See docs/development.md.
+# Not part of `check`: it needs the network and its verdict changes with Homebrew.
 brew-audit:
 	@echo "==> brew audit"
 	@DOT_BREW_AUDIT=1 bats tests/brewfiles.bats

@@ -1,6 +1,2 @@
-# jq is named by dev-cli and dotfiles-dev too, on purpose: a module names what it
-# needs rather than inheriting it, since modules cannot depend on each other.
-# `brew bundle` is idempotent.
-
 cask "claude-code@latest"
-brew "jq" # every hook and statusline.sh parse JSON with it
+brew "jq"

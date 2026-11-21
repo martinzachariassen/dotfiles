@@ -12,5 +12,19 @@
   "spinnerTipsEnabled": false,
   "theme": "custom:catppuccin-latte",
   "inputNeededNotifEnabled": false,
-  "agentPushNotifEnabled": false
+  "agentPushNotifEnabled": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME\"/.claude/hooks/git-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

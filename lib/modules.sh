@@ -1,7 +1,4 @@
 # shellcheck shell=bash
-#
-# The module registry and the apply driver. The directory listing IS the
-# registry; tests/contract.bats walks the same glob and enforces the contract.
 
 modules_dir() { printf '%s\n' "$DOT_ROOT/modules/$1"; }
 module_manifest() { printf '%s\n' "$(modules_dir "$1")/module.toml"; }
@@ -18,9 +15,7 @@ module_exists() { [[ -f $(module_manifest "$1") ]]; }
 
 module_desc() { toml_get "$(module_manifest "$1")" 'description' "$1"; }
 
-# module_setting NAME KEY [DEFAULT] -- [settings.<name>].<key> from the user
-# config. Bracket syntax is mandatory: dasel parses `settings.macos-defaults`
-# as subtraction.
+# Bracket syntax, because dasel reads `settings.macos-defaults` as subtraction.
 module_setting() {
   local name=$1 key=$2 default=${3:-}
   cfg_get "settings[\"$name\"].$key" "$default"
@@ -30,9 +25,7 @@ module_setting_bool() {
   [[ $(module_setting "$1" "$2" "${3:-false}") == true ]]
 }
 
-# Enabled modules that exist, alphabetically. Silent by design: every caller
-# reads it in a subshell, so a warning here would print once per caller and no
-# cache could fix it. Complaining is modules_require_known's job, called once.
+# Silent: read in subshells, so a warning would print once per caller.
 modules_enabled() {
   local name
   while IFS= read -r name; do
@@ -47,8 +40,6 @@ modules_unknown() {
   done < <(cfg_list 'modules.enabled')
 }
 
-# A typo in a hand-edited config must be an error, not a run that reports
-# success having installed three modules out of four.
 modules_require_known() {
   local unknown available n
   unknown=$(modules_unknown | tr '\n' ' ')
@@ -74,17 +65,17 @@ modules_all_dirs() {
   done < <(modules_all)
 }
 
-# modules_preflight -- `bash -n` on every hook this run may execute, before
-# anything in $HOME is touched: otherwise a syntax error in modules/x/apply.sh
-# surfaces halfway through an apply that has already relinked. Core is included
-# for the same reason fs_orphans includes it: it runs like a module.
+DOT_HOOKS_PARSED=0
+
 modules_preflight() {
   local dir hook script
   local -a bad=()
+  DOT_HOOKS_PARSED=0
   while IFS= read -r dir; do
     for hook in apply.sh doctor.sh remove.sh; do
       script="$dir/$hook"
       [[ -f $script ]] || continue
+      DOT_HOOKS_PARSED=$((DOT_HOOKS_PARSED + 1))
       "$BASH" -n "$script" || bad+=("${script#"$DOT_ROOT"/}")
     done
   done < <(
@@ -98,8 +89,6 @@ modules_preflight() {
     reproduce "bash -n $DOT_ROOT/${bad[0]}"
 }
 
-# Hooks are EXECUTED, never sourced: nothing leaks back but an exit status,
-# and `bash modules/git/doctor.sh` reproduces exactly what the driver does.
 module_run_hook() {
   local name=$1 hook=$2 script
   script="$(modules_dir "$name")/$hook"
@@ -110,17 +99,10 @@ module_run_hook() {
     "$BASH" "$script"
 }
 
-# module_apply NAME -- packages, then links, then apply.sh. The order is the
-# one promise apply.sh gets: its packages are installed.
 module_apply() {
   local name=$1 dir packaged=1
   dir=$(modules_dir "$name")
 
-  if [[ ! -d $dir/home && ! -f $dir/apply.sh ]]; then
-    dim 'packages only -- nothing to link, no hook to run'
-  fi
-
-  # A failing Brewfile stops this module, not the run.
   brew_bundle "$dir/Brewfile" "$name" || packaged=0
 
   fs_link_tree "$dir"
@@ -132,8 +114,6 @@ module_apply() {
   fi
 }
 
-# module_doctor NAME -- read-only. Tallies its own failures rather than
-# returning a status, which a `|| true` at the call site could swallow.
 module_doctor() {
   local name=$1 dir tracked=''
   dir=$(modules_dir "$name")
@@ -142,8 +122,6 @@ module_doctor() {
     tracked=$(find "$dir/home" -type f -print -quit)
   fi
 
-  # Packages first, matching module_apply's order. Without this a package-set
-  # module's entire content is the one thing doctor never looks at.
   brew_check "$dir/Brewfile" "$name"
 
   if [[ -z $tracked && ! -f $dir/doctor.sh ]]; then
@@ -160,9 +138,6 @@ module_doctor() {
   fold_status "$name: doctor.sh reported problems" module_run_hook "$name" doctor.sh
 }
 
-# module_remove NAME -- for uninstall.sh, which calls it for EVERY module, not
-# just enabled ones. Exists for what the symlink sweep cannot see: links whose
-# target is outside the repo, and generated real files.
 module_remove() {
   fold_status "$1: remove.sh failed" module_run_hook "$1" remove.sh
 }

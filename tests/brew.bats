@@ -1,6 +1,4 @@
 #!/usr/bin/env bats
-#
-# lib/brew.sh. Nothing installs anything: brew_load and brew are stubbed.
 
 setup() {
   load helper
@@ -10,7 +8,6 @@ setup() {
 teardown() { teardown_sandbox; }
 
 @test "bundle: a module with no Brewfile is success, not failure" {
-  # A 1 here makes module_apply skip apply.sh with no error message.
   run brew_bundle "$DOT_TMP/nope/Brewfile" demo
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -34,21 +31,46 @@ teardown() { teardown_sandbox; }
   [[ $output == *demo* ]]
 }
 
-@test "bundle: a dry run announces the file and installs nothing" {
-  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+@test "bundle: a dry run names each package it would install, and installs none" {
+  printf 'brew "jq"\ncask "widget"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
-  brew() { printf 'BREW-WAS-CALLED\n'; }
+  brew() {
+    printf '%s\n' "$*" >>"$DOT_TMP/brew-calls"
+    printf 'Formula jq needs to be installed.\nCask widget needs to be installed.\n'
+    return 1
+  }
   export DOT_DRY_RUN=1
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 0 ]
-  [[ $output != *BREW-WAS-CALLED* ]]
-  [[ $output == *"brew bundle"* ]]
+  says install 'formula jq'
+  says install 'cask widget'
+  [ "$(grep -vc '^bundle check ' "$DOT_TMP/brew-calls")" -eq 0 ]
+}
+
+@test "bundle: a dry run with everything installed is one good line" {
+  printf 'brew "jq"\ncask "widget"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 0; }
+  export DOT_DRY_RUN=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says packages '2 packages'
+}
+
+@test "bundle: a dry run brew cannot answer names the file instead of guessing" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { return 1; }
+  export DOT_DRY_RUN=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  [[ $output == *"brew bundle --file"* ]]
 }
 
 @test "bundle: the label defaults to the module directory name" {
-  # $label must be a separate `local`: merged with $file, the default expands
-  # before $file is assigned (SC2318) and the name is silently empty.
   mkdir -p "$DOT_TMP/modules/widgets"
   printf 'brew "jq"\n' >"$DOT_TMP/modules/widgets/Brewfile"
   brew_load() { return 1; }
@@ -69,9 +91,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "bundle: brew's own output is kept, indented and out of the way" {
-  # It streams through a pipe now, so two things can go wrong at once: the
-  # output can be swallowed, and the failure can be lost because the pipeline's
-  # status is the last command's. Both are checked here.
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
   brew() {
@@ -82,16 +101,95 @@ teardown() { teardown_sandbox; }
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 1 ]
-  [[ $output == *"Using jq"* ]]
   [[ $output == *"a second line"* ]]
-  # Indented past this repo's own lines, so the eye can skip it.
-  [[ $output =~ ^[[:space:]]{4,}Using\ jq ]] ||
-    [[ $(grep 'Using jq' <<<"$output") =~ ^[[:space:]]{4,} ]]
+  [[ $(grep 'a second line' <<<"$output") =~ ^[[:space:]]{4,} ]]
+}
+
+@test "bundle: a package already installed is counted, not listed" {
+  printf 'brew "jq"\nbrew "fd"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Using jq\nUsing fd\n`brew bundle` complete! 2 Brewfile dependencies now installed.\n'; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says packages '2 packages'
+  [[ $output != *"Using"* ]]
+  [[ $output != *"complete!"* ]]
+}
+
+@test "bundle: each install is announced, then closed with its time" {
+  printf 'cask "widget"\nbrew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing widget\nInstalling jq\n'; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 0 ]
+  says install 'cask widget'
+  says install 'formula jq'
+  [[ $output =~ installed\ +cask\ widget\ +[0-9]+\.[0-9]s ]]
+  [[ $output =~ installed\ +formula\ jq\ +[0-9]+\.[0-9]s ]]
+  [[ $output != *"2 packages"* ]]
+}
+
+@test "bundle: an install brew reports as failed is a failure, by name" {
+  printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing jq\nInstalling jq has failed!\n'; return 1; }
+  brew_missing() { return 2; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  says packages 'formula jq did not install'
+  [[ $output != *"installed "*"formula jq"* ]]
+}
+
+@test "bundle: with no terminal, a silent install never draws a frame" {
+  printf 'cask "widget"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing widget\n'; }
+  export DOT_UI_RECORDS=1
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [[ $output != *$'\033[28m'* ]]
+}
+
+@test "cask size: read from the server's Content-Length, after redirects" {
+  brew() { printf '{"casks":[{"url":"https://example.invalid/widget.dmg"}]}\n'; }
+  printf '#!/usr/bin/env bash\nprintf "HTTP/2 302\\r\\ncontent-length: 0\\r\\n\\r\\nHTTP/2 200\\r\\nContent-Length: 1234\\r\\n\\r\\n"\n' >"$DOT_TMP/curl"
+  chmod +x "$DOT_TMP/curl"
+
+  DOT_CURL_BIN="$DOT_TMP/curl" run __brew_cask_size widget
+  [ "$output" = "1234" ]
+}
+
+@test "cask size: a URL brew will not give is 0, and no request is made" {
+  brew() { return 1; }
+  printf '#!/usr/bin/env bash\ntouch "%s"\n' "$DOT_TMP/curl-called" >"$DOT_TMP/curl"
+  chmod +x "$DOT_TMP/curl"
+
+  DOT_CURL_BIN="$DOT_TMP/curl" run __brew_cask_size widget
+  [ "$output" = "0" ]
+  [ ! -e "$DOT_TMP/curl-called" ]
+}
+
+@test "partial download: the newest .incomplete since the install began" {
+  mkdir -p "$DOT_TMP/dl"
+  head -c 10 /dev/zero >"$DOT_TMP/dl/old.incomplete"
+  touch -t 200001010000 "$DOT_TMP/dl/old.incomplete"
+  head -c 300 /dev/zero >"$DOT_TMP/dl/new.incomplete"
+  head -c 999 /dev/zero >"$DOT_TMP/dl/done.dmg"
+
+  run __brew_partial "$DOT_TMP/dl" $(($(date +%s) - 5))
+  [ "$output" = "300" ]
+}
+
+@test "partial download: nothing in flight is no answer, not zero" {
+  mkdir -p "$DOT_TMP/dl"
+  run __brew_partial "$DOT_TMP/dl" 0
+  [ -z "$output" ]
 }
 
 @test "bundle: a package still missing after a failure is named" {
-  # brew's own hundreds of lines are above by now, and "failed" alone is not
-  # something anyone can act on.
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
   brew() { return 1; }
@@ -115,12 +213,6 @@ teardown() { teardown_sandbox; }
   [[ $output == *"--no-upgrade"* ]]
 }
 
-# --- brew_missing -----------------------------------------------------------
-#
-# The three states are the whole point of this function, and 2 is the one that
-# matters: a check that could not run must never be read as "all installed", or
-# brew_check reports green on a machine with nothing on it.
-
 @test "missing: a module with no Brewfile is satisfied without asking brew" {
   brew() { printf 'BREW-WAS-CALLED\n'; }
 
@@ -132,9 +224,6 @@ teardown() { teardown_sandbox; }
 @test "missing: no Homebrew is 2 -- could not run, not 'nothing missing'" {
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
 
-  # No brew function and none on PATH: `command -v brew` is the guard. Narrowed
-  # inside a subshell, because an empty PATH leaking out takes `rm` from bats'
-  # own teardown with it. Nothing on this branch runs an external command.
   local status=0
   (
     PATH=
@@ -154,9 +243,6 @@ teardown() { teardown_sandbox; }
 
 @test "missing: every absent package is named, formula and cask alike" {
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
-  # brew's real wording, arrow included: the sed deliberately does not anchor
-  # on that glyph, because a C locale would make an anchored match find
-  # nothing and every package would silently read as installed.
   brew() {
     printf "brew bundle can't satisfy your Brewfile's dependencies.\n"
     printf '\xe2\x86\x92 Cask docker needs to be installed.\n'
@@ -173,9 +259,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "missing: a failure it cannot parse is 2, never a silent 0" {
-  # The hazard: brew fails for a reason that is not a missing package, the sed
-  # matches nothing, and an empty list reads as "all installed" unless the
-  # emptiness itself is turned back into 2.
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew() {
     printf 'Error: the Brewfile could not be read.\n'
@@ -188,8 +271,6 @@ teardown() { teardown_sandbox; }
 }
 
 @test "missing: the check never mutates the machine" {
-  # Recorded to a file, not printed: on the satisfied path brew_missing
-  # swallows brew's output, so stdout cannot answer what brew was asked.
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew() {
     printf 'auto-update=%s args=%s\n' \
@@ -207,11 +288,6 @@ teardown() { teardown_sandbox; }
   [[ $call == *"--no-upgrade"* ]]
 }
 
-# --- brew_bundle diagnostics ------------------------------------------------
-#
-# brew's own output is hundreds of lines above by the time the failure lands,
-# so "failed" alone is not something a user can act on.
-
 @test "bundle: a failed run names the packages that are still absent" {
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
@@ -223,14 +299,10 @@ teardown() { teardown_sandbox; }
 
   run brew_bundle "$DOT_TMP/Brewfile" demo
   [ "$status" -eq 1 ]
-  # `says`, not a literal: "still missing" is a label in the aligned column now,
-  # and how wide that column is belongs to lib/ui.sh rather than to this test.
   says 'still missing' 'Formula jq'
 }
 
 @test "bundle: a missing cask points at the one flag that fixes it" {
-  # A cask already in /Applications by hand is the common case, and --adopt is
-  # not something anyone guesses.
   printf 'cask "docker"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
   brew() { return 1; }
@@ -267,11 +339,6 @@ teardown() { teardown_sandbox; }
   [ "$status" -eq 1 ]
   [[ $output == *"could not say what is missing"* ]]
 }
-
-# --- brew_check -------------------------------------------------------------
-#
-# doctor's read-only half. Without it a half-installed module reports green:
-# doctor would be looking at nothing but symlinks.
 
 @test "check: a module with no Brewfile is silent, and not a failure" {
   run brew_check "$DOT_TMP/nope/Brewfile" demo
@@ -321,21 +388,10 @@ teardown() { teardown_sandbox; }
   [[ $output == *"Cask docker is not installed"* ]]
   [[ $output == *"dot apply"* ]]
 
-  # One failure per package, not one for the batch: the tally is the exit code.
   brew_check "$DOT_TMP/Brewfile" demo >/dev/null 2>&1
   [ "$DOT_FAILURES" -eq 2 ]
 }
 
-# --- brew_unmanaged ---------------------------------------------------------
-#
-# The only check in this repo that looks outward from the machine instead of
-# inward from the repo: what is installed here that a rebuild would not get.
-# Same three answers as brew_missing, and 2 matters for the same reason -- a
-# machine whose packages could not be listed must not read as fully written
-# down.
-
-# fixture_repo -- a DOT_ROOT whose Brewfiles are only what a test puts there.
-# The real repo's would make every assertion depend on what this machine has.
 fixture_repo() {
   DOT_ROOT="$DOT_TMP/repo"
   mkdir -p "$DOT_ROOT/core" "$DOT_ROOT/modules/one" "$DOT_ROOT/modules/two"
@@ -344,10 +400,6 @@ fixture_repo() {
   : >"$DOT_ROOT/modules/two/Brewfile"
 }
 
-# installed "FORMULA..." "CASK..." -- the machine, as brew would describe it.
-# The names go into globals and the word splitting is deliberate: a `local`
-# would be out of scope by the time brew_unmanaged calls the stub, and every
-# assertion below would then be made against an empty machine.
 installed() {
   MACHINE_FORMULAE=$1
   MACHINE_CASKS=$2
@@ -373,8 +425,6 @@ installed() {
 }
 
 @test "unmanaged: a checkout whose Brewfiles cannot be read is 2, not a finding" {
-  # Every package on the machine would be unmanaged, which is a broken
-  # checkout reported as forty things to fix.
   DOT_ROOT="$DOT_TMP/empty"
   mkdir -p "$DOT_ROOT"
   installed jq ''
@@ -416,14 +466,8 @@ installed() {
 }
 
 @test "unmanaged: a DISABLED module's Brewfile still counts as named" {
-  # The question is what the next machine would not get, and `dot add
-  # work-apps` brings this back. Reading only the enabled list would make a
-  # machine with one module switched off report that module's whole Brewfile.
   fixture_repo
   printf 'cask "teams"\n' >"$DOT_ROOT/modules/two/Brewfile"
-  # Nothing is enabled at all. Narrowing the scan to the enabled list is the
-  # change this fails on, and it is the tempting one -- every other check in
-  # the repo is about enabled modules.
   modules_enabled() { :; }
   installed bash teams
 
@@ -433,8 +477,6 @@ installed() {
 }
 
 @test "unmanaged: a tap-qualified Brewfile line matches the bare install" {
-  # brew installs homebrew/cask/foo as `foo`, and a comparison that kept the
-  # tap would report it as unmanaged on every machine that has it.
   fixture_repo
   printf 'cask "homebrew/cask/docker"\n' >"$DOT_ROOT/modules/one/Brewfile"
   installed bash docker
@@ -445,10 +487,6 @@ installed() {
 }
 
 @test "unmanaged: a cask does not vouch for a formula of the same name" {
-  # `brew "docker"` and `cask "docker"` are different packages sharing a word.
-  # One set of names for both would make a Brewfile naming either of them
-  # silence the other -- and the silence lands in the one check that exists to
-  # say what nothing here installs, on the names most likely to collide.
   fixture_repo
   printf 'cask "docker"\n' >"$DOT_ROOT/modules/one/Brewfile"
   installed 'bash docker' docker
@@ -471,9 +509,6 @@ installed() {
 }
 
 @test "unmanaged: a repo naming no casks at all is not a machine full of them" {
-  # The empty side of the split. `comm` against an empty list must report
-  # every cask, and against a repo that has none the guard above must still
-  # tell "no Brewfile could be read" apart from "no cask line in any of them".
   fixture_repo
   installed bash 'raycast slack'
 
@@ -509,24 +544,18 @@ installed() {
   run brew_unmanaged
   [ "$status" -eq 0 ]
 
-  # Read-only subcommands only, and never with auto-update on.
   local calls
   calls=$(cat "$DOT_TMP/brew-calls")
   [[ $calls == *"leaves --installed-on-request"* ]]
   [[ $calls == *"list --cask"* ]]
   [[ $calls != *"auto-update=unset"* ]]
 
-  # Every subcommand it reached for, not just the two expected ones present:
-  # an added `brew bundle` would satisfy the assertions above and still write.
   local asked
   asked=$(sed -n 's/^.*args=\([a-z-]*\).*$/\1/p' "$DOT_TMP/brew-calls" | sort -u | tr '\n' ' ')
   [ "$asked" = "leaves list " ]
 }
 
 @test "check: a check that could not answer warns, and never passes" {
-  # The 2 branch. Calling it green is the bug this whole three-state contract
-  # exists to prevent; calling it a failure would make every machine without
-  # Homebrew's cache red for a reason the user cannot fix.
   printf 'brew "jq"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
   brew_missing() { return 2; }

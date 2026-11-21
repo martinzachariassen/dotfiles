@@ -1,10 +1,5 @@
 name: install-smoke
 
-# `install.sh` is the headline command in the README and the least covered path
-# in the repo: tests/install.bats stops at the three guards on purpose. This
-# runs the real thing, once, on a machine that is not the author's.
-#
-# Why it is its own workflow, and what it cannot cover: docs/development.md.
 on:
   push:
     branches: [main]
@@ -16,7 +11,7 @@ on:
       - 'core/**'
       - '.github/workflows/install-smoke.yml'
   schedule:
-    - cron: '43 6 * * 1' # Mondays, after brew-audit
+    - cron: '43 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -27,18 +22,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      # Full history: install.sh clones FROM this checkout, and git balks at
-      # some clones out of a shallow one.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      # The wizard is interactive by design and is not what this tests. A config
-      # already in place is also a real path -- it is what the second machine,
-      # or a reinstall, looks like. zsh is enabled rather than nothing: it links
-      # real files, installs a real Brewfile and runs a real doctor.sh, and
-      # without it `core/doctor.sh` rightly fails the run over a $PATH that
-      # cannot reach ~/.local/bin.
       - name: Seed a config
         run: |
           mkdir -p ~/.config/dotfiles
@@ -55,19 +42,6 @@ jobs:
           ]
           EOF
 
-      # DOTFILES_REPO is this checkout, so a pull request tests its own
-      # install.sh rather than whatever happens to be on main.
-      #
-      # `script`: step 5 refuses without a readable /dev/tty, because the wizard
-      # must be able to ask. A runner has no terminal, so it gets a pty -- the
-      # check that protects a real `curl | bash` is not worth weakening for a
-      # test's convenience.
-      #
-      # `< /dev/null` explicitly: macOS `script` calls tcgetattr on its stdin
-      # and dies on anything it cannot ask about. A runner step already gets
-      # /dev/null, so this only pins what it is relying on.
-      # `shell: bash` for its `-o pipefail`: the default shell would let `tee`
-      # report success over a failed install.
       - name: Run install.sh
         shell: bash
         env:
@@ -77,10 +51,6 @@ jobs:
           script -q /dev/null bash install.sh </dev/null 2>&1 |
             tee "$RUNNER_TEMP/install.log"
 
-      # The step above already fails on a non-zero exit -- macOS `script` passes
-      # the command's status through. This asks the other question: not "did it
-      # return 0" but "is the machine it claimed to build actually there". The
-      # log is the proof `dot apply` ran; nothing else writes one.
       - name: It reached the handoff, and the handoff worked
         env:
           DOTFILES_DIR: ${{ runner.temp }}/dotfiles
@@ -91,8 +61,6 @@ jobs:
           [ -L "$HOME/.zshenv" ]
           ls "$HOME/.local/state/dotfiles/logs/"*-apply.log
 
-      # The real proof: the machine it built agrees it is right. Read-only, so
-      # it cannot paper over anything the step above missed.
       - name: The machine it made passes its own checks
         run: |
           export PATH="$HOME/.local/bin:$PATH"

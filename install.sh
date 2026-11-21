@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-#
-# Phase 0 bootstrap. Runs before the repo exists, so: plain echo, no library.
-#
-#   curl -fsSL https://raw.githubusercontent.com/martinzachariassen/dotfiles/main/install.sh | bash
-
 set -euo pipefail
 
 REPO_URL="${DOTFILES_REPO:-https://github.com/martinzachariassen/dotfiles.git}"
 REPO_DIR="${DOTFILES_DIR:-$HOME/Developer/personal/dotfiles}"
 
-# An input, so step 2's "not installed yet" branch is reachable on a machine
-# that has Homebrew. Its own name and its own default: install.sh shares
-# nothing, including this.
 BREW_PREFIX="${DOTFILES_BREW_PREFIX:-/opt/homebrew}"
 
 echo "==> dotfiles bootstrap"
@@ -38,9 +30,6 @@ step() {
   exit 1
 }
 
-# Below the bottle floor every formula compiles from source: hours, often
-# failing outright. A warning, not a refusal -- the machine is the user's call.
-# Not a guard: a version this cannot read says nothing, and says it silently.
 MACOS_FLOOR=14
 if macos=$(sw_vers -productVersion 2>/dev/null); then
   case "${macos%%.*}" in
@@ -57,7 +46,6 @@ if macos=$(sw_vers -productVersion 2>/dev/null); then
   esac
 fi
 
-# The GUI installer is asynchronous: trigger it, then poll.
 if xcode-select -p >/dev/null 2>&1; then
   step 1 "Xcode Command Line Tools already installed"
 else
@@ -65,7 +53,7 @@ else
   xcode-select --install >/dev/null 2>&1 || true
 
   attempts=0
-  max_attempts=180 # 180 * 10s = 30 minutes
+  max_attempts=180
   until xcode-select -p >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge "$max_attempts" ]; then
@@ -86,14 +74,11 @@ if [ -x "$BREW_PREFIX/bin/brew" ]; then
 else
   step 2 "Installing Homebrew (it will ask for your password)"
 
-  # sudo's credential expires after five minutes; a cold install on a slow
-  # connection takes longer, so keep it refreshed until it stops working.
   sudo -v
   while sudo -n true 2>/dev/null; do sleep 50; done &
   keepalive=$!
   trap 'kill "$keepalive" 2>/dev/null || true' EXIT
 
-  # /bin/bash: Homebrew's installer supports the system shell. Bash 5 comes next.
   NONINTERACTIVE=1 /bin/bash -c \
     "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
@@ -105,24 +90,18 @@ else
 fi
 echo "    Homebrew at $(brew --prefix)"
 
-# One of five places that must agree on bash 5 (core/Brewfile, bin/dot,
-# uninstall.sh, lib/dot.sh). Here because step 5 needs it before core/Brewfile
-# runs; tests/contract.bats holds the five together.
 if brew list --versions bash >/dev/null 2>&1; then
   step 3 "bash 5 already installed"
 else
   step 3 "Installing bash 5 (macOS ships 3.2, from 2007)"
-  # HOMEBREW_NO_ASK: from Homebrew 6, `brew install` asks before pulling in a
-  # dependency, and under `curl | bash` there is no stdin left to answer with.
-  # `brew bundle` sets this itself, so only this bare call needs it.
+  # Homebrew 6 asks before pulling in a dependency, and under `curl | bash` there
+  # is no stdin left to answer with.
   HOMEBREW_NO_ASK=1 brew install bash
 fi
 
 if [ -d "$REPO_DIR/.git" ]; then
   step 4 "Updating existing checkout"
 
-  # Neither branch is fatal to the install: the checkout on disk is already
-  # usable, so say so rather than passing git's error through.
   if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
     echo "$REPO_DIR has uncommitted changes, so it cannot be updated." >&2
     echo "  See them:      git -C $REPO_DIR status" >&2
@@ -144,8 +123,6 @@ elif [ -e "$REPO_DIR" ]; then
 else
   step 4 "Cloning"
   mkdir -p "$(dirname "$REPO_DIR")"
-  # Full history, not --depth=1: both profiles enable dotfiles-dev, so this is
-  # a checkout you edit and commit from.
   git clone "$REPO_URL" "$REPO_DIR"
 fi
 

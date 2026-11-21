@@ -10,16 +10,11 @@ permissions:
 
 jobs:
   check:
-    # macOS: the tests exercise BSD find, stat and readlink.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install tooling
-        # Two sets, and contract.bats holds both: the quality gates
-        # (modules/dotfiles-dev) and core/Brewfile, because the suite runs
-        # `dot doctor` and that checks core's packages are installed.
-        # bash: the runner's /bin/bash is 3.2, and the suite must run under 5.
         run: brew install bash bats-core dasel fzf git jq shellcheck shfmt taplo
 
       - name: make check

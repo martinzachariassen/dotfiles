@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-#
-# Link Homebrew's compose and buildx into ~/.docker/cli-plugins, the only place
-# the docker CLI looks. Linked rather than set via cliPluginsExtraDirs in
-# ~/.docker/config.json, which `docker login` owns. The targets are outside
-# $DOT_ROOT, so remove.sh has to name them.
-
 set -euo pipefail
 source "${DOT_ROOT:?}/lib/dot.sh"
 

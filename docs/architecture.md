@@ -8,6 +8,7 @@ How a run is put together, and the four rules the whole design turns on.
 [Your files stay yours](#your-files-stay-yours) ·
 [Dry runs](#dry-runs) ·
 [What a run prints and returns](#what-a-run-prints-and-returns) ·
+[Records](#records) ·
 [Templating](#templating)
 
 ## Three phases
@@ -188,7 +189,7 @@ tools:
 | `claude-code` | the CLI can authenticate at all — keychain item, API key, token, Bedrock or Vertex |
 | `ssh` | the 1Password agent is live **and** holds a key |
 | `apps` | the menu bar apps have been opened at least once |
-| `zsh` | the account's login shell is zsh, so any of it is read |
+| `zsh` | the account's login shell is zsh, so any of it is read; `~/.config/op` is `700`, the only mode `op` will read its references from |
 | `macos-defaults` | FileVault, the firewall, the update switches, the default browser |
 
 Four rules keep this from becoming noise, and they are the same four
@@ -261,15 +262,93 @@ reads in an editor as well as in a pager. `config` hands the terminal to your
 editor and `doctor` changes nothing, so neither writes one. A dry run opens no
 transcript either.
 
-In the checking phase — `dot doctor`, and the tail of an apply — a module that
-reports nothing wrong collapses to a single line. One that does expands,
-showing only what needs attention, and the run ends by repeating those findings
-rather than telling you to scroll. Applying streams instead of collapsing: a
-`brew bundle` that takes two minutes has to be visible while it runs, not
-afterwards. A cask download or a source build prints nothing of its own while
-it works, which reads the same as a hang, so the streamed line becomes `no
-output for 45s -- still running` every `DOT_UI_HEARTBEAT` seconds (15 by
-default) until the child speaks again.
+Every module of an apply runs as a group. Its records are held back while they
+are all good news, so a module with nothing to do costs one line: what it found,
+joined, and how long it took on the right. The first change, problem or line of
+another program's output lets the group out, header first, and from then on it
+streams, so a two-minute `brew bundle` is watched rather than awaited. A group
+that opened closes on a line counting its changes. A dry run is the same run, so
+it reads the same:
+
+```
+── dot apply ──────────────────────────────── DRY RUN -- nothing will change
+    repo         ~/Developer/personal/dotfiles
+    config       ~/.config/dotfiles/config.toml
+  ✓ packages       5 packages                                           0.3s
+  ✓ read           config parses · 10 modules known · 21 hooks parse
+
+── Applying ────────────────────────────────────────────── core + 10 modules
+  ✓ core           shim current                                         0.0s
+  ▸ apps           GUI apps and fonts as casks, plus an opened-once check
+      → install      cask discord
+      ✓ 1 change                                                        0.3s
+  ✓ claude-code    2 packages · 16 links · settings.json holds all 9 …  0.4s
+  ✓ cmux           2 packages · 2 links                                 0.2s
+  ✓ containers     5 packages · 1 link                                  0.2s
+  ✓ dev-cli        10 packages · 2 links · 10 runtimes match mise.lock  0.3s
+  ✓ dotfiles-dev   4 packages                                           0.2s
+  ✓ git            1 package · 2 links · identity: Martin Zachariasse…  0.3s
+  ✓ macos-defaults 45 keys already set                                  0.2s
+  ✓ ssh            2 packages · 2 links                                 0.2s
+  ✓ zsh            7 packages · 6 links                                 0.3s
+
+── Plan ──────────────────────────────────────────────────────────── dry run
+  → 1 change     1 cask
+    Dry run: nothing was changed. To make these changes: dot apply
+```
+
+The last section adds up the `→` lines of every group by kind. A real run calls
+it `Done` and gives the run's time instead of `Plan`, then runs the same checks
+`dot doctor` does, showing only the groups that failed and a count of the rest.
+
+`brew bundle` hides each install's own output and names a package only as it
+starts on it, so the silence after `Installing discord` is a download or a
+build. With a terminal attached, that silence becomes one line redrawn in place:
+a bar, a percentage, megabytes, speed and time left while the download is
+growing in `$(brew --cache)/downloads`, and `installing` with a clock once it is
+not. The total comes from the cask URL's `Content-Length`, one request per cask;
+a bottle's URL needs a token, so a formula shows megabytes and speed without a
+bar. The line is a frame: a whole line tagged with an escape sequence that draws
+nothing, moved over by the next with a cursor-up. Whole lines keep their place in
+the transcript's line-buffered stream, and the transcript's `sed` drops any line
+carrying the tag, so the log holds the `installed` line and never the frames.
+Without a terminal, or with `DOT_PROGRESS=0`, there are no frames; a
+`no output for 45s -- still running` line comes every `DOT_UI_HEARTBEAT`
+seconds (15 by default) instead.
+
+In `dot doctor` a module that reports nothing wrong collapses to one line naming
+the checks that passed. One that does expands, showing only what needs
+attention, and the run ends by repeating those findings rather than telling you
+to scroll:
+
+```
+── Checking ────────────────────────────────────────────── core + 10 modules
+  ✓ core           packages · xcode · homebrew · dot · PATH · config · repo
+  ✗ apps           GUI apps and fonts as casks, plus an opened-once check
+      ✗ packages     Cask discord is not installed -- run: dot apply
+  ✓ claude-code    packages · files · settings · auth
+  ✓ cmux           packages · files
+  ✓ containers     packages · files · colima · DOCKER_HOST
+  ✓ dev-cli        packages · files · runtimes · gh · gcloud
+  ✓ dotfiles-dev   packages
+  ✓ git            packages · files
+  ✓ macos-defaults defaults · filevault · firewall · updates · browser
+  ✓ ssh            packages · files
+  ✓ zsh            packages · files · op
+  ▲ orphans        unclaimed -- no module ships these any more:
+        ~/.claude/skills/dotfiles-test/SKILL.md
+        rm them; there is nothing else to undo.
+  → unmanaged      2 packages no Brewfile names
+        Formula firebase-cli
+        Cask curseforge
+        add one to a module Brewfile and the next machine gets it too.
+
+── Result ──────────────────────────────────────────────────────────────────
+  ✗ 1 problem, 1 warning
+      ✗ apps           packages: Cask discord is not installed -- run: dot apply
+  ✓ 10 modules clean
+    Every check, including the ones that passed: dot doctor --verbose
+```
 
 A question the wizard needs answered — `Write this config? [Y/n]` — is a line
 of output followed by a bare `read`, never a `read -p` prompt: the transcript
@@ -280,7 +359,38 @@ The count in that last line is the count of the lines under it: a hook is a
 separate process, so its findings reach the driver as records rather than as an
 exit status, and three problems in one hook are counted as three. `dot doctor
 --verbose` prints every check, passed ones included. `NO_COLOR` turns colour
-off; a locale that is not UTF-8 falls back to ASCII markers of the same width.
+off; a locale that is not UTF-8, or `DOT_ASCII=1`, falls back to ASCII markers
+of the same width. `dot --help` lists all of these, with the enabled modules.
+
+## Records
+
+A hook is a separate process, so its exit status is all a driver would
+otherwise see, and one number cannot say which three things went wrong. With
+`DOT_UI_RECORDS` set, the printers in `lib/ui.sh` emit a record instead of a
+rendered line: severity, label and message behind a marker. The driver captures
+a module's whole stream, and `ui_group` renders it as a single green line when
+every record is `ok`, or expanded to the findings when not. A line *without*
+the marker is another program's output; it is shown, never hidden, and it keeps
+the group from collapsing over it.
+
+Reconciling the tallies happens in `ui_group` because only it sees both halves.
+A hook's `fail` and `warn` run in another process and never touch the driver's
+counters, while `fold_status` can add only one failure for a non-zero exit. So
+`fold_status` brackets the child with `foldopen`/`foldshut` records, and
+`ui_group` adds every finding inside that scope and takes the roll-up back
+**when that same child named the problem** — never because something else in
+the group failed, which would eat the only line naming a hook that died before
+it could print.
+
+The verdict's "in X of Y modules" is earned the same way: it is appended only
+when the grouped findings account for every counted one. Orphan links, the
+unmanaged-package report and everything `apply` and `remove` print sit outside
+any group, so they never get blamed on a module.
+
+The transcript sits on top of all of this. `bin/dot` points stdout at one
+line-buffered `sed` that writes a colourless copy to the log and passes the
+coloured line on to the terminal; `lib/dot.sh`'s EXIT trap restores the saved
+file descriptors and waits for it, so even a `die` reaches the log whole.
 
 ## Templating
 

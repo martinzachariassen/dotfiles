@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-#
-# Phase 0 in reverse. Not a `dot` command: `dot remove` undoes a module and
-# `dot add` puts it back, and this is reversible by nothing.
-#
-#   bash uninstall.sh --dry-run    print every intended change, make none
-#   bash uninstall.sh              do it
-#
-# Left alone on purpose: Xcode CLT, the backup tree under $DOT_STATE, real
-# files in $HOME, and macOS defaults (see modules/macos-defaults/remove.sh).
-
-# One of five places that must agree on bash 5 (install.sh, core/Brewfile,
-# bin/dot, lib/dot.sh). Re-exec rather than refuse: the shell that reaches for
-# the uninstaller is the least likely to have sourced Homebrew's shellenv.
 if ((BASH_VERSINFO[0] < 5)); then
   if [[ -x /opt/homebrew/bin/bash ]]; then
     exec /opt/homebrew/bin/bash "$0" "$@"
@@ -25,7 +12,6 @@ set -euo pipefail
 # shellcheck source=lib/dot.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/dot.sh"
 
-# Top level, not a hook: a kept backup tree must not turn into a non-zero exit.
 __DOT_EXIT_WARN=0
 
 BREW_UNINSTALL='https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh'
@@ -42,8 +28,6 @@ export DOT_DRY_RUN
 [[ $(uname -s) == Darwin ]] || die 'This is macOS only.'
 (($(id -u) != 0)) || die 'Do not run this as root.'
 
-# The preview is this script under --dry-run, not a hand-written summary that
-# could drift from it.
 if [[ $DOT_DRY_RUN != 1 ]]; then
   [[ -t 0 ]] ||
     die 'Refusing to run unattended' next 'bash uninstall.sh --dry-run'
@@ -57,8 +41,6 @@ if [[ $DOT_DRY_RUN != 1 ]]; then
   [[ $answer == remove ]] || die 'Nothing was changed.'
 fi
 
-# Every module, enabled or not: a module switched off last month still left
-# its files behind.
 heading 'Modules' 'every one, enabled or not'
 while IFS= read -r name; do
   [[ -f "$(modules_dir "$name")/remove.sh" ]] || continue
@@ -68,7 +50,6 @@ while IFS= read -r name; do
   ui_unnest
 done < <(modules_all)
 
-# The orphan scan with nothing enabled: every link into the repo is unclaimed.
 heading 'Links'
 mapfile -t links < <(fs_repo_links)
 if ((${#links[@]})); then
@@ -79,9 +60,6 @@ else
   say links 'none found'
 fi
 
-# The shim is generated, not linked, so the sweep cannot see it. The baked-in
-# DOT_ROOT line is the proof of ownership; core/doctor.sh greps the same line.
-# -f, not -x: a shim that lost its executable bit is still ours to remove.
 heading 'CLI'
 shim="$HOME/.local/bin/dot"
 if [[ -f $shim ]]; then
@@ -97,14 +75,11 @@ fi
 heading 'Config'
 if [[ -f $DOT_CONFIG ]]; then
   fs_discard "$DOT_CONFIG"
-  # rmdir: the directory goes only if our config was the single thing in it.
   [[ $DOT_DRY_RUN == 1 ]] || rmdir "$(dirname "$DOT_CONFIG")" 2>/dev/null || true
 else
   say config 'none found'
 fi
 
-# Before Backups, which removes $DOT_STATE itself and refuses while anything
-# unexpected is still inside it.
 heading 'Logs'
 if [[ -n $(find "$DOT_STATE/logs" -mindepth 1 -name '*.log' -print -quit 2>/dev/null) ]]; then
   while IFS= read -r logfile; do
@@ -117,15 +92,11 @@ fi
 
 heading 'Backups'
 if [[ -n $(find "$DOT_STATE/backups" -mindepth 1 -print -quit 2>/dev/null) ]]; then
-  # A warning about something KEPT: the only copy of your replaced files.
   warn 'kept' "${DOT_STATE/#$HOME/\~}/backups"
   dim 'Your own files, moved aside by an earlier apply. Nothing else has a copy.'
   dim 'Delete them yourself once you have looked.'
 else
   say backups 'none to keep'
-  # rmdir, never rm -rf: a file nothing in this repo created keeps the
-  # directory alive. Tested up front so a dry run prints the real run's words;
-  # logs/ is excluded because a dry run has not removed it yet.
   if [[ -d $DOT_STATE ]]; then
     if [[ -n $(find "$DOT_STATE" -mindepth 1 -not -path "$DOT_STATE/backups" -not -path "$DOT_STATE/logs*" -print -quit 2>/dev/null) ]]; then
       warn 'left alone' "${DOT_STATE/#$HOME/\~} holds files this repo did not create"
@@ -136,15 +107,11 @@ else
   fi
 fi
 
-# Homebrew MOVES a cask's .app into /Applications and its uninstaller deletes
-# only the prefix, so casks must go by name while brew still works or every GUI
-# app is stranded. Same for `brew services` and its launchd plists.
 heading 'Applications'
 
-# brew_load first: run from a shell that never sourced shellenv, a bare `brew`
-# lists no casks and the run would destroy Homebrew regardless. `fail`, not
-# `die`: it flows into the guard before the handoff like every other problem.
 have_brew=0
+# Without shellenv a bare `brew` lists no casks, and the run would then destroy
+# Homebrew with every cask's .app stranded in /Applications.
 if brew_load; then
   have_brew=1
 elif [[ -d /opt/homebrew || -d /usr/local/Homebrew ]]; then
@@ -172,7 +139,6 @@ remove_applications() {
   elif brew uninstall --cask --zap --force "${casks[@]}"; then
     ok casks "removed $(ui_count "${#casks[@]}" application)"
   else
-    # `fail` so the guard below stops the run before Homebrew goes.
     while IFS= read -r cask; do
       fail casks "could not remove $cask -- remove it by hand, then re-run"
     done < <(brew list --cask 2>/dev/null)
@@ -185,16 +151,12 @@ else
   say casks 'Homebrew is not installed; nothing to remove'
 fi
 
-# brew_headcount -- "<formulae installed> <formulae no Brewfile here names>". A
-# count, because "every package it installed" reads as "this repo's packages"
-# when the truth is every package on the machine. Formulae only; casks above.
 brew_headcount() {
   local installed repo bundle rc=0
   command -v brew >/dev/null 2>&1 || return 1
 
   installed=$(mktemp) repo=$(mktemp) bundle=$(mktemp)
 
-  # Grouped so a failing step cannot skip the cleanup below.
   {
     brew list --formula 2>/dev/null | sort -u >"$installed" &&
       { cat "$DOT_ROOT"/core/Brewfile "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null >"$bundle" || true; } &&
@@ -213,15 +175,12 @@ brew_headcount() {
 
 heading 'Homebrew and the repo'
 
-# Everything above, `dot apply` can put back; nothing below can be.
 if ((DOT_FAILURES > 0)); then
   die "$(ui_count "$DOT_FAILURES" problem) above -- stopping before Homebrew and the repo"
 fi
 
 if [[ $DOT_DRY_RUN == 1 ]]; then
-  # `== 0`, not `!`: shfmt 3.13 and 3.14 disagree about the space after a `!`
-  # inside `(( ))` and reformat the line in opposite directions, so whichever
-  # version CI has fails `make fmt-check`. This spelling neither has a view on.
+  # `== 0`, not `!`: shfmt 3.13 and 3.14 format `(( ! x ))` in opposite ways.
   if ((have_brew == 0)); then
     dim 'Homebrew is not installed; nothing to uninstall.'
   elif read -r n_all n_foreign < <(brew_headcount); then
@@ -237,9 +196,8 @@ if [[ $DOT_DRY_RUN == 1 ]]; then
   exit 0
 fi
 
-# The last two steps remove Homebrew (which owns this bash) and $DOT_ROOT (which
-# holds this file), so they run from a throwaway script under /bin/bash -- the
-# one shell still there once Homebrew is gone.
+# The last steps remove Homebrew, which owns this bash, and the repo, which
+# holds this file, so they run from a throwaway script under /bin/bash.
 handoff=$(mktemp -t dotfiles-uninstall)
 cat >"$handoff" <<EOF
 #!/bin/bash

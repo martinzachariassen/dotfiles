@@ -1,12 +1,5 @@
-# Wizard presets. Read only by `dot config --init`; `dot apply` never reads
-# this file. See docs/configuration.md.
-
-# Copied into config.toml, never asked: none of it varies by machine. The
-# signing key is the PUBLIC half; empty means no signing.
-#
-# Forked this repo? Edit the three values below first -- the wizard writes
-# them as-is, so an unedited fork authors commits as Martin and turns on
-# signing with a key whose private half lives only in his 1Password vault.
+# Forked this repo? Edit these first: the wizard writes them as-is, so an
+# unedited fork commits as Martin, signed with Martin's key.
 [user]
 name = "Martin Zachariassen"
 email = "10747123+martinzachariassen@users.noreply.github.com"

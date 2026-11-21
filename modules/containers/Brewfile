@@ -1,7 +1,5 @@
-# Docker without Docker Desktop. lima and qemu come in as colima's dependencies.
-
-brew "colima"                   # the VM, and the docker daemon inside it
-brew "docker"                   # CLI only
-brew "docker-buildx"            # plugin; apply.sh links it into ~/.docker
-brew "docker-compose"           # plugin; apply.sh links it into ~/.docker
-brew "docker-credential-helper" # `docker login` writes to the macOS keychain
+brew "colima"
+brew "docker"
+brew "docker-buildx"
+brew "docker-compose"
+brew "docker-credential-helper"

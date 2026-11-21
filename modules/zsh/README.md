@@ -61,3 +61,8 @@ One item per service, so a key can be rotated or shared on its own.
 the vault through the app once **1Password → Settings → Developer → Integrate
 with 1Password CLI** is ticked; Touch ID then unlocks it. `op vault list` proves
 the link.
+
+`op` also refuses `~/.config/op` unless its mode is `700`, and the linker
+creates that folder under your umask when it links `env` -- `755` on a new
+Mac, and then every `op run` aborts with "permissions are too broad".
+`apply.sh` sets `700`, and `doctor.sh` warns while it is anything else.

@@ -1,10 +1,5 @@
 # shellcheck shell=bash
-#
-# Homebrew. Thin on purpose: `brew bundle` is already idempotent.
 
-# The fallback path is an input, so "Homebrew could not be loaded" is reachable
-# on a machine that has it. install.sh keeps its own copy and its own name for
-# it: it shares nothing, including this.
 brew_load() {
   command -v brew >/dev/null 2>&1 && return 0
   local brew_bin=${DOT_BREW_BIN:-/opt/homebrew/bin/brew}
@@ -15,12 +10,7 @@ brew_load() {
   return 1
 }
 
-# brew_missing FILE -- "<Formula|Cask> <name>" per package FILE names that is
-# not installed. Returns 0 satisfied, 1 missing, 2 the check could not run.
-#
-# 2 is distinct on purpose: a check that could not run must never read as "all
-# installed". `brew bundle check` rather than parsing the Brewfile here -- it
-# is the only reader that agrees with `brew bundle` about what installed means.
+# 0 satisfied, 1 missing, 2 could not check -- never read 2 as installed.
 brew_missing() {
   local file=$1 out status=0
   [[ -f $file ]] || return 0
@@ -30,15 +20,13 @@ brew_missing() {
     status=1
   ((status)) || return 0
 
-  # Matched without the leading arrow: it is a multibyte glyph, and a C locale
-  # would make this silently match nothing.
+  # Not the leading arrow: a multibyte glyph matches nothing under a C locale.
   out=$(sed -n -E 's/^.*(Formula|Cask) ([^ ]+) needs to be installed\.$/\1 \2/p' <<<"$out")
   [[ -n $out ]] || return 2
   printf '%s\n' "$out"
   return 1
 }
 
-# brew_bundle FILE [LABEL] -- a missing Brewfile is success: modules need none.
 brew_bundle() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}
@@ -49,21 +37,26 @@ brew_bundle() {
     return 1
   fi
 
+  local named
+  named=$(grep -cE '^[[:space:]]*(brew|cask)[[:space:]]' "$file") || named=0
+
   if [[ $DOT_DRY_RUN == 1 ]]; then
-    info packages "brew bundle --file ${file#"$DOT_ROOT"/}"
+    local planned kind name status=0
+    planned=$(brew_missing "$file") || status=$?
+    case $status in
+      0) ok packages "$(ui_count "$named" package)" ;;
+      1) while read -r kind name; do
+        info install "${kind,,} $name"
+      done <<<"$planned" ;;
+      *) info packages "brew bundle --file ${file#"$DOT_ROOT"/}" ;;
+    esac
     return 0
   fi
 
-  # --no-upgrade: apply installs what is missing; upgrading is `brew upgrade`.
-  # Quoted, so brew's hundreds of lines stay visible as they stream but at the
-  # weight of a footnote. The status comes back through PIPESTATUS.
-  brew bundle --file "$file" --no-upgrade 2>&1 | ui_quote
-  if ((PIPESTATUS[0] == 0)); then return 0; fi
+  __brew_follow "$file" "$named" && return 0
 
   fail packages "brew bundle failed for $label"
 
-  # brew's own output is hundreds of lines above by now, and "failed" alone is
-  # not something a user can act on. Name the packages that are still absent.
   local missing status=0
   missing=$(brew_missing "$file") || status=$?
   case $status in
@@ -78,9 +71,136 @@ brew_bundle() {
   return 1
 }
 
-# brew_check FILE [LABEL] -- doctor's read-only counterpart to brew_bundle.
-# Without it a half-installed module reports green: doctor would be looking at
-# nothing but symlinks.
+__brew_kind() {
+  local file=$1 name=$2
+  if grep -qE "^[[:space:]]*cask[[:space:]]+\"([^\"]*/)?$name\"" "$file"; then
+    printf 'cask\n'
+  else
+    printf 'formula\n'
+  fi
+}
+
+# 0 when the server will not say. Only asked for a cask, and only while a
+# terminal is watching: it costs a request, and a bottle's URL needs a token.
+__brew_cask_size() {
+  local url
+  url=$(brew info --cask --json=v2 "$1" 2>/dev/null | dasel -i json -o yaml 'casks[0].url' 2>/dev/null) || url=''
+  url=${url#\"}
+  url=${url%\"}
+  if [[ $url != https://* ]]; then
+    printf '0\n'
+    return 0
+  fi
+  "${DOT_CURL_BIN:-curl}" -sIL --max-time 4 "$url" 2>/dev/null | tr -d '\r' |
+    awk 'tolower($1) == "content-length:" { n = $2 } END { print n + 0 }'
+}
+
+# The newest download brew has open since `since` (epoch seconds), or nothing.
+__brew_partial() {
+  local dir=$1 since=$2 f m best='' newest=0
+  for f in "$dir"/*.incomplete; do
+    [[ -f $f ]] || continue
+    m=$(stat -f '%m' "$f") || continue
+    if ((m >= since && m >= newest)); then
+      best=$f newest=$m
+    fi
+  done
+  if [[ -n $best ]]; then stat -f '%z' "$best"; fi
+}
+
+__brew_finish() {
+  [[ -n $pkg ]] || return 0
+  local size=$total note=''
+  ((size > 0)) || size=$bytes
+  if ((size > 0)); then note=" ($(ui_megabytes "$size"))"; fi
+  ok installed "$kind $pkg$note"$'\t'"$(ui_duration $(($(ui_now) - began)))"
+  installed=$((installed + 1))
+  pkg=''
+}
+
+# brew bundle hides each install's own output and says one line as it starts
+# the next package, so a long silence is a download or a build, never a hang.
+__brew_follow() {
+  local file=$1 named=$2 fd pid status=0 line chunk got
+  local pkg='' kind='' since=0 began=0 total=0 bytes=0 first=0 first_at=0 rate tick=0
+  local using=0 installed=0 idle=0 beat=${DOT_UI_HEARTBEAT:-15} wait_s cache='' live=0
+
+  if ((__UI_LIVE)) && [[ -n ${DOT_UI_RECORDS:-} ]]; then
+    live=1
+    cache="$(brew --cache 2>/dev/null)/downloads"
+  fi
+  wait_s=$beat
+  ((live == 0)) || wait_s=0.25
+
+  exec {fd}< <(brew bundle --file "$file" --no-upgrade 2>&1)
+  pid=$!
+  line=''
+  while true; do
+    chunk=''
+    if IFS= read -r -t "$wait_s" -u "$fd" chunk; then status=0; else status=$?; fi
+    line+=$chunk
+    if ((status > 128)); then
+      if ((live)) && [[ -n $pkg ]]; then
+        tick=$((tick + 1))
+        got=$(__brew_partial "$cache" "$since")
+        rate=0
+        if [[ -n $got ]]; then
+          bytes=$got
+          if ((first_at == 0)); then first=$bytes first_at=$(ui_now); fi
+          if (($(ui_now) - first_at > 500000)); then
+            rate=$(((bytes - first) * 1000000 / ($(ui_now) - first_at)))
+          fi
+        else
+          # Downloaded, or never downloading: either way what is left is the install.
+          got=0
+        fi
+        ui_progress "$pkg" "$got" "$total" "$rate" $(($(ui_now) - began)) "$tick"
+      elif ((live == 0)); then
+        idle=$((idle + beat))
+        dim "no output for $(ui_elapsed "$idle") -- still running"
+      fi
+      continue
+    fi
+    idle=0
+    if ((status != 0)) && [[ -z $line ]]; then break; fi
+
+    case $line in
+      'Using '*) using=$((using + 1)) ;;
+      'Installing '*' has failed!'*)
+        pkg=${line#Installing }
+        pkg=${pkg%% *}
+        fail packages "$(__brew_kind "$file" "$pkg") $pkg did not install"
+        pkg=''
+        ;;
+      'Installing '*)
+        __brew_finish
+        pkg=${line#Installing }
+        pkg=${pkg%% *}
+        kind=$(__brew_kind "$file" "$pkg")
+        info install "$kind $pkg"
+        since=$(date +%s) began=$(ui_now) total=0 bytes=0 first=0 first_at=0 tick=0
+        if ((live)) && [[ $kind == cask ]]; then total=$(__brew_cask_size "$pkg"); fi
+        ((live == 0)) || ui_progress "$pkg" 0 "$total" 0 0 0
+        ;;
+      *'brew bundle'*' complete!'* | 'Homebrew Bundle complete!'*) ;;
+      *) __ui_quoted "$line" ;;
+    esac
+    line=''
+    ((status == 0)) || break
+  done
+  __brew_finish
+  exec {fd}<&-
+  status=0
+  wait "$pid" || status=$?
+  ((status == 0)) || return 1
+
+  if ((installed == 0)); then
+    ((using > 0)) || using=$named
+    ok packages "$(ui_count "$using" package)"
+  fi
+  return 0
+}
+
 brew_check() {
   local file=$1
   local label=${2:-$(basename "$(dirname "$file")")}
@@ -102,33 +222,16 @@ brew_check() {
   esac
 }
 
-# brew_unmanaged -- "<Formula|Cask> <name>" per package this machine has that
-# no Brewfile in the repo names, with the same three answers as brew_missing.
-# The one check that looks the other way: what would the NEXT machine not get?
-# See docs/architecture.md.
-#
-# EVERY Brewfile, not just the enabled ones: `dot add work-apps` still brings
-# back what a disabled module names, so listing those would make a machine with
-# one module switched off report that module's whole Brewfile.
-#
-# `leaves --installed-on-request` is what "by hand" means to brew: it drops
-# dependencies, so a tool is named and its tree is not.
 brew_unmanaged() {
   command -v brew >/dev/null 2>&1 || return 2
 
-  # LC_ALL=C throughout: comm compares bytes, and a sort that collated `-` or
-  # `@` by locale rules instead would make it disagree with its own input.
-  #
-  # Two lists, and never one. `brew "docker"` and `cask "docker"` are different
-  # packages that happen to share a word, so a single set would let a Brewfile
-  # naming either of them vouch for a hand-installed other.
+  # Two lists, never one: `brew "docker"` must not vouch for a hand-installed
+  # `cask "docker"`.
   local files named_brew named_cask formulae casks out
   files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
   named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
   named_cask=$(sed -n -E 's/^cask "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
 
-  # No Brewfile read at all would make every package on the machine unmanaged.
-  # That is a broken checkout, not a finding.
   [[ -n $named_brew || -n $named_cask ]] || return 2
 
   formulae=$(HOMEBREW_NO_AUTO_UPDATE=1 brew leaves --installed-on-request 2>/dev/null) || return 2
