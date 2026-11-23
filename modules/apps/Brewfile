@@ -8,5 +8,6 @@ cask "discord"
 cask "visual-studio-code"
 
 cask "stats"
+cask "keepingyouawake"
 
 cask "font-jetbrains-mono"
