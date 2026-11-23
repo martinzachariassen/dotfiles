@@ -189,6 +189,7 @@ tools:
 | `claude-code` | the CLI can authenticate at all — keychain item, API key, token, Bedrock or Vertex |
 | `ssh` | the 1Password agent is live **and** holds a key |
 | `apps` | the menu bar apps have been opened at least once |
+| `ios` | the selected developer directory is a working Xcode, not the Command Line Tools; the iOS and watchOS simulators exist; SweetPad and Swift are in VS Code; `swift-lsp` is in Claude Code |
 | `zsh` | the account's login shell is zsh, so any of it is read; `~/.config/op` is `700`, the only mode `op` will read its references from |
 | `macos-defaults` | FileVault, the firewall, the update switches, the default browser |
 

@@ -110,6 +110,10 @@ __brew_partial() {
 
 __brew_finish() {
   [[ -n $pkg ]] || return 0
+  if grep -qxF "$pkg" <<<"$failed"; then
+    pkg=''
+    return 0
+  fi
   local size=$total note=''
   ((size > 0)) || size=$bytes
   if ((size > 0)); then note=" ($(ui_megabytes "$size"))"; fi
@@ -124,6 +128,7 @@ __brew_follow() {
   local file=$1 named=$2 fd pid status=0 line chunk got
   local pkg='' kind='' since=0 began=0 total=0 bytes=0 first=0 first_at=0 rate tick=0
   local using=0 installed=0 idle=0 beat=${DOT_UI_HEARTBEAT:-15} wait_s cache='' live=0
+  local failed='' name
 
   if ((__UI_LIVE)) && [[ -n ${DOT_UI_RECORDS:-} ]]; then
     live=1
@@ -166,16 +171,26 @@ __brew_follow() {
 
     case $line in
       'Using '*) using=$((using + 1)) ;;
-      'Installing '*' has failed!'*)
-        pkg=${line#Installing }
-        pkg=${pkg%% *}
-        fail packages "$(__brew_kind "$file" "$pkg") $pkg did not install"
-        pkg=''
+      'Installing '*' has failed!'* | 'Failed to install '*': '*)
+        name=${line#Installing }
+        name=${name#Failed to install }
+        name=${name%%[ :]*}
+        if ! grep -qxF "$name" <<<"$failed"; then
+          failed+=$name$'\n'
+          fail packages "$(__brew_kind "$file" "$name") $name did not install"
+        fi
+        if [[ $line == 'Failed to install '* ]]; then __ui_quoted "${line#*: }"; fi
+        if [[ $name == "$pkg" ]]; then pkg=''; fi
         ;;
       'Installing '*)
         __brew_finish
         pkg=${line#Installing }
         pkg=${pkg%% *}
+        if grep -qxF "$pkg" <<<"$failed"; then
+          pkg=''
+          line=''
+          continue
+        fi
         kind=$(__brew_kind "$file" "$pkg")
         info install "$kind $pkg"
         since=$(date +%s) began=$(ui_now) total=0 bytes=0 first=0 first_at=0 tick=0
@@ -238,8 +253,8 @@ brew_unmanaged() {
   casks=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask 2>/dev/null) || return 2
 
   out=$(
-    comm -23 <(LC_ALL=C sort -u <<<"$formulae") <(printf '%s\n' "$named_brew") |
-      awk 'NF {print "Formula", $0}'
+    awk -F/ 'NR == FNR { named[$0]; next } NF && !($NF in named) { print "Formula", $0 }' \
+      <(printf '%s\n' "$named_brew") <(LC_ALL=C sort -u <<<"$formulae")
     comm -23 <(LC_ALL=C sort -u <<<"$casks") <(printf '%s\n' "$named_cask") |
       awk 'NF {print "Cask", $0}'
   )

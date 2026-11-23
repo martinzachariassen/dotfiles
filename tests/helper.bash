@@ -12,6 +12,13 @@ setup_sandbox() {
 
   export XDG_CONFIG_HOME="$HOME/.config"
   export XDG_STATE_HOME="$HOME/.local/state"
+  mkdir -p "$DOT_TMP/CommandLineTools/usr/bin"
+  printf '#!/bin/sh\n' >"$DOT_TMP/CommandLineTools/usr/bin/git"
+  printf '#!/bin/sh\necho %q\n' "$DOT_TMP/CommandLineTools" >"$DOT_TMP/sandbox-xcode-select"
+  chmod +x "$DOT_TMP/CommandLineTools/usr/bin/git" "$DOT_TMP/sandbox-xcode-select"
+  export DOT_XCODE_SELECT="$DOT_TMP/sandbox-xcode-select"
+  export DOT_CORESIM_ROOT="$DOT_TMP/no-coresimulator"
+  export DOT_CLAUDE_BIN="$DOT_TMP/no-claude"
 
   local kept=() dir
   while IFS= read -r dir; do
