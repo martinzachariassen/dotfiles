@@ -71,4 +71,23 @@ if git -C "$DOT_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   else
     ok git 'clean'
   fi
+
+  # Reads the local remote ref only, so it is as fresh as the last fetch.
+  if ! upstream=$(git -C "$DOT_ROOT" rev-parse --abbrev-ref '@{u}' 2>/dev/null); then
+    dim git 'no upstream branch'
+  elif ! counts=$(git -C "$DOT_ROOT" rev-list --left-right --count 'HEAD...@{u}' 2>/dev/null) ||
+    [[ ! $counts =~ ^[0-9]+[[:space:]]+[0-9]+$ ]]; then
+    warn git "could not compare with $upstream -- run: git -C $short status"
+  else
+    read -r ahead behind <<<"$counts"
+    if ((ahead > 0 && behind > 0)); then
+      warn git "diverged from $upstream, $ahead ahead and $behind behind -- resolve it by hand"
+    elif ((behind > 0)); then
+      warn git "$(ui_count "$behind" commit) behind $upstream, as of the last fetch -- run: dot apply --pull"
+    elif ((ahead > 0)); then
+      dim git "$(ui_count "$ahead" commit) ahead of $upstream"
+    else
+      ok git "level with $upstream, as of the last fetch"
+    fi
+  fi
 fi

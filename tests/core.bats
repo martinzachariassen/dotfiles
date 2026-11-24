@@ -83,3 +83,71 @@ with_xcode_select() {
   says dot "not installed at ~/.local/bin/dot -- run: dot apply"
   [[ $output != *"not executable"* ]]
 }
+
+doctor_with_git() {
+  with_git
+  run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" doctor --verbose "$@"
+}
+
+@test "doctor: a repo behind its upstream warns, and names the fix" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_COUNTS=$'0\t3' doctor_with_git
+
+  says git "3 commits behind origin/main, as of the last fetch -- run: dot apply --pull"
+  [[ $output == *"1 warning"* ]]
+}
+
+@test "doctor: a repo that diverged from its upstream warns" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_COUNTS=$'2\t1' doctor_with_git
+
+  says git "diverged from origin/main, 2 ahead and 1 behind"
+}
+
+@test "doctor: a repo ahead of its upstream is only noted" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_COUNTS=$'1\t0' doctor_with_git
+
+  [ "$status" -eq 0 ]
+  says git "1 commit ahead of origin/main"
+  [[ $output != *"warning"* ]]
+}
+
+@test "doctor: a repo level with its upstream passes, and says how fresh that is" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  doctor_with_git
+
+  [ "$status" -eq 0 ]
+  says git "level with origin/main, as of the last fetch"
+}
+
+@test "doctor: a branch without an upstream is not a failure" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_NO_UPSTREAM=1 doctor_with_git
+
+  [ "$status" -eq 0 ]
+  says git "no upstream branch"
+}
+
+@test "doctor: a comparison that could not run is a warning, never green" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_REVLIST_FAILS=1 doctor_with_git
+
+  says git "could not compare with origin/main"
+  [[ $output != *"level with"* ]]
+}
+
+@test "doctor: counts git did not print as numbers are not read as level" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+  GIT_COUNTS='garbage' doctor_with_git
+
+  says git "could not compare with origin/main"
+  [[ $output != *"level with"* ]]
+}
