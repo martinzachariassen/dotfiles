@@ -180,7 +180,8 @@ __brew_follow() {
           fail packages "$(__brew_kind "$file" "$name") $name did not install"
         fi
         if [[ $line == 'Failed to install '* ]]; then __ui_quoted "${line#*: }"; fi
-        if [[ $name == "$pkg" ]]; then pkg=''; fi
+        # The out-of-band form can name another package, or this one by its full tap name.
+        if [[ $line == 'Installing '* || ${name##*/} == "${pkg##*/}" ]]; then pkg=''; fi
         ;;
       'Installing '*)
         __brew_finish
@@ -244,7 +245,7 @@ brew_unmanaged() {
   # `cask "docker"`.
   local files named_brew named_cask formulae casks out
   files=$(cat "$DOT_ROOT/core/Brewfile" "$DOT_ROOT"/modules/*/Brewfile 2>/dev/null)
-  named_brew=$(sed -n -E 's/^brew "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
+  named_brew=$(sed -n -E 's/^brew "([^"]+)".*/\1/p' <<<"$files" | LC_ALL=C sort -u)
   named_cask=$(sed -n -E 's/^cask "([^"]*\/)?([^"]+)".*/\2/p' <<<"$files" | LC_ALL=C sort -u)
 
   [[ -n $named_brew || -n $named_cask ]] || return 2
@@ -253,7 +254,11 @@ brew_unmanaged() {
   casks=$(HOMEBREW_NO_AUTO_UPDATE=1 brew list --cask 2>/dev/null) || return 2
 
   out=$(
-    awk -F/ 'NR == FNR { named[$0]; next } NF && !($NF in named) { print "Formula", $0 }' \
+    # brew leaves prints a tap formula in full, so only a core one is matched by its bare name.
+    awk 'NR == FNR { named[$0]; n = split($0, a, "/"); base[a[n]]; next }
+      !NF { next }
+      index($0, "/") { if (!($0 in named)) print "Formula", $0; next }
+      !($0 in base) { print "Formula", $0 }' \
       <(printf '%s\n' "$named_brew") <(LC_ALL=C sort -u <<<"$formulae")
     comm -23 <(LC_ALL=C sort -u <<<"$casks") <(printf '%s\n' "$named_cask") |
       awk 'NF {print "Cask", $0}'

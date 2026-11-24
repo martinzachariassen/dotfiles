@@ -161,6 +161,18 @@ teardown() { teardown_sandbox; }
   [[ $output =~ installed\ +formula\ jq ]]
 }
 
+@test "bundle: a failure naming the package by its tap name still closes it" {
+  printf 'brew "acme/tap/tool"\n' >"$DOT_TMP/Brewfile"
+  brew_load() { return 0; }
+  brew() { printf 'Installing tool\nFailed to install acme/tap/tool: untrusted tap\n'; return 1; }
+  brew_missing() { return 2; }
+
+  run brew_bundle "$DOT_TMP/Brewfile" demo
+  [ "$status" -eq 1 ]
+  says packages 'formula acme/tap/tool did not install'
+  [[ ! $output =~ installed\ +formula\ tool ]]
+}
+
 @test "bundle: a failure brew reports first is said once, never then installed" {
   printf 'brew "acme/tap/tool"\n' >"$DOT_TMP/Brewfile"
   brew_load() { return 0; }
@@ -503,6 +515,16 @@ installed() {
   run brew_unmanaged
   [ "$status" -eq 1 ]
   [ "$output" = "Formula other/tap/stray" ]
+}
+
+@test "unmanaged: a core formula a Brewfile names does not vouch for a tap one of the same name" {
+  fixture_repo
+  printf 'brew "jq"\n' >"$DOT_TMP/repo/modules/one/Brewfile"
+  installed 'jq someone/tap/jq' ''
+
+  run brew_unmanaged
+  [ "$status" -eq 1 ]
+  [ "$output" = "Formula someone/tap/jq" ]
 }
 
 @test "unmanaged: a DISABLED module's Brewfile still counts as named" {

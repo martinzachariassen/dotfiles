@@ -295,4 +295,7 @@ remove each:
 | iOS and watchOS simulator runtimes | `xcrun simctl runtime delete <id>` |
 | Xcode | `xcodes uninstall <version>` |
 
-It stays silent on a machine that has none of them.
+It stays silent on a machine that never ran the module, even one with Xcode
+and all the rest: `uninstall.sh` calls every `remove.sh`, and Xcode is on many
+Macs for other reasons. The proof that the module ran is `~/.swift-format`
+still linked into it, since `remove` runs the hook before it takes the links.

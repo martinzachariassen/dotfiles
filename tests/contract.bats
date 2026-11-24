@@ -421,7 +421,7 @@ EOF
 
 @test "ios: all three hooks find runtimes, extensions and plugins alike" {
   local dir="$DOT_ROOT/modules/ios" key
-  for key in '^extensions=' '^coresim=' '^has_runtime()' '^installed_extensions()' \
+  for key in '^extensions=' '^coresim=' '^platforms=' '^has_runtime()' '^installed_extensions()' \
     '^plugins=' '^installed_plugins()' '^xcode_select=' '^developer=' '^xcode_ready()'; do
     [ -n "$(grep "$key" "$dir/apply.sh")" ]
     [ "$(grep "$key" "$dir/apply.sh")" = "$(grep "$key" "$dir/doctor.sh")" ]

@@ -11,6 +11,7 @@ setup() {
   mkdir -p "$BIN" "$CORESIM" "$XCODE/usr/bin"
   : >"$CALLS"
   CLAUDE="$BIN/claude"
+  CODE="$BIN/code"
   recorder code >"$BIN/code"
   recorder claude >"$CLAUDE"
   recorder xcodebuild >"$XCODE/usr/bin/xcodebuild"
@@ -32,7 +33,7 @@ hook() {
   local name=$1 dry=${2:-0}
   run env PATH="$BIN:$PATH" DOT_ROOT="$DOT_ROOT" HOME="$HOME" \
     DOT_CONFIG="$DOT_CONFIG" DOT_STATE="$DOT_STATE" DOT_DRY_RUN="$dry" \
-    DOT_CORESIM_ROOT="$CORESIM" DOT_XCODE_SELECT="$DOT_TMP/xcode-select" DOT_CLAUDE_BIN="$CLAUDE" DOT_COLUMNS=400 \
+    DOT_CORESIM_ROOT="$CORESIM" DOT_XCODE_SELECT="$DOT_TMP/xcode-select" DOT_CLAUDE_BIN="$CLAUDE" DOT_CODE_BIN="$CODE" DOT_COLUMNS=400 \
     DOT_MODULE=ios DOT_MODULE_DIR="$DOT_ROOT/modules/ios" \
     "$BASH" "$DOT_ROOT/modules/ios/$name.sh"
 }
@@ -57,6 +58,10 @@ with_plugins() {
 
 with_runtime() {
   mkdir -p "$CORESIM/Volumes/${1}_23B80/Library/Developer/CoreSimulator/Profiles/Runtimes/$1 26.1.simruntime"
+}
+
+linked_swift_format() {
+  ln -s "$DOT_ROOT/modules/ios/home/.swift-format" "$HOME/.swift-format"
 }
 
 in_registry() {
@@ -185,6 +190,24 @@ EOF
   [ "$status" -eq 0 ]
   grep -qx 'xcodebuild -downloadPlatform watchOS' "$CALLS"
   ! grep -q 'downloadPlatform iOS' "$CALLS"
+}
+
+@test "apply: without the code CLI, a dry run and a real run announce the same extensions" {
+  with_plugins swift-lsp@claude-plugins-official
+  with_runtime iOS
+  with_runtime watchOS
+  CODE="$DOT_TMP/no-code"
+  local dry
+
+  hook apply 1
+  [ "$status" -eq 0 ]
+  dry=$(grep -E 'extension +(sweetpad|swiftlang)' <<<"$output" | grep -v 'waits for')
+
+  hook apply
+  [ "$status" -ne 0 ]
+  [ -n "$dry" ]
+  [ "$dry" = "$(grep -E 'extension +(sweetpad|swiftlang)' <<<"$output" | grep -v 'waits for')" ]
+  says extension 'sweetpad.sweetpad waits for the code CLI'
 }
 
 @test "apply: a runtime under Profiles/Runtimes counts as present" {
@@ -352,7 +375,19 @@ EOF
   [ -z "$output" ]
 }
 
+@test "remove: silent on a Mac with Xcode and all of it that never enabled ios" {
+  with_extensions sweetpad.sweetpad swiftlang.swift-vscode
+  with_plugins swift-lsp@claude-plugins-official
+  with_runtime iOS
+  with_runtime watchOS
+
+  hook remove
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "remove: names what is left, and deletes none of it" {
+  linked_swift_format
   with_extensions sweetpad.sweetpad
   with_plugins swift-lsp@claude-plugins-official
   with_runtime iOS

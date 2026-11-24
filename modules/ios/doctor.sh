@@ -4,6 +4,7 @@ source "${DOT_ROOT:?}/lib/dot.sh"
 
 extensions="${DOT_MODULE_DIR:-$(dirname "$0")}/data/vscode-extensions"
 coresim=${DOT_CORESIM_ROOT:-/Library/Developer/CoreSimulator}
+platforms=(iOS watchOS)
 # Xcode 27 mounts runtimes as cryptexes under /var/run, gone until CoreSimulator mounts them; its binary plist registry persists.
 has_runtime() { compgen -G "$coresim/Volumes/*/Library/Developer/CoreSimulator/Profiles/Runtimes/$1 *.simruntime" >/dev/null || compgen -G "$coresim/Profiles/Runtimes/$1 *.simruntime" >/dev/null || grep -aqE "com\.apple\.CoreSimulator\.SimRuntime\.$1-[0-9]" "$coresim/Images/images.plist" 2>/dev/null; }
 installed_extensions() { jq -r '.[].identifier.id // empty' "$HOME/.vscode/extensions/extensions.json" 2>/dev/null | tr '[:upper:]' '[:lower:]'; }
@@ -18,7 +19,7 @@ if xcode_ready; then
   ok Xcode "${app##*/} selected"
 
   absent=()
-  for platform in iOS watchOS; do
+  for platform in "${platforms[@]}"; do
     has_runtime "$platform" || absent+=("$platform")
   done
   if ((${#absent[@]} == 0)); then
