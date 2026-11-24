@@ -164,10 +164,21 @@ excluded:
   - DerivedData
 ```
 
+`.gitignore`, for what is generated or holds this machine's paths:
+
+```gitignore
+*.xcodeproj/
+DerivedData/
+.build/
+buildServer.json
+.sweetpad/
+```
+
 Then:
 
 ```sh
 xcodegen generate     # or: SweetPad: Generate an Xcode project using XcodeGen
+sweetpad bsp init     # buildServer.json; see the next section
 code .
 ```
 
@@ -175,6 +186,44 @@ In SweetPad's sidebar, pick the `Hello` scheme and an iPhone simulator, then
 build and run. Pick `HelloWatch` and a Watch simulator for the Watch app.
 Lint warnings land in the Problems panel with the build. Tests run from
 SweetPad's Tests view.
+
+## Go to definition and autocomplete
+
+SourceKit-LSP understands a Swift package on its own, but an `.xcodeproj` only
+through a build server, which it finds as `buildServer.json` in the folder VS
+Code opened. Without that file nothing fails: autocomplete and go to definition
+work inside a local package and do nothing in the app's own files.
+
+```sh
+sweetpad bsp init     # writes buildServer.json next to the .xcodeproj
+sweetpad bsp doctor   # checks that its argv really starts a server
+```
+
+The SweetPad extension can also write it when it builds
+(`sweetpad.build.autoGenerateBuildServerConfig`), and "SweetPad: Set up Swift
+code intelligence (BSP)" does it on demand. Build once before expecting
+answers about other modules: their `.swiftmodule` comes from the build. Then
+run "Swift: Restart LSP Server", or reload the window.
+
+**The file holds absolute paths**, to the project and to the `sweetpad`
+binary, so it is ignored rather than committed. Each checkout runs `bsp init`
+once.
+
+**A project that builds into its own DerivedData has to say so.** With
+`-derivedDataPath` or `sweetpad.build.derivedDataPath` set, the server still
+hands SourceKit-LSP compiler arguments that point at Xcode's default
+DerivedData, where the project's own packages are stale or missing. `bsp
+serve` takes `--derived-data-path`, but `bsp init` does not write it, so add
+it to `argv` afterwards:
+
+```sh
+plutil -insert argv -string --derived-data-path -append buildServer.json
+plutil -insert argv -string "$PWD/build/DerivedData" -append buildServer.json
+```
+
+`plutil` rewrites the file as compact JSON, which SourceKit-LSP reads fine.
+The `swift-lsp` plugin runs the same SourceKit-LSP, so Claude Code gets go to
+definition in the app's files from the same file.
 
 ## Why the editor settings are per project
 
@@ -206,6 +255,13 @@ a signing team. A free Apple ID works for running on your own devices, and a
 paid membership is only needed to ship. A Watch app installs through the
 iPhone it is paired with.
 
+**Signing is the one step that needs Xcode's window.** `xcodebuild
+-allowProvisioningUpdates` creates certificates and profiles only for an
+account added under Xcode > Settings > Accounts, so sign in there once. The
+alternative is an App Store Connect API key (`-authenticationKeyPath`), which
+needs the paid membership. `sweetpad device info` then says whether a device
+is ready to build to.
+
 ## What `doctor` checks, and what `remove` does
 
 `doctor.sh` checks the four things that fail without saying so:
@@ -214,7 +270,10 @@ iPhone it is paired with.
   `xcode-select -p` keeps printing a path after the app is deleted, so it also
   checks that `xcodebuild` exists there.
 - An iOS and a watchOS simulator runtime are on disk. Without one, SweetPad
-  simply lists no destination.
+  simply lists no destination. Older Xcodes leave a `.simruntime` under
+  `/Library/Developer/CoreSimulator`. Xcode 27 mounts each runtime as a
+  cryptex under `/var/run`, which is empty until CoreSimulator mounts it, so
+  the check also reads the registry in `CoreSimulator/Images/images.plist`.
 - Both extensions are installed in VS Code.
 - `swift-lsp` is installed in Claude Code at user scope. Without it, Claude
   edits Swift blind and offers the plugin again. With no `claude` CLI at all it

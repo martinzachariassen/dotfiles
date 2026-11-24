@@ -59,6 +59,12 @@ with_runtime() {
   mkdir -p "$CORESIM/Volumes/${1}_23B80/Library/Developer/CoreSimulator/Profiles/Runtimes/$1 26.1.simruntime"
 }
 
+in_registry() {
+  mkdir -p "$CORESIM/Images"
+  printf 'bplist00\0' >"$CORESIM/Images/images.plist"
+  printf 'com.apple.CoreSimulator.SimRuntime.%s\0' "$@" >>"$CORESIM/Images/images.plist"
+}
+
 @test "apply: installs only the extensions VS Code does not have" {
   with_extensions swiftlang.swift-vscode
   with_runtime iOS
@@ -191,6 +197,27 @@ EOF
   [ ! -s "$CALLS" ]
 }
 
+@test "apply: a runtime listed only in the Images registry counts as present" {
+  with_extensions sweetpad.sweetpad swiftlang.swift-vscode
+  with_plugins swift-lsp@claude-plugins-official
+  in_registry iOS-27-2 watchOS-27-2
+
+  hook apply
+  [ "$status" -eq 0 ]
+  [ ! -s "$CALLS" ]
+}
+
+@test "apply: a watchOS entry in the Images registry is not taken for iOS" {
+  with_extensions sweetpad.sweetpad swiftlang.swift-vscode
+  with_plugins swift-lsp@claude-plugins-official
+  in_registry watchOS-27-2
+
+  hook apply
+  [ "$status" -eq 0 ]
+  grep -qx 'xcodebuild -downloadPlatform iOS' "$CALLS"
+  ! grep -q 'downloadPlatform watchOS' "$CALLS"
+}
+
 @test "apply: a failed runtime download is a failure, not a pass" {
   with_extensions sweetpad.sweetpad swiftlang.swift-vscode
   with_runtime iOS
@@ -247,6 +274,16 @@ EOF
   hook doctor
   [ "$status" -ne 0 ]
   says runtimes 'no watchOS simulator'
+}
+
+@test "doctor: runtimes known only to the Images registry are present" {
+  with_extensions sweetpad.sweetpad swiftlang.swift-vscode
+  with_plugins swift-lsp@claude-plugins-official
+  in_registry iOS-27-2-iPhone19-4 watchOS-27-2
+
+  hook doctor
+  [ "$status" -eq 0 ]
+  says runtimes 'iOS and watchOS simulators present'
 }
 
 @test "doctor: the Command Line Tools alone are a failure, and runtimes are not called green" {
