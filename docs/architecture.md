@@ -359,7 +359,10 @@ buffer until the answer supplies one.
 The count in that last line is the count of the lines under it: a hook is a
 separate process, so its findings reach the driver as records rather than as an
 exit status, and three problems in one hook are counted as three. `dot doctor
---verbose` prints every check, passed ones included. `NO_COLOR` turns colour
+--verbose` prints every check, passed ones included. `dot doctor --fetch` runs
+`git fetch` first, announced, and warns instead of dying when the remote cannot
+be reached; without it the repo check compares against the last fetch and
+writes nothing. `NO_COLOR` turns colour
 off; a locale that is not UTF-8, or `DOT_ASCII=1`, falls back to ASCII markers
 of the same width. `dot --help` lists all of these, with the enabled modules.
 

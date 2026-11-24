@@ -68,6 +68,7 @@ usage() {
   __opt --init 'write it for the first time, through the picker'
   say doctor 'Check this Mac against the repo. Never changes anything.'
   __opt --verbose 'every check, including the ones that passed'
+  __opt --fetch 'git fetch first, so the repo check sees what origin has now'
 
   heading 'Reading the output'
   ui_legend
@@ -154,10 +155,13 @@ __help() {
       say 'asks for a profile and modules, and writes it.'
       ;;
     doctor)
-      heading 'dot doctor' '[--verbose]'
+      heading 'dot doctor' '[--verbose] [--fetch]'
       say 'Checks, read-only, that this Mac still matches the repo: packages, links,'
       say 'what each module'"'"'s doctor.sh asks, stale links, and packages no'
       say 'Brewfile names. A healthy module is one line naming what it checked.'
+      heading 'Options'
+      ui_row 14 --verbose 'every check, including the ones that passed'
+      ui_row 14 --fetch 'git fetch first; the one write, and only inside .git'
       ;;
   esac
   printf '\n'
@@ -625,15 +629,25 @@ __unmanaged_report() {
   esac
 }
 
+__fetch() {
+  local repo=${DOT_ROOT/#$HOME/\~}
+  info fetch "git fetch in $repo"
+  if ! GIT_TERMINAL_PROMPT=0 git -C "$DOT_ROOT" fetch --quiet 2>&1 | ui_quote; then
+    warn fetch 'could not reach the remote -- comparing against the last fetch'
+  fi
+}
+
 cmd_doctor() {
+  local fetch=0
   while (($#)); do
     case $1 in
       -v | --verbose) export DOT_VERBOSE=1 ;;
+      --fetch) fetch=1 ;;
       -h | --help)
         __help doctor
         return 0
         ;;
-      *) die "doctor: unknown option '$1'" next 'dot doctor [--verbose]' ;;
+      *) die "doctor: unknown option '$1'" next 'dot doctor [--verbose] [--fetch]' ;;
     esac
     shift
   done
@@ -642,6 +656,7 @@ cmd_doctor() {
     die 'There is no config yet' \
       config "${DOT_CONFIG/#$HOME/\~}" next 'dot config --init'
 
+  if ((fetch)); then __fetch; fi
   run_checks 'Checking'
 
   heading 'Result'

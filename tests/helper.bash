@@ -89,3 +89,20 @@ pass_core_checks() {
   DOT_DRY_RUN=0 bash "$DOT_ROOT/core/apply.sh" >/dev/null
   export PATH="$HOME/.local/bin:$PATH"
 }
+
+with_git() {
+  mkdir -p "$DOT_TMP/stub"
+  cat >"$DOT_TMP/stub/git" <<STUB
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >>"$DOT_TMP/git-calls"
+case "\$*" in
+  *"status --porcelain"*) printf '%s' "${GIT_DIRTY:-}" ;;
+  *"pull --ff-only"*) echo "pulling"; exit ${GIT_PULL:-0} ;;
+  *"fetch"*) exit ${GIT_FETCH:-0} ;;
+  *"--abbrev-ref"*) [[ -n "${GIT_NO_UPSTREAM:-}" ]] && exit 1; echo origin/main ;;
+  *"rev-list"*) [[ -n "${GIT_REVLIST_FAILS:-}" ]] && exit 1; printf '%s\\n' "${GIT_COUNTS:-0	0}" ;;
+esac
+STUB
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
+  chmod +x "$DOT_TMP/stub/git" "$DOT_TMP/stub/brew"
+}

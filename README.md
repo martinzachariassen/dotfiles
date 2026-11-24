@@ -158,6 +158,7 @@ dot config             Open the config file in $EDITOR
 dot config --init      Create it for the first time (runs the wizard)
 dot doctor             Check this machine; read-only
 dot doctor --verbose   The same, including every check that passed
+dot doctor --fetch     The same, after a git fetch, so it sees what origin has now
 dot <command> --help   One command in full; dot --help lists the modules
 ```
 
@@ -173,6 +174,9 @@ dot apply --pull
 
 It refuses over uncommitted changes and only fast-forwards, then hands over to
 the `dot` it just pulled.
+
+`dot doctor` warns when the checkout is behind its upstream. It compares
+against the last fetch and writes nothing; `dot doctor --fetch` fetches first.
 
 This updates the *configuration*, not the packages. `apply` runs
 `brew bundle --no-upgrade`, so a package a Brewfile gained arrives and a newer
