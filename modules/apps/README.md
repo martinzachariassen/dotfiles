@@ -35,8 +35,8 @@ reports the ones that never were:
 
 Four rules keep it from becoming a permanently yellow line:
 
-- **Only apps that do nothing until running.** Chrome and VS Code are opened
-  when you want them; they are not listed.
+- **Only apps that do nothing until running.** VS Code is opened when you
+  want it; it is not listed.
 - **A row is silent when the app is not installed.** Dropping the cask from
   `Brewfile` is the escape hatch for an app you decided against. Column 2 names
   that cask, and `tests/contract.bats` holds the two files together.

@@ -219,7 +219,7 @@ is never half-enabled.
 | `dev-cli` | [CLI tools and mise-managed language runtimes](modules/dev-cli/README.md) |
 | `ios` | [iPhone and Apple Watch apps from VS Code](modules/ios/README.md): Xcode toolchain, simulators, SweetPad, SwiftLint, Swift in Claude Code |
 | `macos-defaults` | [Dock, Finder, keyboard, screenshots, locale units](modules/macos-defaults/README.md), set imperatively with no files at all |
-| `apps` | [GUI casks and fonts](modules/apps/README.md): Raycast, Chrome, VS Code and more, plus which of them have never been opened |
+| `apps` | [GUI casks and fonts](modules/apps/README.md): Raycast, VS Code and more, plus which of them have never been opened |
 
 ### Package sets
 
