@@ -160,9 +160,9 @@ wrong produces a clean bill of health rather than a wrong line.
 
 ## The default browser
 
-`apps` installs Chrome; nothing makes it the browser. Every link opens in
-Safari until someone clicks through a confirmation sheet, and no script may
-click it — that sheet is the whole security property.
+Nothing makes another browser the default. Every link opens in Safari until
+someone clicks through a confirmation sheet, and no script may click it — that
+sheet is the whole security property.
 
 So it is reported, from the LaunchServices handler for `https`, against the
 `browser` setting. The setting is also the escape hatch: `browser = ""` says
