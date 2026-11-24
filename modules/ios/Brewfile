@@ -1,0 +1,9 @@
+brew "sweetpad-dev/tap/sweetpad", trusted: true
+brew "xcodes"
+brew "aria2"
+brew "xcodegen"
+# Homebrew refuses swiftlint without a full Xcode, bottle or not; doctor asks for it once one exists.
+brew "swiftlint" if Dir.glob("/Applications/Xcode*.app").any?
+brew "xcbeautify"
+brew "jq"
+cask "visual-studio-code"

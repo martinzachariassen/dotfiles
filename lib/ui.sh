@@ -428,7 +428,7 @@ ui_live_group() {
 
 # Reads what every group's changes were, from the tally file, as one line.
 ui_changes() {
-  local file=$1 label word n=0 casks=0 formulae=0 runtimes=0 links=0 moved=0 written=0 part
+  local file=$1 label word n=0 casks=0 formulae=0 runtimes=0 extensions=0 plugins=0 links=0 moved=0 written=0 part
   local -A other=()
   local -a parts=() order=()
   [[ -f $file ]] || return 0
@@ -442,6 +442,8 @@ ui_changes() {
       backup) moved=$((moved + 1)) ;;
       write) written=$((written + 1)) ;;
       runtime) runtimes=$((runtimes + 1)) ;;
+      extension) extensions=$((extensions + 1)) ;;
+      plugin) plugins=$((plugins + 1)) ;;
       *)
         [[ -n ${other[$label]:-} ]] || order+=("$label")
         other[$label]=$((${other[$label]:-0} + 1))
@@ -453,6 +455,8 @@ ui_changes() {
   ((casks)) && parts+=("$(ui_count "$casks" cask)")
   ((formulae)) && parts+=("$(ui_count "$formulae" formula)")
   ((runtimes)) && parts+=("$(ui_count "$runtimes" runtime)")
+  ((extensions)) && parts+=("$(ui_count "$extensions" extension)")
+  ((plugins)) && parts+=("$(ui_count "$plugins" plugin)")
   ((links)) && parts+=("$(ui_count "$links" link)")
   ((written)) && parts+=("$(ui_count "$written" file) written")
   ((moved)) && parts+=("$moved moved to backups")

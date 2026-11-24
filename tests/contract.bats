@@ -156,7 +156,7 @@ teardown() { teardown_sandbox; }
   local f fm bad=()
   while IFS= read -r f; do
     case $f in
-      *.json) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
+      *.json | */.swift-format) json_parses "$f" || bad+=("$f -- not JSON or JSONC") ;;
       *.toml | */mise.lock) taplo check "$f" >/dev/null 2>&1 || bad+=("$f -- not TOML") ;;
       *.yaml | *.yml) dasel -i yaml -o json '' <"$f" >/dev/null 2>&1 || bad+=("$f -- not YAML") ;;
       *.tsv) awk -F'\t' '/^#/ || NF == 0 { next } NF < 4 || NF > 6 { exit 1 }' "$f" || bad+=("$f -- not a 4-to-6-column TSV") ;;
@@ -417,6 +417,16 @@ EOF
     cat "$ran"
     return 1
   }
+}
+
+@test "ios: all three hooks find runtimes, extensions and plugins alike" {
+  local dir="$DOT_ROOT/modules/ios" key
+  for key in '^extensions=' '^coresim=' '^platforms=' '^has_runtime()' '^installed_extensions()' \
+    '^plugins=' '^installed_plugins()' '^xcode_select=' '^developer=' '^xcode_ready()'; do
+    [ -n "$(grep "$key" "$dir/apply.sh")" ]
+    [ "$(grep "$key" "$dir/apply.sh")" = "$(grep "$key" "$dir/doctor.sh")" ]
+    [ "$(grep "$key" "$dir/apply.sh")" = "$(grep "$key" "$dir/remove.sh")" ]
+  done
 }
 
 @test "containers: apply.sh and remove.sh agree on the docker plugins" {

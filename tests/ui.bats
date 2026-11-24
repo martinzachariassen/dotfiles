@@ -420,6 +420,12 @@ record_line() {
   [ "$output" = $'7\t1 cask - 1 formula - 2 links - 1 file written - 1 moved to backups - 1 chmod' ]
 }
 
+@test "changes: runtimes, extensions and plugins are plural like packages" {
+  printf 'runtime\tiOS simulator\nruntime\twatchOS simulator\nextension\ta.b\nextension\tc.d\nplugin\te@f\nplugin\tg@h\n' >"$DOT_TMP/tally"
+  run env DOT_ASCII=1 bash -c "source '$DOT_ROOT/lib/ui.sh'; ui_changes '$DOT_TMP/tally'"
+  [ "$output" = $'6\t2 runtimes - 2 extensions - 2 plugins' ]
+}
+
 @test "changes: a run that changed nothing has no line at all" {
   : >"$DOT_TMP/tally"
   run ui_changes "$DOT_TMP/tally"
