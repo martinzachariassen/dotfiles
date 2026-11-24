@@ -61,20 +61,6 @@ dot() { run "$DOT_ROOT/bin/dot" "$@"; }
   [ ! -e "$HOME/.local/bin/dot" ]
 }
 
-with_git() {
-  mkdir -p "$DOT_TMP/stub"
-  cat >"$DOT_TMP/stub/git" <<STUB
-#!/usr/bin/env bash
-printf '%s\\n' "\$*" >>"$DOT_TMP/git-calls"
-case "\$*" in
-  *"status --porcelain"*) printf '%s' "${GIT_DIRTY:-}" ;;
-  *"pull --ff-only"*) echo "pulling"; exit ${GIT_PULL:-0} ;;
-esac
-STUB
-  printf '#!/usr/bin/env bash\nexit 0\n' >"$DOT_TMP/stub/brew"
-  chmod +x "$DOT_TMP/stub/git" "$DOT_TMP/stub/brew"
-}
-
 pull_apply() {
   run env PATH="$DOT_TMP/stub:$HOME/.local/bin:$PATH" "$DOT_ROOT/bin/dot" apply "$@"
 }
@@ -672,4 +658,56 @@ staged_git() {
   kept=$(find "$DOT_STATE/logs" -name '*.log' | wc -l | tr -d ' ')
   [ "$kept" -eq 20 ]
   [ -f "$DOT_STATE/logs/$DOT_RUN_ID-add.log" ]
+}
+
+doctor_fetch() {
+  with_git
+  run env PATH="$DOT_TMP/stub:$PATH" "$DOT_ROOT/bin/dot" doctor "$@"
+}
+
+@test "doctor --fetch: fetches once, before the checks, and says so" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+
+  doctor_fetch --fetch
+  [ "$(grep -c 'fetch' "$DOT_TMP/git-calls")" -eq 1 ]
+  says fetch "git fetch in"
+  [[ $output == *"fetch"*"Checking"* ]]
+}
+
+@test "doctor --fetch: a remote that cannot be reached warns and the checks still run" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+
+  GIT_FETCH=1 doctor_fetch --fetch
+  says fetch "could not reach the remote"
+  [[ $output == *"Checking"* ]]
+  [[ $output == *"Result"* ]]
+}
+
+@test "doctor: without --fetch git is never asked to fetch" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+
+  doctor_fetch
+  ! grep -q 'fetch' "$DOT_TMP/git-calls"
+}
+
+@test "doctor: an option it does not know is fatal and fetches nothing" {
+  config_generate "A" "a@b.c" ""
+  pass_core_checks
+
+  doctor_fetch --fech
+  [ "$status" -ne 0 ]
+  [[ $output == *"unknown option '--fech'"* ]]
+  [ ! -e "$DOT_TMP/git-calls" ]
+}
+
+@test "doctor --help: explains --fetch and acts on nothing" {
+  config_generate "A" "a@b.c" ""
+
+  doctor_fetch --fetch --help
+  [ "$status" -eq 0 ]
+  [[ $output == *"--fetch"* ]]
+  [ ! -e "$DOT_TMP/git-calls" ]
 }
