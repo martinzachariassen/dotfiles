@@ -2,15 +2,39 @@
   "$schema": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",
   "schemaVersion": 1,
 
-  // Subtle divider between split panes in the same window, brighter ring
-  // around the focused one.
-  "paneBorderColor": "#3A3A3A",
-  "activePaneBorderColor": "#5E9EFF",
-
   "app": {
     // Agent sessions resume on launch, so quitting loses little.
     "confirmQuit": "dirty-only",
-    "sendAnonymousTelemetry": false
+    "sendAnonymousTelemetry": false,
+    "accentColor": "system",
+    "equalizeSplitsOnCreate": true,
+    "defaultWorkspacePath": "~/Developer"
+  },
+
+  "terminal": {
+    // Option sends no Esc (macos-option-as-alt = false keeps it for the
+    // Norwegian letters), so word movement has to come from here.
+    "textEditingGestures": true,
+    "copyOnSelect": true,
+    "confirmUnsafePaste": true,
+    "agentHibernation": { "enabled": true },
+    "runawayMemoryGuardrail": { "enabled": true }
+  },
+
+  "sidebar": {
+    "showAgentUsage": true
+  },
+
+  "workspaceGroups": {
+    "byCwd": {
+      "~/Developer/personal": { "color": "#1565C0", "icon": "person.fill" },
+      "~/Developer/learning": { "color": "#196F3D", "icon": "book.fill" },
+      "~/Developer/work": { "color": "#A04000", "icon": "briefcase.fill" }
+    }
+  },
+
+  "browser": {
+    "defaultSearchEngine": "duckduckgo"
   },
 
   // agentPermissionPrompt stays on: it is the one alert that means an agent
