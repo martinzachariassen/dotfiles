@@ -5,5 +5,6 @@ brew "xcodegen"
 # Homebrew refuses swiftlint without a full Xcode, bottle or not; doctor asks for it once one exists.
 brew "swiftlint" if Dir.glob("/Applications/Xcode*.app").any?
 brew "xcbeautify"
+brew "xcode-build-server"
 brew "jq"
 cask "visual-studio-code"
