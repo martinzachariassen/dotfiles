@@ -15,6 +15,7 @@ not the editor: nothing in the daily loop below opens it.
 | The `.xcodeproj`, generated from YAML | [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | Formatting | `swift-format`, bundled with Xcode; SweetPad's default |
 | Linting | [SwiftLint](https://github.com/realm/SwiftLint), as a build plugin per project, and as a CLI once Xcode is installed |
+| `buildServer.json` for an `.xcodeproj` outside SweetPad | [xcode-build-server](https://github.com/SolaWing/xcode-build-server) |
 | Readable build logs | `xcbeautify`, which SweetPad pipes through when it is installed |
 | Installing and switching Xcode | [xcodes](https://github.com/XcodesOrg/xcodes), with `aria2` for parallel downloads |
 | Swift in Claude Code: diagnostics, go-to-definition | the `swift-lsp` plugin (`swift-lsp@claude-plugins-official`), on Xcode's `sourcekit-lsp` |
@@ -198,6 +199,9 @@ work inside a local package and do nothing in the app's own files.
 sweetpad bsp init     # writes buildServer.json next to the .xcodeproj
 sweetpad bsp doctor   # checks that its argv really starts a server
 ```
+
+`xcode-build-server config -project <name>.xcodeproj -scheme <scheme>` writes
+the same file without SweetPad, for a project opened in another editor.
 
 The SweetPad extension can also write it when it builds
 (`sweetpad.build.autoGenerateBuildServerConfig`), and "SweetPad: Set up Swift
